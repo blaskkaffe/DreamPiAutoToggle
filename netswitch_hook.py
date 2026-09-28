@@ -63,6 +63,16 @@ def _select_dcnet(on):
         os.remove(FLAG)
 
 
+def _special(raw_string):
+    """Which special number was dialed, matched on the last seven digits.
+    DreamPi often hears an extra leading digit (e.g. 13333333), and ISP
+    settings may add a prefix or area code, so exact matching is unreliable."""
+    for number in (NUM_OPENMENU, NUM_DCNOW, NUM_DCNET):
+        if raw_string.endswith(number):
+            return number
+    return None
+
+
 def _patch(module):
     cls = getattr(module, "Netlink", None)
     original = getattr(cls, "check_number", None) if cls is not None else None
@@ -73,17 +83,18 @@ def _patch(module):
         return
 
     def check_number(self, raw_string):
+        special = _special(raw_string)
         # Special numbers: remember the choice before DreamPi routes the call
         try:
-            if raw_string == NUM_DCNOW:
+            if special == NUM_DCNOW:
                 _select_dcnet(False)
-                _log(self, "2222222 dialed, DC Now selected")
-            elif raw_string == NUM_DCNET:
+                _log(self, "%s dialed, DC Now selected" % raw_string)
+            elif special == NUM_DCNET:
                 _select_dcnet(True)
-                _log(self, "3333333 dialed, DCNet selected")
-            elif raw_string == NUM_OPENMENU and os.path.exists(AUTORESET) and os.path.exists(FLAG):
+                _log(self, "%s dialed, DCNet selected" % raw_string)
+            elif special == NUM_OPENMENU and os.path.exists(AUTORESET) and os.path.exists(FLAG):
                 _select_dcnet(False)
-                _log(self, "1111111 dialed with reset on, back to DC Now")
+                _log(self, "%s dialed with reset on, back to DC Now" % raw_string)
         except Exception as e:
             _log(self, "could not update selection: %s" % e)
 
@@ -92,7 +103,7 @@ def _patch(module):
         try:
             if not (isinstance(result, dict) and result.get("client") == "PPP"):
                 return result  # Netlink, XBAND, *69 and idle are left alone
-            if raw_string in (NUM_OPENMENU, NUM_DCNOW):
+            if special in (NUM_OPENMENU, NUM_DCNOW):
                 return result  # always DC Now
             if os.path.exists(FLAG):
                 if getattr(self, "dcnet", False):

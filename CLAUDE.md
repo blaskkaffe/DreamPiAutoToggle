@@ -20,13 +20,15 @@
 - If upstream renames `check_number`, the hook writes an error to the status file and does nothing, and DreamPi keeps working.
 
 ## Routing rules (see README table)
-Only calls the original `check_number` returns as `PPP` are redirected. `1111111` and `2222222` always stay PPP. `3333333`, or any number while `dcnet_mode` exists, becomes `dcnet` if `self.dcnet` is true.
+Special numbers are matched with `endswith()` on the dialed string: on real hardware DreamPi hears an extra leading `1` (e.g. `13333333`, `11111111`), and ISP prefixes add digits too. Only calls the original `check_number` returns as `PPP` are redirected. Numbers ending in `1111111` or `2222222` always stay PPP. `3333333`, or any number while `dcnet_mode` exists, becomes `dcnet` if `self.dcnet` is true.
 
 ## Testing without a Pi
 Download the current `netlink.py`, place it at `/home/pi/dreampi/netlink.py`, stub the `serial`, `stun` and `sh` modules, load the `.pth` with `site.addsitedir()`, create the object with `Netlink.__new__(Netlink)`, set `logger`, `servers`, `dcnet`, `dial_modifier` and `mode`, then call `check_number()` for each rule. Also check that `netlink.py`'s hash is unchanged afterwards.
 
+## Verified on hardware
+- The hook loads and patches under DreamPi's real Python 2.7.
+
 ## Not yet verified
-- Running under real Python 2.7 on a Pi.
 - A real DCNet call end to end.
 - Whether port 80 is free on every DreamPi image.
 

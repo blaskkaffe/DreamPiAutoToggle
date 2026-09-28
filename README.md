@@ -15,7 +15,7 @@ Netlink/XBAND dial codes and DreamPi's built-in `*69` prefix are not affected. I
 
 Setting a game's or the browser's ISP number to `333-3333` makes it always use DCNet. Other numbers follow the website.
 
-The special numbers must arrive exactly as those seven digits. An area code, outside-line digit or dial prefix set in the ISP settings becomes part of the number, and then the call just follows the selected network. (DreamPi's own `*69` prefix still works and still means "this call to DCNet".)
+The special numbers are matched on their last seven digits, so a leading `1`, an area code or an outside-line digit doesn't matter (DreamPi often hears an extra leading `1`, for example `13333333`). DreamPi's own `*69` prefix still works and still means "this call to DCNet".
 
 ## Web page
 
