@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 # DreamPi Netswitch add-on - web page to choose DC Now or DCNet.
 # It only creates/removes the files that netswitch_hook.py reads.
+# Works on Python 3 and 2.7.
 import os
+import re
 import sys
-from http.server import BaseHTTPRequestHandler, HTTPServer
+
+try:
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+except ImportError:
+    from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
@@ -40,24 +46,55 @@ PAGE = """<!doctype html>
 </body></html>"""
 
 
-def hook_status():
+def hook_problem():
+    """None when DreamPi is running with the hook loaded, else a reason."""
     try:
         with open(STATUS) as f:
-            return f.read().strip()
+            status = f.read().strip()
     except IOError:
-        return ""
+        return "DreamPi has not loaded the add-on yet (restart DreamPi or reboot)"
+    if not status.startswith("active"):
+        return status
+    m = re.search(r"pid=(\d+)", status)
+    if m and not os.path.exists("/proc/" + m.group(1)):
+        return "DreamPi is not running"
+    return None
+
+
+def dcnet_problem():
+    """None when DreamPi's DCNet support is switched on, else a reason."""
+    if os.path.exists("/boot/noautoupdates.txt"):
+        return ("/boot/noautoupdates.txt exists, so DreamPi skips netlink_config.ini "
+                "and DCNet stays off")
+    for path in ("/boot/netlink_config.ini", "/home/pi/dreampi/netlink_config.ini"):
+        if os.path.isfile(path):
+            break
+    else:
+        return "netlink_config.ini not found, so DCNet is off"
+    try:
+        with open(path) as f:
+            text = f.read()
+    except IOError:
+        return "could not read " + path
+    section = re.search(r"^\[DCNet\](.*?)(?=^\[|\Z)", text, re.M | re.S)
+    if not section or not re.search(r"^\s*enabled\s*=\s*yes\s*$", section.group(1), re.M):
+        return "DCNet is not enabled in " + path + " ([DCNet] enabled = yes)"
+    return None
 
 
 class Handler(BaseHTTPRequestHandler):
     def send_page(self):
         dcnet = os.path.exists(FLAG)
         reset = os.path.exists(AUTORESET)
-        status = hook_status()
         warning = ""
-        if status != "active":
-            detail = status or "DreamPi has not loaded the add-on yet (restart DreamPi or reboot)"
-            warning = ('<div class="warn"><b>Add-on not active:</b> %s. '
-                       'Calls are not affected until it is.</div>' % detail)
+        problem = hook_problem()
+        if problem:
+            warning += ('<div class="warn"><b>Add-on not active:</b> %s. '
+                        'Calls are not affected until it is.</div>' % problem)
+        problem = dcnet_problem()
+        if problem:
+            warning += ('<div class="warn"><b>DCNet unavailable:</b> %s. '
+                        'All calls go to DC Now.</div>' % problem)
         body = PAGE.format(active="DCNet" if dcnet else "DC Now",
                            color="#1c4f9e" if dcnet else "#9e4f10",
                            box="&#9745;" if reset else "&#9744;",

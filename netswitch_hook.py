@@ -30,10 +30,12 @@ NUM_OPENMENU = "1111111"
 NUM_DCNOW = "2222222"
 NUM_DCNET = "3333333"
 
+# __builtin__ first: on Python 2 the "future" package can provide a fake
+# "builtins" module, and patching that would do nothing.
 try:
-    import builtins as _builtins  # Python 3
-except ImportError:
     import __builtin__ as _builtins  # Python 2
+except ImportError:
+    import builtins as _builtins  # Python 3
 
 _original_import = _builtins.__import__
 _done = [False]
@@ -105,7 +107,7 @@ def _patch(module):
 
     check_number._netswitch = True
     cls.check_number = check_number
-    _write_status("active")
+    _write_status("active pid=%d" % os.getpid())
 
 
 def _import_hook(name, *args, **kwargs):
@@ -123,9 +125,19 @@ def _import_hook(name, *args, **kwargs):
     return module
 
 
+def _is_dreampi_process():
+    # sys.argv does not exist yet when Python 2 processes .pth files, so the
+    # command line is read from /proc instead. If that fails, hook anyway:
+    # the hook only reacts to netlink.py from /home/pi/dreampi.
+    try:
+        with open("/proc/self/cmdline", "rb") as f:
+            return b"dreampi" in f.read()
+    except Exception:
+        return True
+
+
 try:
-    # Cheap for other programs: only reacts to a module named "netlink"
-    # loaded from /home/pi/dreampi, then removes itself.
-    _builtins.__import__ = _import_hook
+    if _is_dreampi_process():
+        _builtins.__import__ = _import_hook
 except Exception:
     pass

@@ -7,8 +7,9 @@
 
 ## How it works
 - `install.sh` copies files to `/opt/dreampi-netswitch`, writes `dreampi_netswitch.pth` into site-packages for `python`, `python2` and `python3` (the list is kept in `pth_locations`), creates and starts the `dreampi-netswitch` systemd service (web page), and restarts the `dreampi` service.
-- The `.pth` file imports `netswitch_hook`, which temporarily wraps `builtins.__import__`. When a module named `netlink` is imported from `/home/pi/dreampi`, it wraps `Netlink.check_number()` and then restores the original `__import__`. Every other program is left alone.
-- State lives in files: `/opt/dreampi-netswitch/dcnet_mode` (exists means DCNet is selected) and `/opt/dreampi-netswitch/autoreset` (reset toggle). The hook writes `/tmp/dreampi-netswitch.active` (`active` or an error), which the web page shows.
+- The `.pth` file imports `netswitch_hook`. It only acts when `/proc/self/cmdline` contains `dreampi` (`sys.argv` doesn't exist yet during `.pth` processing on Python 2). It then temporarily wraps `__import__`, using `__builtin__` before `builtins` because python-future can provide a fake `builtins` on Python 2. When a module named `netlink` is imported from `/home/pi/dreampi`, it wraps `Netlink.check_number()` and restores the original `__import__`.
+- State lives in files: `/opt/dreampi-netswitch/dcnet_mode` (exists means DCNet is selected) and `/opt/dreampi-netswitch/autoreset` (reset toggle). The hook writes `/tmp/dreampi-netswitch.active` (`active pid=N` or an error). The web page checks that pid under `/proc`, and also reads `netlink_config.ini` and `/boot/noautoupdates.txt` to warn when DCNet is off.
+- The web page works on Python 3 and 2.7.
 
 ## Upstream facts the hook depends on (netlink.py, dpi2 branch)
 - `check_number(self, raw_string)` returns `{'client': mode, 'dial_string': ...}`. `dreampi.py` answers with its own pppd only when `client == 'PPP'`. Any other non-idle mode is handled by `Netlink.poll()` -> `mode_handler()`.

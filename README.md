@@ -15,6 +15,8 @@ Netlink/XBAND dial codes and DreamPi's built-in `*69` prefix are not affected. I
 
 Setting a game's or the browser's ISP number to `333-3333` makes it always use DCNet. Other numbers follow the website.
 
+The special numbers must arrive exactly as those seven digits. An area code, outside-line digit or dial prefix set in the ISP settings becomes part of the number, and then the call just follows the selected network. (DreamPi's own `*69` prefix still works and still means "this call to DCNet".)
+
 ## Web page
 
 `http://dreampi.local` shows the selected network, buttons for **Use DC Now** / **Use DCNet**, and the **reset on openMenu connect** toggle (off by default).
@@ -49,6 +51,6 @@ sudo /opt/dreampi-netswitch/uninstall.sh
 
 ## Checking it works
 
-- The web page shows a red **Add-on not active** box if DreamPi has not loaded the hook.
+- The web page shows a red **Add-on not active** box if DreamPi has not loaded the hook or is not running, and a **DCNet unavailable** box if DreamPi's DCNet support is switched off.
 - `sudo grep netswitch /var/log/messages` shows lines like `netswitch: routing 5551234 to DCNet`.
-- `cat /tmp/dreampi-netswitch.active` should say `active`.
+- `cat /tmp/dreampi-netswitch.active` should say `active pid=<DreamPi's process id>`.
