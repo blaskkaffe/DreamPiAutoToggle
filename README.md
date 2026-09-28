@@ -83,6 +83,7 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 - **Status LED:**
   - **Brightness** of the NeoPixel, 0 to 100% (default 8%). The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
   - A **colour** and **blink** setting for every DreamPi status, set separately for when DCNow! is selected and when DCNET is selected. For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
+  - A **level** (brightness) per status and network. Grey means the status uses the base brightness; tap it to give that status its own brightness with a slider, and tap **Use base** to go back. For example, "Ready for calls" can glow at 2% while "DreamPi not running" is brighter.
   - **Reset LED settings to defaults** restores the table below.
 
   The status dot on the page uses the same colours, so it works as a preview even without an LED.

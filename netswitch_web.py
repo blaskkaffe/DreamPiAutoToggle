@@ -212,7 +212,7 @@ except NameError:
 
 def default_led_config():
     return {"brightness": 0.08,
-            "colours": dict((net, dict((st, {"color": c, "blink": b})
+            "colours": dict((net, dict((st, {"color": c, "blink": b, "brightness": None})
                                        for st, (c, b) in _DEFAULT_COLOURS.items()))
                             for net in NETWORKS)}
 
@@ -240,6 +240,9 @@ def clean_led_config(data):
                     cfg["colours"][net][st]["color"] = entry["color"].lower()
                 if isinstance(entry.get("blink"), bool):
                     cfg["colours"][net][st]["blink"] = entry["blink"]
+                level = entry.get("brightness")   # None = use the base brightness
+                if isinstance(level, (int, float)) and not isinstance(level, bool):
+                    cfg["colours"][net][st]["brightness"] = min(1.0, max(0.0, float(level)))
     return cfg
 
 
@@ -261,13 +264,16 @@ def save_led_config(data):
 
 
 def status_look(state=None):
-    """Colour and blink for the current DreamPi state and selected network,
-    shared by the page's status dot and the NeoPixel."""
+    """Colour, blink and effective brightness for the current DreamPi state
+    and selected network, shared by the page's status dot and the NeoPixel."""
     if state is None:
         state = dreampi_state()[0]
     net = "dcnet" if os.path.exists(FLAG) else "dcnow"
-    colours = led_config()["colours"][net]
-    return colours.get(state, colours["unknown"])
+    cfg = led_config()
+    look = dict(cfg["colours"][net].get(state, cfg["colours"][net]["unknown"]))
+    if look.get("brightness") is None:
+        look["brightness"] = cfg["brightness"]
+    return look
 
 
 def api_state():
@@ -348,8 +354,14 @@ PAGE = u"""<!doctype html>
  .ledtab th{color:var(--muted);font-size:.9em;border-top:0;padding-bottom:0;text-align:center}
  .ledtab th.h2{font-size:.75em;padding:2px 3px 8px} .ledtab th:first-child{text-align:left}
  .ledtab tbody tr:first-child td{border-top:1px solid var(--line)}
- .ledtab .cell{white-space:nowrap;text-align:center;width:1%;padding:8px 10px}
- .ledtab .cell > *{margin:0 4px}
+ .ledtab .cell{white-space:nowrap;text-align:center;width:1%;padding:8px 4px 8px 10px}
+ .ledtab .cell > *{margin:0 2px}
+ .lvl{display:inline-block;width:44px;height:26px;padding:0;border-radius:7px;border:2px solid #555;background:transparent;color:#777;font-size:.78em;vertical-align:middle}
+ .lvl.on.dcnow{background:var(--dcnow);border-color:var(--dcnow);color:#fff} .lvl.on.dcnet{background:var(--dcnet);border-color:var(--dcnet);color:#fff}
+ .in{position:relative}
+ #lvl-pop{display:none;position:absolute;z-index:20;width:260px;padding:12px 16px;border-radius:var(--r);background:#262626;box-shadow:0 6px 24px rgba(0,0,0,.6)}
+ #lvl-pop.open{display:block} #lvl-pop .t{font-size:.85em;color:#ccc;margin-bottom:4px}
+ #lvl-pop .range{padding:6px 0 10px} #lvl-pop .bar{margin:0;justify-content:space-between}
  .th-dcnow{color:var(--dcnow-l)!important} .th-dcnet{color:var(--dcnet-l)!important}
  input[type=color]{-webkit-appearance:none;appearance:none;width:30px;height:30px;padding:0;border:2px solid #555;border-radius:7px;background:none;vertical-align:middle;cursor:pointer}
  input[type=color]::-webkit-color-swatch-wrapper{padding:0} input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
@@ -412,11 +424,14 @@ millisecond timing. Turn recording on, then dial.</div>
  <div class="range"><span>Brightness</span><input type="range" id="led-bright" min="0" max="1000" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
  <table class="ledtab"><thead>
   <tr><th>Status</th><th class="th-dcnow">DCNow! selected</th><th class="th-dcnet">DCNET selected</th></tr>
-  <tr><th class="h2"></th><th class="h2">colour &nbsp; blink</th><th class="h2">colour &nbsp; blink</th></tr>
+  <tr><th class="h2"></th><th class="h2">colour &nbsp;blink&nbsp; &nbsp;level</th><th class="h2">colour &nbsp;blink&nbsp; &nbsp;level</th></tr>
  </thead><tbody id="led-rows"></tbody></table>
 </div>
 <div class="bar" style="margin-top:0"><button class="pill-s" id="led-reset" type="button">Reset LED settings to defaults</button></div>
-<div class="note">The colours are also used for the status dot on the main page.</div>
+<div class="note">Level: tap to give a status its own LED brightness; grey means it uses the base brightness above. The colours are also used for the status dot on the main page.</div>
+<div id="lvl-pop"><div class="t" id="lvl-t"></div>
+ <div class="range"><input type="range" id="lvl-r" min="0" max="1000" step="1"><span id="lvl-v" style="width:3em;text-align:right"></span></div>
+ <div class="bar"><button class="pill-s" id="lvl-base" type="button">Use base</button><button class="pill-s" id="lvl-done" type="button">Done</button></div></div>
 </div></div>
 
 <script>
@@ -447,7 +462,7 @@ function showSettings(open){$("settings").classList.toggle("open",open);
  document.body.classList.toggle("settings-open",open);if(open)loadLed()}
 $("cog").onclick=function(){showSettings(true)};
 $("close-settings").onclick=function(){showSettings(false)};
-document.addEventListener("keydown",function(e){if(e.key=="Escape")showSettings(false)});
+document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(lvlCur)closeLvl();else showSettings(false)}});
 var led=null,ledDefaults=null,ledTimer=null;
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
@@ -455,14 +470,35 @@ function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
   $("led-note").textContent=r.installed?"":"No LED service installed. Run sudo ./install.sh --led on the Pi to use a NeoPixel on GPIO18. The colours below still apply to the status dot.";
   $("led-rows").innerHTML=r.states.map(function(s){return '<tr><td>'+esc(s[1])+'</td>'+
    ["dcnow","dcnet"].map(function(n){var id=n+"-"+s[0];return '<td class="cell"><input type="color" id="c-'+id+'" data-net="'+n+'" data-state="'+s[0]+'">'+
-    '<input type="checkbox" class="cbox '+n+'" title="Blink" aria-label="Blink" id="b-'+id+'" data-net="'+n+'" data-state="'+s[0]+'"></td>'}).join("")+'</tr>'}).join("");
+    '<input type="checkbox" class="cbox '+n+'" title="Blink" aria-label="Blink" id="b-'+id+'" data-net="'+n+'" data-state="'+s[0]+'">'+
+    '<button type="button" class="lvl '+n+'" title="LED brightness for this status" id="l-'+id+'" data-net="'+n+'" data-state="'+s[0]+'" data-label="'+esc(s[1])+'"></button></td>'}).join("")+'</tr>'}).join("");
+  Array.prototype.forEach.call($("led-rows").querySelectorAll(".lvl"),function(el){el.onclick=function(e){e.stopPropagation();openLvl(el)}});
   Array.prototype.forEach.call($("led-rows").querySelectorAll("input"),function(el){
    el.addEventListener(el.type=="color"?"input":"change",function(){var c=led.colours[el.dataset.net][el.dataset.state];
     if(el.type=="color")c.color=el.value;else c.blink=el.checked;saveLed()})});
   showLed()};x.send()}
 function showLed(){$("led-bright").value=brightToSlider(led.brightness);$("led-bright-v").textContent=pct(led.brightness);
  ["dcnow","dcnet"].forEach(function(n){for(var st in led.colours[n]){var c=led.colours[n][st];
-  var ce=$("c-"+n+"-"+st),be=$("b-"+n+"-"+st);if(ce)ce.value=c.color;if(be)be.checked=c.blink}})}
+  var ce=$("c-"+n+"-"+st),be=$("b-"+n+"-"+st);if(ce)ce.value=c.color;if(be)be.checked=c.blink;showLvl(n,st)}})}
+function showLvl(n,st){var el=$("l-"+n+"-"+st);if(!el)return;var b=led.colours[n][st].brightness,own=b!==null&&b!==undefined;
+ el.className="lvl "+n+(own?" on":"");el.textContent=pct(own?b:led.brightness)}
+var lvlCur=null;
+function openLvl(el){var n=el.dataset.net,st=el.dataset.state,c=led.colours[n][st];
+ if(c.brightness===null||c.brightness===undefined){c.brightness=led.brightness;showLvl(n,st);saveLed()}
+ lvlCur={n:n,st:st,el:el};
+ $("lvl-t").textContent=el.dataset.label+", "+(n=="dcnet"?"DCNET":"DCNow!")+" selected";
+ $("lvl-r").style.accentColor=n=="dcnet"?"#1c6fe8":"#e8761c";$("lvl-r").value=brightToSlider(c.brightness);$("lvl-v").textContent=pct(c.brightness);
+ var pop=$("lvl-pop"),box=pop.parentNode.getBoundingClientRect(),r=el.getBoundingClientRect();
+ pop.classList.add("open");
+ var left=Math.min(Math.max(r.right-box.left-pop.offsetWidth,0),box.width-pop.offsetWidth);
+ pop.style.left=left+"px";pop.style.top=(r.bottom-box.top+6)+"px"}
+function closeLvl(){$("lvl-pop").classList.remove("open");lvlCur=null}
+$("lvl-r").oninput=function(){if(!lvlCur)return;var b=Math.round(sliderToBright(this.value)*1000)/1000;
+ led.colours[lvlCur.n][lvlCur.st].brightness=b;$("lvl-v").textContent=pct(b);showLvl(lvlCur.n,lvlCur.st);saveLed()};
+$("lvl-base").onclick=function(){if(!lvlCur)return;led.colours[lvlCur.n][lvlCur.st].brightness=null;showLvl(lvlCur.n,lvlCur.st);saveLed();closeLvl()};
+$("lvl-done").onclick=closeLvl;
+$("lvl-pop").onclick=function(e){e.stopPropagation()};
+$("settings").addEventListener("click",function(){if(lvlCur)closeLvl()});
 function saveLed(){clearTimeout(ledTimer);ledTimer=setTimeout(function(){
  var x=new XMLHttpRequest();x.open("POST","/ledconfig",true);x.setRequestHeader("Content-Type","application/json");
  x.onload=function(){if(x.status!=200)return;var el=$("led-saved");el.classList.add("show");
@@ -472,7 +508,8 @@ var LOG_BASE=100;
 function sliderToBright(p){return (Math.pow(LOG_BASE,p/1000)-1)/(LOG_BASE-1)}
 function brightToSlider(b){return Math.round(1000*Math.log(1+b*(LOG_BASE-1))/Math.log(LOG_BASE))}
 function pct(b){var v=b*100;return (v<10&&v>0?v.toFixed(1):Math.round(v))+"%"}
-$("led-bright").oninput=function(){led.brightness=Math.round(sliderToBright(this.value)*1000)/1000;$("led-bright-v").textContent=pct(led.brightness);saveLed()};
+$("led-bright").oninput=function(){led.brightness=Math.round(sliderToBright(this.value)*1000)/1000;$("led-bright-v").textContent=pct(led.brightness);
+ ["dcnow","dcnet"].forEach(function(n){for(var st in led.colours[n])showLvl(n,st)});saveLed()};
 $("led-reset").onclick=function(){led=JSON.parse(JSON.stringify(ledDefaults));showLed();saveLed()};
 $("show-debug").onclick=function(){debugOpen=!debugOpen;
  $("debug").style.display=debugOpen?"block":"none";
