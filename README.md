@@ -81,7 +81,7 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 - **Auto reset:** when ticked, dialing `111-1111` resets the selected network to the default network. Off by default.
 - **Phone numbers:** the table above, as a reminder.
 - **Dreamcast background:** an animated background in the style of the Dreamcast menu (see [Credits](#credits)). Off by default, and remembered per browser, so a phone can leave it off while a PC has it on. It pauses while the page is hidden. The Pi serves the files itself (about 600 KB, fetched once), so it works without internet; browsers without WebGL just show the blue gradient.
-- **Status LED:**
+- **Status LED** (only shown when the LED is installed with `--led`):
   - **Global brightness** of the NeoPixel, 0 to 100% (default 8%). The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
   - A **colour** and **blink** setting for every DreamPi status, set separately for when DCNow! is selected and when DCNET is selected. For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
   - A **level** (brightness) per status and network. Grey means the status uses the global brightness; tap it to give that status its own brightness with a slider, and tap **Use global** to go back. For example, "Ready for calls" can glow at 2% while "DreamPi not running" is brighter.

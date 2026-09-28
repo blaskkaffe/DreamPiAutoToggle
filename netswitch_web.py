@@ -438,8 +438,8 @@ millisecond timing. Turn recording on, then dial.</div>
   <input type="checkbox" class="cbox dcnow" id="bg-b" aria-label="Dreamcast background"></div>
 </div>
 
+<div id="led-section" style="display:none;position:relative">
 <h2>Status LED <span class="saved" id="led-saved">Saved &#10003;</span></h2>
-<div class="note" id="led-note"></div>
 <div class="card">
  <div class="range"><span>Global brightness</span><input type="range" id="led-bright" min="0" max="1000" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
  <table class="ledtab"><thead>
@@ -452,6 +452,7 @@ millisecond timing. Turn recording on, then dial.</div>
 <div id="lvl-pop"><div class="t" id="lvl-t"></div>
  <div class="range"><input type="range" id="lvl-r" min="0" max="1000" step="1"><span id="lvl-v" style="width:3em;text-align:right"></span></div>
  <div class="bar"><button class="pill-s" id="lvl-base" type="button">Use global</button><button class="pill-s" id="lvl-done" type="button">Done</button></div></div>
+</div>
 </div></div>
 
 <script>
@@ -501,7 +502,7 @@ var led=null,ledDefaults=null,ledTimer=null;
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
   led=r.config;ledDefaults=r.defaults;
-  $("led-note").textContent=r.installed?"":"No LED service installed. Run sudo ./install.sh --led on the Pi to use a NeoPixel on GPIO18. The colours below still apply to the status dot.";
+  $("led-section").style.display=r.installed?"block":"none";   // only with install.sh --led
   $("led-rows").innerHTML=r.states.map(function(s){return '<tr><td>'+esc(s[1])+'</td>'+
    ["dcnow","dcnet"].map(function(n){var id=n+"-"+s[0];return '<td class="cell"><input type="color" id="c-'+id+'" data-net="'+n+'" data-state="'+s[0]+'">'+
     '<input type="checkbox" class="cbox '+n+'" title="Blink" aria-label="Blink" id="b-'+id+'" data-net="'+n+'" data-state="'+s[0]+'">'+
