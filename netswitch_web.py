@@ -211,7 +211,7 @@ except NameError:
 
 
 def default_led_config():
-    return {"brightness": 0.15,
+    return {"brightness": 0.08,
             "colours": dict((net, dict((st, {"color": c, "blink": b})
                                        for st, (c, b) in _DEFAULT_COLOURS.items()))
                             for net in NETWORKS)}
@@ -407,7 +407,7 @@ millisecond timing. Turn recording on, then dial.</div>
 <h2>Status LED <span class="saved" id="led-saved">Saved &#10003;</span></h2>
 <div class="note" id="led-note"></div>
 <div class="card">
- <div class="range"><span>Brightness</span><input type="range" id="led-bright" min="0" max="100" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
+ <div class="range"><span>Brightness</span><input type="range" id="led-bright" min="0" max="1000" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
  <table class="ledtab"><thead>
   <tr><th>Status</th><th class="th-dcnow">DCNow! selected</th><th class="th-dcnet">DCNET selected</th></tr>
   <tr><th class="h2"></th><th class="h2">colour &nbsp; blink</th><th class="h2">colour &nbsp; blink</th></tr>
@@ -458,14 +458,19 @@ function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
    el.addEventListener(el.type=="color"?"input":"change",function(){var c=led.colours[el.dataset.net][el.dataset.state];
     if(el.type=="color")c.color=el.value;else c.blink=el.checked;saveLed()})});
   showLed()};x.send()}
-function showLed(){$("led-bright").value=Math.round(led.brightness*100);$("led-bright-v").textContent=Math.round(led.brightness*100)+"%";
+function showLed(){$("led-bright").value=brightToSlider(led.brightness);$("led-bright-v").textContent=pct(led.brightness);
  ["dcnow","dcnet"].forEach(function(n){for(var st in led.colours[n]){var c=led.colours[n][st];
   var ce=$("c-"+n+"-"+st),be=$("b-"+n+"-"+st);if(ce)ce.value=c.color;if(be)be.checked=c.blink}})}
 function saveLed(){clearTimeout(ledTimer);ledTimer=setTimeout(function(){
  var x=new XMLHttpRequest();x.open("POST","/ledconfig",true);x.setRequestHeader("Content-Type","application/json");
  x.onload=function(){if(x.status!=200)return;var el=$("led-saved");el.classList.add("show");
   setTimeout(function(){el.classList.remove("show")},1200);refresh()};x.send(JSON.stringify(led))},250)}
-$("led-bright").oninput=function(){led.brightness=this.value/100;$("led-bright-v").textContent=this.value+"%";saveLed()};
+// Logarithmic slider: the left half covers 0-9 %, where an indicator LED is most useful.
+var LOG_BASE=100;
+function sliderToBright(p){return (Math.pow(LOG_BASE,p/1000)-1)/(LOG_BASE-1)}
+function brightToSlider(b){return Math.round(1000*Math.log(1+b*(LOG_BASE-1))/Math.log(LOG_BASE))}
+function pct(b){var v=b*100;return (v<10&&v>0?v.toFixed(1):Math.round(v))+"%"}
+$("led-bright").oninput=function(){led.brightness=Math.round(sliderToBright(this.value)*1000)/1000;$("led-bright-v").textContent=pct(led.brightness);saveLed()};
 $("led-reset").onclick=function(){led=JSON.parse(JSON.stringify(ledDefaults));showLed();saveLed()};
 $("show-debug").onclick=function(){debugOpen=!debugOpen;
  $("debug").style.display=debugOpen?"block":"none";

@@ -149,7 +149,7 @@ def main():
             look = web.status_look()
             brightness = web.led_config()["brightness"]
         except Exception:   # never let a bad read stop the LED loop
-            look, brightness = {"color": "#3c3c3c", "blink": False}, 0.15
+            look, brightness = {"color": "#3c3c3c", "blink": False}, 0.08
         phase = not phase
         on = phase or not look["blink"]
         colour = scaled(look["color"], brightness) if on else (0, 0, 0)

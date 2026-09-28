@@ -81,7 +81,7 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 - **Auto reset:** when ticked, dialing `111-1111` resets the selected network to the default network. Off by default.
 - **Phone numbers:** the table above, as a reminder.
 - **Status LED:**
-  - **Brightness** of the NeoPixel, 0 to 100% (default 15%).
+  - **Brightness** of the NeoPixel, 0 to 100% (default 8%). The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
   - A **colour** and **blink** setting for every DreamPi status, set separately for when DCNow! is selected and when DCNET is selected. For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
   - **Reset LED settings to defaults** restores the table below.
 
