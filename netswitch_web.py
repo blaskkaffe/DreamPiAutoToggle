@@ -240,7 +240,7 @@ def clean_led_config(data):
                     cfg["colours"][net][st]["color"] = entry["color"].lower()
                 if isinstance(entry.get("blink"), bool):
                     cfg["colours"][net][st]["blink"] = entry["blink"]
-                level = entry.get("brightness")   # None = use the base brightness
+                level = entry.get("brightness")   # None = use the global brightness
                 if isinstance(level, (int, float)) and not isinstance(level, bool):
                     cfg["colours"][net][st]["brightness"] = min(1.0, max(0.0, float(level)))
     return cfg
@@ -421,17 +421,17 @@ millisecond timing. Turn recording on, then dial.</div>
 <h2>Status LED <span class="saved" id="led-saved">Saved &#10003;</span></h2>
 <div class="note" id="led-note"></div>
 <div class="card">
- <div class="range"><span>Brightness</span><input type="range" id="led-bright" min="0" max="1000" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
+ <div class="range"><span>Global brightness</span><input type="range" id="led-bright" min="0" max="1000" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
  <table class="ledtab"><thead>
   <tr><th>Status</th><th class="th-dcnow">DCNow! selected</th><th class="th-dcnet">DCNET selected</th></tr>
   <tr><th class="h2"></th><th class="h2">colour &nbsp;blink&nbsp; &nbsp;level</th><th class="h2">colour &nbsp;blink&nbsp; &nbsp;level</th></tr>
  </thead><tbody id="led-rows"></tbody></table>
 </div>
 <div class="bar" style="margin-top:0"><button class="pill-s" id="led-reset" type="button">Reset LED settings to defaults</button></div>
-<div class="note">Level: tap to give a status its own LED brightness; grey means it uses the base brightness above. The colours are also used for the status dot on the main page.</div>
+<div class="note">Level: tap to give a status its own LED brightness; grey means it uses the global brightness above. The colours are also used for the status dot on the main page.</div>
 <div id="lvl-pop"><div class="t" id="lvl-t"></div>
  <div class="range"><input type="range" id="lvl-r" min="0" max="1000" step="1"><span id="lvl-v" style="width:3em;text-align:right"></span></div>
- <div class="bar"><button class="pill-s" id="lvl-base" type="button">Use base</button><button class="pill-s" id="lvl-done" type="button">Done</button></div></div>
+ <div class="bar"><button class="pill-s" id="lvl-base" type="button">Use global</button><button class="pill-s" id="lvl-done" type="button">Done</button></div></div>
 </div></div>
 
 <script>

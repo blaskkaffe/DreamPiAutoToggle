@@ -10,7 +10,7 @@
 # When the FIFO runs empty the pin stays low, which latches the colour.
 #
 # Shows the same DreamPi status as the web page. Colours, blinking and
-# brightness (base or per status) come from the page's settings (led.json, see netswitch_web).
+# brightness (global or per status) come from the page's settings (led.json, see netswitch_web).
 import ctypes
 import mmap
 import os
@@ -154,7 +154,7 @@ def main():
     while True:
         try:
             look = web.status_look()
-            brightness = look["brightness"]   # this status's own level, or the base
+            brightness = look["brightness"]   # this status's own level, or the global one
         except Exception:   # never let a bad read stop the LED loop
             look, brightness = {"color": "#3c3c3c", "blink": False}, 0.08
         phase = not phase
