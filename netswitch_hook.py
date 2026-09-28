@@ -7,14 +7,16 @@ the running program imports DreamPi's netlink.py from /home/pi/dreampi.
 It then wraps Netlink.check_number() with these rules:
 
   1111111  openMenu's number. Always DC Now. If the reset toggle is on,
-           it also switches the selected network back to DC Now.
+           it also switches the selected network back to the default
+           network (DC Now unless the file default_dcnet exists).
   2222222  Selects DC Now and connects through DC Now.
   3333333  Selects DCNet and connects through DCNet.
   others   Go to whichever network is selected (website or 2222222/3333333).
            Only calls DreamPi would send to its normal PPP are redirected;
            Netlink/XBAND codes and the built-in *69 prefix are untouched.
 
-The selection is the file dcnet_mode, the reset toggle is the file autoreset.
+The selection is the file dcnet_mode, the reset toggle is the file autoreset,
+the default network for the reset is the file default_dcnet (exists = DCNet).
 It also reports DreamPi's state (starting / ready / in a call) to
 /tmp/dreampi-netswitch.state for the web page. If the file debug_dtmf exists,
 it also logs every modem event while DreamPi listens for digits to
@@ -30,6 +32,7 @@ import time
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 AUTORESET = os.path.join(BASE_DIR, "autoreset")
+DEFAULT_DCNET = os.path.join(BASE_DIR, "default_dcnet")  # exists = reset goes to DCNet
 STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")  # exists = log modem events
@@ -197,9 +200,12 @@ def _patch(module):
             elif special == NUM_DCNET:
                 _select_dcnet(True)
                 _log(self, "%s dialed, DCNet selected" % raw_string)
-            elif special == NUM_OPENMENU and os.path.exists(AUTORESET) and os.path.exists(FLAG):
-                _select_dcnet(False)
-                _log(self, "%s dialed with reset on, back to DC Now" % raw_string)
+            elif special == NUM_OPENMENU and os.path.exists(AUTORESET):
+                default_dcnet = os.path.exists(DEFAULT_DCNET)
+                if os.path.exists(FLAG) != default_dcnet:
+                    _select_dcnet(default_dcnet)
+                    _log(self, "%s dialed with reset on, back to the default (%s)"
+                         % (raw_string, "DCNet" if default_dcnet else "DC Now"))
         except Exception as e:
             _log(self, "could not update selection: %s" % e)
 

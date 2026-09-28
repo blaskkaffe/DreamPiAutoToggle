@@ -20,6 +20,7 @@ except ImportError:
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 AUTORESET = os.path.join(BASE_DIR, "autoreset")
+DEFAULT_DCNET = os.path.join(BASE_DIR, "default_dcnet")
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
 STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
@@ -188,6 +189,7 @@ def api_state():
         checks = json.loads(json.dumps(_checks))
     return {"network": "dcnet" if os.path.exists(FLAG) else "dcnow",
             "autoreset": os.path.exists(AUTORESET),
+            "default": "dcnet" if os.path.exists(DEFAULT_DCNET) else "dcnow",
             "debug": os.path.exists(DEBUG_DTMF),
             "dreampi": {"state": dstate, "text": dtext},
             "modem": {"text": mtext, "since": msince},
@@ -217,6 +219,16 @@ PAGE = u"""<!doctype html>
  button{font-size:1.1em;width:100%;padding:14px;margin:5px 0;border:0;border-radius:10px;cursor:pointer}
  .dcnow-b{background:#e8761c;color:#fff} .dcnet-b{background:#1c6fe8;color:#fff}
  .toggle{background:#2a2a2a;color:#eee;font-size:.95em;text-align:left}
+ .prefs{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin:10px 2px 0}
+ .pref{display:flex;align-items:center;gap:9px;color:#ccc}
+ .prefs button{margin:0;padding:0;border:0}
+ .prefs .switch{position:relative;width:96px;height:32px;border-radius:16px;background:#e8761c;color:#fff;font-size:.8em;font-weight:bold;transition:background .2s}
+ .switch .knob{position:absolute;top:3px;left:67px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+ .switch .lbl{position:absolute;top:0;bottom:0;left:10px;line-height:32px}
+ .switch.dcnet{background:#1c6fe8} .switch.dcnet .knob{left:3px} .switch.dcnet .lbl{left:auto;right:12px}
+ .prefs .check{width:26px;height:26px;border-radius:6px;border:2px solid #888;background:transparent;color:transparent;font-size:1em;line-height:1}
+ .prefs .check.on{color:#fff}
+ .prefs .check.on.dcnow{background:#e8761c;border-color:#e8761c} .prefs .check.on.dcnet{background:#1c6fe8;border-color:#1c6fe8}
  .warnbox{background:#7a1f1f;padding:11px;border-radius:8px;margin:8px 0;font-size:.9em}
  table{width:100%;border-collapse:collapse;font-size:.88em}
  td{padding:5px 3px;border-top:1px solid #2a2a2a;vertical-align:top} td.n{color:#eee}
@@ -236,9 +248,14 @@ PAGE = u"""<!doctype html>
  <div class="row more"><span class="k">Internet</span><span class="v"><span class="dot" id="i-dot"></span><span id="i-text">...</span></span></div>
 </div>
 <div class="now" id="net">Selected network:<br><b id="net-name">...</b></div>
-<form method="post" action="/dcnow"><button class="dcnow-b">Use DC Now (default)</button></form>
+<form method="post" action="/dcnow"><button class="dcnow-b">Use DC Now</button></form>
 <form method="post" action="/dcnet"><button class="dcnet-b">Use DCNet</button></form>
-<form method="post" action="/autoreset"><button class="toggle" id="reset-b">Reset to DC Now when openMenu (111-1111) connects</button></form>
+<div class="prefs">
+ <form method="post" action="/default" class="pref"><span>Default network</span>
+  <button class="switch" id="default-b" type="submit" title="Network that 111-1111 resets to"><span class="lbl" id="default-l">DC Now!</span><span class="knob"></span></button></form>
+ <form method="post" action="/autoreset" class="pref" title="Switch back to the default network when openMenu dials 111-1111"><span>Auto reset</span>
+  <button class="check" id="reset-b" type="submit">&#10003;</button></form>
+</div>
 
 <h2>Numbers</h2>
 <table>
@@ -270,8 +287,10 @@ function render(d){
  $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now);
  dot($("i-dot"),d.internet.state); $("i-text").textContent=d.internet.text;
  $("net").className="now "+d.network; $("net-name").textContent=d.network=="dcnet"?"DCNet":"DC Now";
- $("reset-b").innerHTML=(d.autoreset?"&#9745;":"&#9744;")+" Reset to DC Now when openMenu (111-1111) connects";
- $("reset-note").textContent=d.autoreset?", and resets the selection":"";
+ var defName=d.default=="dcnet"?"DCNet":"DC Now";
+ $("default-b").className="switch "+d.default; $("default-l").textContent=d.default=="dcnet"?"DCNet":"DC Now!";
+ $("reset-b").className="check "+d.default+(d.autoreset?" on":"");
+ $("reset-note").textContent=d.autoreset?", and resets the selection to "+defName:"";
  $("debug-b").innerHTML=(d.debug?"&#9745; Recording":"&#9744; Recording (off)");
  $("log-tools").style.display=d.debug?"inline":"none";
  $("log").style.display=(d.debug||logSize)?"block":"none";
@@ -334,8 +353,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(json.dumps(read_log(int(m.group(1)) if m else 0)), "application/json")
         elif self.path == "/status":
             d = api_state()
-            self.send("network=%s\nautoreset=%s\ndreampi=%s\nmodem=%s\ninternet=%s\n" % (
-                d["network"], "on" if d["autoreset"] else "off", d["dreampi"]["text"],
+            self.send("network=%s\ndefault=%s\nautoreset=%s\ndreampi=%s\nmodem=%s\ninternet=%s\n" % (
+                d["network"], d["default"], "on" if d["autoreset"] else "off", d["dreampi"]["text"],
                 d["modem"]["text"], d["internet"]["text"]), "text/plain; charset=utf-8")
         elif self.path == "/dtmf":
             try:
@@ -355,6 +374,13 @@ class Handler(BaseHTTPRequestHandler):
             if os.path.exists(FLAG):
                 os.remove(FLAG)
             debug_log("web page: DC Now selected")
+        elif self.path == "/default":
+            if os.path.exists(DEFAULT_DCNET):
+                os.remove(DEFAULT_DCNET)
+                debug_log("web page: default network set to DC Now")
+            else:
+                open(DEFAULT_DCNET, "w").close()
+                debug_log("web page: default network set to DCNet")
         elif self.path == "/autoreset":
             if os.path.exists(AUTORESET):
                 os.remove(AUTORESET)

@@ -6,7 +6,7 @@ Switch a DreamPi between **DC Now** (normal DreamPi / Dreamcast Live) and **DCNe
 
 | Number dialed | Result |
 |---|---|
-| `111-1111` | openMenu's built-in number. Always DC Now. If **reset** is on, the selection also goes back to DC Now. |
+| `111-1111` | openMenu's built-in number. Always DC Now. If **Auto reset** is on, the selection also goes back to the **default network**. |
 | `222-2222` | Selects DC Now and connects through DC Now. |
 | `333-3333` | Selects DCNet and connects through DCNet. |
 | Any other number | Connects through the currently selected network. |
@@ -24,11 +24,14 @@ The special numbers are matched on their last seven digits, so a leading `1`, an
 - **DreamPi:** starting up, ready for calls, in a call (and on which network), or not running.
 - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DC Now or DCNet, call ended.
 - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online` (checked every 30 seconds).
-- The selected network, the **Use DC Now** / **Use DCNet** buttons and the **reset on openMenu connect** toggle (off by default).
+- The selected network and the **Use DC Now** / **Use DCNet** buttons.
+- **Default network:** a switch (orange DC Now! / blue DCNet) that sets which network Auto reset returns to. DC Now unless changed.
+- **Auto reset:** when ticked, dialing openMenu's `111-1111` switches the selection back to the default network (off by default). openMenu's own call always uses DC Now, since DCNet won't accept openMenu's login.
 
 `http://dreampi.local/api` returns everything as JSON, and `http://dreampi.local/status` as plain text, for example:
 ```
 network=dcnet
+default=dcnow
 autoreset=off
 dreampi=Ready for calls
 modem=Dial tone on, waiting for a call
