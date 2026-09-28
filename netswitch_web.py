@@ -210,7 +210,7 @@ _DEFAULT_COLOURS = {   # state -> (colour, effect, speed); used for both network
     "unknown": ("#3c3c3c", "solid", "slow"),
 }
 # LED effects. The first four work on a single LED; the rest need a strip.
-# "rgb" ignores the colour and has one speed (a calm 10 s colour cycle).
+# "rgb" ignores the colour and cycles through all colours (10 s slow, 4 s fast).
 EFFECTS = [
     ("solid", "Solid", False),
     ("blink", "Blink", False),
@@ -505,7 +505,7 @@ function ago(t,now){if(!t)return"";var s=Math.max(0,now-t);
  if(s<60)return"("+s+"s ago)";if(s<3600)return"("+Math.floor(s/60)+" min ago)";return"("+Math.floor(s/3600)+" h ago)"}
 function dot(el,state){el.className="dot "+(state||"")}
 // Status dot preview of the LED effect: [keyframes, slow s, fast s, timing]
-var DOT_FX={blink:["blink",1,.4,"steps(1)"],breathe:["breathe",4,1.6,"ease-in-out"],rgb:["rgbc",10,10,"linear"],
+var DOT_FX={blink:["blink",1,.4,"steps(1)"],breathe:["breathe",4,1.6,"ease-in-out"],rgb:["rgbc",10,4,"linear"],
  rainbow:["rgbc",10,3,"linear"],scanner:["breathe",3,1.2,"ease-in-out"],comet:["breathe",3,1.2,"ease-in-out"],
  chase:["blink",.6,.24,"steps(1)"],twinkle:["breathe",3,1.2,"ease-in-out"]};
 function lookDot(el,look){var f=DOT_FX[look.effect];el.className="dot";el.style.background=look.color;
@@ -571,7 +571,7 @@ function showLed(){$("led-bright").value=brightToSlider(led.brightness);$("led-b
  ledStates.forEach(function(s){var st=s[0],c=led.colours[ledNet][st];
   $("c-"+st).value=c.color;showFx(st);showLvl(st)})}
 function showFx(st){var el=$("f-"+st);if(!el)return;var c=led.colours[ledNet][st];
- el.innerHTML=esc(effectName(c.effect))+(c.effect=="solid"||c.effect=="rgb"?"":"<small>"+c.speed+"</small>")}
+ el.innerHTML=esc(effectName(c.effect))+(c.effect=="solid"?"":"<small>"+c.speed+"</small>")}
 function showLvl(st){var el=$("l-"+st);if(!el)return;var b=led.colours[ledNet][st].brightness,own=b!==null&&b!==undefined;
  el.className="chip lvl "+ledNet+(own?" on":"");el.textContent=pct(own?b:led.brightness)}
 function placePop(pop,el){var box=pop.parentNode.getBoundingClientRect(),r=el.getBoundingClientRect();
@@ -586,7 +586,7 @@ function openFx(el){closePops();var st=el.dataset.state,c=led.colours[ledNet][st
   return '<button type="button" class="pill-s" data-fx="'+e[0]+'">'+esc(e[1])+'</button>'}).join("");
  Array.prototype.forEach.call($("fx-opts").querySelectorAll("button"),function(b){b.onclick=function(){c.effect=b.dataset.fx;fxMark();saveLed()}});
  fxMark();placePop($("fx-pop"),el)}
-function fxMark(){if(!fxCur)return;var c=led.colours[ledNet][fxCur],fixed=c.effect=="solid"||c.effect=="rgb";
+function fxMark(){if(!fxCur)return;var c=led.colours[ledNet][fxCur],fixed=c.effect=="solid";
  Array.prototype.forEach.call($("fx-opts").querySelectorAll("button"),function(b){b.className="pill-s "+ledNet+(b.dataset.fx==c.effect?" sel":"")});
  Array.prototype.forEach.call($("fx-speed").querySelectorAll("button"),function(b){b.disabled=fixed;
   b.className="pill-s "+ledNet+(!fixed&&b.dataset.speed==c.speed?" sel":"")});

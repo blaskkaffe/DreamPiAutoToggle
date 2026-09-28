@@ -101,7 +101,7 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 - **Global brightness** of the LEDs, 0 to 100% (default 8%). The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
 - Two tabs, **DCNow! selected** and **DCNET selected**, each with a table of every DreamPi status. For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
 - Per status: a **colour**, an **effect** and a **level**:
-  - **Effect:** tap it for a small menu. **Solid**, **Blink**, **Breathe** (fading up and down) and **RGB** (a calm colour cycle, about 10 seconds per round, ignoring the colour) work on any LED. With a strip there are also **Rainbow**, **Scanner** (a dot sweeping back and forth), **Comet**, **Chase** and **Twinkle**. Every effect except Solid and RGB has a **Slow** and a **Fast** speed.
+  - **Effect:** tap it for a small menu. **Solid**, **Blink**, **Breathe** (fading up and down) and **RGB** (cycles through all colours, ignoring the colour set: about 10 seconds per round when slow, 4 when fast) work on any LED. With a strip there are also **Rainbow**, **Scanner** (a dot sweeping back and forth), **Comet**, **Chase** and **Twinkle**. Every effect except Solid has a **Slow** and a **Fast** speed.
   - **Level:** the brightness for that status. Grey means it uses the global brightness; tap it to give the status its own brightness with a slider, and tap **Use global** to go back.
 - **Reset LED settings to defaults** restores the colours and effects in [Status colours](#status-colours) and the 8% global brightness.
 

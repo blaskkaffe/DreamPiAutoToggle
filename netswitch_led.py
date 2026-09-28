@@ -271,8 +271,8 @@ PERIODS = {
     "comet": (3.0, 1.2),
     "chase": (0.6, 0.24),      # time for one full 3-LED step cycle
     "twinkle": (3.0, 1.2),
+    "rgb": (10.0, 4.0),        # slow: a calm, standard colour cycle
 }
-RGB_PERIOD = 10.0              # a calm, standard colour cycle
 
 
 def hex_rgb(colour):
@@ -298,10 +298,10 @@ def effect_frame(effect, speed, colour, t, n):
     fast = speed == "fast"
     if effect == "solid":
         return [c] * n
-    if effect == "rgb":
-        return [hue(t / RGB_PERIOD)] * n
     period = PERIODS.get(effect, (1.0, 0.4))[1 if fast else 0]
     phase = (t / period) % 1.0
+    if effect == "rgb":
+        return [hue(phase)] * n
     if effect == "blink":
         return [c if phase < 0.5 else (0, 0, 0)] * n
     if effect == "breathe":
