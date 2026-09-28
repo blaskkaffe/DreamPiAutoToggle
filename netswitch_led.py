@@ -25,8 +25,8 @@ except ImportError:
 COLOURS = {
     "ok":         (0, 255, 0, False),     # ready for calls
     "busy":       (255, 170, 0, True),    # starting up (blinking yellow)
-    "call-dcnow": (255, 80, 0, False),    # in a call on DC Now (orange)
-    "call-dcnet": (0, 70, 255, False),    # in a call on DCNet (blue)
+    "call-dcnow": (255, 80, 0, False),    # in a call on DCNow! (orange)
+    "call-dcnet": (0, 70, 255, False),    # in a call on DCNET (blue)
     "call":       (170, 0, 255, False),   # other calls, e.g. Netlink (purple)
     "off":        (255, 0, 0, True),      # DreamPi not running (blinking red)
     "unknown":    (60, 60, 60, False),    # state unknown (dim white)

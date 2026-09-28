@@ -6,17 +6,17 @@ Loaded automatically by Python (through a .pth file) but does nothing unless
 the running program imports DreamPi's netlink.py from /home/pi/dreampi.
 It then wraps Netlink.check_number() with these rules:
 
-  1111111  openMenu's number. Always DC Now. If the reset toggle is on,
+  1111111  openMenu's number. Always DCNow! If the reset toggle is on,
            it also switches the selected network back to the default
-           network (DC Now unless the file default_dcnet exists).
-  2222222  Selects DC Now and connects through DC Now.
-  3333333  Selects DCNet and connects through DCNet.
+           network (DCNow! unless the file default_dcnet exists).
+  2222222  Selects DCNow! and connects through DCNow!
+  3333333  Selects DCNET and connects through DCNET.
   others   Go to whichever network is selected (website or 2222222/3333333).
            Only calls DreamPi would send to its normal PPP are redirected;
            Netlink/XBAND codes and the built-in *69 prefix are untouched.
 
 The selection is the file dcnet_mode, the reset toggle is the file autoreset,
-the default network for the reset is the file default_dcnet (exists = DCNet).
+the default network for the reset is the file default_dcnet (exists = DCNET).
 It also reports DreamPi's state (starting / ready / in a call) to
 /tmp/dreampi-netswitch.state for the web page. If the file debug_dtmf exists,
 it also logs every modem event while DreamPi listens for digits to
@@ -32,7 +32,7 @@ import time
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 AUTORESET = os.path.join(BASE_DIR, "autoreset")
-DEFAULT_DCNET = os.path.join(BASE_DIR, "default_dcnet")  # exists = reset goes to DCNet
+DEFAULT_DCNET = os.path.join(BASE_DIR, "default_dcnet")  # exists = reset goes to DCNET
 STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")  # exists = log modem events
@@ -196,16 +196,16 @@ def _patch(module):
         try:
             if special == NUM_DCNOW:
                 _select_dcnet(False)
-                _log(self, "%s dialed, DC Now selected" % raw_string)
+                _log(self, "%s dialed, DCNow! selected" % raw_string)
             elif special == NUM_DCNET:
                 _select_dcnet(True)
-                _log(self, "%s dialed, DCNet selected" % raw_string)
+                _log(self, "%s dialed, DCNET selected" % raw_string)
             elif special == NUM_OPENMENU and os.path.exists(AUTORESET):
                 default_dcnet = os.path.exists(DEFAULT_DCNET)
                 if os.path.exists(FLAG) != default_dcnet:
                     _select_dcnet(default_dcnet)
                     _log(self, "%s dialed with reset on, back to the default (%s)"
-                         % (raw_string, "DCNet" if default_dcnet else "DC Now"))
+                         % (raw_string, "DCNET" if default_dcnet else "DCNow!"))
         except Exception as e:
             _log(self, "could not update selection: %s" % e)
 
@@ -217,10 +217,10 @@ def _patch(module):
                 if getattr(self, "dcnet", False):
                     self.mode = "dcnet"
                     self.dial_string = raw_string
-                    _log(self, "routing %s to DCNet" % raw_string)
+                    _log(self, "routing %s to DCNET" % raw_string)
                     result = {"client": "dcnet", "dial_string": raw_string}
                 else:
-                    _log(self, "DCNet selected but not enabled in netlink_config.ini, using DC Now")
+                    _log(self, "DCNET selected but not enabled in netlink_config.ini, using DCNow!")
             # Netlink, XBAND, *69 and idle results pass through unchanged
             client = result.get("client") if isinstance(result, dict) else None
             if client and client != "idle":
@@ -248,9 +248,9 @@ _MODEM_EVENTS = [
     (r"^<LISTENING>", "Dial tone on, waiting for a call", "clear"),
     (r"^Heard: (\S+)", "Number dialed: %s", None),
     (r"^(?:Response: )?CONNECT (\d+)", "Carrier up at %s bps", "speed"),
-    (r"^DCNet Call answered", "Online via DCNet{speed}", None),
+    (r"^DCNet Call answered", "Online via DCNET{speed}", None),
     (r"Call answered", "Answered, starting PPP{speed}", None),
-    (r"^Connected$", "Online via DC Now{speed}", None),
+    (r"^Connected$", "Online via DCNow!{speed}", None),
     (r"^Couldn't answer call", "Could not answer the call", "clear"),
     (r"^Detected modem hang up", "Call ended", "clear"),
     (r"^Connection terminated", "Call ended", "clear"),

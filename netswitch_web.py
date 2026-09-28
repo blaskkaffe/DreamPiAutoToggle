@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# DreamPi Netswitch add-on - web page to choose DC Now or DCNet.
+# DreamPi Netswitch add-on - web page to choose DCNow! or DCNET.
 # Shows DreamPi's and the modem's live status and internet access, plus an
 # optional debug timeline. It only creates/removes the files that
 # netswitch_hook.py reads.
@@ -58,19 +58,19 @@ def hook_problem():
 
 
 def dcnet_problem():
-    """None when DreamPi's DCNet support is switched on, else a reason."""
+    """None when DreamPi's DCNET support is switched on, else a reason."""
     if os.path.exists("/boot/noautoupdates.txt"):
         return ("/boot/noautoupdates.txt exists, so DreamPi skips netlink_config.ini "
-                "and DCNet stays off")
+                "and DCNET stays off")
     for path in ("/boot/netlink_config.ini", "/home/pi/dreampi/netlink_config.ini"):
         if os.path.isfile(path):
             break
     else:
-        return "netlink_config.ini not found, so DCNet is off"
+        return "netlink_config.ini not found, so DCNET is off"
     text = read_file(path) or ""
     section = re.search(r"^\[DCNet\](.*?)(?=^\[|\Z)", text, re.M | re.S)
     if not section or not re.search(r"^\s*enabled\s*=\s*yes\s*$", section.group(1), re.M):
-        return "DCNet is not enabled in " + path + " ([DCNet] enabled = yes)"
+        return "DCNET is not enabled in " + path + " ([DCNet] enabled = yes)"
     return None
 
 
@@ -88,7 +88,7 @@ def dreampi_state():
         return "ok", "Ready for calls"
     if state.startswith("call "):
         kind = state[5:]
-        net = {"dcnow": "DC Now", "dcnet": "DCNet"}.get(kind, kind)
+        net = {"dcnow": "DCNow!", "dcnet": "DCNET"}.get(kind, kind)
         return ("call-" + kind if kind in ("dcnow", "dcnet") else "call"), "In a call: " + net
     return "unknown", "State unknown"
 
@@ -184,7 +184,7 @@ def api_state():
         warnings.append("Add-on not active: %s. Calls are not affected until it is." % problem)
     problem = dcnet_problem()
     if problem:
-        warnings.append("DCNet unavailable: %s. All calls go to DC Now." % problem)
+        warnings.append("DCNET unavailable: %s. All calls go to DCNow!" % problem)
     with _checks_lock:
         checks = json.loads(json.dumps(_checks))
     return {"network": "dcnet" if os.path.exists(FLAG) else "dcnow",
@@ -231,7 +231,7 @@ PAGE = u"""<!doctype html>
  .prefs .check.on.dcnow{background:#e8761c;border-color:#e8761c} .prefs .check.on.dcnet{background:#1c6fe8;border-color:#1c6fe8}
  .warnbox{background:#7a1f1f;padding:11px;border-radius:8px;margin:8px 0;font-size:.9em}
  table{width:100%;border-collapse:collapse;font-size:.88em}
- td{padding:5px 3px;border-top:1px solid #2a2a2a;vertical-align:top} td.n{color:#eee}
+ td{padding:5px 3px;border-top:1px solid #2a2a2a;vertical-align:top} td.n{color:#eee;white-space:nowrap;padding-right:10px}
  h2{font-size:1em;color:#bbb;margin:22px 0 6px}
  .note{color:#999;font-size:.85em;margin:4px 0 8px}
  .small button{font-size:.85em;padding:8px;width:auto} a{color:#8bf}
@@ -248,21 +248,23 @@ PAGE = u"""<!doctype html>
  <div class="row more"><span class="k">Internet</span><span class="v"><span class="dot" id="i-dot"></span><span id="i-text">...</span></span></div>
 </div>
 <div class="now" id="net">Selected network:<br><b id="net-name">...</b></div>
-<form method="post" action="/dcnow"><button class="dcnow-b">Use DC Now</button></form>
-<form method="post" action="/dcnet"><button class="dcnet-b">Use DCNet</button></form>
+<form method="post" action="/dcnow"><button class="dcnow-b">DCNow! / DreamPi</button></form>
+<form method="post" action="/dcnet"><button class="dcnet-b">DCNET / FLYCAST</button></form>
 <div class="prefs">
  <form method="post" action="/default" class="pref"><span>Default network</span>
-  <button class="switch" id="default-b" type="submit" title="Network that 111-1111 resets to"><span class="lbl" id="default-l">DC Now!</span><span class="knob"></span></button></form>
+  <button class="switch" id="default-b" type="submit" title="Network that 111-1111 resets to"><span class="lbl" id="default-l">DCNow!</span><span class="knob"></span></button></form>
  <form method="post" action="/autoreset" class="pref" title="Switch back to the default network when openMenu dials 111-1111"><span>Auto reset</span>
   <button class="check" id="reset-b" type="submit">&#10003;</button></form>
 </div>
 
-<h2>Numbers</h2>
+<h2>Phone numbers</h2>
 <table>
-<tr><td class="n">111-1111</td><td>openMenu. Always DC Now<span id="reset-note"></span></td></tr>
-<tr><td class="n">222-2222</td><td>Selects DC Now and connects to it</td></tr>
-<tr><td class="n">333-3333</td><td>Selects DCNet and connects to it</td></tr>
-<tr><td class="n">Any other</td><td>Connects to the selected network</td></tr>
+<tr><td class="n">111-1111</td><td>Always directs to DCNow! for compatibility with openMenu and standard ISP configs.<br>
+<span class="sub">When &quot;Auto reset&quot; is enabled, dialing it also resets the network to the default network.<span id="reset-note"></span></span></td></tr>
+<tr><td class="n">222-2222</td><td>Selects DCNow! / DreamPi and connects to it</td></tr>
+<tr><td class="n">333-3333</td><td>Selects DCNET / FLYCAST and connects to it</td></tr>
+<tr><td class="n">Any other</td><td>Connects to the currently selected network.<br>
+<span class="sub">Set your Dreamcast ISP config to any 7-digit number to use this feature.</span></td></tr>
 </table>
 
 <div class="small" style="margin-top:26px"><button class="toggle" id="show-debug" type="button">Debug log &#9656;</button></div>
@@ -286,11 +288,11 @@ function render(d){
  dot($("d-dot"),d.dreampi.state); $("d-text").textContent=d.dreampi.text;
  $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now);
  dot($("i-dot"),d.internet.state); $("i-text").textContent=d.internet.text;
- $("net").className="now "+d.network; $("net-name").textContent=d.network=="dcnet"?"DCNet":"DC Now";
- var defName=d.default=="dcnet"?"DCNet":"DC Now";
- $("default-b").className="switch "+d.default; $("default-l").textContent=d.default=="dcnet"?"DCNet":"DC Now!";
+ $("net").className="now "+d.network; $("net-name").textContent=d.network=="dcnet"?"DCNET":"DCNow!";
+ var defName=d.default=="dcnet"?"DCNET":"DCNow!";
+ $("default-b").className="switch "+d.default; $("default-l").textContent=d.default=="dcnet"?"DCNET":"DCNow!";
  $("reset-b").className="check "+d.default+(d.autoreset?" on":"");
- $("reset-note").textContent=d.autoreset?", and resets the selection to "+defName:"";
+ $("reset-note").textContent=" (Auto reset is "+(d.autoreset?"on, default: "+defName:"off")+")";
  $("debug-b").innerHTML=(d.debug?"&#9745; Recording":"&#9744; Recording (off)");
  $("log-tools").style.display=d.debug?"inline":"none";
  $("log").style.display=(d.debug||logSize)?"block":"none";
@@ -369,18 +371,18 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/dcnet":
             open(FLAG, "w").close()
-            debug_log("web page: DCNet selected")
+            debug_log("web page: DCNET selected")
         elif self.path == "/dcnow":
             if os.path.exists(FLAG):
                 os.remove(FLAG)
-            debug_log("web page: DC Now selected")
+            debug_log("web page: DCNow! selected")
         elif self.path == "/default":
             if os.path.exists(DEFAULT_DCNET):
                 os.remove(DEFAULT_DCNET)
-                debug_log("web page: default network set to DC Now")
+                debug_log("web page: default network set to DCNow!")
             else:
                 open(DEFAULT_DCNET, "w").close()
-                debug_log("web page: default network set to DCNet")
+                debug_log("web page: default network set to DCNET")
         elif self.path == "/autoreset":
             if os.path.exists(AUTORESET):
                 os.remove(AUTORESET)
@@ -397,7 +399,7 @@ class Handler(BaseHTTPRequestHandler):
                 if os.path.exists(DTMF_LOG):
                     os.remove(DTMF_LOG)  # start a fresh log
                 debug_log("web page: debug log started (network: %s)" %
-                          ("DCNet" if os.path.exists(FLAG) else "DC Now"))
+                          ("DCNET" if os.path.exists(FLAG) else "DCNow!"))
         elif self.path == "/clearlog":
             if os.path.exists(DTMF_LOG):
                 os.remove(DTMF_LOG)

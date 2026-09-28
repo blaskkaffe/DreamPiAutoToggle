@@ -5,10 +5,13 @@
 - **Never modify DreamPi's own files** (`/home/pi/dreampi/dreampi.py`, `netlink.py`, `dcnow.py`). DreamPi auto-updates them from GitHub, and the add-on must install and uninstall cleanly without touching them.
 - `netswitch_hook.py` runs inside DreamPi, which runs on **Python 2.7**. Keep it Python 2 and 3 compatible: no f-strings, no type hints, no Python-3-only stdlib. The web page runs separately under Python 3.
 
+## Naming in the UI
+User-facing text (web page, README, log lines) spells the networks **DCNow!** and **DCNET**; the buttons read "DCNow! / DreamPi" and "DCNET / FLYCAST". Code identifiers, file names and upstream strings keep their original spelling (`dcnow`, `dcnet`, `[DCNet]` in `netlink_config.ini`, DreamPi's `DCNet Call answered` log text).
+
 ## How it works
 - `install.sh` copies files to `/opt/dreampi-netswitch`, writes `dreampi_netswitch.pth` into site-packages for `python`, `python2` and `python3` (the list is kept in `pth_locations`), creates and starts the `dreampi-netswitch` systemd service (web page), and restarts the `dreampi` service.
 - The `.pth` file imports `netswitch_hook`. It only acts when `/proc/self/cmdline` contains `dreampi` (`sys.argv` doesn't exist yet during `.pth` processing on Python 2). It then temporarily wraps `__import__`, using `__builtin__` before `builtins` because python-future can provide a fake `builtins` on Python 2. When a module named `netlink` is imported from `/home/pi/dreampi`, it wraps `Netlink.check_number()` and restores the original `__import__`.
-- State lives in files: `/opt/dreampi-netswitch/dcnet_mode` (exists means DCNet is selected) `/opt/dreampi-netswitch/autoreset` (reset toggle) and `/opt/dreampi-netswitch/default_dcnet` (exists means auto reset returns to DCNet instead of DC Now; page: `POST /default`). The hook writes `/tmp/dreampi-netswitch.active` (`active pid=N` or an error). The hook also writes `/tmp/dreampi-netswitch.state` (`starting`, `ready`, `call <network>` or `unknown`, plus a unix time): `starting` when netlink is imported, `call ...` from `check_number()`, and `ready` after `__main__.Modem.start_dial_tone()` (the moment DreamPi logs `<LISTENING>`) or `Netlink.reset_serial()`. The web page checks that pid under `/proc`, and also reads `netlink_config.ini` and `/boot/noautoupdates.txt` to warn when DCNet is off.
+- State lives in files: `/opt/dreampi-netswitch/dcnet_mode` (exists means DCNet is selected), `/opt/dreampi-netswitch/autoreset` (reset toggle) and `/opt/dreampi-netswitch/default_dcnet` (exists means auto reset returns to DCNet instead of DC Now; page: `POST /default`). The hook writes `/tmp/dreampi-netswitch.active` (`active pid=N` or an error). The hook also writes `/tmp/dreampi-netswitch.state` (`starting`, `ready`, `call <network>` or `unknown`, plus a unix time): `starting` when netlink is imported, `call ...` from `check_number()`, and `ready` after `__main__.Modem.start_dial_tone()` (the moment DreamPi logs `<LISTENING>`) or `Netlink.reset_serial()`. The web page checks that pid under `/proc`, and also reads `netlink_config.ini` and `/boot/noautoupdates.txt` to warn when DCNet is off.
 - Modem status: the hook adds a `logging.Handler` to DreamPi's `dreampi` logger and maps DreamPi's own messages (`<LISTENING>`, `Heard:`, `CONNECT 33600`, `Call answered`, `Connected`, `Detected modem hang up`, ...) to a short text in `/tmp/dreampi-netswitch.modem` (`<unix time> <text>`). Table `_MODEM_EVENTS`; keep it in sync if upstream log texts change.
 - The web page works on Python 3 and 2.7. It serves a static page that polls `GET /api` (JSON) every 2 s; buttons POST via XMLHttpRequest (plain form POST + 303 still works without JS). A background thread checks internet every 30 s. The debug panel is hidden behind a "Debug log" toggle button; the log is only polled while it is open. The status box shows only the DreamPi row until it is clicked, which reveals the Modem and Internet rows.
 
@@ -40,9 +43,9 @@ Download the current `netlink.py`, place it at `/home/pi/dreampi/netlink.py`, st
 
 ## Verified on hardware
 - The hook loads and patches under DreamPi's real Python 2.7.
+- A real DCNet call end to end via 333-3333.
 
 ## Not yet verified
-- A real DCNet call end to end.
 - Whether port 80 is free on every DreamPi image.
 
 ## Ideas for later
