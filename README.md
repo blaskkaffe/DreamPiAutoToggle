@@ -6,7 +6,7 @@ Switch a DreamPi between **DC Now** (normal DreamPi / Dreamcast Live) and **DCNe
 
 | Number dialed | Result |
 |---|---|
-| `111-1111` | openMenu's built-in number. Always DC Now. If **reset** is on, the selection also goes back to DC Now. |
+| `111-1111` | openMenu's built-in number (any number made only of `1`s counts, because DreamPi sometimes misses some of openMenu's digits). Always DC Now. If **reset** is on, the selection also goes back to DC Now. |
 | `222-2222` | Selects DC Now and connects through DC Now. |
 | `333-3333` | Selects DCNet and connects through DCNet. |
 | Any other number | Connects through the currently selected network. |

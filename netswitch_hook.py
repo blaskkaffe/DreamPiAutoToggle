@@ -80,7 +80,11 @@ def _select_dcnet(on):
 def _special(raw_string):
     """Which special number was dialed, matched on the last seven digits.
     DreamPi often hears an extra leading digit (e.g. 13333333), and ISP
-    settings may add a prefix or area code, so exact matching is unreliable."""
+    settings may add a prefix or area code, so exact matching is unreliable.
+    DreamPi also often loses digits of openMenu's fast dialing (heard "1111"
+    or just "1"), so any number made only of 1s counts as openMenu."""
+    if raw_string and raw_string.strip("1") == "":
+        return NUM_OPENMENU
     for number in (NUM_OPENMENU, NUM_DCNOW, NUM_DCNET):
         if raw_string.endswith(number):
             return number
