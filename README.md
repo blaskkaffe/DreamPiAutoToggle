@@ -19,12 +19,13 @@ The special numbers are matched on their last seven digits, so a leading `1`, an
 
 ## Web page
 
-`http://dreampi.local` shows the selected network, buttons for **Use DC Now** / **Use DCNet**, and the **reset on openMenu connect** toggle (off by default).
+`http://dreampi.local` shows what DreamPi is doing (starting up, ready for calls, in a call and on which network, or not running), the selected network, buttons for **Use DC Now** / **Use DCNet**, and the **reset on openMenu connect** toggle (off by default). The page refreshes itself every 5 seconds.
 
 `http://dreampi.local/status` returns plain text, for example:
 ```
 network=dcnet
 autoreset=off
+dreampi=Ready for calls
 ```
 
 ## Install

@@ -15,15 +15,19 @@ It then wraps Netlink.check_number() with these rules:
            Netlink/XBAND codes and the built-in *69 prefix are untouched.
 
 The selection is the file dcnet_mode, the reset toggle is the file autoreset.
+It also reports DreamPi's state (starting / ready / in a call) to
+/tmp/dreampi-netswitch.state for the web page.
 No DreamPi file is modified. Written for both Python 2.7 and 3.
 """
 import os
 import sys
+import time
 
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 AUTORESET = os.path.join(BASE_DIR, "autoreset")
 STATUS = "/tmp/dreampi-netswitch.active"
+STATE = "/tmp/dreampi-netswitch.state"
 NETLINK_DIR = "/home/pi/dreampi"
 
 NUM_OPENMENU = "1111111"
@@ -52,6 +56,16 @@ def _write_status(text):
     try:
         with open(STATUS, "w") as f:
             f.write(text + "\n")
+    except Exception:
+        pass
+
+
+def _write_state(state):
+    """DreamPi's current state for the web page: starting, ready,
+    call <network> or unknown, with a unix timestamp."""
+    try:
+        with open(STATE, "w") as f:
+            f.write("%s %d\n" % (state, int(time.time())))
     except Exception:
         pass
 
@@ -101,17 +115,19 @@ def _patch(module):
         result = original(self, raw_string)
 
         try:
-            if not (isinstance(result, dict) and result.get("client") == "PPP"):
-                return result  # Netlink, XBAND, *69 and idle are left alone
-            if special in (NUM_OPENMENU, NUM_DCNOW):
-                return result  # always DC Now
-            if os.path.exists(FLAG):
+            if isinstance(result, dict) and result.get("client") == "PPP" \
+                    and special not in (NUM_OPENMENU, NUM_DCNOW) and os.path.exists(FLAG):
                 if getattr(self, "dcnet", False):
                     self.mode = "dcnet"
                     self.dial_string = raw_string
                     _log(self, "routing %s to DCNet" % raw_string)
-                    return {"client": "dcnet", "dial_string": raw_string}
-                _log(self, "DCNet selected but not enabled in netlink_config.ini, using DC Now")
+                    result = {"client": "dcnet", "dial_string": raw_string}
+                else:
+                    _log(self, "DCNet selected but not enabled in netlink_config.ini, using DC Now")
+            # Netlink, XBAND, *69 and idle results pass through unchanged
+            client = result.get("client") if isinstance(result, dict) else None
+            if client and client != "idle":
+                _write_state("call " + {"PPP": "dcnow", "dcnet": "dcnet"}.get(client, client))
         except Exception:
             pass
         return result
@@ -119,6 +135,39 @@ def _patch(module):
     check_number._netswitch = True
     cls.check_number = check_number
     _write_status("active pid=%d" % os.getpid())
+    _write_state("starting")
+    _patch_ready_signals(cls)
+
+
+def _wrap_ready(cls, name):
+    """Mark DreamPi ready when cls.name has run (the dial tone starting is
+    exactly when DreamPi logs <LISTENING>)."""
+    original = getattr(cls, name, None)
+    if original is None or getattr(original, "_netswitch", False):
+        return False
+
+    def wrapper(self, *args, **kwargs):
+        value = original(self, *args, **kwargs)
+        _write_state("ready")
+        return value
+
+    wrapper._netswitch = True
+    setattr(cls, name, wrapper)
+    return True
+
+
+def _patch_ready_signals(netlink_cls):
+    # dreampi.py runs as the __main__ module and defines Modem there. It
+    # imports netlink inside process(), so Modem already exists at this point.
+    try:
+        main = sys.modules.get("__main__")
+        modem = getattr(main, "Modem", None)
+        if modem is None or not _wrap_ready(modem, "start_dial_tone"):
+            _write_state("unknown")
+        # The USB serial path goes back to idle without a dial tone
+        _wrap_ready(netlink_cls, "reset_serial")
+    except Exception:
+        pass
 
 
 def _import_hook(name, *args, **kwargs):

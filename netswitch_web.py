@@ -5,6 +5,7 @@
 import os
 import re
 import sys
+import time
 
 try:
     from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -15,11 +16,13 @@ BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 AUTORESET = os.path.join(BASE_DIR, "autoreset")
 STATUS = "/tmp/dreampi-netswitch.active"
+STATE = "/tmp/dreampi-netswitch.state"
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 80
 
 PAGE = """<!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="5">
 <title>DreamPi network</title>
 <style>
  body{{font-family:sans-serif;background:#111;color:#eee;max-width:440px;margin:32px auto;padding:0 16px;text-align:center}}
@@ -27,11 +30,14 @@ PAGE = """<!doctype html>
  button{{font-size:1.15em;width:100%;padding:15px;margin:6px 0;border:0;border-radius:10px;cursor:pointer}}
  .dcnow{{background:#e8761c;color:#fff}} .dcnet{{background:#1c6fe8;color:#fff}}
  .toggle{{background:#2a2a2a;color:#eee;font-size:1em;text-align:left}}
+ .pi{{margin:8px 0 18px;padding:10px;border-radius:8px;background:#1d1d1d;font-size:1.05em}}
+ .dot{{display:inline-block;width:.7em;height:.7em;border-radius:50%;margin-right:8px;background:{dot}}}
  .warn{{background:#7a1f1f;padding:12px;border-radius:8px;margin-top:16px;font-size:.9em;text-align:left}}
  table{{width:100%;margin-top:22px;border-collapse:collapse;font-size:.9em;text-align:left;color:#bbb}}
  td{{padding:5px 4px;border-top:1px solid #2a2a2a}} td:first-child{{white-space:nowrap;color:#eee}}
 </style></head><body>
 <h1>DreamPi</h1>
+<div class="pi"><span class="dot"></span>{pi_state}</div>
 {warning}
 <div class="now">Selected network:<br><b>{active}</b></div>
 <form method="post" action="/dcnow"><button class="dcnow">Use DC Now (default)</button></form>
@@ -59,6 +65,29 @@ def hook_problem():
     if m and not os.path.exists("/proc/" + m.group(1)):
         return "DreamPi is not running"
     return None
+
+
+def dreampi_state():
+    """(text, colour) describing what DreamPi is doing right now."""
+    problem = hook_problem()
+    if problem == "DreamPi is not running":
+        return "DreamPi is not running", "#d33"
+    try:
+        with open(STATE) as f:
+            parts = f.read().split()
+        state, since = " ".join(parts[:-1]), int(parts[-1])
+    except (IOError, ValueError, IndexError):
+        return "DreamPi state unknown", "#888"
+    mins = max(0, int(time.time()) - since) // 60
+    ago = " (%d min)" % mins if mins else ""
+    if state == "starting":
+        return "Starting up, not answering calls yet", "#e0b400"
+    if state == "ready":
+        return "Ready for calls", "#2c2"
+    if state.startswith("call "):
+        net = {"dcnow": "DC Now", "dcnet": "DCNet"}.get(state[5:], state[5:])
+        return "In a call: " + net + ago, "#39f"
+    return "DreamPi state unknown", "#888"
 
 
 def dcnet_problem():
@@ -95,7 +124,9 @@ class Handler(BaseHTTPRequestHandler):
         if problem:
             warning += ('<div class="warn"><b>DCNet unavailable:</b> %s. '
                         'All calls go to DC Now.</div>' % problem)
+        pi_state, dot = dreampi_state()
         body = PAGE.format(active="DCNet" if dcnet else "DC Now",
+                           pi_state=pi_state, dot=dot,
                            color="#1c4f9e" if dcnet else "#9e4f10",
                            box="&#9745;" if reset else "&#9744;",
                            reset_note=", and resets the selection" if reset else "",
@@ -109,9 +140,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/status":
-            body = ("network=%s\nautoreset=%s\n" % (
+            body = ("network=%s\nautoreset=%s\ndreampi=%s\n" % (
                 "dcnet" if os.path.exists(FLAG) else "dcnow",
-                "on" if os.path.exists(AUTORESET) else "off")).encode("ascii")
+                "on" if os.path.exists(AUTORESET) else "off",
+                dreampi_state()[0])).encode("ascii")
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
             self.send_header("Content-Length", str(len(body)))
