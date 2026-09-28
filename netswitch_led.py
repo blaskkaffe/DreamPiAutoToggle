@@ -1,40 +1,24 @@
 #!/usr/bin/env python3
-# DreamPi Netswitch add-on - status on a single NeoPixel (WS2812) on GPIO10.
+# DreamPi Netswitch add-on - status on a single NeoPixel (WS2812) on GPIO18.
 #
-# GPIO10 is the Pi's SPI data pin (MOSI). Each NeoPixel bit is sent as one SPI
-# byte at ~6.25 MHz: 0b11111000 for a 1 (0.8 us high) and 0b11000000 for a 0
-# (0.32 us high). That meets WS2812 timing without DMA or special drivers.
-# Needs SPI enabled (dtparam=spi=on). Talks to /dev/spidevB.D directly with
-# ioctl + write, so no extra Python package (spidev) is needed.
+# GPIO18 is the Pi's PWM0 output. The PWM block runs in serialiser mode from
+# the crystal (19.2 MHz / 8 = 2.4 MHz; 54 MHz / 22 on a Pi 4), independent of
+# CPU/core clock changes, so each PWM bit lasts about 417 ns. Every NeoPixel bit becomes three PWM
+# bits: 100 for a 0 (417 ns high) and 110 for a 1 (833 ns high). One pixel is
+# 72 PWM bits, which fits in the PWM FIFO, so no DMA or driver is needed: the
+# registers are written directly through /dev/mem (the service runs as root).
+# When the FIFO runs empty the pin stays low, which latches the colour.
 #
 # Shows the same DreamPi status as the web page, using the same colours.
-# Works on Python 3 and 2.7.
-import fcntl
+import ctypes
+import mmap
 import os
 import signal
-import struct
 import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import netswitch_web as web  # noqa: E402  (reuses the page's status logic)
-
-
-# spidev ioctls, _IOW('k', nr, size): mode (u8) and max speed (u32)
-SPI_IOC_WR_MODE = 0x40016b01
-SPI_IOC_WR_MAX_SPEED_HZ = 0x40046b04
-
-
-class Spi(object):
-    """Minimal SPI output through the kernel's spidev device."""
-
-    def __init__(self, bus, device, hz):
-        self.fd = os.open("/dev/spidev%d.%d" % (bus, device), os.O_RDWR)
-        fcntl.ioctl(self.fd, SPI_IOC_WR_MODE, struct.pack("B", 0))
-        fcntl.ioctl(self.fd, SPI_IOC_WR_MAX_SPEED_HZ, struct.pack("I", hz))
-
-    def send(self, data):
-        os.write(self.fd, bytes(bytearray(data)))
 
 # Status (as returned by web.dreampi_state) -> (red, green, blue, blink)
 COLOURS = {
@@ -48,36 +32,122 @@ COLOURS = {
 }
 
 BRIGHTNESS = float(os.environ.get("NETSWITCH_LED_BRIGHTNESS", "0.15"))
-SPI_BUS = int(os.environ.get("NETSWITCH_LED_SPI_BUS", "0"))      # GPIO10 = bus 0
-SPI_DEVICE = int(os.environ.get("NETSWITCH_LED_SPI_DEVICE", "0"))
-SPI_HZ = 6400000   # the Pi rounds down to 6.25 MHz at both 250 and 400 MHz core
-ONE, ZERO = 0xF8, 0xC0
-RESET = [0] * 48   # > 50 us low latches the colour
+
+# ---------------------------------------------------------------- registers
+GPIO_OFFSET = 0x200000
+CLOCK_OFFSET = 0x101000
+PWM_OFFSET = 0x20C000
+
+GPFSEL1 = 0x04                 # GPIO 10-19 function select
+CM_PWMCTL, CM_PWMDIV = 0xA0, 0xA4
+CM_PASSWD = 0x5A000000
+CM_ENAB, CM_BUSY, CM_SRC_OSC = 0x10, 0x80, 1
+PWM_BIT_HZ = 2400000           # 3 PWM bits per NeoPixel bit = 800 kHz
+
+PWM_CTL, PWM_STA, PWM_RNG1, PWM_FIF1 = 0x00, 0x04, 0x10, 0x18
+PWEN1, MODE1, USEF1, CLRF1 = 0x01, 0x02, 0x20, 0x40
+STA_EMPT1 = 0x02
+STA_ERRORS = 0x1FC             # write 1 to clear WERR/RERR/GAPO/BERR
+
+
+def peripheral_base():
+    """Physical peripheral address (Pi 1/Zero, Pi 2/3 and Pi 4 differ)."""
+    try:
+        with open("/proc/device-tree/soc/ranges", "rb") as f:
+            ranges = bytearray(f.read(12))
+        base = int.from_bytes(ranges[4:8], "big")
+        if base == 0:   # Pi 4: 64-bit parent address
+            base = int.from_bytes(ranges[8:12], "big")
+        return base
+    except (IOError, OSError):
+        return 0x3F000000   # Pi 2/3
+
+
+class Block(object):
+    """One 4 KB register block mapped from /dev/mem, 32-bit accesses only."""
+
+    def __init__(self, fd, address):
+        self.mem = mmap.mmap(fd, 4096, mmap.MAP_SHARED,
+                             mmap.PROT_READ | mmap.PROT_WRITE, offset=address)
+
+    def __getitem__(self, offset):
+        return ctypes.c_uint32.from_buffer(self.mem, offset).value
+
+    def __setitem__(self, offset, value):
+        ctypes.c_uint32.from_buffer(self.mem, offset).value = value & 0xFFFFFFFF
+
+
+class PwmPixel(object):
+    def __init__(self, gpio, clock, pwm, osc_hz=19200000):
+        self.gpio, self.clock, self.pwm = gpio, clock, pwm
+        divider = int(round(float(osc_hz) / PWM_BIT_HZ))
+        # GPIO18 -> ALT5 (PWM0): bits 24-26 of GPFSEL1 = 0b010
+        self.gpio[GPFSEL1] = (self.gpio[GPFSEL1] & ~(7 << 24)) | (2 << 24)
+        # PWM clock from the crystal
+        self.pwm[PWM_CTL] = 0
+        self.clock[CM_PWMCTL] = CM_PASSWD | (self.clock[CM_PWMCTL] & 0xFF & ~CM_ENAB)
+        self._wait(lambda: not self.clock[CM_PWMCTL] & CM_BUSY)
+        self.clock[CM_PWMDIV] = CM_PASSWD | (divider << 12)
+        self.clock[CM_PWMCTL] = CM_PASSWD | CM_SRC_OSC
+        self.clock[CM_PWMCTL] = CM_PASSWD | CM_SRC_OSC | CM_ENAB
+        self._wait(lambda: self.clock[CM_PWMCTL] & CM_BUSY)
+        self.pwm[PWM_RNG1] = 32
+
+    @staticmethod
+    def _wait(done, timeout=0.1):
+        end = time.time() + timeout
+        while not done() and time.time() < end:
+            time.sleep(0.0001)
+
+    def show(self, words):
+        pwm = self.pwm
+        pwm[PWM_CTL] = 0                     # stop; the pin idles low
+        pwm[PWM_STA] = STA_ERRORS
+        pwm[PWM_CTL] = CLRF1                 # empty the FIFO
+        time.sleep(0.0001)
+        for w in words:
+            pwm[PWM_FIF1] = w
+        pwm[PWM_CTL] = PWEN1 | MODE1 | USEF1  # shift it out once, then stay low
+        self._wait(lambda: pwm[PWM_STA] & STA_EMPT1, 0.01)
 
 
 def encode(r, g, b):
-    """WS2812 wants green, red, blue, most significant bit first."""
-    out = []
+    """GRB, most significant bit first, 3 PWM bits per NeoPixel bit,
+    packed into 32-bit FIFO words (the unused tail stays low)."""
+    bits = 0
     for byte in (g, r, b):
         for i in range(7, -1, -1):
-            out.append(ONE if (byte >> i) & 1 else ZERO)
-    return RESET + out + RESET
+            bits = (bits << 3) | (0b110 if (byte >> i) & 1 else 0b100)
+    bits <<= 96 - 72
+    return [(bits >> shift) & 0xFFFFFFFF for shift in (64, 32, 0)]
 
 
 def scaled(r, g, b):
     return tuple(int(round(c * BRIGHTNESS)) for c in (r, g, b))
 
 
+def open_pixel():
+    base = peripheral_base()
+    osc_hz = 54000000 if base == 0xFE000000 else 19200000   # Pi 4 crystal
+    fd = os.open("/dev/mem", os.O_RDWR | os.O_SYNC)
+    try:
+        return PwmPixel(Block(fd, base + GPIO_OFFSET),
+                        Block(fd, base + CLOCK_OFFSET),
+                        Block(fd, base + PWM_OFFSET), osc_hz)
+    finally:
+        os.close(fd)   # the mappings stay valid
+
+
 def main():
     try:
-        spi = Spi(SPI_BUS, SPI_DEVICE, SPI_HZ)
+        pixel = open_pixel()
     except (IOError, OSError) as e:
-        sys.exit("Cannot open /dev/spidev%d.%d (%s). Is SPI enabled "
-                 "(dtparam=spi=on in config.txt, then reboot)?" % (SPI_BUS, SPI_DEVICE, e))
+        sys.exit("Cannot access the PWM hardware through /dev/mem (%s). "
+                 "The LED service must run as root." % e)
 
     def off(*_):
         try:
-            spi.send(encode(0, 0, 0))
+            pixel.show(encode(0, 0, 0))
         finally:
             sys.exit(0)
 
@@ -90,9 +160,8 @@ def main():
         r, g, b, blink = COLOURS.get(state, COLOURS["unknown"])
         phase = not phase
         colour = scaled(r, g, b) if (phase or not blink) else (0, 0, 0)
-        # Sent every half second, so a glitch (e.g. a CPU clock change during
-        # a transfer) fixes itself straight away.
-        spi.send(encode(*colour))
+        # Sent every half second, so a garbled frame fixes itself.
+        pixel.show(encode(*colour))
         time.sleep(0.5)
 
 

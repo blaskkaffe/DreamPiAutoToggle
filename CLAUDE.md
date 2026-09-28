@@ -17,7 +17,7 @@ User-facing text (web page, README, log lines) spells the networks **DCNow!** an
 - The web page works on Python 3 and 2.7. It serves a static page that polls `GET /api` (JSON) every 2 s; buttons POST via XMLHttpRequest (plain form POST + 303 still works without JS). A background thread checks internet every 30 s. The debug panel is hidden behind a "Debug log" toggle button; the log is only polled while it is open. The status box shows only the DreamPi row until it is clicked, which reveals the Modem and Internet rows.
 
 ## Status NeoPixel
-`netswitch_led.py` (Python 3, service `dreampi-netswitch-led`, installed with `install.sh --led`, remembered via `/opt/dreampi-netswitch/led_enabled`, removed with `--no-led`) imports `netswitch_web` and shows `dreampi_state()` on one WS2812 on GPIO10 via SPI (`/dev/spidev0.0` driven directly with `ioctl` + `write`, no spidev package; 6.4 MHz requested, 6.25 MHz actual: `0xF8` = 1, `0xC0` = 0, 48 zero bytes reset on each side, GRB order). It resends every 0.5 s, so a garbled frame fixes itself. Colours match the page's dot classes (`ok`, `busy`, `call-dcnow`, `call-dcnet`, `call`, `off`, `unknown`); `busy` and `off` blink. The installer adds `dtparam=spi=on  # added by dreampi-netswitch` to config.txt only if SPI is off, records that in `spi_added`, and uninstall removes only that line.
+`netswitch_led.py` (Python 3, service `dreampi-netswitch-led` running as root, installed with `install.sh --led`, remembered via `/opt/dreampi-netswitch/led_enabled`, removed with `--no-led`) imports `netswitch_web` and shows `dreampi_state()` on one WS2812 on **GPIO18** (PWM0, physical pin 12). No driver or package: it maps the GPIO, clock-manager and PWM register blocks from `/dev/mem` (peripheral base read from `/proc/device-tree/soc/ranges`; 32-bit accesses via `ctypes.c_uint32.from_buffer`), sets GPIO18 to ALT5, runs the PWM clock from the crystal (19.2 MHz / 8 = 2.4 MHz; Pi 4: 54 MHz / 22) and uses serialiser mode with the FIFO: 3 PWM bits per LED bit (`100` = 0, `110` = 1), 72 bits = 3 FIFO words, GRB order, MSB first. With `RPTL1` off the pin idles low when the FIFO empties, which latches the colour. It resends every 0.5 s. Analog audio also uses PWM; DreamPi doesn't play sound. Colours match the page's dot classes (`ok`, `busy`, `call-dcnow`, `call-dcnet`, `call`, `off`, `unknown`); `busy` and `off` blink. Older versions used SPI on GPIO10 and added `dtparam=spi=on  # added by dreampi-netswitch` (recorded in `spi_added`); the installer and uninstaller remove only that line.
 
 ## Debug log
 If `/opt/dreampi-netswitch/debug_dtmf` exists, the hook writes one timeline to `/tmp/dreampi-netswitch-dtmf.log` (`HH:MM:SS.mmm  +Nms  text`):
@@ -47,6 +47,7 @@ Download the current `netlink.py`, place it at `/home/pi/dreampi/netlink.py`, st
 - A real DCNet call end to end via 333-3333.
 
 ## Not yet verified
+- The GPIO18 PWM NeoPixel driver on real hardware (register sequence only tested against fake memory).
 - Whether port 80 is free on every DreamPi image.
 
 ## Ideas for later

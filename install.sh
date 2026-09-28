@@ -5,7 +5,7 @@
 #   sudo ./install.sh 8080         use another port for the web page
 #   sudo ./install.sh --https-port=8443   HTTPS on another port (default 443)
 #   sudo ./install.sh --no-https   plain HTTP only
-#   sudo ./install.sh --led        also show the status on a NeoPixel on GPIO10
+#   sudo ./install.sh --led        also show the status on a NeoPixel on GPIO18
 #   sudo ./install.sh --no-led     remove the NeoPixel service again
 #
 # Once --led has been used, later updates keep the LED until --no-led.
@@ -90,21 +90,18 @@ EOF
 
 # ---------------------------------------------------------------- NeoPixel
 if [ "$LED" = keep ] && [ -f "$DEST/led_enabled" ]; then LED=on; fi
-NEED_REBOOT=0
 if [ "$LED" = on ]; then
     touch "$DEST/led_enabled"
-    # SPI drives the NeoPixel on GPIO10 (MOSI)
-    CONFIG=/boot/config.txt
-    [ -f /boot/firmware/config.txt ] && CONFIG=/boot/firmware/config.txt
-    if ! grep -q "^dtparam=spi=on" "$CONFIG"; then
-        echo "dtparam=spi=on  # added by dreampi-netswitch" >> "$CONFIG"
-        echo "$CONFIG" > "$DEST/spi_added"
-        echo "Enabled SPI in $CONFIG"
+    # The LED uses GPIO18's PWM directly. Older versions used SPI on GPIO10:
+    # take back the SPI line they added, it isn't needed any more.
+    if [ -f "$DEST/spi_added" ]; then
+        sed -i '/^dtparam=spi=on  # added by dreampi-netswitch$/d' "$(cat "$DEST/spi_added")"
+        rm -f "$DEST/spi_added"
+        echo "Removed the SPI setting added by an older version (not needed any more)."
     fi
-    [ -e /dev/spidev0.0 ] || NEED_REBOOT=1
     cat > /etc/systemd/system/dreampi-netswitch-led.service <<EOF
 [Unit]
-Description=DreamPi Netswitch status NeoPixel (GPIO10)
+Description=DreamPi Netswitch status NeoPixel (GPIO18)
 After=network.target
 
 [Service]
@@ -119,7 +116,7 @@ EOF
 elif [ "$LED" = off ]; then
     systemctl disable --now dreampi-netswitch-led.service 2>/dev/null || true
     rm -f /etc/systemd/system/dreampi-netswitch-led.service "$DEST/led_enabled"
-    echo "NeoPixel service removed (SPI stays enabled)."
+    echo "NeoPixel service removed."
 fi
 
 systemctl daemon-reload
@@ -135,8 +132,5 @@ echo
 echo "Installed. Open http://dreampi.local$( [ "$PORT" = 80 ] || echo ":$PORT" )"
 if [ "$HTTPS_PORT" != 0 ] && [ -f "$DEST/https.crt" ]; then
     echo "      or https://dreampi.local$( [ "$HTTPS_PORT" = 443 ] || echo ":$HTTPS_PORT" )  (accept the certificate warning once)"
-fi
-if [ "$NEED_REBOOT" = 1 ]; then
-    echo "Reboot once (sudo reboot) to switch on SPI for the NeoPixel."
 fi
 echo "Uninstall any time with: sudo $DEST/uninstall.sh"

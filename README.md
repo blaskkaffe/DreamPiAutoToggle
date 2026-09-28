@@ -40,7 +40,7 @@ Your settings (selected network, default network, Auto reset, LED) are kept. If 
 ```
 sudo /opt/dreampi-netswitch/uninstall.sh
 ```
-This removes the services, the hook and the SPI setting (only if the installer added it), and restarts DreamPi.
+This removes the services and the hook, and restarts DreamPi.
 
 ## Requirements
 
@@ -105,17 +105,17 @@ The dot next to **DreamPi** on the web page and the optional NeoPixel use the sa
 A single WS2812 / NeoPixel LED can show the DreamPi status next to the Pi.
 
 **Wiring:**
-- Data in to **GPIO10** (physical pin 19).
+- Data in to **GPIO18** (physical pin 12).
 - Power to **3.3 V** (pin 1).
 - Ground to **GND** (pin 6).
 
-Powering one pixel from 3.3 V keeps its data input compatible with the Pi's 3.3 V signal. The LED is driven through the Pi's SPI port, which gives accurate NeoPixel timing without special drivers or extra Python packages.
+Powering one pixel from 3.3 V keeps its data input compatible with the Pi's 3.3 V signal. The LED is driven by the Pi's PWM hardware on GPIO18, clocked from the crystal, which gives accurate NeoPixel timing without special drivers, extra Python packages or config changes. PWM is also what the Pi's analog (3.5 mm jack) audio uses, so don't play sound through the jack while the LED is running; DreamPi doesn't use it.
 
-**Install:** run `sudo ./install.sh --led`. This switches on SPI (`dtparam=spi=on` in `config.txt`) and starts the `dreampi-netswitch-led` service. The first time, reboot once (`sudo reboot`) so SPI becomes active; the installer tells you when that's needed. Later updates keep the LED until you run `sudo ./install.sh --no-led`.
+**Install:** run `sudo ./install.sh --led`. This starts the `dreampi-netswitch-led` service; no reboot is needed. Later updates keep the LED until you run `sudo ./install.sh --no-led`. If an older version switched on SPI for the LED, the installer removes that setting again.
 
 **Brightness:** set `NETSWITCH_LED_BRIGHTNESS` (0 to 1, default 0.15) in `/etc/systemd/system/dreampi-netswitch-led.service`, then run `sudo systemctl daemon-reload && sudo systemctl restart dreampi-netswitch-led`.
 
-If the LED stays dark, `systemctl status dreampi-netswitch-led` shows why (for example, SPI not enabled yet).
+If the LED stays dark, `systemctl status dreampi-netswitch-led` shows why.
 
 ## Debug log
 
