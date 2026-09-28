@@ -19,12 +19,11 @@ The special numbers are matched on their last seven digits, so a leading `1`, an
 
 ## Web page
 
-`http://dreampi.local` updates live (every 2 seconds) and shows:
+`http://dreampi.local` updates live (every second). The status box at the top shows only the **DreamPi** row; tap it (the small arrow) to show the Modem and Internet rows as well:
 
 - **DreamPi:** starting up, ready for calls, in a call (and on which network), or not running.
 - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DC Now or DCNet, call ended.
 - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online` (checked every 30 seconds).
-- **Ports:** whether each game from the [Dreamcast Live connection guide](https://dreamcastlive.net/connection-guide/) has a path for incoming traffic (checked every 10 minutes, or with **Check again**). If DreamPi's VPN tunnel (`tun0`) is up, incoming traffic arrives through the VPN and no router forwarding is needed. Without the VPN, the router is asked over UPnP whether each port is forwarded to the Dreamcast. This checks the forwarding setup; it can't prove a port is reachable from the internet (that needs an outside test, and isn't possible for UDP), and a DMZ isn't visible over UPnP.
 - The selected network, the **Use DC Now** / **Use DCNet** buttons and the **reset on openMenu connect** toggle (off by default).
 
 `http://dreampi.local/api` returns everything as JSON, and `http://dreampi.local/status` as plain text, for example:
@@ -60,13 +59,13 @@ A single WS2812 / NeoPixel LED can show the DreamPi status next to the Pi.
 
 ## Debug log
 
-Tick **Debug log** at the bottom of the web page and dial. A live panel on the page shows one timeline with millisecond timing:
+The debug log is hidden by default. Click **Debug log** at the bottom of the web page to open it (click again to close), make sure **Recording** is on, and dial. The panel shows one live timeline with millisecond timing:
 
 - what the modem reports while DreamPi listens: each dialed digit (`DTMF 1`), dial tone underruns, calling tones, and its replies (`OK`, `CONNECT 33600`),
 - every message DreamPi logs (heard, mode, answering, carrier speed, hang-up),
 - the add-on's routing decisions and your button presses.
 
-**Clear** empties it, **Open as text** shows the whole file (`http://dreampi.local/dtmf`), and unticking stops recording.
+**Clear** empties it, **Open as text** shows the whole file (`http://dreampi.local/dtmf`), and switching **Recording** off stops recording.
 
 ## Install
 
