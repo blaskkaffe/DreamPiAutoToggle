@@ -231,7 +231,7 @@ PAGE = u"""<!doctype html>
  .prefs .check.on.dcnow{background:#e8761c;border-color:#e8761c} .prefs .check.on.dcnet{background:#1c6fe8;border-color:#1c6fe8}
  .warnbox{background:#7a1f1f;padding:11px;border-radius:8px;margin:8px 0;font-size:.9em}
  table{width:100%;border-collapse:collapse;font-size:.88em}
- td{padding:5px 3px;border-top:1px solid #2a2a2a;vertical-align:top} td.n{color:#eee;white-space:nowrap;padding-right:10px}
+ td{padding:5px 3px;border-top:1px solid #2a2a2a;vertical-align:top} td.n{color:#eee;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;width:1%;padding-right:12px}
  h2{font-size:1em;color:#bbb;margin:22px 0 6px}
  .note{color:#999;font-size:.85em;margin:4px 0 8px}
  .small button{font-size:.85em;padding:8px;width:auto} a{color:#8bf}
