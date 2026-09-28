@@ -25,6 +25,12 @@ FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 AUTORESET = os.path.join(BASE_DIR, "autoreset")
 DEFAULT_DCNET = os.path.join(BASE_DIR, "default_dcnet")
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
+STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+STATIC_FILES = {   # only these are served from /static/
+    "three.min.js": "application/javascript; charset=utf-8",
+    "dc-background.js": "application/javascript; charset=utf-8",
+    "LICENSES.txt": "text/plain; charset=utf-8",
+}
 LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness + colours
 LED_ENABLED = os.path.join(BASE_DIR, "led_enabled")  # written by install.sh --led
 STATUS = "/tmp/dreampi-netswitch.active"
@@ -366,13 +372,21 @@ PAGE = u"""<!doctype html>
  input[type=color]{-webkit-appearance:none;appearance:none;width:30px;height:30px;padding:0;border:2px solid #555;border-radius:7px;background:none;vertical-align:middle;cursor:pointer}
  input[type=color]::-webkit-color-swatch-wrapper{padding:0} input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
  input[type=color]::-moz-color-swatch{border:0;border-radius:4px}
- .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range input{flex:1;accent-color:var(--dcnow)}
+ .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range > span:first-child{white-space:nowrap} .range input{flex:1;min-width:60px;accent-color:var(--dcnow)}
  .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
  #log{background:#0a0a0a;border:1px solid var(--line);border-radius:12px;padding:8px;font-size:11px;line-height:1.45;
       height:55vh;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:12px}
  #log .dtmf{color:#6f6;font-weight:bold} #log .route{color:#8bf} #log .web{color:#e0b400}
  #log .modem{color:#aaa} #log .dim{color:#555} #log .err{color:#f66}
+ #dcbg{position:fixed;top:0;left:0;width:100%;height:100vh;z-index:-1;overflow:hidden;pointer-events:none}
+ body.dcbg{background:linear-gradient(to bottom,#9cc3dc,#4d639c) fixed;min-height:100vh}
+ body.dcbg{--card:rgba(20,20,20,.78)} body.dcbg .rows,body.dcbg .wide{background:rgba(20,20,20,.78)}
+ body.dcbg h1,body.dcbg .cog{text-shadow:0 1px 4px rgba(0,0,0,.6)} body.dcbg .cog{color:#eee}
+ body.settings-open > :not(#settings):not(#dcbg){visibility:hidden}
+ body.dcbg #settings{background:transparent}
+ body.dcbg .note,body.dcbg h2{color:#eee;text-shadow:0 1px 3px rgba(0,0,0,.8)}
 </style></head><body>
+<div id="dcbg"></div>
 <header><h1>DreamPi</h1><button class="cog" id="cog" type="button" title="Settings" aria-label="Settings">&#9881;</button></header>
 <div id="warnings"></div>
 <div class="card rows" id="rows" title="Show or hide details">
@@ -416,6 +430,12 @@ millisecond timing. Turn recording on, then dial.</div>
 <tr><td class="n">Any other</td><td>Connects to the currently selected network.<br>
 <span class="sub">Set your Dreamcast ISP config to any 7-digit number to use this feature.</span></td></tr>
 </table>
+</div>
+
+<h2>Appearance</h2>
+<div class="card">
+ <div class="srow"><span>Dreamcast background<span class="sub">Animated, saved in this browser only</span></span>
+  <input type="checkbox" class="cbox dcnow" id="bg-b" aria-label="Dreamcast background"></div>
 </div>
 
 <h2>Status LED <span class="saved" id="led-saved">Saved &#10003;</span></h2>
@@ -463,6 +483,20 @@ function showSettings(open){$("settings").classList.toggle("open",open);
 $("cog").onclick=function(){showSettings(true)};
 $("close-settings").onclick=function(){showSettings(false)};
 document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(lvlCur)closeLvl();else showSettings(false)}});
+// Optional Dreamcast background (static/dc-background.js), remembered per browser
+function bgWanted(){try{return localStorage.getItem("netswitch-bg")==="on"}catch(e){return false}}
+function loadScript(src,done){var sc=document.createElement("script");sc.src=src;sc.onload=done;
+ sc.onerror=function(){document.body.classList.remove("dcbg")};document.head.appendChild(sc)}
+function setBg(on){
+ try{localStorage.setItem("netswitch-bg",on?"on":"off")}catch(e){}
+ $("bg-b").checked=on;document.body.classList.toggle("dcbg",on);
+ if(!on){if(window.DCBackground)DCBackground.stop();return}
+ function go(){if(document.body.classList.contains("dcbg"))DCBackground.start($("dcbg"))}
+ if(window.DCBackground)go();
+ else if(window.THREE)loadScript("/static/dc-background.js",go);
+ else loadScript("/static/three.min.js",function(){loadScript("/static/dc-background.js",go)})}
+$("bg-b").onchange=function(){setBg(this.checked)};
+if(bgWanted())setBg(true);
 var led=null,ledDefaults=null,ledTimer=null;
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
@@ -569,6 +603,24 @@ class Handler(BaseHTTPRequestHandler):
             self.send("network=%s\ndefault=%s\nautoreset=%s\ndreampi=%s\nmodem=%s\ninternet=%s\n" % (
                 d["network"], d["default"], "on" if d["autoreset"] else "off", d["dreampi"]["text"],
                 d["modem"]["text"], d["internet"]["text"]), "text/plain; charset=utf-8")
+        elif self.path.startswith("/static/"):
+            name = self.path[len("/static/"):].split("?")[0]
+            try:
+                if name not in STATIC_FILES:
+                    raise IOError(name)
+                with open(os.path.join(STATIC_DIR, name), "rb") as f:
+                    body = f.read()
+            except (IOError, OSError):
+                self.send_response(404)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", STATIC_FILES[name])
+            self.send_header("Cache-Control", "max-age=86400")   # 600 KB, fetch once a day
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         elif self.path == "/ledconfig":
             self.send(json.dumps({"config": led_config(), "defaults": default_led_config(),
                                   "states": LED_STATES,

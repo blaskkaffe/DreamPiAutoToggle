@@ -30,6 +30,8 @@ if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--
 
 mkdir -p "$DEST"
 cp "$SRC/netswitch_hook.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/uninstall.sh" "$DEST/"
+mkdir -p "$DEST/static"
+cp "$SRC/static/three.min.js" "$SRC/static/dc-background.js" "$SRC/static/LICENSES.txt" "$DEST/static/"
 chmod +x "$DEST/uninstall.sh"
 
 # Tell every installed Python to load the hook at startup (.pth file)
