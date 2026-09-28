@@ -12,10 +12,13 @@ import sys
 import threading
 import time
 
+import ssl
 try:
     from http.server import BaseHTTPRequestHandler, HTTPServer
+    from socketserver import ThreadingMixIn
 except ImportError:
     from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+    from SocketServer import ThreadingMixIn
 
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
@@ -27,6 +30,9 @@ STATE = "/tmp/dreampi-netswitch.state"
 MODEM = "/tmp/dreampi-netswitch.modem"
 DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 80
+HTTPS_PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 443   # 0 = no HTTPS
+CERT = os.path.join(BASE_DIR, "https.crt")   # self-signed, made by install.sh
+KEY = os.path.join(BASE_DIR, "https.key")
 
 INTERNET_EVERY = 30   # seconds between internet checks
 
@@ -414,8 +420,52 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+class Server(ThreadingMixIn, HTTPServer):
+    """One thread per request, so a slow client never blocks the page."""
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def handle_error(self, request, client_address):
+        pass   # dropped connections, rejected certificates, etc.
+
+
+class HTTPSServer(Server):
+    """Same page over HTTPS. The TLS handshake runs in the request's own
+    thread, so a browser still showing the certificate warning can't stall
+    other requests."""
+
+    def __init__(self, address, handler, context):
+        self.context = context
+        Server.__init__(self, address, handler)
+
+    def finish_request(self, request, client_address):
+        request.settimeout(15)
+        request = self.context.wrap_socket(request, server_side=True)
+        Server.finish_request(self, request, client_address)
+
+
+def start_https():
+    if not HTTPS_PORT:
+        return
+    if not (os.path.exists(CERT) and os.path.exists(KEY)):
+        sys.stderr.write("HTTPS off: no certificate at %s (run install.sh)\n" % CERT)
+        return
+    try:
+        protocol = getattr(ssl, "PROTOCOL_TLS_SERVER", ssl.PROTOCOL_SSLv23)
+        context = ssl.SSLContext(protocol)
+        context.load_cert_chain(CERT, KEY)
+        server = HTTPSServer(("", HTTPS_PORT), Handler, context)
+    except Exception as e:   # port taken, bad certificate: keep plain HTTP running
+        sys.stderr.write("HTTPS off: %s\n" % e)
+        return
+    t = threading.Thread(target=server.serve_forever)
+    t.daemon = True
+    t.start()
+
+
 if __name__ == "__main__":
     t = threading.Thread(target=checker)
     t.daemon = True
     t.start()
-    HTTPServer(("", PORT), Handler).serve_forever()
+    start_https()
+    Server(("", PORT), Handler).serve_forever()

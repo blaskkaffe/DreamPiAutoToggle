@@ -3,6 +3,8 @@
 #
 #   sudo ./install.sh              install or update (web page on port 80)
 #   sudo ./install.sh 8080         use another port for the web page
+#   sudo ./install.sh --https-port=8443   HTTPS on another port (default 443)
+#   sudo ./install.sh --no-https   plain HTTP only
 #   sudo ./install.sh --led        also show the status on a NeoPixel on GPIO10
 #   sudo ./install.sh --no-led     remove the NeoPixel service again
 #
@@ -11,17 +13,20 @@ set -e
 DEST=/opt/dreampi-netswitch
 SRC="$(cd "$(dirname "$0")" && pwd)"
 PORT=80
+HTTPS_PORT=443
 LED=keep
 for arg in "$@"; do
     case "$arg" in
         --led) LED=on ;;
         --no-led) LED=off ;;
+        --https-port=*) HTTPS_PORT="${arg#--https-port=}" ;;
+        --no-https) HTTPS_PORT=0 ;;
         [0-9]*) PORT="$arg" ;;
         *) echo "Unknown option: $arg"; exit 1 ;;
     esac
 done
 
-if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--led|--no-led]"; exit 1; fi
+if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--led|--no-led]"; exit 1; fi
 
 mkdir -p "$DEST"
 cp "$SRC/netswitch_hook.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/uninstall.sh" "$DEST/"
@@ -39,6 +44,36 @@ for PY in python python2 python3; do
     echo "Hook registered for $PY ($SITE)"
 done
 
+# Self-signed certificate for the HTTPS page. Kept on updates, renewed when it
+# expires within 30 days. 820 days: Apple devices refuse certificates valid
+# for more than 825 days.
+if [ -f "$DEST/https.crt" ] && command -v openssl >/dev/null 2>&1 \
+        && ! openssl x509 -checkend 2592000 -noout -in "$DEST/https.crt" >/dev/null 2>&1; then
+    rm -f "$DEST/https.crt" "$DEST/https.key"
+fi
+if [ "$HTTPS_PORT" != 0 ] && [ ! -f "$DEST/https.crt" ]; then
+    if command -v openssl >/dev/null 2>&1; then
+        HOST=$(hostname)
+        SAN="DNS:dreampi.local,DNS:$HOST.local,DNS:$HOST,DNS:localhost,IP:127.0.0.1"
+        for IP in $(hostname -I 2>/dev/null); do
+            case "$IP" in *:*) ;; *) SAN="$SAN,IP:$IP" ;; esac
+        done
+        CNF=$(mktemp)
+        printf '[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=dreampi.local\nO=DreamPi Netswitch\n[ext]\nsubjectAltName=%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n' "$SAN" > "$CNF"
+        if openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 820 \
+                -keyout "$DEST/https.key" -out "$DEST/https.crt" -config "$CNF" >/dev/null 2>&1; then
+            chmod 600 "$DEST/https.key"
+            echo "Created a self-signed HTTPS certificate"
+        else
+            rm -f "$DEST/https.key" "$DEST/https.crt"
+            echo "Could not create an HTTPS certificate, the page stays HTTP only"
+        fi
+        rm -f "$CNF"
+    else
+        echo "openssl not found, the page stays HTTP only"
+    fi
+fi
+
 WEBPY=$(command -v python3 || command -v python)
 cat > /etc/systemd/system/dreampi-netswitch.service <<EOF
 [Unit]
@@ -46,7 +81,7 @@ Description=DreamPi Netswitch web page
 After=network.target
 
 [Service]
-ExecStart=$WEBPY $DEST/netswitch_web.py $PORT
+ExecStart=$WEBPY $DEST/netswitch_web.py $PORT $HTTPS_PORT
 Restart=always
 
 [Install]
@@ -98,6 +133,9 @@ systemctl restart dreampi.service 2>/dev/null || echo "Could not restart DreamPi
 
 echo
 echo "Installed. Open http://dreampi.local$( [ "$PORT" = 80 ] || echo ":$PORT" )"
+if [ "$HTTPS_PORT" != 0 ] && [ -f "$DEST/https.crt" ]; then
+    echo "      or https://dreampi.local$( [ "$HTTPS_PORT" = 443 ] || echo ":$HTTPS_PORT" )  (accept the certificate warning once)"
+fi
 if [ "$NEED_REBOOT" = 1 ]; then
     echo "Reboot once (sudo reboot) to switch on SPI for the NeoPixel."
 fi

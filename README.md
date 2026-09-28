@@ -12,10 +12,20 @@ git clone https://github.com/blaskkaffe/DreamPiAutoToggle.git
 cd DreamPiAutoToggle
 sudo ./install.sh
 ```
-Then open **http://dreampi.local** in a browser on the same network.
+Then open **http://dreampi.local** or **https://dreampi.local** in a browser on the same network. If `dreampi.local` doesn't resolve on a device, use the Pi's IP address instead.
+
+### HTTPS
+
+Some browsers refuse or keep upgrading plain `http://` pages, so the page is also served over HTTPS on port 443. A Pi on a home network can't get a certificate from a public authority, so the installer makes its own (self-signed) certificate:
+
+- The first time you open `https://dreampi.local`, the browser warns that the connection isn't private. Choose **Advanced** and **Proceed** (the wording varies); most browsers remember that choice for the site.
+- The traffic is still encrypted; the warning only means no public authority vouches for the certificate.
+- The certificate is valid for about 2 years (Apple devices won't accept longer). Running the installer renews it when it has less than 30 days left.
+- `http://` keeps working as before.
 
 Options:
-- `sudo ./install.sh 8080` puts the web page on another port, if port 80 is taken.
+- `sudo ./install.sh 8080` puts the HTTP page on another port, if port 80 is taken.
+- `sudo ./install.sh --https-port=8443` puts the HTTPS page on another port, and `--no-https` turns it off.
 - `sudo ./install.sh --led` adds the status NeoPixel (see below). `--no-led` removes it again.
 
 ### Update
