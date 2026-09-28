@@ -302,7 +302,7 @@ PAGE = u"""<!doctype html>
  body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#111;color:#eee;max-width:460px;margin:24px auto;padding:0 16px}
  header{position:relative;margin-bottom:16px} h1{text-align:center;margin:0;font-size:1.9em}
  h2{font-size:.8em;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 4px 8px;font-weight:600}
- .card{background:var(--card);border-radius:14px;padding:4px 16px;margin-bottom:14px}
+ .card{background:var(--card);border-radius:var(--r);padding:6px 20px;margin-bottom:14px}
  .sub{color:#888;font-size:.85em} .note{color:var(--muted);font-size:.85em;margin:8px 4px} a{color:#8bf}
  button{font:inherit;cursor:pointer;border:0;color:#fff}
  .rows{cursor:pointer;user-select:none;border-radius:var(--r);border:5px solid #3a3a3a;padding:2px 20px}
