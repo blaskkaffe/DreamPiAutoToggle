@@ -25,6 +25,8 @@ FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 AUTORESET = os.path.join(BASE_DIR, "autoreset")
 DEFAULT_DCNET = os.path.join(BASE_DIR, "default_dcnet")
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
+LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness + colours
+LED_ENABLED = os.path.join(BASE_DIR, "led_enabled")  # written by install.sh --led
 STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
 MODEM = "/tmp/dreampi-netswitch.modem"
@@ -181,6 +183,93 @@ def checker():
 
 # -------------------------------------------------------------------- page
 
+# DreamPi states (as returned by dreampi_state) in the order the settings show them
+LED_STATES = [
+    ("ok", "Ready for calls"),
+    ("busy", "Starting up"),
+    ("call-dcnow", "In a call on DCNow!"),
+    ("call-dcnet", "In a call on DCNET"),
+    ("call", "In another call (Netlink)"),
+    ("off", "DreamPi not running"),
+    ("unknown", "State unknown"),
+]
+_DEFAULT_COLOURS = {   # state -> (colour, blink); used for both networks
+    "ok": ("#00ff00", False),
+    "busy": ("#ffaa00", True),
+    "call-dcnow": ("#ff5000", False),
+    "call-dcnet": ("#0046ff", False),
+    "call": ("#aa00ff", False),
+    "off": ("#ff0000", True),
+    "unknown": ("#3c3c3c", False),
+}
+NETWORKS = ("dcnow", "dcnet")
+_COLOUR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+try:
+    _TEXT = basestring  # noqa: F821  (Python 2: json gives unicode)
+except NameError:
+    _TEXT = str
+
+
+def default_led_config():
+    return {"brightness": 0.15,
+            "colours": dict((net, dict((st, {"color": c, "blink": b})
+                                       for st, (c, b) in _DEFAULT_COLOURS.items()))
+                            for net in NETWORKS)}
+
+
+def clean_led_config(data):
+    """Defaults for anything missing or invalid in data."""
+    cfg = default_led_config()
+    if not isinstance(data, dict):
+        return cfg
+    try:
+        cfg["brightness"] = min(1.0, max(0.0, float(data.get("brightness", cfg["brightness"]))))
+    except (TypeError, ValueError):
+        pass
+    colours = data.get("colours")
+    if isinstance(colours, dict):
+        for net in NETWORKS:
+            per_net = colours.get(net)
+            if not isinstance(per_net, dict):
+                continue
+            for st in _DEFAULT_COLOURS:
+                entry = per_net.get(st)
+                if not isinstance(entry, dict):
+                    continue
+                if isinstance(entry.get("color"), _TEXT) and _COLOUR_RE.match(entry["color"]):
+                    cfg["colours"][net][st]["color"] = entry["color"].lower()
+                if isinstance(entry.get("blink"), bool):
+                    cfg["colours"][net][st]["blink"] = entry["blink"]
+    return cfg
+
+
+def led_config():
+    try:
+        with open(LED_CONFIG) as f:
+            return clean_led_config(json.load(f))
+    except (IOError, OSError, ValueError):
+        return default_led_config()
+
+
+def save_led_config(data):
+    cfg = clean_led_config(data)
+    tmp = LED_CONFIG + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cfg, f, indent=1, sort_keys=True)
+    os.rename(tmp, LED_CONFIG)   # the LED service never sees a half-written file
+    return cfg
+
+
+def status_look(state=None):
+    """Colour and blink for the current DreamPi state and selected network,
+    shared by the page's status dot and the NeoPixel."""
+    if state is None:
+        state = dreampi_state()[0]
+    net = "dcnet" if os.path.exists(FLAG) else "dcnow"
+    colours = led_config()["colours"][net]
+    return colours.get(state, colours["unknown"])
+
+
 def api_state():
     dstate, dtext = dreampi_state()
     mtext, msince = modem_state()
@@ -197,7 +286,7 @@ def api_state():
             "autoreset": os.path.exists(AUTORESET),
             "default": "dcnet" if os.path.exists(DEFAULT_DCNET) else "dcnow",
             "debug": os.path.exists(DEBUG_DTMF),
-            "dreampi": {"state": dstate, "text": dtext},
+            "dreampi": {"state": dstate, "text": dtext, "look": status_look(dstate)},
             "modem": {"text": mtext, "since": msince},
             "internet": checks["internet"],
             "warnings": warnings, "now": int(time.time())}
@@ -235,6 +324,21 @@ PAGE = u"""<!doctype html>
  .prefs .check{width:26px;height:26px;border-radius:6px;border:2px solid #888;background:transparent;color:transparent;font-size:1em;line-height:1}
  .prefs .check.on{color:#fff}
  .prefs .check.on.dcnow{background:#e8761c;border-color:#e8761c} .prefs .check.on.dcnet{background:#1c6fe8;border-color:#1c6fe8}
+ .dot.blink{animation:blink 1s steps(1) infinite} @keyframes blink{50%{opacity:.15}}
+ header{position:relative}
+ .cog{position:absolute;right:0;top:50%;transform:translateY(-50%);width:auto;margin:0;padding:6px 8px;background:transparent;color:#aaa;font-size:1.6em;line-height:1}
+ .cog:hover{color:#fff}
+ #settings{display:none;position:fixed;top:0;right:0;bottom:0;left:0;background:#111;overflow:auto;z-index:10}
+ #settings.open{display:block} body.settings-open{overflow:hidden}
+ #settings .in{max-width:460px;margin:28px auto;padding:0 16px 40px}
+ #settings h2:first-of-type{margin-top:10px}
+ .ledtab td,.ledtab th{padding:6px 3px;border-top:1px solid #2a2a2a;vertical-align:middle;text-align:left;font-weight:normal}
+ .ledtab th{color:#999;font-size:.9em;border-top:0}
+ .ledtab .cell{white-space:nowrap}
+ .ledtab input[type=color]{width:40px;height:28px;padding:0;border:1px solid #444;border-radius:6px;background:none;vertical-align:middle;cursor:pointer}
+ .ledtab label{color:#aaa;font-size:.85em;margin-left:4px;cursor:pointer}
+ .range{display:flex;align-items:center;gap:10px;margin:6px 0 12px} .range input{flex:1}
+ .saved{color:#6c6;font-size:.85em;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
  .warnbox{background:#7a1f1f;padding:11px;border-radius:8px;margin:8px 0;font-size:.9em}
  table{width:100%;border-collapse:collapse;font-size:.88em}
  td{padding:5px 3px;border-top:1px solid #2a2a2a;vertical-align:top} td.n{color:#eee;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;width:1%;padding-right:12px}
@@ -246,7 +350,7 @@ PAGE = u"""<!doctype html>
  #log .dtmf{color:#6f6;font-weight:bold} #log .route{color:#8bf} #log .web{color:#e0b400}
  #log .modem{color:#aaa} #log .dim{color:#555} #log .err{color:#f66}
 </style></head><body>
-<h1>DreamPi</h1>
+<header><h1>DreamPi</h1><button class="cog" id="cog" type="button" title="Settings" aria-label="Settings">&#9881;</button></header>
 <div id="warnings"></div>
 <div class="rows" id="rows" title="Show or hide details">
  <div class="row"><span class="k">DreamPi</span><span class="v"><span class="dot" id="d-dot"></span><span id="d-text">...</span></span><span class="arrow">&#9656;</span></div>
@@ -256,6 +360,19 @@ PAGE = u"""<!doctype html>
 <div class="now" id="net">Selected network:<br><b id="net-name">...</b></div>
 <form method="post" action="/dcnow"><button class="dcnow-b">DCNow! / DreamPi</button></form>
 <form method="post" action="/dcnet"><button class="dcnet-b">DCNET / FLYCAST</button></form>
+<div class="small" style="margin-top:26px"><button class="toggle" id="show-debug" type="button">Debug log &#9656;</button></div>
+<div id="debug" style="display:none">
+<div class="note">Records every modem event, DreamPi message and routing decision with
+millisecond timing. Turn recording on, then dial.</div>
+<div class="small"><form method="post" action="/debug" style="display:inline"><button class="toggle" id="debug-b">Recording</button></form>
+<span id="log-tools" style="display:none"><form method="post" action="/clearlog" style="display:inline"><button class="toggle">Clear</button></form>
+<a href="/dtmf" target="_blank">Open as text</a> <label class="sub"><input type="checkbox" id="follow" checked> Follow</label></span></div>
+<pre id="log" style="display:none"></pre>
+</div>
+
+<div id="settings" role="dialog" aria-label="Settings"><div class="in">
+<header><h1>Settings</h1><button class="cog" id="close-settings" type="button" title="Close" aria-label="Close">&#10005;</button></header>
+<h2>Network</h2>
 <div class="prefs">
  <form method="post" action="/default" class="pref"><span>Default network</span>
   <button class="switch" id="default-b" type="submit" title="Network that 111-1111 resets to"><span class="lbl" id="default-l">DCNow!</span><span class="knob"></span></button></form>
@@ -275,15 +392,13 @@ PAGE = u"""<!doctype html>
 <span class="sub">Set your Dreamcast ISP config to any 7-digit number to use this feature.</span></td></tr>
 </table>
 
-<div class="small" style="margin-top:26px"><button class="toggle" id="show-debug" type="button">Debug log &#9656;</button></div>
-<div id="debug" style="display:none">
-<div class="note">Records every modem event, DreamPi message and routing decision with
-millisecond timing. Turn recording on, then dial.</div>
-<div class="small"><form method="post" action="/debug" style="display:inline"><button class="toggle" id="debug-b">Recording</button></form>
-<span id="log-tools" style="display:none"><form method="post" action="/clearlog" style="display:inline"><button class="toggle">Clear</button></form>
-<a href="/dtmf" target="_blank">Open as text</a> <label class="sub"><input type="checkbox" id="follow" checked> Follow</label></span></div>
-<pre id="log" style="display:none"></pre>
-</div>
+<h2>Status LED <span class="saved" id="led-saved">Saved &#10003;</span></h2>
+<div class="note" id="led-note"></div>
+<div class="range"><span class="sub">Brightness</span><input type="range" id="led-bright" min="0" max="100" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
+<table class="ledtab"><thead><tr><th>Status</th><th>DCNow! selected</th><th>DCNET selected</th></tr></thead><tbody id="led-rows"></tbody></table>
+<div class="small" style="margin-top:12px"><button class="toggle" id="led-reset" type="button">Reset LED settings to defaults</button></div>
+<div class="note">The colours are also used for the status dot on this page.</div>
+</div></div>
 
 <script>
 function $(id){return document.getElementById(id)}
@@ -291,9 +406,10 @@ function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp
 function ago(t,now){if(!t)return"";var s=Math.max(0,now-t);
  if(s<60)return"("+s+"s ago)";if(s<3600)return"("+Math.floor(s/60)+" min ago)";return"("+Math.floor(s/3600)+" h ago)"}
 function dot(el,state){el.className="dot "+(state||"")}
+function lookDot(el,look){el.className="dot"+(look.blink?" blink":"");el.style.background=look.color}
 function render(d){
  $("warnings").innerHTML=d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("");
- dot($("d-dot"),d.dreampi.state); $("d-text").textContent=d.dreampi.text;
+ lookDot($("d-dot"),d.dreampi.look); $("d-text").textContent=d.dreampi.text;
  $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now);
  dot($("i-dot"),d.internet.state); $("i-text").textContent=d.internet.text;
  $("net").className="now "+d.network; $("net-name").textContent=d.network=="dcnet"?"DCNET":"DCNow!";
@@ -308,6 +424,32 @@ function render(d){
 }
 var logSize=0,debugOn=false,logBusy=false,debugOpen=false;
 $("rows").onclick=function(){this.classList.toggle("open")};
+function showSettings(open){$("settings").classList.toggle("open",open);
+ document.body.classList.toggle("settings-open",open);if(open)loadLed()}
+$("cog").onclick=function(){showSettings(true)};
+$("close-settings").onclick=function(){showSettings(false)};
+document.addEventListener("keydown",function(e){if(e.key=="Escape")showSettings(false)});
+var led=null,ledDefaults=null,ledTimer=null;
+function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
+ x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
+  led=r.config;ledDefaults=r.defaults;
+  $("led-note").textContent=r.installed?"":"No LED service installed. Run sudo ./install.sh --led on the Pi to use a NeoPixel on GPIO18. The colours below still apply to the status dot.";
+  $("led-rows").innerHTML=r.states.map(function(s){return '<tr><td>'+esc(s[1])+'</td>'+
+   ["dcnow","dcnet"].map(function(n){var id=n+"-"+s[0];return '<td class="cell"><input type="color" id="c-'+id+'" data-net="'+n+'" data-state="'+s[0]+'">'+
+    '<label><input type="checkbox" id="b-'+id+'" data-net="'+n+'" data-state="'+s[0]+'"> blink</label></td>'}).join("")+'</tr>'}).join("");
+  Array.prototype.forEach.call($("led-rows").querySelectorAll("input"),function(el){
+   el.addEventListener(el.type=="color"?"input":"change",function(){var c=led.colours[el.dataset.net][el.dataset.state];
+    if(el.type=="color")c.color=el.value;else c.blink=el.checked;saveLed()})});
+  showLed()};x.send()}
+function showLed(){$("led-bright").value=Math.round(led.brightness*100);$("led-bright-v").textContent=Math.round(led.brightness*100)+"%";
+ ["dcnow","dcnet"].forEach(function(n){for(var st in led.colours[n]){var c=led.colours[n][st];
+  var ce=$("c-"+n+"-"+st),be=$("b-"+n+"-"+st);if(ce)ce.value=c.color;if(be)be.checked=c.blink}})}
+function saveLed(){clearTimeout(ledTimer);ledTimer=setTimeout(function(){
+ var x=new XMLHttpRequest();x.open("POST","/ledconfig",true);x.setRequestHeader("Content-Type","application/json");
+ x.onload=function(){if(x.status!=200)return;var el=$("led-saved");el.classList.add("show");
+  setTimeout(function(){el.classList.remove("show")},1200);refresh()};x.send(JSON.stringify(led))},250)}
+$("led-bright").oninput=function(){led.brightness=this.value/100;$("led-bright-v").textContent=this.value+"%";saveLed()};
+$("led-reset").onclick=function(){led=JSON.parse(JSON.stringify(ledDefaults));showLed();saveLed()};
 $("show-debug").onclick=function(){debugOpen=!debugOpen;
  $("debug").style.display=debugOpen?"block":"none";
  this.innerHTML=debugOpen?"Debug log &#9662;":"Debug log &#9656;";
@@ -366,6 +508,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send("network=%s\ndefault=%s\nautoreset=%s\ndreampi=%s\nmodem=%s\ninternet=%s\n" % (
                 d["network"], d["default"], "on" if d["autoreset"] else "off", d["dreampi"]["text"],
                 d["modem"]["text"], d["internet"]["text"]), "text/plain; charset=utf-8")
+        elif self.path == "/ledconfig":
+            self.send(json.dumps({"config": led_config(), "defaults": default_led_config(),
+                                  "states": LED_STATES,
+                                  "installed": os.path.exists(LED_ENABLED)}), "application/json")
         elif self.path == "/dtmf":
             try:
                 with open(DTMF_LOG, "rb") as f:
@@ -377,6 +523,18 @@ class Handler(BaseHTTPRequestHandler):
             self.send(PAGE, "text/html; charset=utf-8")
 
     def do_POST(self):
+        if self.path == "/ledconfig":
+            try:
+                length = min(int(self.headers.get("Content-Length") or 0), 65536)
+                data = json.loads(self.rfile.read(length).decode("utf-8"))
+                cfg = save_led_config(data)
+            except (ValueError, IOError, OSError) as e:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(str(e).encode("utf-8"))
+                return
+            self.send(json.dumps(cfg), "application/json")
+            return
         if self.path == "/dcnet":
             open(FLAG, "w").close()
             debug_log("web page: DCNET selected")

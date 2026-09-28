@@ -105,7 +105,6 @@ Description=DreamPi Netswitch status NeoPixel (GPIO18)
 After=network.target
 
 [Service]
-Environment=NETSWITCH_LED_BRIGHTNESS=0.15
 ExecStart=$(command -v python3) $DEST/netswitch_led.py
 Restart=always
 RestartSec=10

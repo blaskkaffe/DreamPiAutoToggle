@@ -71,10 +71,21 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
   - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DCNow! or DCNET, call ended.
   - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online`, checked every 30 seconds.
 - **Selected network** and the **DCNow! / DreamPi** (orange) and **DCNET / FLYCAST** (blue) buttons to change it.
+- **Debug log:** hidden until you click the button at the bottom (see below).
+
+### Settings (cogwheel)
+
+The cogwheel in the top right corner opens the settings. Changes are saved straight away; close them with the ✕ or Esc.
+
 - **Default network:** a switch, orange for DCNow! or blue for DCNET, that sets which network Auto reset goes back to. DCNow! unless changed.
 - **Auto reset:** when ticked, dialing `111-1111` resets the selected network to the default network. Off by default.
 - **Phone numbers:** the table above, as a reminder.
-- **Debug log:** hidden until you click the button at the bottom (see below).
+- **Status LED:**
+  - **Brightness** of the NeoPixel, 0 to 100% (default 15%).
+  - A **colour** and **blink** setting for every DreamPi status, set separately for when DCNow! is selected and when DCNET is selected. For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
+  - **Reset LED settings to defaults** restores the table below.
+
+  The status dot on the page uses the same colours, so it works as a preview even without an LED.
 
 `http://dreampi.local/api` returns the status as JSON, and `http://dreampi.local/status` as plain text:
 ```
@@ -88,17 +99,17 @@ internet=Connected (18 ms)
 
 ## Status colours
 
-The dot next to **DreamPi** on the web page and the optional NeoPixel use the same colours:
+The dot next to **DreamPi** on the web page and the optional NeoPixel show the same colour, set in the settings. The defaults are the same for both networks:
 
 | Colour | DreamPi status |
 |---|---|
 | Green | Ready for calls |
-| Yellow (blinks on the LED) | Starting up, not answering calls yet |
+| Yellow, blinking | Starting up, not answering calls yet |
 | Orange | In a call on DCNow! |
 | Blue | In a call on DCNET |
 | Purple | In another kind of call (e.g. Netlink) |
-| Red (blinks on the LED) | DreamPi not running |
-| Grey / dim white | State unknown |
+| Red, blinking | DreamPi not running |
+| Dim grey | State unknown |
 
 ## Status NeoPixel (optional)
 
@@ -113,7 +124,7 @@ Powering one pixel from 3.3 V keeps its data input compatible with the Pi's 3.3 
 
 **Install:** run `sudo ./install.sh --led`. This starts the `dreampi-netswitch-led` service; no reboot is needed. Later updates keep the LED until you run `sudo ./install.sh --no-led`. If an older version switched on SPI for the LED, the installer removes that setting again.
 
-**Brightness:** set `NETSWITCH_LED_BRIGHTNESS` (0 to 1, default 0.15) in `/etc/systemd/system/dreampi-netswitch-led.service`, then run `sudo systemctl daemon-reload && sudo systemctl restart dreampi-netswitch-led`.
+**Brightness and colours:** set in the web page's settings (cogwheel); the LED picks up changes within half a second. They're stored in `/opt/dreampi-netswitch/led.json`.
 
 If the LED stays dark, `systemctl status dreampi-netswitch-led` shows why.
 

@@ -9,7 +9,8 @@
 # registers are written directly through /dev/mem (the service runs as root).
 # When the FIFO runs empty the pin stays low, which latches the colour.
 #
-# Shows the same DreamPi status as the web page, using the same colours.
+# Shows the same DreamPi status as the web page. Colours, blinking and
+# brightness come from the page's settings (led.json, see netswitch_web).
 import ctypes
 import mmap
 import os
@@ -19,19 +20,6 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import netswitch_web as web  # noqa: E402  (reuses the page's status logic)
-
-# Status (as returned by web.dreampi_state) -> (red, green, blue, blink)
-COLOURS = {
-    "ok":         (0, 255, 0, False),     # ready for calls
-    "busy":       (255, 170, 0, True),    # starting up (blinking yellow)
-    "call-dcnow": (255, 80, 0, False),    # in a call on DCNow! (orange)
-    "call-dcnet": (0, 70, 255, False),    # in a call on DCNET (blue)
-    "call":       (170, 0, 255, False),   # other calls, e.g. Netlink (purple)
-    "off":        (255, 0, 0, True),      # DreamPi not running (blinking red)
-    "unknown":    (60, 60, 60, False),    # state unknown (dim white)
-}
-
-BRIGHTNESS = float(os.environ.get("NETSWITCH_LED_BRIGHTNESS", "0.15"))
 
 # ---------------------------------------------------------------- registers
 GPIO_OFFSET = 0x200000
@@ -122,8 +110,9 @@ def encode(r, g, b):
     return [(bits >> shift) & 0xFFFFFFFF for shift in (64, 32, 0)]
 
 
-def scaled(r, g, b):
-    return tuple(int(round(c * BRIGHTNESS)) for c in (r, g, b))
+def scaled(colour, brightness):
+    """'#rrggbb' -> (r, g, b) scaled by brightness (0..1)."""
+    return tuple(int(round(int(colour[i:i + 2], 16) * brightness)) for i in (1, 3, 5))
 
 
 def open_pixel():
@@ -156,10 +145,14 @@ def main():
 
     phase = False
     while True:
-        state, _ = web.dreampi_state()
-        r, g, b, blink = COLOURS.get(state, COLOURS["unknown"])
+        try:
+            look = web.status_look()
+            brightness = web.led_config()["brightness"]
+        except Exception:   # never let a bad read stop the LED loop
+            look, brightness = {"color": "#3c3c3c", "blink": False}, 0.15
         phase = not phase
-        colour = scaled(r, g, b) if (phase or not blink) else (0, 0, 0)
+        on = phase or not look["blink"]
+        colour = scaled(look["color"], brightness) if on else (0, 0, 0)
         # Sent every half second, so a garbled frame fixes itself.
         pixel.show(encode(*colour))
         time.sleep(0.5)
