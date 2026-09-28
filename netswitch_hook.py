@@ -21,7 +21,9 @@ it also logs every modem event while DreamPi listens for digits to
 /tmp/dreampi-netswitch-dtmf.log, to diagnose misheard numbers.
 No DreamPi file is modified. Written for both Python 2.7 and 3.
 """
+import logging
 import os
+import re
 import sys
 import time
 
@@ -32,6 +34,7 @@ STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")  # exists = log modem events
 DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
+MODEM = "/tmp/dreampi-netswitch.modem"
 NETLINK_DIR = "/home/pi/dreampi"
 
 NUM_OPENMENU = "1111111"
@@ -197,6 +200,68 @@ def _patch(module):
     _write_status("active pid=%d" % os.getpid())
     _write_state("starting")
     _patch_ready_signals(cls)
+    _install_modem_status()
+
+
+# DreamPi's own log messages -> modem status shown on the web page.
+# The first pattern that matches wins; "%s" is filled from the match and
+# "{speed}" with the last carrier speed seen.
+_MODEM_EVENTS = [
+    (r"^Detecting connection and modem", "Looking for the modem", None),
+    (r"^Unable to find a modem device", "No modem found, retrying", None),
+    (r"^Unable to detect an internet connection", "Waiting for internet", None),
+    (r"^Opening serial interface to (\S+)", "Opening modem on %s", None),
+    (r"^<LISTENING>", "Dial tone on, waiting for a call", "clear"),
+    (r"^Heard: (\S+)", "Number dialed: %s", None),
+    (r"^(?:Response: )?CONNECT (\d+)", "Carrier up at %s bps", "speed"),
+    (r"^DCNet Call answered", "Online via DCNet{speed}", None),
+    (r"Call answered", "Answered, starting PPP{speed}", None),
+    (r"^Connected$", "Online via DC Now{speed}", None),
+    (r"^Couldn't answer call", "Could not answer the call", "clear"),
+    (r"^Detected modem hang up", "Call ended", "clear"),
+    (r"^Connection terminated", "Call ended", "clear"),
+    (r"^Xband disconnected|^Listener stopped", "Call ended", "clear"),
+]
+_speed = [""]
+
+
+def _write_modem(text):
+    try:
+        with open(MODEM, "w") as f:
+            f.write("%d %s\n" % (int(time.time()), text))
+    except Exception:
+        pass
+
+
+class _ModemStatusHandler(logging.Handler):
+    """Turns DreamPi's own log lines into a short modem status."""
+    def emit(self, record):
+        try:
+            msg = record.getMessage().strip()
+            for pattern, text, action in _MODEM_EVENTS:
+                m = re.search(pattern, msg)
+                if m:
+                    if action == "speed":
+                        _speed[0] = m.group(1)
+                    elif action == "clear":
+                        _speed[0] = ""
+                    text = text % m.groups() if m.groups() else text
+                    _write_modem(text.replace("{speed}", " at %s bps" % _speed[0] if _speed[0] else ""))
+                    return
+        except Exception:
+            pass
+
+
+def _install_modem_status():
+    try:
+        logger = logging.getLogger("dreampi")
+        if not any(isinstance(h, _ModemStatusHandler) for h in logger.handlers):
+            handler = _ModemStatusHandler()
+            handler.setLevel(logging.INFO)
+            logger.addHandler(handler)
+        _write_modem("DreamPi starting")
+    except Exception:
+        pass
 
 
 def _wrap_ready(cls, name):

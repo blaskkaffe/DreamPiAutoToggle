@@ -19,13 +19,21 @@ The special numbers are matched on their last seven digits, so a leading `1`, an
 
 ## Web page
 
-`http://dreampi.local` shows what DreamPi is doing (starting up, ready for calls, in a call and on which network, or not running), the selected network, buttons for **Use DC Now** / **Use DCNet**, and the **reset on openMenu connect** toggle (off by default). The page refreshes itself every 5 seconds.
+`http://dreampi.local` updates live (every 2 seconds) and shows:
 
-`http://dreampi.local/status` returns plain text, for example:
+- **DreamPi:** starting up, ready for calls, in a call (and on which network), or not running.
+- **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DC Now or DCNet, call ended.
+- **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online` (checked every 30 seconds).
+- **Ports:** whether each game from the [Dreamcast Live connection guide](https://dreamcastlive.net/connection-guide/) has a path for incoming traffic (checked every 10 minutes, or with **Check again**). If DreamPi's VPN tunnel (`tun0`) is up, incoming traffic arrives through the VPN and no router forwarding is needed. Without the VPN, the router is asked over UPnP whether each port is forwarded to the Dreamcast. This checks the forwarding setup; it can't prove a port is reachable from the internet (that needs an outside test, and isn't possible for UDP), and a DMZ isn't visible over UPnP.
+- The selected network, the **Use DC Now** / **Use DCNet** buttons and the **reset on openMenu connect** toggle (off by default).
+
+`http://dreampi.local/api` returns everything as JSON, and `http://dreampi.local/status` as plain text, for example:
 ```
 network=dcnet
 autoreset=off
 dreampi=Ready for calls
+modem=Dial tone on, waiting for a call
+internet=Connected (18 ms)
 ```
 
 ## Diagnosing misheard numbers

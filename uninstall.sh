@@ -17,6 +17,6 @@ for PY in python python2 python3; do
     rm -f "$SITE/dreampi_netswitch.pth"
 done
 
-rm -rf "$DEST" /tmp/dreampi-netswitch.active /tmp/dreampi-netswitch.state /tmp/dreampi-netswitch-dtmf.log
+rm -rf "$DEST" /tmp/dreampi-netswitch.active /tmp/dreampi-netswitch.state /tmp/dreampi-netswitch-dtmf.log /tmp/dreampi-netswitch.modem
 systemctl restart dreampi.service 2>/dev/null || echo "Could not restart DreamPi, please reboot."
 echo "Uninstalled. DreamPi is back to its original behavior."
