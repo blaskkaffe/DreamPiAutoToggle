@@ -111,8 +111,15 @@ def encode(r, g, b):
 
 
 def scaled(colour, brightness):
-    """'#rrggbb' -> (r, g, b) scaled by brightness (0..1)."""
-    return tuple(int(round(int(colour[i:i + 2], 16) * brightness)) for i in (1, 3, 5))
+    """'#rrggbb' -> (r, g, b) scaled by brightness (0..1). At low brightness a
+    channel that is on never rounds down to 0, so the hue stays recognisable
+    (e.g. orange doesn't turn red at 2 %)."""
+    out = []
+    for i in (1, 3, 5):
+        c = int(colour[i:i + 2], 16)
+        v = int(round(c * brightness))
+        out.append(max(v, 1) if c and brightness > 0 else v)
+    return tuple(out)
 
 
 def open_pixel():
