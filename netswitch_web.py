@@ -33,6 +33,7 @@ STATIC_FILES = {   # only these are served from /static/
 }
 LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness + colours
 LED_ENABLED = os.path.join(BASE_DIR, "led_enabled")  # written by install.sh --led
+LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs (install.sh --leds=N)
 STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
 MODEM = "/tmp/dreampi-netswitch.modem"
@@ -199,15 +200,42 @@ LED_STATES = [
     ("off", "DreamPi not running"),
     ("unknown", "State unknown"),
 ]
-_DEFAULT_COLOURS = {   # state -> (colour, blink); used for both networks
-    "ok": ("#00ff00", False),
-    "busy": ("#ffaa00", True),
-    "call-dcnow": ("#ff5000", False),
-    "call-dcnet": ("#0046ff", False),
-    "call": ("#aa00ff", False),
-    "off": ("#ff0000", True),
-    "unknown": ("#3c3c3c", False),
+_DEFAULT_COLOURS = {   # state -> (colour, effect, speed); used for both networks
+    "ok": ("#00ff00", "solid", "slow"),
+    "busy": ("#ffaa00", "blink", "slow"),
+    "call-dcnow": ("#ff5000", "solid", "slow"),
+    "call-dcnet": ("#0046ff", "solid", "slow"),
+    "call": ("#aa00ff", "solid", "slow"),
+    "off": ("#ff0000", "blink", "slow"),
+    "unknown": ("#3c3c3c", "solid", "slow"),
 }
+# LED effects. The first four work on a single LED; the rest need a strip.
+# "rgb" ignores the colour and has one speed (a calm 10 s colour cycle).
+EFFECTS = [
+    ("solid", "Solid", False),
+    ("blink", "Blink", False),
+    ("breathe", "Breathe", False),
+    ("rgb", "RGB", False),
+    ("rainbow", "Rainbow", True),
+    ("scanner", "Scanner", True),
+    ("comet", "Comet", True),
+    ("chase", "Chase", True),
+    ("twinkle", "Twinkle", True),
+]
+EFFECT_NAMES = set(e[0] for e in EFFECTS)
+SPEEDS = ("slow", "fast")
+
+
+def led_count():
+    """LEDs installed: 0 = no LED service, 1 = single LED, more = strip."""
+    if not os.path.exists(LED_ENABLED):
+        return 0
+    try:
+        return max(1, min(300, int((read_file(LED_COUNT) or "1").strip())))
+    except ValueError:
+        return 1
+
+
 NETWORKS = ("dcnow", "dcnet")
 _COLOUR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 try:
@@ -218,8 +246,8 @@ except NameError:
 
 def default_led_config():
     return {"brightness": 0.08,
-            "colours": dict((net, dict((st, {"color": c, "blink": b, "brightness": None})
-                                       for st, (c, b) in _DEFAULT_COLOURS.items()))
+            "colours": dict((net, dict((st, {"color": c, "effect": e, "speed": sp, "brightness": None})
+                                       for st, (c, e, sp) in _DEFAULT_COLOURS.items()))
                             for net in NETWORKS)}
 
 
@@ -244,8 +272,14 @@ def clean_led_config(data):
                     continue
                 if isinstance(entry.get("color"), _TEXT) and _COLOUR_RE.match(entry["color"]):
                     cfg["colours"][net][st]["color"] = entry["color"].lower()
-                if isinstance(entry.get("blink"), bool):
-                    cfg["colours"][net][st]["blink"] = entry["blink"]
+                if entry.get("blink") is True and "effect" not in entry:   # older led.json
+                    cfg["colours"][net][st]["effect"] = "blink"
+                elif entry.get("blink") is False and "effect" not in entry:
+                    cfg["colours"][net][st]["effect"] = "solid"
+                if entry.get("effect") in EFFECT_NAMES:
+                    cfg["colours"][net][st]["effect"] = str(entry["effect"])
+                if entry.get("speed") in SPEEDS:
+                    cfg["colours"][net][st]["speed"] = str(entry["speed"])
                 level = entry.get("brightness")   # None = use the global brightness
                 if isinstance(level, (int, float)) and not isinstance(level, bool):
                     cfg["colours"][net][st]["brightness"] = min(1.0, max(0.0, float(level)))
@@ -270,7 +304,7 @@ def save_led_config(data):
 
 
 def status_look(state=None):
-    """Colour, blink and effective brightness for the current DreamPi state
+    """Colour, effect, speed and effective brightness for the current DreamPi state
     and selected network, shared by the page's status dot and the NeoPixel."""
     if state is None:
         state = dreampi_state()[0]
@@ -323,30 +357,32 @@ PAGE = u"""<!doctype html>
  .rows .more{display:none} .rows.open .more{display:flex}
  .arrow{color:#aaa;flex:none;margin-left:8px;transition:transform .15s} .rows.open .arrow{transform:rotate(90deg)}
  .dot{display:inline-block;width:.65em;height:.65em;border-radius:50%;margin-right:8px;background:#888}
- .dot.blink{animation:blink 1s steps(1) infinite} @keyframes blink{50%{opacity:.15}}
+ @keyframes blink{50%{opacity:.12}} @keyframes breathe{0%,100%{opacity:.1}50%{opacity:1}}
+ @keyframes rgbc{0%,100%{background:#f00}17%{background:#ff0}33%{background:#0f0}50%{background:#0ff}67%{background:#00f}83%{background:#f0f}}
  .ok{background:#2c2} .busy,.warn{background:#e0b400} .call{background:#b04cff} .bad,.off{background:#d33}
  .call-dcnow{background:#ff7a1a} .call-dcnet{background:#2a7bff}
  .warnbox{background:#7a1f1f;border:5px solid #a84a4a;padding:10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.9em}
  .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r);text-align:center;background:#9e4f10;border:5px solid #c9793a;line-height:1.35}
  .now b{font-size:1.25em} .now.dcnet{background:#1c4f9e;border-color:#5a86cf}
  .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r);font-size:1.1em;font-weight:600;letter-spacing:.02em}
- .dcnow-b{background:var(--dcnow);border:5px solid var(--dcnow-l)} .dcnet-b{background:var(--dcnet);border:5px solid var(--dcnet-l)}
+ .dcnow-b{background:rgba(232,118,28,.82);border:5px solid rgba(246,178,122,.82)} .dcnet-b{background:rgba(28,111,232,.82);border:5px solid rgba(128,177,246,.82)}
  .pill:active{filter:brightness(1.1)}
- .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:#2a2a2a;border:3px solid #444;color:#eee;font-size:.88em}
+ .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:rgba(42,42,42,.82);border:3px solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
  .wide{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 20px;border-radius:var(--r);background:var(--card);border:5px solid #3a3a3a;color:#eee;font-size:1em;text-align:left}
  .wide .arrow{margin-left:8px} .wide.open .arrow{transform:rotate(90deg)}
  .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 0}
- .cog{position:absolute;right:0;top:50%;transform:translateY(-50%);padding:6px 8px;background:transparent;color:#aaa;font-size:1.6em;line-height:1}
- .cog:hover{color:#fff}
+ .cog{position:absolute;right:0;top:50%;transform:translateY(-50%);padding:6px;background:transparent;color:#3a3a3a;line-height:0}
+ .cog svg{width:30px;height:30px;fill:currentColor;display:block} .cog:hover{color:#5a5a5a}
  #settings{display:none;position:fixed;top:0;right:0;bottom:0;left:0;background:#111;overflow:auto;z-index:10}
  #settings.open{display:block} body.settings-open{overflow:hidden}
  #settings .in{max-width:460px;margin:24px auto;padding:0 16px 40px}
  .srow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line);margin:0}
  .srow:first-child{border-top:0} .srow .sub{display:block;margin-top:2px}
- .switch{position:relative;flex:none;width:96px;height:32px;padding:0;border-radius:16px;background:var(--dcnow);font-size:.8em;font-weight:bold;transition:background .2s}
- .switch .knob{position:absolute;top:3px;left:67px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
- .switch .lbl{position:absolute;top:0;bottom:0;left:10px;line-height:32px}
- .switch.dcnet{background:var(--dcnet)} .switch.dcnet .knob{left:3px} .switch.dcnet .lbl{left:auto;right:12px}
+ .switch{position:relative;flex:none;width:104px;height:40px;padding:0;border-radius:var(--r);font-size:.8em;font-weight:bold;
+         background:rgba(232,118,28,.82);border:5px solid rgba(246,178,122,.82);transition:background .2s,border-color .2s}
+ .switch .knob{position:absolute;top:3px;left:67px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+ .switch .lbl{position:absolute;top:0;bottom:0;left:11px;line-height:30px}
+ .switch.dcnet{background:rgba(28,111,232,.82);border-color:rgba(128,177,246,.82)} .switch.dcnet .knob{left:3px} .switch.dcnet .lbl{left:auto;right:12px}
  .cbox{-webkit-appearance:none;appearance:none;flex:none;display:inline-block;width:26px;height:26px;margin:0;padding:0;border-radius:7px;
        border:2px solid #777;background:transparent center/18px no-repeat;vertical-align:middle;cursor:pointer}
  .cbox.on,.cbox:checked{background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")}
@@ -357,17 +393,21 @@ PAGE = u"""<!doctype html>
  tr:first-child td{border-top:0}
  td.n{color:#eee;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;width:1%;padding-right:14px}
  .ledtab td,.ledtab th{vertical-align:middle}
- .ledtab th{color:var(--muted);font-size:.9em;border-top:0;padding-bottom:0;text-align:center}
- .ledtab th.h2{font-size:.75em;padding:2px 3px 8px} .ledtab th:first-child{text-align:left}
+ .ledtab th{color:var(--muted);font-size:.78em;border-top:0;padding:4px 3px 8px;text-align:center} .ledtab th:first-child{text-align:left}
  .ledtab tbody tr:first-child td{border-top:1px solid var(--line)}
- .ledtab .cell{white-space:nowrap;text-align:center;width:1%;padding:8px 4px 8px 10px}
- .ledtab .cell > *{margin:0 2px}
- .lvl{display:inline-block;width:44px;height:26px;padding:0;border-radius:7px;border:2px solid #555;background:transparent;color:#777;font-size:.78em;vertical-align:middle}
+ .ledtab td.c{width:1%;padding:8px 4px;text-align:center}
+ .tabs{display:flex;gap:8px;padding:10px 0 4px} .tabs button{flex:1;padding:7px 4px;font-size:.85em}
+ .tabs .sel.dcnow{background:rgba(232,118,28,.82);border-color:rgba(246,178,122,.82)} .tabs .sel.dcnet{background:rgba(28,111,232,.82);border-color:rgba(128,177,246,.82)}
+ .chip{display:inline-block;height:30px;padding:0 4px;border-radius:7px;border:2px solid #555;background:transparent;color:#ccc;font-size:.72em;line-height:1.1;vertical-align:middle}
+ .fx{width:74px} .fx small{display:block;color:#888;font-size:.9em} .lvl{width:52px;color:#777}
  .lvl.on.dcnow{background:var(--dcnow);border-color:var(--dcnow);color:#fff} .lvl.on.dcnet{background:var(--dcnet);border-color:var(--dcnet);color:#fff}
  .in{position:relative}
- #lvl-pop{display:none;position:absolute;z-index:20;width:260px;padding:12px 16px;border-radius:var(--r);background:#262626;box-shadow:0 6px 24px rgba(0,0,0,.6)}
- #lvl-pop.open{display:block} #lvl-pop .t{font-size:.85em;color:#ccc;margin-bottom:4px}
- #lvl-pop .range{padding:6px 0 10px} #lvl-pop .bar{margin:0;justify-content:space-between}
+ .pop{display:none;position:absolute;z-index:20;width:270px;padding:12px 16px;border-radius:var(--r);background:#262626;box-shadow:0 6px 24px rgba(0,0,0,.6)}
+ .pop.open{display:block} .pop .t{font-size:.85em;color:#ccc;margin-bottom:8px}
+ .pop .range{padding:6px 0 10px} .pop .bar{margin:0;justify-content:space-between}
+ .opts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px} .opts button{padding:6px 12px;font-size:.82em}
+ .opts .sel.dcnow{background:var(--dcnow);border-color:var(--dcnow-l)} .opts .sel.dcnet{background:var(--dcnet);border-color:var(--dcnet-l)}
+ .opts button:disabled{opacity:.35;cursor:default}
  .th-dcnow{color:var(--dcnow-l)!important} .th-dcnet{color:var(--dcnet-l)!important}
  input[type=color]{-webkit-appearance:none;appearance:none;width:30px;height:30px;padding:0;border:2px solid #555;border-radius:7px;background:none;vertical-align:middle;cursor:pointer}
  input[type=color]::-webkit-color-swatch-wrapper{padding:0} input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
@@ -381,13 +421,13 @@ PAGE = u"""<!doctype html>
  #dcbg{position:fixed;top:0;left:0;width:100%;height:100vh;z-index:-1;overflow:hidden;pointer-events:none}
  body.dcbg{background:linear-gradient(to bottom,#9cc3dc,#4d639c) fixed;min-height:100vh}
  body.dcbg{--card:rgba(20,20,20,.78)} body.dcbg .rows,body.dcbg .wide{background:rgba(20,20,20,.78)}
- body.dcbg h1,body.dcbg .cog{text-shadow:0 1px 4px rgba(0,0,0,.6)} body.dcbg .cog{color:#eee}
+ body.dcbg h1{text-shadow:0 1px 4px rgba(0,0,0,.6)}
  body.settings-open > :not(#settings):not(#dcbg){visibility:hidden}
  body.dcbg #settings{background:transparent}
  body.dcbg .note,body.dcbg h2{color:#eee;text-shadow:0 1px 3px rgba(0,0,0,.8)}
 </style></head><body>
 <div id="dcbg"></div>
-<header><h1>DreamPi</h1><button class="cog" id="cog" type="button" title="Settings" aria-label="Settings">&#9881;</button></header>
+<header><h1>DreamPi</h1><button class="cog" id="cog" type="button" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M10.3 1.5h3.4l.5 2.6a8.3 8.3 0 0 1 2.1.9l2.2-1.5 2.4 2.4-1.5 2.2c.4.7.7 1.4.9 2.1l2.6.5v3.4l-2.6.5a8.3 8.3 0 0 1-.9 2.1l1.5 2.2-2.4 2.4-2.2-1.5c-.7.4-1.4.7-2.1.9l-.5 2.6h-3.4l-.5-2.6a8.3 8.3 0 0 1-2.1-.9l-2.2 1.5-2.4-2.4 1.5-2.2a8.3 8.3 0 0 1-.9-2.1l-2.6-.5v-3.4l2.6-.5c.2-.7.5-1.4.9-2.1L3.4 5.9l2.4-2.4L8 5c.7-.4 1.4-.7 2.1-.9zM12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6z"/></svg></button></header>
 <div id="warnings"></div>
 <div class="card rows" id="rows" title="Show or hide details">
  <div class="row"><span class="k">DreamPi</span><span class="v"><span class="dot" id="d-dot"></span><span id="d-text">...</span></span><span class="arrow">&#9656;</span></div>
@@ -409,7 +449,7 @@ millisecond timing. Turn recording on, then dial.</div>
 </div>
 
 <div id="settings" role="dialog" aria-label="Settings"><div class="in">
-<header><h1>Settings</h1><button class="cog" id="close-settings" type="button" title="Close" aria-label="Close">&#10005;</button></header>
+<header><h1>Settings</h1><button class="cog" id="close-settings" type="button" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.6 3.5 12 9.9l6.4-6.4 2.1 2.1-6.4 6.4 6.4 6.4-2.1 2.1-6.4-6.4-6.4 6.4-2.1-2.1 6.4-6.4-6.4-6.4z"/></svg></button></header>
 <h2>Network</h2>
 <div class="card">
  <form method="post" action="/default" class="srow"><span>Default network<span class="sub">Where Auto reset goes back to</span></span>
@@ -439,17 +479,19 @@ millisecond timing. Turn recording on, then dial.</div>
 </div>
 
 <div id="led-section" style="display:none;position:relative">
-<h2>Status LED <span class="saved" id="led-saved">Saved &#10003;</span></h2>
+<h2>Status LED<span id="led-count-t"></span> <span class="saved" id="led-saved">Saved &#10003;</span></h2>
 <div class="card">
  <div class="range"><span>Global brightness</span><input type="range" id="led-bright" min="0" max="1000" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
- <table class="ledtab"><thead>
-  <tr><th>Status</th><th class="th-dcnow">DCNow! selected</th><th class="th-dcnet">DCNET selected</th></tr>
-  <tr><th class="h2"></th><th class="h2">colour &nbsp;blink&nbsp; &nbsp;level</th><th class="h2">colour &nbsp;blink&nbsp; &nbsp;level</th></tr>
- </thead><tbody id="led-rows"></tbody></table>
+ <div class="tabs"><button class="pill-s" type="button" id="tab-dcnow">DCNow! selected</button><button class="pill-s" type="button" id="tab-dcnet">DCNET selected</button></div>
+ <table class="ledtab"><thead><tr><th>Status</th><th>colour</th><th>effect</th><th>level</th></tr></thead><tbody id="led-rows"></tbody></table>
 </div>
 <div class="bar" style="margin-top:0"><button class="pill-s" id="led-reset" type="button">Reset LED settings to defaults</button></div>
-<div class="note">Level: tap to give a status its own LED brightness; grey means it uses the global brightness above. The colours are also used for the status dot on the main page.</div>
-<div id="lvl-pop"><div class="t" id="lvl-t"></div>
+<div class="note">The tabs choose which network the table is for. Effect: tap to pick solid, blink, breathe, RGB or (with a strip) an animation, and its speed. Level: tap to give a status its own brightness; grey means it uses the global brightness above. The status dot on the main page previews colour and effect.</div>
+<div id="fx-pop" class="pop"><div class="t" id="fx-t"></div>
+ <div class="opts" id="fx-opts"></div>
+ <div class="opts" id="fx-speed" style="align-items:center"><span class="sub" style="margin-right:4px">Speed</span><button class="pill-s" type="button" data-speed="slow">Slow</button><button class="pill-s" type="button" data-speed="fast">Fast</button></div>
+ <div class="bar" style="justify-content:flex-end"><button class="pill-s" id="fx-done" type="button">Done</button></div></div>
+<div id="lvl-pop" class="pop"><div class="t" id="lvl-t"></div>
  <div class="range"><input type="range" id="lvl-r" min="0" max="1000" step="1"><span id="lvl-v" style="width:3em;text-align:right"></span></div>
  <div class="bar"><button class="pill-s" id="lvl-base" type="button">Use global</button><button class="pill-s" id="lvl-done" type="button">Done</button></div></div>
 </div>
@@ -461,7 +503,12 @@ function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp
 function ago(t,now){if(!t)return"";var s=Math.max(0,now-t);
  if(s<60)return"("+s+"s ago)";if(s<3600)return"("+Math.floor(s/60)+" min ago)";return"("+Math.floor(s/3600)+" h ago)"}
 function dot(el,state){el.className="dot "+(state||"")}
-function lookDot(el,look){el.className="dot"+(look.blink?" blink":"");el.style.background=look.color}
+// Status dot preview of the LED effect: [keyframes, slow s, fast s, timing]
+var DOT_FX={blink:["blink",1,.4,"steps(1)"],breathe:["breathe",4,1.6,"ease-in-out"],rgb:["rgbc",10,10,"linear"],
+ rainbow:["rgbc",10,3,"linear"],scanner:["breathe",3,1.2,"ease-in-out"],comet:["breathe",3,1.2,"ease-in-out"],
+ chase:["blink",.6,.24,"steps(1)"],twinkle:["breathe",3,1.2,"ease-in-out"]};
+function lookDot(el,look){var f=DOT_FX[look.effect];el.className="dot";el.style.background=look.color;
+ el.style.animation=f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none"}
 function render(d){
  $("warnings").innerHTML=d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("");
  lookDot($("d-dot"),d.dreampi.look); $("d-text").textContent=d.dreampi.text;
@@ -483,7 +530,7 @@ function showSettings(open){$("settings").classList.toggle("open",open);
  document.body.classList.toggle("settings-open",open);if(open)loadLed()}
 $("cog").onclick=function(){showSettings(true)};
 $("close-settings").onclick=function(){showSettings(false)};
-document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(lvlCur)closeLvl();else showSettings(false)}});
+document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(lvlCur||fxCur)closePops();else showSettings(false)}});
 // Optional Dreamcast background (static/dc-background.js), remembered per browser
 function bgWanted(){try{return localStorage.getItem("netswitch-bg")==="on"}catch(e){return false}}
 function loadScript(src,done){var sc=document.createElement("script");sc.src=src;sc.onload=done;
@@ -498,42 +545,66 @@ function setBg(on){
  else loadScript("/static/three.min.js",function(){loadScript("/static/dc-background.js",go)})}
 $("bg-b").onchange=function(){setBg(this.checked)};
 if(bgWanted())setBg(true);
-var led=null,ledDefaults=null,ledTimer=null;
+var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledEffects=[],ledCount=1,ledNet="dcnow";
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
-  led=r.config;ledDefaults=r.defaults;
+  led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledEffects=r.effects;ledCount=r.count||1;
   $("led-section").style.display=r.installed?"block":"none";   // only with install.sh --led
-  $("led-rows").innerHTML=r.states.map(function(s){return '<tr><td>'+esc(s[1])+'</td>'+
-   ["dcnow","dcnet"].map(function(n){var id=n+"-"+s[0];return '<td class="cell"><input type="color" id="c-'+id+'" data-net="'+n+'" data-state="'+s[0]+'">'+
-    '<input type="checkbox" class="cbox '+n+'" title="Blink" aria-label="Blink" id="b-'+id+'" data-net="'+n+'" data-state="'+s[0]+'">'+
-    '<button type="button" class="lvl '+n+'" title="LED brightness for this status" id="l-'+id+'" data-net="'+n+'" data-state="'+s[0]+'" data-label="'+esc(s[1])+'"></button></td>'}).join("")+'</tr>'}).join("");
-  Array.prototype.forEach.call($("led-rows").querySelectorAll(".lvl"),function(el){el.onclick=function(e){e.stopPropagation();openLvl(el)}});
-  Array.prototype.forEach.call($("led-rows").querySelectorAll("input"),function(el){
-   el.addEventListener(el.type=="color"?"input":"change",function(){var c=led.colours[el.dataset.net][el.dataset.state];
-    if(el.type=="color")c.color=el.value;else c.blink=el.checked;saveLed()})});
-  showLed()};x.send()}
+  $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";
+  buildLed()};x.send()}
+function buildLed(){
+ ["dcnow","dcnet"].forEach(function(n){$("tab-"+n).className="pill-s "+n+(n==ledNet?" sel":"")});
+ $("led-rows").innerHTML=ledStates.map(function(s){var st=s[0];return '<tr><td>'+esc(s[1])+'</td>'+
+  '<td class="c"><input type="color" id="c-'+st+'" data-state="'+st+'" aria-label="Colour"></td>'+
+  '<td class="c"><button type="button" class="chip fx" id="f-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'"></button></td>'+
+  '<td class="c"><button type="button" class="chip lvl" id="l-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'"></button></td></tr>'}).join("");
+ ledStates.forEach(function(s){var st=s[0];
+  $("c-"+st).addEventListener("input",function(){led.colours[ledNet][st].color=this.value;saveLed()});
+  $("f-"+st).onclick=function(e){e.stopPropagation();openFx(this)};
+  $("l-"+st).onclick=function(e){e.stopPropagation();openLvl(this)}});
+ showLed()}
+["dcnow","dcnet"].forEach(function(n){$("tab-"+n).onclick=function(){ledNet=n;closePops();buildLed()}});
+function netName(n){return n=="dcnet"?"DCNET":"DCNow!"}
+function effectName(e){for(var i=0;i<ledEffects.length;i++)if(ledEffects[i][0]==e)return ledEffects[i][1];return e}
 function showLed(){$("led-bright").value=brightToSlider(led.brightness);$("led-bright-v").textContent=pct(led.brightness);
- ["dcnow","dcnet"].forEach(function(n){for(var st in led.colours[n]){var c=led.colours[n][st];
-  var ce=$("c-"+n+"-"+st),be=$("b-"+n+"-"+st);if(ce)ce.value=c.color;if(be)be.checked=c.blink;showLvl(n,st)}})}
-function showLvl(n,st){var el=$("l-"+n+"-"+st);if(!el)return;var b=led.colours[n][st].brightness,own=b!==null&&b!==undefined;
- el.className="lvl "+n+(own?" on":"");el.textContent=pct(own?b:led.brightness)}
-var lvlCur=null;
-function openLvl(el){var n=el.dataset.net,st=el.dataset.state,c=led.colours[n][st];
- if(c.brightness===null||c.brightness===undefined){c.brightness=led.brightness;showLvl(n,st);saveLed()}
- lvlCur={n:n,st:st,el:el};
- $("lvl-t").textContent=el.dataset.label+", "+(n=="dcnet"?"DCNET":"DCNow!")+" selected";
- $("lvl-r").style.accentColor=n=="dcnet"?"#1c6fe8":"#e8761c";$("lvl-r").value=brightToSlider(c.brightness);$("lvl-v").textContent=pct(c.brightness);
- var pop=$("lvl-pop"),box=pop.parentNode.getBoundingClientRect(),r=el.getBoundingClientRect();
+ ledStates.forEach(function(s){var st=s[0],c=led.colours[ledNet][st];
+  $("c-"+st).value=c.color;showFx(st);showLvl(st)})}
+function showFx(st){var el=$("f-"+st);if(!el)return;var c=led.colours[ledNet][st];
+ el.innerHTML=esc(effectName(c.effect))+(c.effect=="solid"||c.effect=="rgb"?"":"<small>"+c.speed+"</small>")}
+function showLvl(st){var el=$("l-"+st);if(!el)return;var b=led.colours[ledNet][st].brightness,own=b!==null&&b!==undefined;
+ el.className="chip lvl "+ledNet+(own?" on":"");el.textContent=pct(own?b:led.brightness)}
+function placePop(pop,el){var box=pop.parentNode.getBoundingClientRect(),r=el.getBoundingClientRect();
  pop.classList.add("open");
- var left=Math.min(Math.max(r.right-box.left-pop.offsetWidth,0),box.width-pop.offsetWidth);
- pop.style.left=left+"px";pop.style.top=(r.bottom-box.top+6)+"px"}
-function closeLvl(){$("lvl-pop").classList.remove("open");lvlCur=null}
+ pop.style.left=Math.min(Math.max(r.right-box.left-pop.offsetWidth,0),box.width-pop.offsetWidth)+"px";
+ pop.style.top=(r.bottom-box.top+6)+"px"}
+var lvlCur=null,fxCur=null;
+function closePops(){$("lvl-pop").classList.remove("open");$("fx-pop").classList.remove("open");lvlCur=fxCur=null}
+function openFx(el){closePops();var st=el.dataset.state,c=led.colours[ledNet][st];fxCur=st;
+ $("fx-t").textContent=el.dataset.label+", "+netName(ledNet)+" selected";
+ $("fx-opts").innerHTML=ledEffects.filter(function(e){return !e[2]||ledCount>1||e[0]==c.effect}).map(function(e){
+  return '<button type="button" class="pill-s" data-fx="'+e[0]+'">'+esc(e[1])+'</button>'}).join("");
+ Array.prototype.forEach.call($("fx-opts").querySelectorAll("button"),function(b){b.onclick=function(){c.effect=b.dataset.fx;fxMark();saveLed()}});
+ fxMark();placePop($("fx-pop"),el)}
+function fxMark(){if(!fxCur)return;var c=led.colours[ledNet][fxCur],fixed=c.effect=="solid"||c.effect=="rgb";
+ Array.prototype.forEach.call($("fx-opts").querySelectorAll("button"),function(b){b.className="pill-s "+ledNet+(b.dataset.fx==c.effect?" sel":"")});
+ Array.prototype.forEach.call($("fx-speed").querySelectorAll("button"),function(b){b.disabled=fixed;
+  b.className="pill-s "+ledNet+(!fixed&&b.dataset.speed==c.speed?" sel":"")});
+ showFx(fxCur)}
+Array.prototype.forEach.call($("fx-speed").querySelectorAll("button"),function(b){b.onclick=function(){
+ if(!fxCur)return;led.colours[ledNet][fxCur].speed=b.dataset.speed;fxMark();saveLed()}});
+$("fx-done").onclick=closePops;
+function openLvl(el){closePops();var st=el.dataset.state,c=led.colours[ledNet][st];
+ if(c.brightness===null||c.brightness===undefined){c.brightness=led.brightness;showLvl(st);saveLed()}
+ lvlCur=st;
+ $("lvl-t").textContent=el.dataset.label+", "+netName(ledNet)+" selected";
+ $("lvl-r").style.accentColor=ledNet=="dcnet"?"#1c6fe8":"#e8761c";$("lvl-r").value=brightToSlider(c.brightness);$("lvl-v").textContent=pct(c.brightness);
+ placePop($("lvl-pop"),el)}
 $("lvl-r").oninput=function(){if(!lvlCur)return;var b=Math.round(sliderToBright(this.value)*1000)/1000;
- led.colours[lvlCur.n][lvlCur.st].brightness=b;$("lvl-v").textContent=pct(b);showLvl(lvlCur.n,lvlCur.st);saveLed()};
-$("lvl-base").onclick=function(){if(!lvlCur)return;led.colours[lvlCur.n][lvlCur.st].brightness=null;showLvl(lvlCur.n,lvlCur.st);saveLed();closeLvl()};
-$("lvl-done").onclick=closeLvl;
-$("lvl-pop").onclick=function(e){e.stopPropagation()};
-$("settings").addEventListener("click",function(){if(lvlCur)closeLvl()});
+ led.colours[ledNet][lvlCur].brightness=b;$("lvl-v").textContent=pct(b);showLvl(lvlCur);saveLed()};
+$("lvl-base").onclick=function(){if(!lvlCur)return;led.colours[ledNet][lvlCur].brightness=null;showLvl(lvlCur);saveLed();closePops()};
+$("lvl-done").onclick=closePops;
+$("lvl-pop").onclick=$("fx-pop").onclick=function(e){e.stopPropagation()};
+$("settings").addEventListener("click",function(){if(lvlCur||fxCur)closePops()});
 function saveLed(){clearTimeout(ledTimer);ledTimer=setTimeout(function(){
  var x=new XMLHttpRequest();x.open("POST","/ledconfig",true);x.setRequestHeader("Content-Type","application/json");
  x.onload=function(){if(x.status!=200)return;var el=$("led-saved");el.classList.add("show");
@@ -544,7 +615,7 @@ function sliderToBright(p){return (Math.pow(LOG_BASE,p/1000)-1)/(LOG_BASE-1)}
 function brightToSlider(b){return Math.round(1000*Math.log(1+b*(LOG_BASE-1))/Math.log(LOG_BASE))}
 function pct(b){var v=b*100;return (v<10&&v>0?v.toFixed(1):Math.round(v))+"%"}
 $("led-bright").oninput=function(){led.brightness=Math.round(sliderToBright(this.value)*1000)/1000;$("led-bright-v").textContent=pct(led.brightness);
- ["dcnow","dcnet"].forEach(function(n){for(var st in led.colours[n])showLvl(n,st)});saveLed()};
+ ledStates.forEach(function(s){showLvl(s[0])});saveLed()};
 $("led-reset").onclick=function(){led=JSON.parse(JSON.stringify(ledDefaults));showLed();saveLed()};
 $("show-debug").onclick=function(){debugOpen=!debugOpen;
  $("debug").style.display=debugOpen?"block":"none";
@@ -625,6 +696,7 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/ledconfig":
             self.send(json.dumps({"config": led_config(), "defaults": default_led_config(),
                                   "states": LED_STATES,
+                                  "effects": EFFECTS, "count": led_count(),
                                   "installed": os.path.exists(LED_ENABLED)}), "application/json")
         elif self.path == "/dtmf":
             try:

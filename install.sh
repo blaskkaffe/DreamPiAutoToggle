@@ -6,6 +6,7 @@
 #   sudo ./install.sh --https-port=8443   HTTPS on another port (default 443)
 #   sudo ./install.sh --no-https   plain HTTP only
 #   sudo ./install.sh --led        also show the status on a NeoPixel on GPIO18
+#   sudo ./install.sh --leds=30    the same with several NeoPixels / a strip (30 LEDs)
 #   sudo ./install.sh --no-led     remove the NeoPixel service again
 #
 # Once --led has been used, later updates keep the LED until --no-led.
@@ -15,9 +16,13 @@ SRC="$(cd "$(dirname "$0")" && pwd)"
 PORT=80
 HTTPS_PORT=443
 LED=keep
+LED_COUNT=
 for arg in "$@"; do
     case "$arg" in
-        --led) LED=on ;;
+        --led) LED=on; LED_COUNT=1 ;;
+        --leds=*) LED=on; LED_COUNT="${arg#--leds=}"
+                  case "$LED_COUNT" in ''|*[!0-9]*) echo "--leds needs a number, e.g. --leds=30"; exit 1 ;; esac
+                  if [ "$LED_COUNT" -lt 1 ] || [ "$LED_COUNT" -gt 300 ]; then echo "--leds must be 1 to 300"; exit 1; fi ;;
         --no-led) LED=off ;;
         --https-port=*) HTTPS_PORT="${arg#--https-port=}" ;;
         --no-https) HTTPS_PORT=0 ;;
@@ -26,7 +31,7 @@ for arg in "$@"; do
     esac
 done
 
-if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--led|--no-led]"; exit 1; fi
+if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--led|--leds=N|--no-led]"; exit 1; fi
 
 mkdir -p "$DEST"
 cp "$SRC/netswitch_hook.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/uninstall.sh" "$DEST/"
@@ -94,6 +99,9 @@ EOF
 if [ "$LED" = keep ] && [ -f "$DEST/led_enabled" ]; then LED=on; fi
 if [ "$LED" = on ]; then
     touch "$DEST/led_enabled"
+    if [ -n "$LED_COUNT" ]; then echo "$LED_COUNT" > "$DEST/led_count"; fi
+    [ -f "$DEST/led_count" ] || echo 1 > "$DEST/led_count"
+    echo "NeoPixel output on GPIO18: $(cat "$DEST/led_count") LED(s)"
     # The LED uses GPIO18's PWM directly. Older versions used SPI on GPIO10:
     # take back the SPI line they added, it isn't needed any more.
     if [ -f "$DEST/spi_added" ]; then
@@ -116,7 +124,7 @@ WantedBy=multi-user.target
 EOF
 elif [ "$LED" = off ]; then
     systemctl disable --now dreampi-netswitch-led.service 2>/dev/null || true
-    rm -f /etc/systemd/system/dreampi-netswitch-led.service "$DEST/led_enabled"
+    rm -f /etc/systemd/system/dreampi-netswitch-led.service "$DEST/led_enabled" "$DEST/led_count"
     echo "NeoPixel service removed."
 fi
 

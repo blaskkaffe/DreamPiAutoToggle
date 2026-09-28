@@ -81,13 +81,15 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 - **Auto reset:** when ticked, dialing `111-1111` resets the selected network to the default network. Off by default.
 - **Phone numbers:** the table above, as a reminder.
 - **Dreamcast background:** an animated background in the style of the Dreamcast menu (see [Credits](#credits)). Off by default, and remembered per browser, so a phone can leave it off while a PC has it on. It pauses while the page is hidden. The Pi serves the files itself (about 600 KB, fetched once), so it works without internet; browsers without WebGL just show the blue gradient.
-- **Status LED** (only shown when the LED is installed with `--led`):
-  - **Global brightness** of the NeoPixel, 0 to 100% (default 8%). The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
-  - A **colour** and **blink** setting for every DreamPi status, set separately for when DCNow! is selected and when DCNET is selected. For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
-  - A **level** (brightness) per status and network. Grey means the status uses the global brightness; tap it to give that status its own brightness with a slider, and tap **Use global** to go back. For example, "Ready for calls" can glow at 2% while "DreamPi not running" is brighter.
+- **Status LED** (only shown when the LED is installed with `--led` or `--leds=N`):
+  - **Global brightness** of the LEDs, 0 to 100% (default 8%). The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
+  - Two tabs, **DCNow! selected** and **DCNET selected**, each with a table of every DreamPi status. For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
+  - Per status: a **colour**, an **effect** and a **level**:
+    - **Effect:** tap it for a small menu. **Solid**, **Blink**, **Breathe** (fading up and down) and **RGB** (a calm colour cycle, about 10 seconds per round, ignoring the colour) work on any LED. With a strip there are also **Rainbow**, **Scanner** (a dot sweeping back and forth), **Comet**, **Chase** and **Twinkle**. Every effect except Solid and RGB has a **Slow** and a **Fast** speed.
+    - **Level:** the brightness for that status. Grey means it uses the global brightness; tap it to give the status its own brightness with a slider, and tap **Use global** to go back.
   - **Reset LED settings to defaults** restores the table below.
 
-  The status dot on the page uses the same colours, so it works as a preview even without an LED.
+  The status dot on the main page shows the same colour and a matching animation, so it works as a preview even without an LED.
 
 `http://dreampi.local/api` returns the status as JSON, and `http://dreampi.local/status` as plain text:
 ```
@@ -101,7 +103,7 @@ internet=Connected (18 ms)
 
 ## Status colours
 
-The dot next to **DreamPi** on the web page and the optional NeoPixel show the same colour, set in the settings. The defaults are the same for both networks:
+The dot next to **DreamPi** on the web page and the optional NeoPixels show the same colour and effect, set in the settings. The defaults are the same for both networks:
 
 | Colour | DreamPi status |
 |---|---|
@@ -113,22 +115,34 @@ The dot next to **DreamPi** on the web page and the optional NeoPixel show the s
 | Red, blinking | DreamPi not running |
 | Dim grey | State unknown |
 
-## Status NeoPixel (optional)
+## Status NeoPixels (optional)
 
-A single WS2812 / NeoPixel LED can show the DreamPi status next to the Pi.
+A single WS2812 / NeoPixel LED, several of them in a chain, or a WS2812 strip can show the DreamPi status next to the Pi.
 
-**Wiring:**
+**Wiring, single LED:**
 - Data in to **GPIO18** (physical pin 12).
 - Power to **3.3 V** (pin 1).
 - Ground to **GND** (pin 6).
 
-Powering one pixel from 3.3 V keeps its data input compatible with the Pi's 3.3 V signal. The LED is driven by the Pi's PWM hardware on GPIO18, clocked from the crystal, which gives accurate NeoPixel timing without special drivers, extra Python packages or config changes. PWM is also what the Pi's analog (3.5 mm jack) audio uses, so don't play sound through the jack while the LED is running; DreamPi doesn't use it.
+Powering one pixel from 3.3 V keeps its data input compatible with the Pi's 3.3 V signal.
 
-**Install:** run `sudo ./install.sh --led`. This starts the `dreampi-netswitch-led` service; no reboot is needed. Later updates keep the LED until you run `sudo ./install.sh --no-led`. If an older version switched on SPI for the LED, the installer removes that setting again.
+**Wiring, several LEDs or a strip:**
+- Data in (DIN) to **GPIO18** (pin 12), ideally through a 300-500 ohm resistor.
+- Power the strip from **5 V**. A few LEDs at the low default brightness can use the Pi's 5 V pin (pin 2). Longer strips need their own 5 V supply, since each LED can draw up to 60 mA at full white.
+- Connect the strip's ground to the Pi's **GND** (pin 6) in every case.
+- Strips powered from 5 V usually accept the Pi's 3.3 V data signal. If yours flickers or shows wrong colours, add a 3.3 V to 5 V level shifter (for example a 74AHCT125).
 
-**Brightness and colours:** set in the web page's settings (cogwheel); the LED picks up changes within half a second. They're stored in `/opt/dreampi-netswitch/led.json`.
+**Install:**
+- One LED: `sudo ./install.sh --led`
+- Several LEDs or a strip: `sudo ./install.sh --leds=30` (the number of LEDs, 1 to 300)
 
-If the LED stays dark, `systemctl status dreampi-netswitch-led` shows why.
+This starts the `dreampi-netswitch-led` service; no reboot is needed. Later updates keep the LED setting until you run `sudo ./install.sh --no-led`. If an older version switched on SPI for the LED, the installer removes that setting again.
+
+**How it works:** the LEDs are driven by the Pi's PWM hardware on GPIO18, clocked from the crystal, which gives accurate NeoPixel timing without special drivers, extra Python packages or config changes. A single LED is fed directly; a strip is fed by a DMA channel from memory shared with the GPU, the same method the rpi_ws281x library uses. PWM is also what the Pi's analog (3.5 mm jack) audio uses, so don't play sound through the jack while the LEDs are running; DreamPi doesn't use it.
+
+**Brightness, colours and effects:** set in the web page's settings (cogwheel). Effects run at 50 frames per second, and changes show up within a quarter of a second. They're stored in `/opt/dreampi-netswitch/led.json`.
+
+If the LEDs stay dark, `systemctl status dreampi-netswitch-led` shows why.
 
 ## Debug log
 
