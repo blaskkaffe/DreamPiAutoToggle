@@ -297,90 +297,101 @@ PAGE = u"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DreamPi</title>
 <style>
- body{font-family:sans-serif;background:#111;color:#eee;max-width:460px;margin:28px auto;padding:0 16px}
- h1{text-align:center;margin-bottom:14px}
- .rows{background:#1d1d1d;border-radius:10px;padding:6px 12px;margin-bottom:16px}
- .row{display:flex;align-items:baseline;padding:7px 0;border-top:1px solid #2a2a2a}
- .row:first-child{border-top:0}
- .row .k{width:84px;color:#999;flex:none} .row .v{flex:1}
- .rows{cursor:pointer;user-select:none} .rows .more{display:none} .rows.open .more{display:flex}
- .arrow{color:#aaa;flex:none;margin-left:8px;font-size:1.1em;transition:transform .15s} .rows.open .arrow{transform:rotate(90deg)}
+ :root{--dcnow:#e8761c;--dcnow-l:#f6b27a;--dcnet:#1c6fe8;--dcnet-l:#80b1f6;--card:#1b1b1b;--line:#2a2a2a;--muted:#999}
+ *{box-sizing:border-box}
+ body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#111;color:#eee;max-width:460px;margin:24px auto;padding:0 16px}
+ header{position:relative;margin-bottom:16px} h1{text-align:center;margin:0;font-size:1.9em}
+ h2{font-size:.8em;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 4px 8px;font-weight:600}
+ .card{background:var(--card);border-radius:14px;padding:4px 16px;margin-bottom:14px}
+ .sub{color:#888;font-size:.85em} .note{color:var(--muted);font-size:.85em;margin:8px 4px} a{color:#8bf}
+ button{font:inherit;cursor:pointer;border:0;color:#fff}
+ .rows{cursor:pointer;user-select:none}
+ .row{display:flex;align-items:baseline;padding:11px 0;border-top:1px solid var(--line)} .row:first-child{border-top:0}
+ .row .k{width:84px;color:var(--muted);flex:none} .row .v{flex:1}
+ .rows .more{display:none} .rows.open .more{display:flex}
+ .arrow{color:#aaa;flex:none;margin-left:8px;transition:transform .15s} .rows.open .arrow{transform:rotate(90deg)}
  .dot{display:inline-block;width:.65em;height:.65em;border-radius:50%;margin-right:8px;background:#888}
+ .dot.blink{animation:blink 1s steps(1) infinite} @keyframes blink{50%{opacity:.15}}
  .ok{background:#2c2} .busy,.warn{background:#e0b400} .call{background:#b04cff} .bad,.off{background:#d33}
  .call-dcnow{background:#ff7a1a} .call-dcnet{background:#2a7bff}
- .sub{color:#888;font-size:.85em}
- .now{font-size:1.5em;margin:14px 0;padding:16px;border-radius:10px;text-align:center;background:#9e4f10}
- .now.dcnet{background:#1c4f9e}
- button{font-size:1.1em;width:100%;padding:14px;margin:5px 0;border:0;border-radius:10px;cursor:pointer}
- .dcnow-b{background:#e8761c;color:#fff} .dcnet-b{background:#1c6fe8;color:#fff}
- .toggle{background:#2a2a2a;color:#eee;font-size:.95em;text-align:left}
- .prefs{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin:10px 2px 0}
- .pref{display:flex;align-items:center;gap:9px;color:#ccc}
- .prefs button{margin:0;padding:0;border:0}
- .prefs .switch{position:relative;width:96px;height:32px;border-radius:16px;background:#e8761c;color:#fff;font-size:.8em;font-weight:bold;transition:background .2s}
- .switch .knob{position:absolute;top:3px;left:67px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
- .switch .lbl{position:absolute;top:0;bottom:0;left:10px;line-height:32px}
- .switch.dcnet{background:#1c6fe8} .switch.dcnet .knob{left:3px} .switch.dcnet .lbl{left:auto;right:12px}
- .prefs .check{width:26px;height:26px;border-radius:6px;border:2px solid #888;background:transparent;color:transparent;font-size:1em;line-height:1}
- .prefs .check.on{color:#fff}
- .prefs .check.on.dcnow{background:#e8761c;border-color:#e8761c} .prefs .check.on.dcnet{background:#1c6fe8;border-color:#1c6fe8}
- .dot.blink{animation:blink 1s steps(1) infinite} @keyframes blink{50%{opacity:.15}}
- header{position:relative}
- .cog{position:absolute;right:0;top:50%;transform:translateY(-50%);width:auto;margin:0;padding:6px 8px;background:transparent;color:#aaa;font-size:1.6em;line-height:1}
+ .warnbox{background:#7a1f1f;padding:11px 14px;border-radius:12px;margin:0 0 12px;font-size:.9em}
+ .now{font-size:1.3em;margin:0 0 16px;padding:16px;border-radius:14px;text-align:center;background:#9e4f10;line-height:1.35}
+ .now b{font-size:1.25em} .now.dcnet{background:#1c4f9e}
+ .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:999px;font-size:1.1em;font-weight:600;letter-spacing:.02em}
+ .dcnow-b{background:var(--dcnow);border:5px solid var(--dcnow-l)} .dcnet-b{background:var(--dcnet);border:5px solid var(--dcnet-l)}
+ .pill:active{filter:brightness(1.1)}
+ .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:#2a2a2a;border:3px solid #444;color:#eee;font-size:.88em}
+ .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 0}
+ .cog{position:absolute;right:0;top:50%;transform:translateY(-50%);padding:6px 8px;background:transparent;color:#aaa;font-size:1.6em;line-height:1}
  .cog:hover{color:#fff}
  #settings{display:none;position:fixed;top:0;right:0;bottom:0;left:0;background:#111;overflow:auto;z-index:10}
  #settings.open{display:block} body.settings-open{overflow:hidden}
- #settings .in{max-width:460px;margin:28px auto;padding:0 16px 40px}
- #settings h2:first-of-type{margin-top:10px}
- .ledtab td,.ledtab th{padding:6px 3px;border-top:1px solid #2a2a2a;vertical-align:middle;text-align:left;font-weight:normal}
- .ledtab th{color:#999;font-size:.9em;border-top:0}
- .ledtab .cell{white-space:nowrap}
- .ledtab input[type=color]{width:40px;height:28px;padding:0;border:1px solid #444;border-radius:6px;background:none;vertical-align:middle;cursor:pointer}
- .ledtab label{color:#aaa;font-size:.85em;margin-left:4px;cursor:pointer}
- .range{display:flex;align-items:center;gap:10px;margin:6px 0 12px} .range input{flex:1}
- .saved{color:#6c6;font-size:.85em;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
- .warnbox{background:#7a1f1f;padding:11px;border-radius:8px;margin:8px 0;font-size:.9em}
+ #settings .in{max-width:460px;margin:24px auto;padding:0 16px 40px}
+ .srow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line);margin:0}
+ .srow:first-child{border-top:0} .srow .sub{display:block;margin-top:2px}
+ .switch{position:relative;flex:none;width:96px;height:32px;padding:0;border-radius:16px;background:var(--dcnow);font-size:.8em;font-weight:bold;transition:background .2s}
+ .switch .knob{position:absolute;top:3px;left:67px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+ .switch .lbl{position:absolute;top:0;bottom:0;left:10px;line-height:32px}
+ .switch.dcnet{background:var(--dcnet)} .switch.dcnet .knob{left:3px} .switch.dcnet .lbl{left:auto;right:12px}
+ .cbox{-webkit-appearance:none;appearance:none;flex:none;display:inline-block;width:26px;height:26px;margin:0;padding:0;border-radius:7px;
+       border:2px solid #777;background:transparent center/18px no-repeat;vertical-align:middle;cursor:pointer}
+ .cbox.on,.cbox:checked{background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")}
+ .cbox.on.dcnow,.cbox.dcnow:checked{background-color:var(--dcnow);border-color:var(--dcnow)}
+ .cbox.on.dcnet,.cbox.dcnet:checked{background-color:var(--dcnet);border-color:var(--dcnet)}
  table{width:100%;border-collapse:collapse;font-size:.88em}
- td{padding:5px 3px;border-top:1px solid #2a2a2a;vertical-align:top} td.n{color:#eee;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;width:1%;padding-right:12px}
- h2{font-size:1em;color:#bbb;margin:22px 0 6px}
- .note{color:#999;font-size:.85em;margin:4px 0 8px}
- .small button{font-size:.85em;padding:8px;width:auto} a{color:#8bf}
- #log{background:#0a0a0a;border:1px solid #2a2a2a;border-radius:8px;padding:8px;font-size:11px;line-height:1.45;
-      height:55vh;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:8px}
+ td,th{padding:10px 3px;border-top:1px solid var(--line);vertical-align:top;text-align:left;font-weight:normal}
+ tr:first-child td{border-top:0}
+ td.n{color:#eee;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;width:1%;padding-right:14px}
+ .ledtab td,.ledtab th{vertical-align:middle}
+ .ledtab th{color:var(--muted);font-size:.9em;border-top:0;padding-bottom:0;text-align:center}
+ .ledtab th.h2{font-size:.75em;padding:2px 3px 8px} .ledtab th:first-child{text-align:left}
+ .ledtab tbody tr:first-child td{border-top:1px solid var(--line)}
+ .ledtab .cell{white-space:nowrap;text-align:center;width:1%;padding:8px 10px}
+ .ledtab .cell > *{margin:0 4px}
+ .th-dcnow{color:var(--dcnow-l)!important} .th-dcnet{color:var(--dcnet-l)!important}
+ input[type=color]{-webkit-appearance:none;appearance:none;width:30px;height:30px;padding:0;border:2px solid #555;border-radius:7px;background:none;vertical-align:middle;cursor:pointer}
+ input[type=color]::-webkit-color-swatch-wrapper{padding:0} input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
+ input[type=color]::-moz-color-swatch{border:0;border-radius:4px}
+ .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range input{flex:1;accent-color:var(--dcnow)}
+ .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
+ #log{background:#0a0a0a;border:1px solid var(--line);border-radius:12px;padding:8px;font-size:11px;line-height:1.45;
+      height:55vh;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:12px}
  #log .dtmf{color:#6f6;font-weight:bold} #log .route{color:#8bf} #log .web{color:#e0b400}
  #log .modem{color:#aaa} #log .dim{color:#555} #log .err{color:#f66}
 </style></head><body>
 <header><h1>DreamPi</h1><button class="cog" id="cog" type="button" title="Settings" aria-label="Settings">&#9881;</button></header>
 <div id="warnings"></div>
-<div class="rows" id="rows" title="Show or hide details">
+<div class="card rows" id="rows" title="Show or hide details">
  <div class="row"><span class="k">DreamPi</span><span class="v"><span class="dot" id="d-dot"></span><span id="d-text">...</span></span><span class="arrow">&#9656;</span></div>
  <div class="row more"><span class="k">Modem</span><span class="v"><span id="m-text">...</span> <span class="sub" id="m-since"></span></span></div>
  <div class="row more"><span class="k">Internet</span><span class="v"><span class="dot" id="i-dot"></span><span id="i-text">...</span></span></div>
 </div>
 <div class="now" id="net">Selected network:<br><b id="net-name">...</b></div>
-<form method="post" action="/dcnow"><button class="dcnow-b">DCNow! / DreamPi</button></form>
-<form method="post" action="/dcnet"><button class="dcnet-b">DCNET / FLYCAST</button></form>
-<div class="small" style="margin-top:26px"><button class="toggle" id="show-debug" type="button">Debug log &#9656;</button></div>
+<form method="post" action="/dcnow"><button class="pill dcnow-b">DCNow! / DreamPi</button></form>
+<form method="post" action="/dcnet"><button class="pill dcnet-b">DCNET / FLYCAST</button></form>
+<div class="bar"><button class="pill-s" id="show-debug" type="button">Debug log &#9656;</button></div>
 <div id="debug" style="display:none">
 <div class="note">Records every modem event, DreamPi message and routing decision with
 millisecond timing. Turn recording on, then dial.</div>
-<div class="small"><form method="post" action="/debug" style="display:inline"><button class="toggle" id="debug-b">Recording</button></form>
-<span id="log-tools" style="display:none"><form method="post" action="/clearlog" style="display:inline"><button class="toggle">Clear</button></form>
-<a href="/dtmf" target="_blank">Open as text</a> <label class="sub"><input type="checkbox" id="follow" checked> Follow</label></span></div>
+<div class="bar" style="margin-top:6px"><form method="post" action="/debug"><button class="pill-s" id="debug-b">Recording</button></form>
+<span id="log-tools" style="display:none"><form method="post" action="/clearlog" style="display:inline"><button class="pill-s">Clear</button></form>
+<a class="pill-s" href="/dtmf" target="_blank" style="text-decoration:none">Open as text</a>
+<label class="sub" style="margin-left:6px"><input type="checkbox" class="cbox dcnow" id="follow" checked style="width:20px;height:20px;background-size:14px"> Follow</label></span></div>
 <pre id="log" style="display:none"></pre>
 </div>
 
 <div id="settings" role="dialog" aria-label="Settings"><div class="in">
 <header><h1>Settings</h1><button class="cog" id="close-settings" type="button" title="Close" aria-label="Close">&#10005;</button></header>
 <h2>Network</h2>
-<div class="prefs">
- <form method="post" action="/default" class="pref"><span>Default network</span>
-  <button class="switch" id="default-b" type="submit" title="Network that 111-1111 resets to"><span class="lbl" id="default-l">DCNow!</span><span class="knob"></span></button></form>
- <form method="post" action="/autoreset" class="pref" title="Switch back to the default network when openMenu dials 111-1111"><span>Auto reset</span>
-  <button class="check" id="reset-b" type="submit">&#10003;</button></form>
+<div class="card">
+ <form method="post" action="/default" class="srow"><span>Default network<span class="sub">Where Auto reset goes back to</span></span>
+  <button class="switch" id="default-b" type="submit"><span class="lbl" id="default-l">DCNow!</span><span class="knob"></span></button></form>
+ <form method="post" action="/autoreset" class="srow"><span>Auto reset<span class="sub">Dialing 111-1111 returns to the default network</span></span>
+  <button class="cbox" id="reset-b" type="submit" aria-label="Auto reset"></button></form>
 </div>
 
 <h2>Phone numbers</h2>
+<div class="card">
 <table>
 <tr><td class="n">111-1111</td><td>Always directs to DCNow! for compatibility with openMenu and standard ISP configs.<br>
 <span class="sub">When &quot;Auto reset&quot; is enabled, dialing it also resets the network to the default network.<span id="reset-note"></span></span></td></tr>
@@ -391,13 +402,19 @@ millisecond timing. Turn recording on, then dial.</div>
 <tr><td class="n">Any other</td><td>Connects to the currently selected network.<br>
 <span class="sub">Set your Dreamcast ISP config to any 7-digit number to use this feature.</span></td></tr>
 </table>
+</div>
 
 <h2>Status LED <span class="saved" id="led-saved">Saved &#10003;</span></h2>
 <div class="note" id="led-note"></div>
-<div class="range"><span class="sub">Brightness</span><input type="range" id="led-bright" min="0" max="100" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
-<table class="ledtab"><thead><tr><th>Status</th><th>DCNow! selected</th><th>DCNET selected</th></tr></thead><tbody id="led-rows"></tbody></table>
-<div class="small" style="margin-top:12px"><button class="toggle" id="led-reset" type="button">Reset LED settings to defaults</button></div>
-<div class="note">The colours are also used for the status dot on this page.</div>
+<div class="card">
+ <div class="range"><span>Brightness</span><input type="range" id="led-bright" min="0" max="100" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
+ <table class="ledtab"><thead>
+  <tr><th>Status</th><th class="th-dcnow">DCNow! selected</th><th class="th-dcnet">DCNET selected</th></tr>
+  <tr><th class="h2"></th><th class="h2">colour &nbsp; blink</th><th class="h2">colour &nbsp; blink</th></tr>
+ </thead><tbody id="led-rows"></tbody></table>
+</div>
+<div class="bar" style="margin-top:0"><button class="pill-s" id="led-reset" type="button">Reset LED settings to defaults</button></div>
+<div class="note">The colours are also used for the status dot on the main page.</div>
 </div></div>
 
 <script>
@@ -415,9 +432,9 @@ function render(d){
  $("net").className="now "+d.network; $("net-name").textContent=d.network=="dcnet"?"DCNET":"DCNow!";
  var defName=d.default=="dcnet"?"DCNET":"DCNow!";
  $("default-b").className="switch "+d.default; $("default-l").textContent=d.default=="dcnet"?"DCNET":"DCNow!";
- $("reset-b").className="check "+d.default+(d.autoreset?" on":"");
+ $("reset-b").className="cbox "+d.default+(d.autoreset?" on":"");
  $("reset-note").textContent=" (Auto reset is "+(d.autoreset?"on, default: "+defName:"off")+")";
- $("debug-b").innerHTML=(d.debug?"&#9745; Recording":"&#9744; Recording (off)");
+ $("debug-b").innerHTML=(d.debug?"&#9679; Recording":"Recording off");
  $("log-tools").style.display=d.debug?"inline":"none";
  $("log").style.display=(d.debug||logSize)?"block":"none";
  debugOn=d.debug;
@@ -436,7 +453,7 @@ function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
   $("led-note").textContent=r.installed?"":"No LED service installed. Run sudo ./install.sh --led on the Pi to use a NeoPixel on GPIO18. The colours below still apply to the status dot.";
   $("led-rows").innerHTML=r.states.map(function(s){return '<tr><td>'+esc(s[1])+'</td>'+
    ["dcnow","dcnet"].map(function(n){var id=n+"-"+s[0];return '<td class="cell"><input type="color" id="c-'+id+'" data-net="'+n+'" data-state="'+s[0]+'">'+
-    '<label><input type="checkbox" id="b-'+id+'" data-net="'+n+'" data-state="'+s[0]+'"> blink</label></td>'}).join("")+'</tr>'}).join("");
+    '<input type="checkbox" class="cbox '+n+'" title="Blink" aria-label="Blink" id="b-'+id+'" data-net="'+n+'" data-state="'+s[0]+'"></td>'}).join("")+'</tr>'}).join("");
   Array.prototype.forEach.call($("led-rows").querySelectorAll("input"),function(el){
    el.addEventListener(el.type=="color"?"input":"change",function(){var c=led.colours[el.dataset.net][el.dataset.state];
     if(el.type=="color")c.color=el.value;else c.blink=el.checked;saveLed()})});
