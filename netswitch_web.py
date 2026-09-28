@@ -119,8 +119,9 @@ def dreampi_state():
     if state == "ready":
         return "ok", "Ready for calls"
     if state.startswith("call "):
-        net = {"dcnow": "DC Now", "dcnet": "DCNet"}.get(state[5:], state[5:])
-        return "call", "In a call: " + net
+        kind = state[5:]
+        net = {"dcnow": "DC Now", "dcnet": "DCNet"}.get(kind, kind)
+        return ("call-" + kind if kind in ("dcnow", "dcnet") else "call"), "In a call: " + net
     return "unknown", "State unknown"
 
 
@@ -384,7 +385,8 @@ PAGE = u"""<!doctype html>
  .row:first-child{border-top:0}
  .row .k{width:84px;color:#999;flex:none} .row .v{flex:1}
  .dot{display:inline-block;width:.65em;height:.65em;border-radius:50%;margin-right:8px;background:#888}
- .ok{background:#2c2} .busy,.warn{background:#e0b400} .call{background:#39f} .bad,.off{background:#d33}
+ .ok{background:#2c2} .busy,.warn{background:#e0b400} .call{background:#b04cff} .bad,.off{background:#d33}
+ .call-dcnow{background:#ff7a1a} .call-dcnet{background:#2a7bff}
  .sub{color:#888;font-size:.85em}
  .now{font-size:1.5em;margin:14px 0;padding:16px;border-radius:10px;text-align:center;background:#9e4f10}
  .now.dcnet{background:#1c4f9e}

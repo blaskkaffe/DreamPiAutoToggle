@@ -4,8 +4,10 @@ DEST=/opt/dreampi-netswitch
 
 if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo $0"; exit 1; fi
 
-systemctl disable --now dreampi-netswitch.service 2>/dev/null
-rm -f /etc/systemd/system/dreampi-netswitch.service
+for SERVICE in dreampi-netswitch dreampi-netswitch-led; do
+    systemctl disable --now "$SERVICE.service" 2>/dev/null
+    rm -f "/etc/systemd/system/$SERVICE.service"
+done
 systemctl daemon-reload
 
 if [ -f "$DEST/pth_locations" ]; then
@@ -16,6 +18,13 @@ for PY in python python2 python3; do
     SITE=$("$PY" -c "import site; print(site.getsitepackages()[0])" 2>/dev/null) || continue
     rm -f "$SITE/dreampi_netswitch.pth"
 done
+
+# Undo SPI only if the installer switched it on
+if [ -f "$DEST/spi_added" ]; then
+    CONFIG=$(cat "$DEST/spi_added")
+    sed -i '/^dtparam=spi=on  # added by dreampi-netswitch$/d' "$CONFIG"
+    echo "Removed the SPI setting from $CONFIG (takes effect after a reboot)."
+fi
 
 rm -rf "$DEST" /tmp/dreampi-netswitch.active /tmp/dreampi-netswitch.state /tmp/dreampi-netswitch-dtmf.log /tmp/dreampi-netswitch.modem
 systemctl restart dreampi.service 2>/dev/null || echo "Could not restart DreamPi, please reboot."

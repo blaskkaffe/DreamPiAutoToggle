@@ -13,6 +13,9 @@
 - The web page works on Python 3 and 2.7. It serves a static page that polls `GET /api` (JSON) every 2 s; buttons POST via XMLHttpRequest (plain form POST + 303 still works without JS). A background thread checks internet every 30 s and ports every 10 min (`POST /recheck` forces it).
 - Port check: if `tun0` has an address, DreamPi's VPN carries inbound traffic, so all games show "Via VPN". Otherwise it finds the router with SSDP and asks `GetSpecificPortMappingEntry` for every port of every game in `GAMES` (from dreamcastlive.net/connection-guide), comparing the target with the Dreamcast IP from `/etc/ppp/peers/dreamcast`. It can't prove reachability from the internet, and a DMZ is invisible to UPnP.
 
+## Status NeoPixel
+`netswitch_led.py` (Python 3, service `dreampi-netswitch-led`, installed with `install.sh --led`, remembered via `/opt/dreampi-netswitch/led_enabled`, removed with `--no-led`) imports `netswitch_web` and shows `dreampi_state()` on one WS2812 on GPIO10 via SPI (`/dev/spidev0.0`, 6.4 MHz requested, 6.25 MHz actual: `0xF8` = 1, `0xC0` = 0, 48 zero bytes reset on each side, GRB order). It resends every 0.5 s, so a garbled frame fixes itself. Colours match the page's dot classes (`ok`, `busy`, `call-dcnow`, `call-dcnet`, `call`, `off`, `unknown`); `busy` and `off` blink. The installer adds `dtparam=spi=on  # added by dreampi-netswitch` to config.txt only if SPI is off, records that in `spi_added`, and uninstall removes only that line.
+
 ## Debug log
 If `/opt/dreampi-netswitch/debug_dtmf` exists, the hook writes one timeline to `/tmp/dreampi-netswitch-dtmf.log` (`HH:MM:SS.mmm  +Nms  text`):
 - modem bytes read while `modem._sending_tone` is true, decoded by `_serial_feed()`: `<DLE><digit>` -> `modem: DTMF x`, other `<DLE>` codes via `_DLE_CODES` (V.253), text lines -> `modem says: ...`. The hook replaces `read` on the pyserial object again after every `start_dial_tone()`, since DreamPi opens a new serial object after each call;
