@@ -67,10 +67,6 @@ if [ "$LED" = on ]; then
         echo "Enabled SPI in $CONFIG"
     fi
     [ -e /dev/spidev0.0 ] || NEED_REBOOT=1
-    if ! python3 -c "import spidev" 2>/dev/null; then
-        echo "Installing python3-spidev..."
-        apt-get install -y python3-spidev >/dev/null 2>&1 || pip3 install spidev
-    fi
     cat > /etc/systemd/system/dreampi-netswitch-led.service <<EOF
 [Unit]
 Description=DreamPi Netswitch status NeoPixel (GPIO10)

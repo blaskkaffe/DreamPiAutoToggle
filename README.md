@@ -58,7 +58,7 @@ A single WS2812 / NeoPixel LED can show the DreamPi status next to the Pi.
 
 **Wiring:** data in to **GPIO10** (physical pin 19), power to **3.3 V** (pin 1) and ground to **GND** (pin 6). Running one pixel from 3.3 V keeps its data input compatible with the Pi's 3.3 V signal. The LED is driven through SPI, which gives accurate NeoPixel timing without special drivers.
 
-**Install:** `sudo ./install.sh --led`. This switches on SPI (`dtparam=spi=on` in `config.txt`), installs `python3-spidev` and starts the `dreampi-netswitch-led` service. Reboot once the first time so SPI becomes active. Later updates keep the LED; `sudo ./install.sh --no-led` removes it again. Brightness is set with `NETSWITCH_LED_BRIGHTNESS` (0 to 1, default 0.15) in `/etc/systemd/system/dreampi-netswitch-led.service`.
+**Install:** `sudo ./install.sh --led`. This switches on SPI (`dtparam=spi=on` in `config.txt`) and starts the `dreampi-netswitch-led` service. Reboot once the first time so SPI becomes active. Later updates keep the LED; `sudo ./install.sh --no-led` removes it again. Brightness is set with `NETSWITCH_LED_BRIGHTNESS` (0 to 1, default 0.15) in `/etc/systemd/system/dreampi-netswitch-led.service`.
 
 ## Debug log
 

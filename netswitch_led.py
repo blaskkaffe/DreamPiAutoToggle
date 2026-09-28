@@ -4,22 +4,37 @@
 # GPIO10 is the Pi's SPI data pin (MOSI). Each NeoPixel bit is sent as one SPI
 # byte at ~6.25 MHz: 0b11111000 for a 1 (0.8 us high) and 0b11000000 for a 0
 # (0.32 us high). That meets WS2812 timing without DMA or special drivers.
-# Needs SPI enabled (dtparam=spi=on) and python3-spidev.
+# Needs SPI enabled (dtparam=spi=on). Talks to /dev/spidevB.D directly with
+# ioctl + write, so no extra Python package (spidev) is needed.
 #
 # Shows the same DreamPi status as the web page, using the same colours.
 # Works on Python 3 and 2.7.
+import fcntl
 import os
 import signal
+import struct
 import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import netswitch_web as web  # noqa: E402  (reuses the page's status logic)
 
-try:
-    import spidev
-except ImportError:
-    sys.exit("python3-spidev is missing: sudo apt install python3-spidev")
+
+# spidev ioctls, _IOW('k', nr, size): mode (u8) and max speed (u32)
+SPI_IOC_WR_MODE = 0x40016b01
+SPI_IOC_WR_MAX_SPEED_HZ = 0x40046b04
+
+
+class Spi(object):
+    """Minimal SPI output through the kernel's spidev device."""
+
+    def __init__(self, bus, device, hz):
+        self.fd = os.open("/dev/spidev%d.%d" % (bus, device), os.O_RDWR)
+        fcntl.ioctl(self.fd, SPI_IOC_WR_MODE, struct.pack("B", 0))
+        fcntl.ioctl(self.fd, SPI_IOC_WR_MAX_SPEED_HZ, struct.pack("I", hz))
+
+    def send(self, data):
+        os.write(self.fd, bytes(bytearray(data)))
 
 # Status (as returned by web.dreampi_state) -> (red, green, blue, blink)
 COLOURS = {
@@ -54,18 +69,15 @@ def scaled(r, g, b):
 
 
 def main():
-    spi = spidev.SpiDev()
     try:
-        spi.open(SPI_BUS, SPI_DEVICE)
+        spi = Spi(SPI_BUS, SPI_DEVICE, SPI_HZ)
     except (IOError, OSError) as e:
         sys.exit("Cannot open /dev/spidev%d.%d (%s). Is SPI enabled "
                  "(dtparam=spi=on in config.txt, then reboot)?" % (SPI_BUS, SPI_DEVICE, e))
-    spi.max_speed_hz = SPI_HZ
-    spi.mode = 0
 
     def off(*_):
         try:
-            spi.xfer2(encode(0, 0, 0))
+            spi.send(encode(0, 0, 0))
         finally:
             sys.exit(0)
 
@@ -80,7 +92,7 @@ def main():
         colour = scaled(r, g, b) if (phase or not blink) else (0, 0, 0)
         # Sent every half second, so a glitch (e.g. a CPU clock change during
         # a transfer) fixes itself straight away.
-        spi.xfer2(encode(*colour))
+        spi.send(encode(*colour))
         time.sleep(0.5)
 
 
