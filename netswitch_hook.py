@@ -81,39 +81,66 @@ _dtmf_last = [0.0]
 
 
 def _dtmf_log(text):
-    """Append a timestamped line to the DTMF debug log (only when enabled)."""
+    """Append a line to the debug log (only when enabled):
+    time, milliseconds since the previous line, and the event."""
     if not os.path.exists(DEBUG_DTMF):
         return
     try:
         now = time.time()
-        gap = now - _dtmf_last[0]
+        gap = "" if not _dtmf_last[0] else "+%dms" % int((now - _dtmf_last[0]) * 1000)
         _dtmf_last[0] = now
         with open(DTMF_LOG, "a") as f:
-            if gap > 5:
-                f.write("\n")
-            f.write("%s.%03d  +%6dms  %s\n" % (time.strftime("%H:%M:%S", time.localtime(now)),
-                                              int(now * 1000) % 1000,
-                                              min(int(gap * 1000), 999999), text))
+            f.write("%s.%03d %9s  %s\n" % (time.strftime("%H:%M:%S", time.localtime(now)),
+                                          int(now * 1000) % 1000, gap, text))
     except Exception:
         pass
 
 
-def _describe(data):
-    """Readable form of modem bytes: DLE shown as <DLE>, others as-is."""
-    out = []
+# What the modem means by <DLE><code> in voice mode (ITU V.253 / Rockwell)
+_DLE_CODES = {
+    "u": "dial tone ran out (transmit underrun)",
+    "o": "receive overrun",
+    "b": "busy tone",
+    "d": "dial tone detected",
+    "s": "silence",
+    "q": "quiet after tone",
+    "c": "fax calling tone",
+    "e": "calling tone from a modem (1300 Hz)",
+    "a": "answer tone (2100 Hz)",
+    "R": "ring",
+    "h": "line hung up",
+    "l": "loop current break",
+    "/": "DTMF tone starts",
+    "~": "DTMF tone ends",
+}
+_serial_buf = [bytearray()]
+
+
+def _serial_feed(data):
+    """Turn raw modem bytes into readable events: <DLE><code> pairs become
+    'DTMF 1' etc., other text is collected into whole lines."""
     for b in bytearray(data):
-        if b == 0x10:
-            out.append("<DLE>")
-        elif 32 <= b < 127:
-            out.append(chr(b))
-        else:
-            out.append("<%02X>" % b)
-    return "".join(out)
+        buf = _serial_buf[0]
+        if buf[:1] == bytearray(b"\x10"):
+            code = chr(b)
+            _serial_buf[0] = bytearray()
+            if code in "0123456789*#ABCD":
+                _dtmf_log("modem: DTMF " + code)
+            else:
+                _dtmf_log("modem: " + _DLE_CODES.get(code, "event <DLE>%r" % code))
+            continue
+        if b in (0x10, 0x0D, 0x0A):
+            text = buf.decode("ascii", "replace").strip()
+            if text:
+                _dtmf_log("modem says: " + text)
+            _serial_buf[0] = bytearray(b"\x10") if b == 0x10 else bytearray()
+            continue
+        buf.append(b)
 
 
 def _watch_serial(modem):
-    """Log every byte the modem sends while DreamPi is listening (dial tone
-    on), which is when the modem reports the dialed digits as <DLE><digit>."""
+    """Log what the modem reports while DreamPi is listening (dial tone on),
+    which is when dialed digits arrive as <DLE><digit>."""
     try:
         ser = getattr(modem, "_serial", None)
         if ser is None or getattr(ser, "_netswitch", False):
@@ -122,8 +149,8 @@ def _watch_serial(modem):
 
         def read(*args, **kwargs):
             data = original_read(*args, **kwargs)
-            if data and getattr(modem, "_sending_tone", False):
-                _dtmf_log("modem: " + _describe(data))
+            if data and getattr(modem, "_sending_tone", False) and os.path.exists(DEBUG_DTMF):
+                _serial_feed(data)
             return data
 
         ser.read = read
@@ -160,7 +187,8 @@ def _patch(module):
 
     def check_number(self, raw_string):
         special = _special(raw_string)
-        _dtmf_log("DreamPi heard: %r" % raw_string)
+        if raw_string:
+            _dtmf_log("add-on: number heard %r (matches %s)" % (raw_string, special or "no special number"))
         # Special numbers: remember the choice before DreamPi routes the call
         try:
             if special == NUM_DCNOW:
@@ -238,6 +266,8 @@ class _ModemStatusHandler(logging.Handler):
     def emit(self, record):
         try:
             msg = record.getMessage().strip()
+            if msg and not msg.startswith("Rule "):
+                _dtmf_log("dreampi: " + msg)
             for pattern, text, action in _MODEM_EVENTS:
                 m = re.search(pattern, msg)
                 if m:

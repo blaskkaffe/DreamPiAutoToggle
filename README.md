@@ -36,9 +36,15 @@ modem=Dial tone on, waiting for a call
 internet=Connected (18 ms)
 ```
 
-## Diagnosing misheard numbers
+## Debug log
 
-Tick **DTMF debug log** at the bottom of the web page, dial, then open **View log** (or `http://dreampi.local/dtmf`). Every byte the modem sends while DreamPi listens for digits is listed with millisecond timings, followed by what DreamPi heard. The modem reports each dialed digit as `<DLE>` followed by the digit. Ticking the box again stops logging; ticking it on starts a fresh log.
+Tick **Debug log** at the bottom of the web page and dial. A live panel on the page shows one timeline with millisecond timing:
+
+- what the modem reports while DreamPi listens: each dialed digit (`DTMF 1`), dial tone underruns, calling tones, and its replies (`OK`, `CONNECT 33600`),
+- every message DreamPi logs (heard, mode, answering, carrier speed, hang-up),
+- the add-on's routing decisions and your button presses.
+
+**Clear** empties it, **Open as text** shows the whole file (`http://dreampi.local/dtmf`), and unticking stops recording.
 
 ## Install
 

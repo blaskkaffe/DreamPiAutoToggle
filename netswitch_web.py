@@ -138,6 +138,39 @@ def modem_state():
         return text, 0
 
 
+def debug_log(text):
+    """Add a line to the debug timeline (same format as the hook)."""
+    if not os.path.exists(DEBUG_DTMF):
+        return
+    try:
+        now = time.time()
+        with open(DTMF_LOG, "a") as f:
+            f.write("%s.%03d %9s  %s\n" % (time.strftime("%H:%M:%S", time.localtime(now)),
+                                          int(now * 1000) % 1000, "", text))
+    except IOError:
+        pass
+
+
+def read_log(start):
+    """New log text from byte offset start. If the log was cleared or
+    restarted, everything is returned with reset=True."""
+    try:
+        with open(DTMF_LOG, "rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            reset = start > size or start < 0
+            if reset:
+                start = 0
+            # Don't send megabytes to a page that just opened
+            if size - start > 200000:
+                start, reset = size - 200000, True
+            f.seek(start)
+            data = f.read()
+    except IOError:
+        return {"size": 0, "text": "", "reset": start != 0}
+    return {"size": start + len(data), "text": data.decode("utf-8", "replace"), "reset": reset}
+
+
 # ----------------------------------------------------------- internet check
 
 def check_internet():
@@ -364,6 +397,10 @@ PAGE = u"""<!doctype html>
  h2{font-size:1em;color:#bbb;margin:22px 0 6px}
  .note{color:#999;font-size:.85em;margin:4px 0 8px}
  .small button{font-size:.85em;padding:8px;width:auto} a{color:#8bf}
+ #log{background:#0a0a0a;border:1px solid #2a2a2a;border-radius:8px;padding:8px;font-size:11px;line-height:1.45;
+      height:55vh;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:8px}
+ #log .dtmf{color:#6f6;font-weight:bold} #log .route{color:#8bf} #log .web{color:#e0b400}
+ #log .modem{color:#aaa} #log .dim{color:#555} #log .err{color:#f66}
 </style></head><body>
 <h1>DreamPi</h1>
 <div id="warnings"></div>
@@ -391,9 +428,13 @@ PAGE = u"""<!doctype html>
 <table id="ports"></table>
 <div class="small"><form method="post" action="/recheck"><button class="toggle">Check again</button></form></div>
 
-<h2>Debugging</h2>
-<div class="small"><form method="post" action="/debug"><button class="toggle" id="debug-b">DTMF debug log</button></form>
-<span id="debug-link"></span></div>
+<h2>Debug log</h2>
+<div class="note">Records every modem event, DreamPi message and routing decision with
+millisecond timing. Turn it on, then dial.</div>
+<div class="small"><form method="post" action="/debug" style="display:inline"><button class="toggle" id="debug-b">Debug log</button></form>
+<span id="log-tools" style="display:none"><form method="post" action="/clearlog" style="display:inline"><button class="toggle">Clear</button></form>
+<a href="/dtmf" target="_blank">Open as text</a> <label class="sub"><input type="checkbox" id="follow" checked> Follow</label></span></div>
+<pre id="log" style="display:none"></pre>
 
 <script>
 function $(id){return document.getElementById(id)}
@@ -415,14 +456,40 @@ function render(d){
  $("net").className="now "+d.network; $("net-name").textContent=d.network=="dcnet"?"DCNet":"DC Now";
  $("reset-b").innerHTML=(d.autoreset?"&#9745;":"&#9744;")+" Reset to DC Now when openMenu (111-1111) connects";
  $("reset-note").textContent=d.autoreset?", and resets the selection":"";
- $("debug-b").innerHTML=(d.debug?"&#9745;":"&#9744;")+" DTMF debug log";
- $("debug-link").innerHTML=d.debug?' <a href="/dtmf" target="_blank">View log</a>':"";
+ $("debug-b").innerHTML=(d.debug?"&#9745;":"&#9744;")+" Debug log "+(d.debug?"(recording)":"(off)");
+ $("log-tools").style.display=d.debug?"inline":"none";
+ $("log").style.display=(d.debug||logSize)?"block":"none";
+ debugOn=d.debug;
+}
+var logSize=0,debugOn=false,logBusy=false;
+function cls(line){
+ if(/modem: DTMF/.test(line))return"dtmf";
+ if(/netswitch:|add-on:/.test(line))return"route";
+ if(/web page:/.test(line))return"web";
+ if(/underrun/.test(line))return"dim";
+ if(/fail|error|Couldn't|Unable|No carrier|NO CARRIER/i.test(line))return"err";
+ if(/modem/.test(line))return"modem";
+ return"";
+}
+function pollLog(){
+ if(logBusy||(!debugOn&&logSize))return; logBusy=true;
+ var x=new XMLHttpRequest();x.open("GET","/log?from="+logSize,true);
+ x.onload=function(){logBusy=false;if(x.status!=200)return;var r=JSON.parse(x.responseText);
+  var el=$("log");if(r.reset)el.innerHTML="";
+  if(r.text){var html=r.text.split(/\\r?\\n/).filter(function(l){return l.length}).map(function(l){
+    return '<div class="'+cls(l)+'">'+esc(l)+'</div>'}).join("");
+   el.insertAdjacentHTML("beforeend",html);
+   if($("follow").checked)el.scrollTop=el.scrollHeight;}
+  logSize=r.size;};
+ x.onerror=function(){logBusy=false};x.send();
 }
 function refresh(){var x=new XMLHttpRequest();x.open("GET","/api",true);
  x.onload=function(){if(x.status==200)render(JSON.parse(x.responseText))};x.send()}
 Array.prototype.forEach.call(document.forms,function(f){f.onsubmit=function(e){e.preventDefault();
- var x=new XMLHttpRequest();x.open("POST",f.getAttribute("action"),true);x.onload=refresh;x.send()}});
-refresh(); setInterval(refresh,2000);
+ var x=new XMLHttpRequest();x.open("POST",f.getAttribute("action"),true);
+ x.onload=function(){refresh();pollLog()};x.send()}});
+refresh(); setInterval(refresh,1000);
+pollLog(); setInterval(pollLog,700);
 </script>
 </body></html>"""
 
@@ -441,6 +508,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/api":
             self.send(json.dumps(api_state()), "application/json")
+        elif self.path.startswith("/log"):
+            m = re.search(r"from=(-?\d+)", self.path)
+            self.send(json.dumps(read_log(int(m.group(1)) if m else 0)), "application/json")
         elif self.path == "/status":
             d = api_state()
             self.send("network=%s\nautoreset=%s\ndreampi=%s\nmodem=%s\ninternet=%s\n" % (
@@ -459,20 +529,32 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/dcnet":
             open(FLAG, "w").close()
-        elif self.path == "/dcnow" and os.path.exists(FLAG):
-            os.remove(FLAG)
+            debug_log("web page: DCNet selected")
+        elif self.path == "/dcnow":
+            if os.path.exists(FLAG):
+                os.remove(FLAG)
+            debug_log("web page: DC Now selected")
         elif self.path == "/autoreset":
             if os.path.exists(AUTORESET):
                 os.remove(AUTORESET)
+                debug_log("web page: reset on openMenu turned off")
             else:
                 open(AUTORESET, "w").close()
+                debug_log("web page: reset on openMenu turned on")
         elif self.path == "/debug":
             if os.path.exists(DEBUG_DTMF):
+                debug_log("web page: debug log stopped")
                 os.remove(DEBUG_DTMF)
             else:
                 open(DEBUG_DTMF, "w").close()
                 if os.path.exists(DTMF_LOG):
                     os.remove(DTMF_LOG)  # start a fresh log
+                debug_log("web page: debug log started (network: %s)" %
+                          ("DCNet" if os.path.exists(FLAG) else "DC Now"))
+        elif self.path == "/clearlog":
+            if os.path.exists(DTMF_LOG):
+                os.remove(DTMF_LOG)
+            debug_log("web page: log cleared")
         elif self.path == "/recheck":
             _recheck.set()
         self.send_response(303)  # back to the page when JavaScript is off

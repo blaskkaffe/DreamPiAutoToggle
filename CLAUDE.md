@@ -13,8 +13,12 @@
 - The web page works on Python 3 and 2.7. It serves a static page that polls `GET /api` (JSON) every 2 s; buttons POST via XMLHttpRequest (plain form POST + 303 still works without JS). A background thread checks internet every 30 s and ports every 10 min (`POST /recheck` forces it).
 - Port check: if `tun0` has an address, DreamPi's VPN carries inbound traffic, so all games show "Via VPN". Otherwise it finds the router with SSDP and asks `GetSpecificPortMappingEntry` for every port of every game in `GAMES` (from dreamcastlive.net/connection-guide), comparing the target with the Dreamcast IP from `/etc/ppp/peers/dreamcast`. It can't prove reachability from the internet, and a DMZ is invisible to UPnP.
 
-## DTMF debug log
-If `/opt/dreampi-netswitch/debug_dtmf` exists, the hook replaces `read` on the modem's pyserial object (re-applied after every `start_dial_tone()`, since DreamPi opens a new serial object after each call) and logs every non-empty read while `modem._sending_tone` is true, plus each string `check_number()` receives, to `/tmp/dreampi-netswitch-dtmf.log`. The web page toggles it (`POST /debug`) and serves the log at `/dtmf`.
+## Debug log
+If `/opt/dreampi-netswitch/debug_dtmf` exists, the hook writes one timeline to `/tmp/dreampi-netswitch-dtmf.log` (`HH:MM:SS.mmm  +Nms  text`):
+- modem bytes read while `modem._sending_tone` is true, decoded by `_serial_feed()`: `<DLE><digit>` -> `modem: DTMF x`, other `<DLE>` codes via `_DLE_CODES` (V.253), text lines -> `modem says: ...`. The hook replaces `read` on the pyserial object again after every `start_dial_tone()`, since DreamPi opens a new serial object after each call;
+- every message on DreamPi's `dreampi` logger (`dreampi: ...`), via the same handler as the modem status;
+- the number `check_number()` received (`add-on: number heard ...`) and routing lines.
+The web page appends its own actions (`web page: ...`), serves new text incrementally at `GET /log?from=<byte offset>` (JSON; `reset` when the file was cleared), shows it live in a panel polled every 0.7 s, and has `POST /debug` (toggle) and `POST /clearlog`. The page's status poll runs every 1 s. Note the page's HTML/JS lives in a Python string: write `\\n` for a JavaScript `\n`.
 
 Open question being investigated: on hardware DreamPi heard openMenu's `1111111` as `11111111`, `1111` and `1`. Known contributors: (1) `digit_parser()` in netlink.py reads the digit right after `<DLE>` on a non-blocking port (`timeout=0`); if the byte hasn't arrived yet the digit is dropped and parsing restarts at the next `<DLE>` (reproduced in simulation). (2) openMenu's KallistiOS `modem_dial()` dials immediately after opening the line, without waiting for dial tone, using the modem chip's default DTMF timing. The debug log on real hardware decides which it is. Do not paper over it in the routing rules; the user wants the cause fixed.
 
