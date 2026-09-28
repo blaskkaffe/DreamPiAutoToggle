@@ -297,7 +297,7 @@ PAGE = u"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DreamPi</title>
 <style>
- :root{--dcnow:#e8761c;--dcnow-l:#f6b27a;--dcnet:#1c6fe8;--dcnet-l:#80b1f6;--card:#1b1b1b;--line:#2a2a2a;--muted:#999}
+ :root{--r:29px;--dcnow:#e8761c;--dcnow-l:#f6b27a;--dcnet:#1c6fe8;--dcnet-l:#80b1f6;--card:#1b1b1b;--line:#2a2a2a;--muted:#999}
  *{box-sizing:border-box}
  body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#111;color:#eee;max-width:460px;margin:24px auto;padding:0 16px}
  header{position:relative;margin-bottom:16px} h1{text-align:center;margin:0;font-size:1.9em}
@@ -305,7 +305,7 @@ PAGE = u"""<!doctype html>
  .card{background:var(--card);border-radius:14px;padding:4px 16px;margin-bottom:14px}
  .sub{color:#888;font-size:.85em} .note{color:var(--muted);font-size:.85em;margin:8px 4px} a{color:#8bf}
  button{font:inherit;cursor:pointer;border:0;color:#fff}
- .rows{cursor:pointer;user-select:none;border-radius:28px;border:5px solid #3a3a3a;padding:2px 20px}
+ .rows{cursor:pointer;user-select:none;border-radius:var(--r);border:5px solid #3a3a3a;padding:2px 20px}
  .row{display:flex;align-items:baseline;padding:11px 0;border-top:1px solid var(--line)} .row:first-child{border-top:0}
  .row .k{width:84px;color:var(--muted);flex:none} .row .v{flex:1}
  .rows .more{display:none} .rows.open .more{display:flex}
@@ -314,13 +314,15 @@ PAGE = u"""<!doctype html>
  .dot.blink{animation:blink 1s steps(1) infinite} @keyframes blink{50%{opacity:.15}}
  .ok{background:#2c2} .busy,.warn{background:#e0b400} .call{background:#b04cff} .bad,.off{background:#d33}
  .call-dcnow{background:#ff7a1a} .call-dcnet{background:#2a7bff}
- .warnbox{background:#7a1f1f;border:5px solid #a84a4a;padding:10px 20px;border-radius:28px;margin:0 0 12px;font-size:.9em}
- .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:999px;text-align:center;background:#9e4f10;border:5px solid #c9793a;line-height:1.35}
+ .warnbox{background:#7a1f1f;border:5px solid #a84a4a;padding:10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.9em}
+ .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r);text-align:center;background:#9e4f10;border:5px solid #c9793a;line-height:1.35}
  .now b{font-size:1.25em} .now.dcnet{background:#1c4f9e;border-color:#5a86cf}
- .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:999px;font-size:1.1em;font-weight:600;letter-spacing:.02em}
+ .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r);font-size:1.1em;font-weight:600;letter-spacing:.02em}
  .dcnow-b{background:var(--dcnow);border:5px solid var(--dcnow-l)} .dcnet-b{background:var(--dcnet);border:5px solid var(--dcnet-l)}
  .pill:active{filter:brightness(1.1)}
  .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:#2a2a2a;border:3px solid #444;color:#eee;font-size:.88em}
+ .wide{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 20px;border-radius:var(--r);background:var(--card);border:5px solid #3a3a3a;color:#eee;font-size:1em;text-align:left}
+ .wide .arrow{margin-left:8px} .wide.open .arrow{transform:rotate(90deg)}
  .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 0}
  .cog{position:absolute;right:0;top:50%;transform:translateY(-50%);padding:6px 8px;background:transparent;color:#aaa;font-size:1.6em;line-height:1}
  .cog:hover{color:#fff}
@@ -369,7 +371,7 @@ PAGE = u"""<!doctype html>
 <div class="now" id="net">Selected network:<br><b id="net-name">...</b></div>
 <form method="post" action="/dcnow"><button class="pill dcnow-b">DCNow! / DreamPi</button></form>
 <form method="post" action="/dcnet"><button class="pill dcnet-b">DCNET / FLYCAST</button></form>
-<div class="bar"><button class="pill-s" id="show-debug" type="button">Debug log &#9656;</button></div>
+<div class="bar"><button class="wide" id="show-debug" type="button"><span>Debug log</span><span class="arrow">&#9656;</span></button></div>
 <div id="debug" style="display:none">
 <div class="note">Records every modem event, DreamPi message and routing decision with
 millisecond timing. Turn recording on, then dial.</div>
@@ -474,7 +476,7 @@ $("led-bright").oninput=function(){led.brightness=Math.round(sliderToBright(this
 $("led-reset").onclick=function(){led=JSON.parse(JSON.stringify(ledDefaults));showLed();saveLed()};
 $("show-debug").onclick=function(){debugOpen=!debugOpen;
  $("debug").style.display=debugOpen?"block":"none";
- this.innerHTML=debugOpen?"Debug log &#9662;":"Debug log &#9656;";
+ this.classList.toggle("open",debugOpen);
  if(debugOpen){pollLog();var el=$("log");el.scrollTop=el.scrollHeight}};
 function cls(line){
  if(/modem: DTMF/.test(line))return"dtmf";
