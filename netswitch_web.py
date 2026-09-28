@@ -418,8 +418,9 @@ PAGE = u"""<!doctype html>
       height:55vh;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:12px}
  #log .dtmf{color:#6f6;font-weight:bold} #log .route{color:#8bf} #log .web{color:#e0b400}
  #log .modem{color:#aaa} #log .dim{color:#555} #log .err{color:#f66}
- #dcbg{position:fixed;top:0;left:0;width:100%;height:100vh;z-index:-1;overflow:hidden;pointer-events:none}
- body.dcbg{background:linear-gradient(to bottom,#9cc3dc,#4d639c) fixed;min-height:100vh}
+ #dcbg{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100lvh;z-index:-1;overflow:hidden;pointer-events:none;
+       background:linear-gradient(to bottom,#9cc3dc,#4d639c);transform:translateZ(0)}
+ body.dcbg #dcbg{display:block} body.dcbg{background:transparent} html.dcbg{background:#4d639c}
  body.dcbg{--card:rgba(20,20,20,.78)} body.dcbg .rows,body.dcbg .wide{background:rgba(20,20,20,.78)}
  body.dcbg h1{text-shadow:0 1px 4px rgba(0,0,0,.6)}
  body.settings-open > :not(#settings):not(#dcbg){visibility:hidden}
@@ -537,7 +538,7 @@ function loadScript(src,done){var sc=document.createElement("script");sc.src=src
  sc.onerror=function(){document.body.classList.remove("dcbg")};document.head.appendChild(sc)}
 function setBg(on){
  try{localStorage.setItem("netswitch-bg",on?"on":"off")}catch(e){}
- $("bg-b").checked=on;document.body.classList.toggle("dcbg",on);
+ $("bg-b").checked=on;document.body.classList.toggle("dcbg",on);document.documentElement.classList.toggle("dcbg",on);
  if(!on){if(window.DCBackground)DCBackground.stop();return}
  function go(){if(document.body.classList.contains("dcbg"))DCBackground.start($("dcbg"))}
  if(window.DCBackground)go();

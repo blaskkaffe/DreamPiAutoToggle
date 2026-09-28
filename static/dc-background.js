@@ -6,7 +6,8 @@
  * MIT License - see LICENSES.txt next to this file. Changes for DreamPi
  * Netswitch: wrapped in start()/stop() so the web page can switch it on and
  * off, the performance toggle and clock were removed, it pauses while the
- * page is hidden, and the canvas follows the device pixel ratio.
+ * page is hidden, the canvas follows the device pixel ratio, and it sizes
+ * itself from its fixed container so phone toolbars don't make it jump.
  * The scene, texture, waves and cylinder are his.
  *
  * Needs three.min.js (Three.js r128, MIT) loaded first.
@@ -22,8 +23,12 @@
         if (running || !window.THREE) return !!running;
         var THREE = window.THREE;
 
+        // Size from the fixed container (100lvh), not window.innerHeight, so the
+        // scene doesn't jump when a phone's toolbar slides in and out.
+        var width = container.clientWidth || window.innerWidth;
+        var height = container.clientHeight || window.innerHeight;
         var scene = new THREE.Scene();
-        var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        var camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
         var renderer;
         try {
             renderer = new THREE.WebGLRenderer({alpha: true, antialias: true});
@@ -32,7 +37,8 @@
         }
         renderer.setClearColor(0x000000, 0);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setSize(width, height);
+        renderer.domElement.style.display = "block";
         container.appendChild(renderer.domElement);
 
         // Plane with the texture
@@ -180,9 +186,15 @@
         }
 
         function onResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
+            var w = container.clientWidth || window.innerWidth;
+            var h = container.clientHeight || window.innerHeight;
+            // Ignore small height-only changes (mobile toolbars while scrolling)
+            if (w === width && Math.abs(h - height) < 160) return;
+            width = w;
+            height = h;
+            camera.aspect = width / height;
             camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setSize(width, height);
         }
 
         function onVisibility() {   // save battery while the tab is hidden
