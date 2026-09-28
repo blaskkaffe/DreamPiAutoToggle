@@ -4,6 +4,13 @@ Switch a DreamPi between **DCNow!** (the normal DreamPi / Dreamcast Live network
 
 It installs as an add-on and changes no DreamPi files, so DreamPi's auto-updates keep working and uninstalling leaves DreamPi exactly as it was.
 
+What you get:
+- A live status page at `http://dreampi.local` (also over HTTPS) with buttons to pick the network.
+- Special phone numbers that switch the network straight from the Dreamcast.
+- Optional status LEDs on GPIO18: one NeoPixel, several, or a strip, with colours and effects per status.
+- An optional animated Dreamcast-style background for the page.
+- A debug log for tracking down calls that go wrong.
+
 ## Install
 
 On the Pi:
@@ -26,21 +33,23 @@ Some browsers refuse or keep upgrading plain `http://` pages, so the page is als
 Options:
 - `sudo ./install.sh 8080` puts the HTTP page on another port, if port 80 is taken.
 - `sudo ./install.sh --https-port=8443` puts the HTTPS page on another port, and `--no-https` turns it off.
-- `sudo ./install.sh --led` adds the status NeoPixel (see below). `--no-led` removes it again.
+- `sudo ./install.sh --led` adds one status NeoPixel, and `--leds=30` a chain or strip of 30 (see [Status NeoPixels](#status-neopixels-optional)). `--no-led` removes the LED service again.
+
+Options can be combined, for example `sudo ./install.sh --leds=8 --no-https`.
 
 ### Update
 
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
 ```
-Your settings (selected network, default network, Auto reset, LED) are kept. If the page still looks old afterwards, reload it in the browser.
+Your settings are kept: selected network, default network, Auto reset, the LED setup and its colours, and the HTTPS certificate. You don't need to repeat `--led` or `--leds=N`; the installer remembers them until `--no-led`. If the page still looks old afterwards, reload it in the browser.
 
 ### Uninstall
 
 ```
 sudo /opt/dreampi-netswitch/uninstall.sh
 ```
-This removes the services and the hook, and restarts DreamPi.
+This removes the web page and LED services, the hook, all settings and the certificate, and restarts DreamPi.
 
 ## Requirements
 
@@ -70,26 +79,33 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 - **Status box:** shows the **DreamPi** row. Tap it (the small arrow) to also show:
   - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DCNow! or DCNET, call ended.
   - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online`, checked every 30 seconds.
-- **Selected network** and the **DCNow! / DreamPi** (orange) and **DCNET / FLYCAST** (blue) buttons to change it.
+- **Selected network**, orange for DCNow! or blue for DCNET, and the **DCNow! / DreamPi** and **DCNET / FLYCAST** buttons to change it.
 - **Debug log:** hidden until you click the button at the bottom (see below).
 
 ### Settings (cogwheel)
 
 The cogwheel in the top right corner opens the settings. Changes are saved straight away; close them with the ✕ or Esc.
 
+**Network**
+
 - **Default network:** a switch, orange for DCNow! or blue for DCNET, that sets which network Auto reset goes back to. DCNow! unless changed.
 - **Auto reset:** when ticked, dialing `111-1111` resets the selected network to the default network. Off by default.
-- **Phone numbers:** the table above, as a reminder.
-- **Dreamcast background:** an animated background in the style of the Dreamcast menu (see [Credits](#credits)). Off by default, and remembered per browser, so a phone can leave it off while a PC has it on. It pauses while the page is hidden. The Pi serves the files itself (about 600 KB, fetched once), so it works without internet; browsers without WebGL just show the blue gradient.
-- **Status LED** (only shown when the LED is installed with `--led` or `--leds=N`):
-  - **Global brightness** of the LEDs, 0 to 100% (default 8%). The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
-  - Two tabs, **DCNow! selected** and **DCNET selected**, each with a table of every DreamPi status. For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
-  - Per status: a **colour**, an **effect** and a **level**:
-    - **Effect:** tap it for a small menu. **Solid**, **Blink**, **Breathe** (fading up and down) and **RGB** (a calm colour cycle, about 10 seconds per round, ignoring the colour) work on any LED. With a strip there are also **Rainbow**, **Scanner** (a dot sweeping back and forth), **Comet**, **Chase** and **Twinkle**. Every effect except Solid and RGB has a **Slow** and a **Fast** speed.
-    - **Level:** the brightness for that status. Grey means it uses the global brightness; tap it to give the status its own brightness with a slider, and tap **Use global** to go back.
-  - **Reset LED settings to defaults** restores the table below.
 
-  The status dot on the main page shows the same colour and a matching animation, so it works as a preview even without an LED.
+**Phone numbers:** the table above, as a reminder.
+
+**Appearance**
+- **Dreamcast background:** an animated background in the style of the Dreamcast menu (see [Credits](#credits)). Off by default, and remembered per browser, so a phone can leave it off while a PC has it on. It pauses while the page is hidden. The Pi serves the files itself (about 600 KB, fetched once), so it works without internet; browsers without WebGL just show the blue gradient. The buttons are slightly see-through so the background shows through them.
+
+**Status LED** (only shown when LEDs are installed with `--led` or `--leds=N`; the title shows the number of LEDs for a strip)
+
+- **Global brightness** of the LEDs, 0 to 100% (default 8%). The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
+- Two tabs, **DCNow! selected** and **DCNET selected**, each with a table of every DreamPi status. For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
+- Per status: a **colour**, an **effect** and a **level**:
+  - **Effect:** tap it for a small menu. **Solid**, **Blink**, **Breathe** (fading up and down) and **RGB** (a calm colour cycle, about 10 seconds per round, ignoring the colour) work on any LED. With a strip there are also **Rainbow**, **Scanner** (a dot sweeping back and forth), **Comet**, **Chase** and **Twinkle**. Every effect except Solid and RGB has a **Slow** and a **Fast** speed.
+  - **Level:** the brightness for that status. Grey means it uses the global brightness; tap it to give the status its own brightness with a slider, and tap **Use global** to go back.
+- **Reset LED settings to defaults** restores the colours and effects in [Status colours](#status-colours) and the 8% global brightness.
+
+The status dot on the main page shows the same colour and a matching animation, so it works as a preview.
 
 `http://dreampi.local/api` returns the status as JSON, and `http://dreampi.local/status` as plain text:
 ```
@@ -103,16 +119,16 @@ internet=Connected (18 ms)
 
 ## Status colours
 
-The dot next to **DreamPi** on the web page and the optional NeoPixels show the same colour and effect, set in the settings. The defaults are the same for both networks:
+The dot next to **DreamPi** on the web page and the optional NeoPixels show the same colour and effect. With LEDs installed you can change them in the settings; otherwise the dot uses these defaults, which are the same for both networks:
 
 | Colour | DreamPi status |
 |---|---|
 | Green | Ready for calls |
-| Yellow, blinking | Starting up, not answering calls yet |
+| Yellow, blinking slowly | Starting up, not answering calls yet |
 | Orange | In a call on DCNow! |
 | Blue | In a call on DCNET |
 | Purple | In another kind of call (e.g. Netlink) |
-| Red, blinking | DreamPi not running |
+| Red, blinking slowly | DreamPi not running |
 | Dim grey | State unknown |
 
 ## Status NeoPixels (optional)
@@ -146,13 +162,13 @@ If the LEDs stay dark, `systemctl status dreampi-netswitch-led` shows why.
 
 ## Debug log
 
-The debug log is for tracking down calls that go wrong, such as misheard numbers. Click **Debug log** at the bottom of the web page to open it (click again to close it), make sure **Recording** is ticked, and dial. The panel shows one live timeline with millisecond timing:
+The debug log is for tracking down calls that go wrong, such as misheard numbers. Click **Debug log** at the bottom of the web page to open it (click again to close it), press **Recording off** so it changes to **Recording**, and dial. The panel shows one live timeline with millisecond timing:
 
 - what the modem reports while DreamPi listens: each dialed digit (`DTMF 1`), dial tone underruns, calling tones, and its replies (`OK`, `CONNECT 33600`),
 - every message DreamPi logs (heard, mode, answering, carrier speed, hang-up),
 - the add-on's routing decisions and your button presses.
 
-**Clear** empties it, **Open as text** shows the whole file (`http://dreampi.local/dtmf`), and unticking **Recording** stops recording.
+**Clear** empties it, **Open as text** shows the whole file (`http://dreampi.local/dtmf`), and pressing **Recording** again stops recording.
 
 ## Checking it works
 
