@@ -261,8 +261,10 @@ PAGE = u"""<!doctype html>
 <table>
 <tr><td class="n">111-1111</td><td>Always directs to DCNow! for compatibility with openMenu and standard ISP configs.<br>
 <span class="sub">When &quot;Auto reset&quot; is enabled, dialing it also resets the network to the default network.<span id="reset-note"></span></span></td></tr>
-<tr><td class="n">222-2222</td><td>Selects DCNow! / DreamPi and connects to it</td></tr>
-<tr><td class="n">333-3333</td><td>Selects DCNET / FLYCAST and connects to it</td></tr>
+<tr><td class="n">222-2222</td><td>Selects DCNow! / DreamPi and connects to it<br>
+<span class="sub">Can be set in the Dreamcast ISP config to always connect to DCNow!</span></td></tr>
+<tr><td class="n">333-3333</td><td>Selects DCNET / FLYCAST and connects to it<br>
+<span class="sub">Can be set in the Dreamcast ISP config to always connect to DCNET.</span></td></tr>
 <tr><td class="n">Any other</td><td>Connects to the currently selected network.<br>
 <span class="sub">Set your Dreamcast ISP config to any 7-digit number to use this feature.</span></td></tr>
 </table>

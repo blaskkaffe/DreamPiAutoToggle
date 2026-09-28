@@ -7,8 +7,8 @@ Switch a DreamPi between **DCNow!** (normal DreamPi / Dreamcast Live) and **DCNE
 | Phone number | Result |
 |---|---|
 | `111-1111` | Always directs to DCNow! for compatibility with openMenu and standard ISP configs. When **Auto reset** is enabled, dialing it also resets the network to the **default network**. |
-| `222-2222` | Selects DCNow! / DreamPi and connects to it. |
-| `333-3333` | Selects DCNET / FLYCAST and connects to it. |
+| `222-2222` | Selects DCNow! / DreamPi and connects to it. Can be set in the Dreamcast ISP config to always connect to DCNow! |
+| `333-3333` | Selects DCNET / FLYCAST and connects to it. Can be set in the Dreamcast ISP config to always connect to DCNET. |
 | Any other number | Connects to the currently selected network. Set your Dreamcast ISP config to any 7-digit number to use this feature. |
 
 Netlink/XBAND dial codes and DreamPi's built-in `*69` prefix are not affected. If DCNET is not enabled in `netlink_config.ini`, all calls go to DCNow!
