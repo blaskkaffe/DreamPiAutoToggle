@@ -16,7 +16,9 @@ It then wraps Netlink.check_number() with these rules:
 
 The selection is the file dcnet_mode, the reset toggle is the file autoreset.
 It also reports DreamPi's state (starting / ready / in a call) to
-/tmp/dreampi-netswitch.state for the web page.
+/tmp/dreampi-netswitch.state for the web page. If the file debug_dtmf exists,
+it also logs every modem event while DreamPi listens for digits to
+/tmp/dreampi-netswitch-dtmf.log, to diagnose misheard numbers.
 No DreamPi file is modified. Written for both Python 2.7 and 3.
 """
 import os
@@ -28,6 +30,8 @@ FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 AUTORESET = os.path.join(BASE_DIR, "autoreset")
 STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
+DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")  # exists = log modem events
+DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
 NETLINK_DIR = "/home/pi/dreampi"
 
 NUM_OPENMENU = "1111111"
@@ -70,6 +74,61 @@ def _write_state(state):
         pass
 
 
+_dtmf_last = [0.0]
+
+
+def _dtmf_log(text):
+    """Append a timestamped line to the DTMF debug log (only when enabled)."""
+    if not os.path.exists(DEBUG_DTMF):
+        return
+    try:
+        now = time.time()
+        gap = now - _dtmf_last[0]
+        _dtmf_last[0] = now
+        with open(DTMF_LOG, "a") as f:
+            if gap > 5:
+                f.write("\n")
+            f.write("%s.%03d  +%6dms  %s\n" % (time.strftime("%H:%M:%S", time.localtime(now)),
+                                              int(now * 1000) % 1000,
+                                              min(int(gap * 1000), 999999), text))
+    except Exception:
+        pass
+
+
+def _describe(data):
+    """Readable form of modem bytes: DLE shown as <DLE>, others as-is."""
+    out = []
+    for b in bytearray(data):
+        if b == 0x10:
+            out.append("<DLE>")
+        elif 32 <= b < 127:
+            out.append(chr(b))
+        else:
+            out.append("<%02X>" % b)
+    return "".join(out)
+
+
+def _watch_serial(modem):
+    """Log every byte the modem sends while DreamPi is listening (dial tone
+    on), which is when the modem reports the dialed digits as <DLE><digit>."""
+    try:
+        ser = getattr(modem, "_serial", None)
+        if ser is None or getattr(ser, "_netswitch", False):
+            return
+        original_read = ser.read
+
+        def read(*args, **kwargs):
+            data = original_read(*args, **kwargs)
+            if data and getattr(modem, "_sending_tone", False):
+                _dtmf_log("modem: " + _describe(data))
+            return data
+
+        ser.read = read
+        ser._netswitch = True
+    except Exception:
+        pass
+
+
 def _select_dcnet(on):
     if on:
         open(FLAG, "w").close()
@@ -98,6 +157,7 @@ def _patch(module):
 
     def check_number(self, raw_string):
         special = _special(raw_string)
+        _dtmf_log("DreamPi heard: %r" % raw_string)
         # Special numbers: remember the choice before DreamPi routes the call
         try:
             if special == NUM_DCNOW:
@@ -149,6 +209,8 @@ def _wrap_ready(cls, name):
     def wrapper(self, *args, **kwargs):
         value = original(self, *args, **kwargs)
         _write_state("ready")
+        # A new serial object is opened after every call, so watch it again
+        _watch_serial(getattr(self, "modem", self))
         return value
 
     wrapper._netswitch = True

@@ -11,6 +11,11 @@
 - State lives in files: `/opt/dreampi-netswitch/dcnet_mode` (exists means DCNet is selected) and `/opt/dreampi-netswitch/autoreset` (reset toggle). The hook writes `/tmp/dreampi-netswitch.active` (`active pid=N` or an error). The hook also writes `/tmp/dreampi-netswitch.state` (`starting`, `ready`, `call <network>` or `unknown`, plus a unix time): `starting` when netlink is imported, `call ...` from `check_number()`, and `ready` after `__main__.Modem.start_dial_tone()` (the moment DreamPi logs `<LISTENING>`) or `Netlink.reset_serial()`. The web page checks that pid under `/proc`, and also reads `netlink_config.ini` and `/boot/noautoupdates.txt` to warn when DCNet is off.
 - The web page works on Python 3 and 2.7.
 
+## DTMF debug log
+If `/opt/dreampi-netswitch/debug_dtmf` exists, the hook replaces `read` on the modem's pyserial object (re-applied after every `start_dial_tone()`, since DreamPi opens a new serial object after each call) and logs every non-empty read while `modem._sending_tone` is true, plus each string `check_number()` receives, to `/tmp/dreampi-netswitch-dtmf.log`. The web page toggles it (`POST /debug`) and serves the log at `/dtmf`.
+
+Open question being investigated: on hardware DreamPi heard openMenu's `1111111` as `11111111`, `1111` and `1`. Known contributors: (1) `digit_parser()` in netlink.py reads the digit right after `<DLE>` on a non-blocking port (`timeout=0`); if the byte hasn't arrived yet the digit is dropped and parsing restarts at the next `<DLE>` (reproduced in simulation). (2) openMenu's KallistiOS `modem_dial()` dials immediately after opening the line, without waiting for dial tone, using the modem chip's default DTMF timing. The debug log on real hardware decides which it is. Do not paper over it in the routing rules; the user wants the cause fixed.
+
 ## Upstream facts the hook depends on (netlink.py, dpi2 branch)
 - `check_number(self, raw_string)` returns `{'client': mode, 'dial_string': ...}`. `dreampi.py` answers with its own pppd only when `client == 'PPP'`. Any other non-idle mode is handled by `Netlink.poll()` -> `mode_handler()`.
 - Mode `"dcnet"` makes `mode_handler()` call `dcnet_connect()`, which answers and runs `dcnet.rpi`. This is the same route the built-in `*69` prefix uses: it stores `self.dial_modifier` in memory, valid for 10 seconds.

@@ -17,6 +17,8 @@ FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 AUTORESET = os.path.join(BASE_DIR, "autoreset")
 STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
+DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
+DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 80
 
 PAGE = """<!doctype html>
@@ -32,6 +34,7 @@ PAGE = """<!doctype html>
  .toggle{{background:#2a2a2a;color:#eee;font-size:1em;text-align:left}}
  .pi{{margin:8px 0 18px;padding:10px;border-radius:8px;background:#1d1d1d;font-size:1.05em}}
  .dot{{display:inline-block;width:.7em;height:.7em;border-radius:50%;margin-right:8px;background:{dot}}}
+ .debug{{margin-top:26px;font-size:.85em;color:#999}} .debug button{{font-size:.9em;padding:8px;width:auto}} a{{color:#8bf}}
  .warn{{background:#7a1f1f;padding:12px;border-radius:8px;margin-top:16px;font-size:.9em;text-align:left}}
  table{{width:100%;margin-top:22px;border-collapse:collapse;font-size:.9em;text-align:left;color:#bbb}}
  td{{padding:5px 4px;border-top:1px solid #2a2a2a}} td:first-child{{white-space:nowrap;color:#eee}}
@@ -49,6 +52,7 @@ PAGE = """<!doctype html>
 <tr><td>333-3333</td><td>Selects DCNet and connects to it</td></tr>
 <tr><td>Any other</td><td>Connects to the selected network</td></tr>
 </table>
+<div class="debug"><form method="post" action="/debug"><button class="toggle">{debug_box} DTMF debug log</button></form>{debug_link}</div>
 </body></html>"""
 
 
@@ -127,6 +131,9 @@ class Handler(BaseHTTPRequestHandler):
         pi_state, dot = dreampi_state()
         body = PAGE.format(active="DCNet" if dcnet else "DC Now",
                            pi_state=pi_state, dot=dot,
+                           debug_box="&#9745;" if os.path.exists(DEBUG_DTMF) else "&#9744;",
+                           debug_link=(' <a href="/dtmf">View log</a> (records what the modem reports while '
+                                       'DreamPi listens for digits)') if os.path.exists(DEBUG_DTMF) else "",
                            color="#1c4f9e" if dcnet else "#9e4f10",
                            box="&#9745;" if reset else "&#9744;",
                            reset_note=", and resets the selection" if reset else "",
@@ -139,6 +146,19 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if self.path == "/dtmf":
+            try:
+                with open(DTMF_LOG, "rb") as f:
+                    body = f.read()
+            except IOError:
+                body = b"No DTMF log yet. Enable the debug log and dial.\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path == "/status":
             body = ("network=%s\nautoreset=%s\ndreampi=%s\n" % (
                 "dcnet" if os.path.exists(FLAG) else "dcnow",
@@ -157,6 +177,13 @@ class Handler(BaseHTTPRequestHandler):
             open(FLAG, "w").close()
         elif self.path == "/dcnow" and os.path.exists(FLAG):
             os.remove(FLAG)
+        elif self.path == "/debug":
+            if os.path.exists(DEBUG_DTMF):
+                os.remove(DEBUG_DTMF)
+            else:
+                open(DEBUG_DTMF, "w").close()
+                if os.path.exists(DTMF_LOG):
+                    os.remove(DTMF_LOG)  # start a fresh log
         elif self.path == "/autoreset":
             if os.path.exists(AUTORESET):
                 os.remove(AUTORESET)

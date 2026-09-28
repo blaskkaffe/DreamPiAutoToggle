@@ -28,6 +28,10 @@ autoreset=off
 dreampi=Ready for calls
 ```
 
+## Diagnosing misheard numbers
+
+Tick **DTMF debug log** at the bottom of the web page, dial, then open **View log** (or `http://dreampi.local/dtmf`). Every byte the modem sends while DreamPi listens for digits is listed with millisecond timings, followed by what DreamPi heard. The modem reports each dialed digit as `<DLE>` followed by the digit. Ticking the box again stops logging; ticking it on starts a fresh log.
+
 ## Install
 
 On the Pi:
