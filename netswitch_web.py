@@ -438,7 +438,7 @@ PAGE = u"""<!doctype html>
 <div class="now" id="net">Selected network:<br><b id="net-name">...</b></div>
 <form method="post" action="/dcnow"><button class="pill dcnow-b">DCNow! / DreamPi</button></form>
 <form method="post" action="/dcnet"><button class="pill dcnet-b">DCNET / FLYCAST</button></form>
-<div class="bar"><button class="wide" id="show-debug" type="button"><span>Debug log</span><span class="arrow">&#9656;</span></button></div>
+<div class="bar" id="debug-bar" style="display:none"><button class="wide" id="show-debug" type="button"><span>Debug log</span><span class="arrow">&#9656;</span></button></div>
 <div id="debug" style="display:none">
 <div class="note">Records every modem event, DreamPi message and routing decision with
 millisecond timing. Turn recording on, then dial.</div>
@@ -457,6 +457,8 @@ millisecond timing. Turn recording on, then dial.</div>
   <button class="switch" id="default-b" type="submit"><span class="lbl" id="default-l">DCNow!</span><span class="knob"></span></button></form>
  <form method="post" action="/autoreset" class="srow"><span>Auto reset<span class="sub">Dialing 111-1111 returns to the default network</span></span>
   <button class="cbox" id="reset-b" type="submit" aria-label="Auto reset"></button></form>
+ <div class="srow"><span>Debug log<span class="sub">Show the debug log on the main page (this browser only)</span></span>
+  <input type="checkbox" class="cbox dcnow" id="dbg-b" aria-label="Show debug log"></div>
 </div>
 
 <h2>Phone numbers</h2>
@@ -546,6 +548,12 @@ function setBg(on){
  else loadScript("/static/three.min.js",function(){loadScript("/static/dc-background.js",go)})}
 $("bg-b").onchange=function(){setBg(this.checked)};
 if(bgWanted())setBg(true);
+// Debug log menu: hidden unless switched on in settings, remembered per browser
+function setDebugMenu(on){
+ try{localStorage.setItem("netswitch-debug",on?"on":"off")}catch(e){}
+ $("dbg-b").checked=on;$("debug-bar").style.display=on?"flex":"none";
+ if(!on){debugOpen=false;$("debug").style.display="none";$("show-debug").classList.remove("open")}}
+$("dbg-b").onchange=function(){setDebugMenu(this.checked)};
 var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledEffects=[],ledCount=1,ledNet="dcnow";
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
@@ -622,6 +630,7 @@ $("show-debug").onclick=function(){debugOpen=!debugOpen;
  $("debug").style.display=debugOpen?"block":"none";
  this.classList.toggle("open",debugOpen);
  if(debugOpen){pollLog();var el=$("log");el.scrollTop=el.scrollHeight}};
+setDebugMenu((function(){try{return localStorage.getItem("netswitch-debug")==="on"}catch(e){return false}})());
 function cls(line){
  if(/modem: DTMF/.test(line))return"dtmf";
  if(/netswitch:|add-on:/.test(line))return"route";

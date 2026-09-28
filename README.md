@@ -80,7 +80,7 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
   - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DCNow! or DCNET, call ended.
   - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online`, checked every 30 seconds.
 - **Selected network**, orange for DCNow! or blue for DCNET, and the **DCNow! / DreamPi** and **DCNET / FLYCAST** buttons to change it.
-- **Debug log:** hidden until you click the button at the bottom (see below).
+- **Debug log:** hidden unless switched on in the settings (see below).
 
 ### Settings (cogwheel)
 
@@ -90,6 +90,7 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 
 - **Default network:** a switch, orange for DCNow! or blue for DCNET, that sets which network Auto reset goes back to. DCNow! unless changed.
 - **Auto reset:** when ticked, dialing `111-1111` resets the selected network to the default network. Off by default.
+- **Debug log:** when ticked, the **Debug log** bar appears at the bottom of the main page. Off by default and remembered per browser.
 
 **Phone numbers:** the table above, as a reminder.
 
@@ -162,7 +163,7 @@ If the LEDs stay dark, `systemctl status dreampi-netswitch-led` shows why.
 
 ## Debug log
 
-The debug log is for tracking down calls that go wrong, such as misheard numbers. Click **Debug log** at the bottom of the web page to open it (click again to close it), press **Recording off** so it changes to **Recording**, and dial. The panel shows one live timeline with millisecond timing:
+The debug log is for tracking down calls that go wrong, such as misheard numbers. Tick **Debug log** under Network in the settings, then click the **Debug log** bar at the bottom of the main page to open it (click again to close it), press **Recording off** so it changes to **Recording**, and dial. The panel shows one live timeline with millisecond timing:
 
 - what the modem reports while DreamPi listens: each dialed digit (`DTMF 1`), dial tone underruns, calling tones, and its replies (`OK`, `CONNECT 33600`),
 - every message DreamPi logs (heard, mode, answering, carrier speed, hang-up),
