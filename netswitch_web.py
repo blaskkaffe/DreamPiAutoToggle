@@ -470,10 +470,8 @@ def force_hangup():
                     say("hung up, DreamPi is ready for calls")
                     return
             say("DreamPi didn't get ready, restarting it")
-        elif state == "ok":
-            say("no call to end; restarting DreamPi to reset the modem")
         else:
-            say("no call process found, restarting DreamPi")
+            say("the call seems stuck (no call process found), restarting DreamPi")
         rc = _run(["systemctl", "restart", "dreampi.service"])
         say("DreamPi restarted, it takes a few seconds to be ready" if rc == 0
             else "could not restart DreamPi (systemctl returned %s)" % rc)
@@ -483,6 +481,9 @@ def force_hangup():
 
 
 def start_hangup():
+    """Only while DreamPi is in a call (the button is hidden otherwise)."""
+    if not dreampi_state()[0].startswith("call"):
+        return False
     with _hangup_lock:
         if _hangup["busy"]:
             return False
@@ -893,7 +894,7 @@ PAGE = u"""<!doctype html>
  <div class="row more"><span class="k">Modem</span><span class="v"><span><span class="nw" id="m-text">...</span><span class="sub blk" id="m-since"></span></span></span></div>
  <div class="row more"><span class="k">Internet</span><span class="v"><span class="dot" id="i-dot"></span><span id="i-text">...</span></span></div>
  <div class="row more"><span class="k">Pi</span><span class="v"><span class="dot" id="p-dot"></span><span id="p-text">...</span></span></div>
- <div class="row more hang"><form method="post" action="/hangup" id="hang-f"><button class="pill-s" id="hang-b" type="submit"
+ <div class="row more hang" id="hang-row" style="display:none"><form method="post" action="/hangup" id="hang-f"><button class="pill-s" id="hang-b" type="submit"
   title="Ends the current call and gets the modem ready again">Hang up</button></form></div>
 </div>
 <form method="post" action="/dcnow"><button class="pill dcnow-b">DCNow! / DreamPi</button></form>
@@ -982,6 +983,8 @@ function lookDot(el,look){if(!look){el.className="dot";el.style.background="#333
  el.style.animation=f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none"}
 var favNet="dcnow";
 function render(d){
+ // Hang up only while in a call (or while a hang up is still running)
+ $("hang-row").style.display=(d.dreampi.state.indexOf("call")==0||(d.hangup&&d.hangup.busy))?"":"none";
  if(d.hangup){var hb=$("hang-b");
   if(d.hangup.busy){hb.disabled=true;hb.className="pill-s";
    hb.textContent=d.hangup.text?d.hangup.text.charAt(0).toUpperCase()+d.hangup.text.slice(1):"Hanging up..."}
