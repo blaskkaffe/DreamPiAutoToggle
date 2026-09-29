@@ -698,7 +698,7 @@ PAGE = u"""<!doctype html>
  .card{background:var(--card);border-radius:var(--r);padding:6px 20px;margin-bottom:14px}
  .sub{color:#888;font-size:.85em} .note{color:var(--muted);font-size:.85em;margin:8px 4px} a{color:#8bf}
  button{font:inherit;cursor:pointer;border:0;color:#fff}
- .rows{cursor:pointer;user-select:none;border-radius:var(--r);border:var(--bw) solid #3a3a3a;padding:2px 20px}
+ .rows{cursor:pointer;user-select:none}
  .row{display:flex;align-items:baseline;padding:11px 0;border-top:1px solid var(--line)} .row:first-child{border-top:0}
  .row .k{width:84px;color:var(--muted);flex:none} .row .v{flex:1}
  .rows .more{display:none} .rows.open .more{display:flex}
@@ -710,7 +710,17 @@ PAGE = u"""<!doctype html>
  .call-dcnow{background:#ff7a1a} .call-dcnet{background:#2a7bff}
  .warnbox{background:#7a1f1f;border:var(--bw) solid #a84a4a;padding:10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.9em}
  .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r);text-align:center;background:#9e4f10;border:var(--bw) solid #c9793a;line-height:1.35}
- .now b{font-size:1.25em} .now.dcnet{background:#1c4f9e;border-color:#5a86cf}
+ .now b{font-size:1.25em;display:block} .now.dcnet{background:#1c4f9e;border-color:#5a86cf}
+ /* status rows inside the network box: closed = just the DreamPi status,
+    centred under the network name; open = all rows with their labels */
+ .now .row{font-size:.62em;line-height:1.35;padding:9px 0;border-top:1px solid rgba(255,255,255,.18);text-align:left}
+ .now .row.main{justify-content:center;border-top:0;padding:8px 0 2px}
+ .now .row.main .k{display:none} .now .row.main .v{flex:none}
+ .now .row .k{color:rgba(255,255,255,.65)} .now .sub{color:rgba(255,255,255,.65)}
+ .now .arrow{color:rgba(255,255,255,.7);font-size:.9em}
+ .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)}
+ .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.18)}
+ .now.open .row.main .k{display:block} .now.open .row.main .v{flex:1}
  .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r);font-size:1.1em;font-weight:600;letter-spacing:.02em}
  .dcnow-b{background:rgba(232,118,28,.82);border:var(--bw) solid rgba(246,178,122,.82)} .dcnet-b{background:rgba(28,111,232,.82);border:var(--bw) solid rgba(128,177,246,.82)}
  .pill:active{filter:brightness(1.1)}
@@ -782,13 +792,13 @@ PAGE = u"""<!doctype html>
 <div id="dcbg"></div>
 <header><h1>DreamPi</h1><button class="cog" id="cog" type="button" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M10.3 1.5h3.4l.5 2.6a8.3 8.3 0 0 1 2.1.9l2.2-1.5 2.4 2.4-1.5 2.2c.4.7.7 1.4.9 2.1l2.6.5v3.4l-2.6.5a8.3 8.3 0 0 1-.9 2.1l1.5 2.2-2.4 2.4-2.2-1.5c-.7.4-1.4.7-2.1.9l-.5 2.6h-3.4l-.5-2.6a8.3 8.3 0 0 1-2.1-.9l-2.2 1.5-2.4-2.4 1.5-2.2a8.3 8.3 0 0 1-.9-2.1l-2.6-.5v-3.4l2.6-.5c.2-.7.5-1.4.9-2.1L3.4 5.9l2.4-2.4L8 5c.7-.4 1.4-.7 2.1-.9zM12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6z"/></svg></button></header>
 <div id="warnings"></div>
-<div class="card rows" id="rows" title="Show or hide details">
- <div class="row"><span class="k">DreamPi</span><span class="v"><span class="dot" id="d-dot"></span><span id="d-text">...</span></span><span class="arrow">&#9656;</span></div>
+<div class="now rows" id="net" title="Show or hide details">
+ <div class="nlabel">Selected network:</div><b id="net-name">...</b>
+ <div class="row main"><span class="k">DreamPi</span><span class="v"><span class="dot" id="d-dot"></span><span id="d-text">...</span></span><span class="arrow">&#9656;</span></div>
  <div class="row more"><span class="k">Modem</span><span class="v"><span id="m-text">...</span> <span class="sub" id="m-since"></span></span></div>
  <div class="row more"><span class="k">Internet</span><span class="v"><span class="dot" id="i-dot"></span><span id="i-text">...</span></span></div>
  <div class="row more"><span class="k">Pi</span><span class="v"><span class="dot" id="p-dot"></span><span id="p-text">...</span></span></div>
 </div>
-<div class="now" id="net">Selected network:<br><b id="net-name">...</b></div>
 <form method="post" action="/dcnow"><button class="pill dcnow-b">DCNow! / DreamPi</button></form>
 <form method="post" action="/dcnet"><button class="pill dcnet-b">DCNET / FLYCAST</button></form>
 <div class="bar" id="debug-bar" style="display:none"><button class="wide" id="show-debug" type="button"><span>Debug log</span><span class="arrow">&#9656;</span></button></div>
@@ -880,7 +890,7 @@ function render(d){
  $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now);
  dot($("i-dot"),d.internet.state); $("i-text").textContent=d.internet.text;
  dot($("p-dot"),d.pi.state); $("p-text").textContent=d.pi.text||"...";
- $("net").className="now "+d.network;
+ $("net").className="now rows "+d.network+($("net").classList.contains("open")?" open":"");
  if(d.network!=favNet){favNet=d.network;$("fav").href="/static/favicon-"+d.network+".png";$("touch").href="/static/touch-"+d.network+".png"} $("net-name").textContent=d.network=="dcnet"?"DCNET":"DCNow!";
  var defName=d.default=="dcnet"?"DCNET":"DCNow!";
  $("default-b").className="switch "+d.default; $("default-l").textContent=d.default=="dcnet"?"DCNET":"DCNow!";
@@ -892,7 +902,7 @@ function render(d){
  debugOn=d.debug;
 }
 var logSize=0,debugOn=false,logBusy=false,debugOpen=false;
-$("rows").onclick=function(){this.classList.toggle("open")};
+$("net").onclick=function(){this.classList.toggle("open")};
 function showSettings(open){$("settings").classList.toggle("open",open);
  document.body.classList.toggle("settings-open",open);if(open){loadLed();loadAbout()}}
 function loadAbout(){var x=new XMLHttpRequest();x.open("GET","/about",true);
