@@ -71,10 +71,11 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 | `111-1111` | Always directs to DCNow! for compatibility with openMenu and standard ISP configs. When **Auto reset** is enabled, dialing it also resets the network to the **default network**. |
 | `222-2222` | Selects DCNow! / DreamPi and connects to it. Can be set in the Dreamcast ISP config to always connect to DCNow! |
 | `333-3333` | Selects DCNET / FLYCAST and connects to it. Can be set in the Dreamcast ISP config to always connect to DCNET. |
+| `222-2222#` / `333-3333#` | Selects the network but doesn't answer the call. openMenu's Switch buttons dial this way, so a press just records the selection instead of tying up DreamPi's modem answering a call that's about to be hung up anyway. |
 | Any other number | Connects to the currently selected network. Set your Dreamcast ISP config to any 7-digit number to use this feature. |
 
-- The numbers are matched on a run of six or more of their own digit at the end of what was heard, not an exact seven-digit tail: a leading `1` (long-distance prefix), an area code or an outside-line digit doesn't matter (DreamPi often hears an extra leading `1`, for example `13333333`), and since each number is just one digit repeated, losing a single repeat to a DTMF decode hiccup still leaves which number was meant unambiguous.
-- openMenu always dials `111-1111`, so it always gets DCNow! (DCNET wouldn't accept openMenu's login).
+- The numbers are matched on a run of six or more of their own digit at the end of what was heard (ignoring a trailing `#`), not an exact seven-digit tail: a leading `1` (long-distance prefix), an area code or an outside-line digit doesn't matter (DreamPi often hears an extra leading `1`, for example `13333333`), and since each number is just one digit repeated, losing a single repeat to a DTMF decode hiccup still leaves which number was meant unambiguous.
+- openMenu always dials `111-1111` for a full connect, and `222-2222#` / `333-3333#` for its quick Switch buttons.
 - Netlink/XBAND dial codes and DreamPi's built-in `*69` prefix ("this call to DCNET") keep working as before.
 
 ## Web page

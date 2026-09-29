@@ -11,6 +11,10 @@ It then wraps Netlink.check_number() with these rules:
            network (DCNow! unless the file default_dcnet exists).
   2222222  Selects DCNow! and connects through DCNow!
   3333333  Selects DCNET and connects through DCNET.
+  2222222# Selects DCNow!, but doesn't answer the call - openMenu's Switch
+  3333333# buttons dial this way, so a press just records the selection and
+           lets DreamPi go back to listening instead of spending a minute
+           retrying an answer that has nowhere to go.
   others   Go to whichever network is selected (website or 2222222/3333333).
            Only calls DreamPi would send to its normal PPP are redirected;
            Netlink/XBAND codes and the built-in *69 prefix are untouched.
@@ -171,18 +175,20 @@ def _select_dcnet(on):
 
 def _special(raw_string):
     """Which special number was dialed, matched on a run of the number's own
-    digit at the end of what was heard, one shorter than the number itself,
-    rather than an exact tail match. DreamPi often hears an extra leading
-    digit (e.g. 13333333), and ISP settings may add a prefix or area code,
-    so exact matching was already unreliable - and since each number is just
-    one digit repeated, losing a single repeat to a DTMF decode hiccup still
+    digit at the end of what was heard (ignoring a trailing '#', see
+    check_number()), one shorter than the number itself, rather than an
+    exact tail match. DreamPi often hears an extra leading digit (e.g.
+    13333333), and ISP settings may add a prefix or area code, so exact
+    matching was already unreliable - and since each number is just one
+    digit repeated, losing a single repeat to a DTMF decode hiccup still
     leaves which number was meant unambiguous. Confirmed on real hardware:
     a capture of 3333333 with proper 2-second finalization (not a hang-up
     cut short) still only reported six of the seven "3"s."""
+    string = raw_string[:-1] if raw_string.endswith("#") else raw_string
     for number in (NUM_OPENMENU, NUM_DCNOW, NUM_DCNET):
         digit = number[0]
         run = 0
-        for ch in reversed(raw_string):
+        for ch in reversed(string):
             if ch != digit:
                 break
             run += 1
@@ -220,6 +226,19 @@ def _patch(module):
                          % (raw_string, "DCNET" if default_dcnet else "DCNow!"))
         except Exception as e:
             _log(self, "could not update selection: %s" % e)
+
+        if raw_string.endswith("#") and special in (NUM_DCNOW, NUM_DCNET):
+            # openMenu's Switch buttons dial this way: the selection above is
+            # already recorded, and there is nothing else to do. Returning
+            # here instead of routing the call to PPP/DCNET the way a plain
+            # 2222222/3333333 would (see NUM_DCNOW/NUM_DCNET's docs) keeps
+            # DreamPi from spending several seconds prepping its modem and
+            # then retrying ATA against an already-dead line for a full
+            # minute, since openMenu hangs up right after dialing.
+            self.mode = "idle"
+            self.dial_string = ""
+            _log(self, "%s: quick switch, not answering" % raw_string)
+            return {"client": "idle", "dial_string": raw_string}
 
         result = original(self, raw_string)
 
