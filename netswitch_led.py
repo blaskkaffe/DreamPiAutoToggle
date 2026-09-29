@@ -268,12 +268,12 @@ def open_output(count):
 PERIODS = {
     "blink": (1.0, 0.4),
     "breathe": (4.0, 1.6),
-    "rainbow": (10.0, 3.0),
+    "rainbow": (20.0, 10.0),
     "scanner": (3.0, 1.2),
     "comet": (3.0, 1.2),
     "chase": (0.6, 0.24),      # time for one full 3-LED step cycle
     "twinkle": (3.0, 1.2),
-    "rgb": (10.0, 4.0),        # slow: a calm, standard colour cycle
+    "rgb": (20.0, 10.0),       # fast = a standard, calm RGB cycle; slow = half that speed
 }
 
 
@@ -307,14 +307,14 @@ def effect_frame(effect, speed, colour, t, n):
     if effect == "blink":
         return [c if phase < 0.5 else (0, 0, 0)] * n
     if effect == "breathe":
-        f = 0.5 - 0.5 * math.cos(2 * math.pi * phase)
+        f = 0.5 + 0.5 * math.cos(2 * math.pi * phase)    # starts bright
         return [_mul(c, f * f)] * n
     if n == 1:   # strip effects on a single LED
         if effect == "rainbow":
             return [hue(phase)]
         if effect in ("chase", "twinkle"):
             return [c if phase < 0.5 else (0, 0, 0)]
-        f = 0.5 - 0.5 * math.cos(2 * math.pi * phase)
+        f = 0.5 + 0.5 * math.cos(2 * math.pi * phase)
         return [_mul(c, f * f)]
     if effect == "rainbow":
         return [hue(phase + float(i) / n) for i in range(n)]
@@ -330,8 +330,8 @@ def effect_frame(effect, speed, colour, t, n):
             out.append(_mul(c, max(0.0, 1 - d / tail) ** 2))
         return out
     if effect == "chase":
-        step = int(phase * 3)
-        return [c if (i + step) % 3 == 0 else (0, 0, 0) for i in range(n)]
+        step = int(phase * 3 + 1e-6) % 3     # 1e-6: no float rounding at the step edges
+        return [c if (i - step) % 3 == 0 else (0, 0, 0) for i in range(n)]   # moves forward
     if effect == "twinkle":
         out = []
         for i in range(n):
@@ -361,20 +361,36 @@ def scaled(colour, brightness):
 
 
 # ---------------------------------------------------------------- composing
-def render(messages, t, count):
+def render(messages, now, count, clocks=None):
     """Draw the active messages (lowest priority first) into one frame.
     Each message covers all LEDs or its own section; later (more important)
-    messages draw over earlier ones, and uncovered LEDs stay dark."""
+    messages draw over earlier ones, and uncovered LEDs stay dark.
+    Every message's effect starts from its beginning (blink on, breathe
+    bright) when the message appears or its look changes, so a change shows
+    straight away instead of landing somewhere in the middle of a cycle.
+    clocks keeps those start times between frames."""
+    if clocks is None:
+        clocks = {}
     frame = [(0, 0, 0)] * count
+    seen = set()
     for m in messages:
+        key = m.get("key", "")
+        seen.add(key)
+        sig = (m.get("effect"), m.get("speed"), m.get("color"), m.get("leds"))
+        if key not in clocks or clocks[key][0] != sig:
+            clocks[key] = (sig, now)
         leds = m.get("leds")
         first, last = (1, count) if not leds else (max(1, leds[0]), min(count, leds[1]))
         if first > last:
             continue          # section lies beyond the end of this strip
         n = last - first + 1
         part = to_bytes(effect_frame(m.get("effect", "solid"), m.get("speed", "slow"),
-                                     m.get("color", "#3c3c3c"), t, n), m.get("brightness", 0.08))
+                                     m.get("color", "#3c3c3c"), now - clocks[key][1], n),
+                        m.get("brightness", 0.08))
         frame[first - 1:last] = part
+    for key in list(clocks):
+        if key not in seen:
+            del clocks[key]   # starts over next time the message appears
     return frame
 
 
@@ -398,8 +414,9 @@ def main():
     signal.signal(signal.SIGINT, stop)
 
     messages = []
+    clocks = {}
+    last_frame, last_sent = None, 0.0
     next_read = 0.0
-    start = time.time()
     while True:
         now = time.time()
         if now >= next_read:
@@ -408,7 +425,12 @@ def main():
             except Exception:   # never let a bad read stop the LED loop
                 pass
             next_read = now + REFRESH
-        out.show(render(messages, now - start, count))
+        frame = render(messages, now, count, clocks)
+        # Unchanged frames (solid colours) are only resent twice a second,
+        # which fixes any garbled frame and keeps the CPU free for DreamPi.
+        if frame != last_frame or now - last_sent >= 0.5:
+            out.show(frame)
+            last_frame, last_sent = frame, now
         time.sleep(max(0.0, 1.0 / FPS - (time.time() - now)))
 
 

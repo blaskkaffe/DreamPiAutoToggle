@@ -34,7 +34,7 @@ done
 if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--led|--leds=N|--no-led]"; exit 1; fi
 
 mkdir -p "$DEST"
-cp "$SRC/netswitch_hook.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/uninstall.sh" "$DEST/"
+cp "$SRC/netswitch_hook.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/static"
 cp "$SRC/static/three.min.js" "$SRC/static/dc-background.js" "$SRC/static/LICENSES.txt" "$SRC"/static/*.png "$DEST/static/"
 chmod +x "$DEST/uninstall.sh"
@@ -86,10 +86,16 @@ cat > /etc/systemd/system/dreampi-netswitch.service <<EOF
 [Unit]
 Description=DreamPi Netswitch web page
 After=network.target
+# never give up restarting (the default stops after 5 quick failures)
+StartLimitIntervalSec=0
 
 [Service]
+# Wi-Fi power saving makes a Pi drop off the network now and then (see the script)
+ExecStartPre=-/bin/sh $DEST/wifi-powersave-off.sh
 ExecStart=$WEBPY $DEST/netswitch_web.py $PORT $HTTPS_PORT
 Restart=always
+RestartSec=3
+Nice=-5
 
 [Install]
 WantedBy=multi-user.target
@@ -113,11 +119,14 @@ if [ "$LED" = on ]; then
 [Unit]
 Description=DreamPi Netswitch status NeoPixel (GPIO18)
 After=network.target
+StartLimitIntervalSec=0
 
 [Service]
 ExecStart=$(command -v python3) $DEST/netswitch_led.py
 Restart=always
 RestartSec=10
+# the LED animation must never slow down the web page or DreamPi
+Nice=10
 
 [Install]
 WantedBy=multi-user.target

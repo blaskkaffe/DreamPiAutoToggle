@@ -109,7 +109,7 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 - Per message:
   - A **tick box** to use it or not. When no ticked message applies, the LED is off.
   - **Colour.**
-  - **Effect:** tap it for a small menu. **Solid**, **Blink**, **Breathe** (fading up and down) and **RGB** (cycles through all colours, ignoring the colour set) work on any LED. With a strip there are also **Rainbow**, **Scanner** (a dot sweeping back and forth), **Comet**, **Chase** and **Twinkle**. Every effect except Solid has a **Slow** and a **Fast** speed. With a strip, the same menu sets which **LEDs** the message uses: **All**, or a range such as 1 to 1 or 2 to 8.
+  - **Effect:** tap it for a small menu. **Solid**, **Blink**, **Breathe** (fading up and down) and **RGB** (cycles through all colours, ignoring the colour set: one round every 20 seconds when slow, every 10 when fast) work on any LED. With a strip there are also **Rainbow**, **Scanner** (a dot sweeping back and forth), **Comet**, **Chase** and **Twinkle**. Every effect except Solid has a **Slow** and a **Fast** speed. With a strip, the same menu sets which **LEDs** the message uses: **All**, or a range such as 1 to 1 or 2 to 8.
   - **Level:** the brightness for that message. Grey means it uses the global brightness; tap it to give the message its own brightness with a slider, and tap **Use global** to go back.
 - **Reset LED settings to defaults** restores the defaults in [LED messages](#led-messages) and the 8% global brightness.
 
@@ -177,7 +177,7 @@ This starts the `dreampi-netswitch-led` service; no reboot is needed. Later upda
 
 **How it works:** the LEDs are driven by the Pi's PWM hardware on GPIO18, clocked from the crystal, which gives accurate NeoPixel timing without special drivers, extra Python packages or config changes. A single LED is fed directly; a strip is fed by a DMA channel from memory shared with the GPU, the same method the rpi_ws281x library uses. PWM is also what the Pi's analog (3.5 mm jack) audio uses, so don't play sound through the jack while the LEDs are running; DreamPi doesn't use it.
 
-**Brightness, colours and effects:** set in the web page's settings (cogwheel). Effects run at 50 frames per second, and changes show up within a quarter of a second. They're stored in `/opt/dreampi-netswitch/led.json`.
+**Brightness, colours and effects:** set in the web page's settings (cogwheel). Effects run at 50 frames per second and start from the beginning whenever a message appears or changes (a blink starts lit, a breathe starts bright), and changes show up within a quarter of a second. They're stored in `/opt/dreampi-netswitch/led.json`.
 
 If the LEDs stay dark, `systemctl status dreampi-netswitch-led` shows why.
 
@@ -198,6 +198,10 @@ The debug log is for tracking down calls that go wrong, such as misheard numbers
   - **DCNET unavailable:** DreamPi's DCNET support is switched off (see [Requirements](#requirements)).
   - **No internet:** the Pi reaches your router but not the internet, or name lookups fail.
 - If the page doesn't open at all, the Pi may have no network connection. With LEDs installed, **No network** shows as solid red.
+- If the page is unreachable now and then, or slow to open the first time:
+  - Try the Pi's IP address instead of `dreampi.local`. Looking up `.local` names can take a few seconds on some phones and PCs, or fail now and then.
+  - Wi-Fi power saving is a common cause of a Pi dropping off the network. The page service switches it off for every Wi-Fi adapter each time it starts; the setting resets on reboot, and the service switches it off again.
+  - `journalctl -u dreampi-netswitch -n 50` shows whether the page service restarted or logged an error. It restarts itself within seconds if it ever stops answering.
 - `sudo grep netswitch /var/log/messages` shows lines like `netswitch: routing 5551234 to DCNET`.
 - `cat /tmp/dreampi-netswitch.active` should say `active pid=<DreamPi's process id>`.
 
