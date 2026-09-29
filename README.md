@@ -4,7 +4,7 @@ An add-on for [DreamPi](https://github.com/Kazade/dreampi), the Raspberry Pi bri
 
 Switch a DreamPi between **DCNow!** (the normal DreamPi / Dreamcast Live network) and **DCNET** (Flycast's network) from a web page, or by dialing special numbers from the Dreamcast.
 
-It installs as an add-on and changes no DreamPi files, so DreamPi's auto-updates keep working and uninstalling leaves DreamPi exactly as it was.
+It changes no DreamPi files, so DreamPi's auto-updates keep working and uninstalling leaves DreamPi exactly as it was.
 
 What you get:
 - A live status page at `http://dreampi.local` (also over HTTPS) with buttons to pick the network.
@@ -12,6 +12,8 @@ What you get:
 - Optional status LEDs on GPIO18: one NeoPixel, several, or a strip. They show DreamPi's status and network or internet problems, with colours, effects and LED sections per message.
 - An optional animated Dreamcast-style background for the page.
 - A debug log for tracking down calls that go wrong.
+
+**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `333-3333` works end to end. The LED driver hasn't been tried on real LEDs yet; feedback is welcome.
 
 ## Install
 
@@ -103,7 +105,7 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 **Status LED** (only shown when LEDs are installed with `--led` or `--leds=N`; the title shows the number of LEDs for a strip)
 
 - **Global brightness** of the LEDs, 0 to 100% (default 8%). The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
-- Two tabs, **DCNow! selected** and **DCNET selected**, each with the full list of LED messages (see [LED messages](#led-messages)). For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
+- Two tabs, **DCNow! selected** and **DCNET selected**, each with the full list of LED messages, grouped into **Errors** and **Information** (see [LED messages](#led-messages)). For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
 - Per message:
   - A **tick box** to use it or not. When no ticked message applies, the LED is off.
   - **Colour.**
@@ -120,7 +122,7 @@ default=dcnow
 autoreset=off
 dreampi=Ready for calls
 modem=Dial tone on, waiting for a call
-internet=Connected (18 ms)
+internet=Connected via Ethernet (18 ms)
 ```
 
 ## LED messages
@@ -191,7 +193,11 @@ The debug log is for tracking down calls that go wrong, such as misheard numbers
 
 ## Checking it works
 
-- The web page shows a red **Add-on not active** box if DreamPi hasn't loaded the add-on or isn't running, and a **DCNET unavailable** box if DreamPi's DCNET support is switched off.
+- The web page shows red warning boxes at the top when something is wrong:
+  - **Add-on not active:** DreamPi hasn't loaded the add-on or isn't running. Restart DreamPi or reboot.
+  - **DCNET unavailable:** DreamPi's DCNET support is switched off (see [Requirements](#requirements)).
+  - **No internet:** the Pi reaches your router but not the internet, or name lookups fail.
+- If the page doesn't open at all, the Pi may have no network connection. With LEDs installed, **No network** shows as solid red.
 - `sudo grep netswitch /var/log/messages` shows lines like `netswitch: routing 5551234 to DCNET`.
 - `cat /tmp/dreampi-netswitch.active` should say `active pid=<DreamPi's process id>`.
 
