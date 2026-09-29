@@ -32,6 +32,10 @@ STATIC_FILES = {   # only these are served from /static/
     "three.min.js": "application/javascript; charset=utf-8",
     "dc-background.js": "application/javascript; charset=utf-8",
     "LICENSES.txt": "text/plain; charset=utf-8",
+    "favicon-dcnow.png": "image/png",   # DreamPi logo (without the text)
+    "favicon-dcnet.png": "image/png",   # purple swirl while DCNET is selected
+    "touch-dcnow.png": "image/png",
+    "touch-dcnet.png": "image/png",
 }
 LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness + colours
 LED_ENABLED = os.path.join(BASE_DIR, "led_enabled")  # written by install.sh --led
@@ -509,6 +513,8 @@ PAGE = u"""<!doctype html>
 <html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DreamPi</title>
+<link rel="icon" type="image/png" id="fav" href="/static/favicon-dcnow.png">
+<link rel="apple-touch-icon" id="touch" href="/static/touch-dcnow.png">
 <style>
  :root{--r:29px;--bw:4px;--dcnow:#e8761c;--dcnow-l:#f6b27a;--dcnet:#1c6fe8;--dcnet-l:#80b1f6;--card:#1b1b1b;--line:#2a2a2a;--muted:#999}
  *{box-sizing:border-box}
@@ -689,12 +695,14 @@ var DOT_FX={blink:["blink",1,.4,"steps(1)"],breathe:["breathe",4,1.6,"ease-in-ou
 function lookDot(el,look){if(!look){el.className="dot";el.style.background="#333";el.style.animation="none";return}
  var f=DOT_FX[look.effect];el.className="dot";el.style.background=look.color;
  el.style.animation=f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none"}
+var favNet="dcnow";
 function render(d){
  $("warnings").innerHTML=d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("");
  lookDot($("d-dot"),d.dreampi.look); $("d-text").textContent=d.dreampi.text;
  $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now);
  dot($("i-dot"),d.internet.state); $("i-text").textContent=d.internet.text;
- $("net").className="now "+d.network; $("net-name").textContent=d.network=="dcnet"?"DCNET":"DCNow!";
+ $("net").className="now "+d.network;
+ if(d.network!=favNet){favNet=d.network;$("fav").href="/static/favicon-"+d.network+".png";$("touch").href="/static/touch-"+d.network+".png"} $("net-name").textContent=d.network=="dcnet"?"DCNET":"DCNow!";
  var defName=d.default=="dcnet"?"DCNET":"DCNow!";
  $("default-b").className="switch "+d.default; $("default-l").textContent=d.default=="dcnet"?"DCNET":"DCNow!";
  $("reset-b").className="cbox "+d.default+(d.autoreset?" on":"");

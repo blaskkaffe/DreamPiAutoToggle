@@ -205,4 +205,6 @@ The debug log is for tracking down calls that go wrong, such as misheard numbers
 
 This add-on is built for [DreamPi](https://github.com/Kazade/dreampi) by Luke Benstead (Kazade), with DCNET and Netlink support from [eaudunord/Netlink](https://github.com/eaudunord/Netlink). It doesn't include or change any of their code; it only hooks into it while DreamPi runs.
 
+The page's tab icon is the DreamPi logo (without its text) while DCNow! is selected, and a purple Dreamcast swirl while DCNET is selected. The DreamPi logo belongs to the DreamPi project, and the Dreamcast swirl is a trademark of SEGA; they're used here only to identify what the page is for.
+
 The optional **Dreamcast background** comes from the [VMU Icon Maker](http://dcvmuicons.net/maker/) by **Robert Dale Smith** ([source on GitHub](https://github.com/RobertDaleSmith/vmu-icon-maker), MIT License), part of his [DC VMU Icons](http://dcvmuicons.net/) site. The animated scene, its texture, the waves and the cylinder are his work; this add-on only wraps it so it can be switched on and off (`static/dc-background.js`). It runs on [Three.js](https://threejs.org) r128 (MIT License). The licence texts are in `static/LICENSES.txt`.
