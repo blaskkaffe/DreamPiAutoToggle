@@ -43,7 +43,11 @@ HTTPS_PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 443   # 0 = no HTTPS
 CERT = os.path.join(BASE_DIR, "https.crt")   # self-signed, made by install.sh
 KEY = os.path.join(BASE_DIR, "https.key")
 
-INTERNET_EVERY = 30   # seconds between internet checks
+INTERNET_EVERY = 30   # seconds between internet checks while it works
+INTERNET_RETRY = 5    # ... and while it doesn't
+LINK_EVERY = 2        # seconds between checks of cables / Wi-Fi / route
+NET_STATE = "/tmp/dreampi-netswitch.net"   # shared with the LED service
+NET_STALE = 20        # ignore NET_STATE when older than this (web service down)
 
 _checks = {"internet": {"state": "checking", "text": "Checking...", "time": 0}}
 _checks_lock = threading.Lock()
@@ -179,36 +183,129 @@ def check_internet():
     return {"state": "ok", "text": "Connected (%d ms)" % best}
 
 
-def checker():
+def _sys(iface, name):
+    return read_file("/sys/class/net/%s/%s" % (iface, name))
+
+
+def link_state():
+    """Which links are up, and whether there is a default route.
+    Ethernet: a wired interface (eth*/en*) with carrier. Wi-Fi: a wireless
+    interface (wlan*/wl*) that is up, i.e. associated with a network."""
+    ethernet = wifi = False
+    try:
+        ifaces = os.listdir("/sys/class/net")
+    except OSError:
+        ifaces = []
+    for iface in ifaces:
+        up = _sys(iface, "operstate") == "up"
+        if os.path.isdir("/sys/class/net/%s/wireless" % iface) or iface.startswith(("wlan", "wl")):
+            wifi = wifi or up
+        elif iface.startswith(("eth", "en")):
+            ethernet = ethernet or (up and _sys(iface, "carrier") == "1")
+    route = False
+    try:
+        with open("/proc/net/route") as f:
+            for line in f.readlines()[1:]:
+                parts = line.split()
+                if len(parts) > 3 and parts[1] == "00000000" and int(parts[3], 16) & 1 \
+                        and not parts[0].startswith(("ppp", "tun", "lo")):
+                    route = True
+    except (IOError, OSError, ValueError):
+        pass
+    # "network" = the Pi has a default route (a router to send traffic to)
+    return {"ethernet": ethernet, "wifi": wifi, "network": route}
+
+
+def network_state():
+    """Latest link + internet state written by the web service, or None."""
+    try:
+        with open(NET_STATE) as f:
+            data = json.load(f)
+        if time.time() - data.get("time", 0) > NET_STALE:
+            return None
+        return data
+    except (IOError, OSError, ValueError):
+        return None
+
+
+def _write_net_state(data):
+    tmp = NET_STATE + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump(data, f)
+        os.rename(tmp, NET_STATE)
+    except (IOError, OSError):
+        pass
+
+
+_net = {"links": None, "internet": {"state": "checking", "text": "Checking...", "time": 0},
+        "recheck": threading.Event()}
+
+
+def internet_checker():
+    """Internet check: every 30 s while it works, every 5 s while it doesn't,
+    and straight away when a cable or Wi-Fi connection changes."""
     while True:
-        result = check_internet()
+        links = _net["links"]
+        if links is not None and not links["network"]:
+            result = {"state": "bad", "text": "No network connection"}
+        else:
+            result = check_internet()
         result["time"] = int(time.time())
+        _net["internet"] = result
+        _net["recheck"].clear()
+        _net["recheck"].wait(INTERNET_EVERY if result["state"] == "ok" else INTERNET_RETRY)
+
+
+def checker():
+    """Cables / Wi-Fi / route every 2 s (cheap, so errors show quickly), and
+    the shared state file for the LED service."""
+    t = threading.Thread(target=internet_checker)
+    t.daemon = True
+    t.start()
+    while True:
+        links = link_state()
+        if links != _net["links"]:           # plugged/unplugged, Wi-Fi joined/lost
+            _net["links"] = links
+            _net["recheck"].set()
+        internet = _net["internet"]
+        if not links["network"]:
+            internet = {"state": "bad", "text": "No network connection", "time": int(time.time())}
+        shown = dict(internet)
+        if internet["state"] == "ok" and (links["ethernet"] or links["wifi"]):
+            via = " and ".join(n for n, on in (("Ethernet", links["ethernet"]), ("Wi-Fi", links["wifi"])) if on)
+            shown["text"] = internet["text"].replace("Connected", "Connected via " + via, 1)
         with _checks_lock:
-            _checks["internet"] = result
-        time.sleep(INTERNET_EVERY)
+            _checks["internet"] = shown
+        _write_net_state({"ethernet": links["ethernet"], "wifi": links["wifi"],
+                          "network": links["network"],
+                          "internet": None if internet["state"] == "checking" else internet["state"] == "ok",
+                          "time": time.time()})
+        time.sleep(LINK_EVERY)
 
 
 # -------------------------------------------------------------------- page
 
 # DreamPi states (as returned by dreampi_state) in the order the settings show them
+# LED messages, highest priority first, with category and default look.
+# Errors always win over information. The DreamPi ones come from
+# dreampi_state(); the network ones from the checker (NET_STATE).
 LED_STATES = [
-    ("ok", "Ready for calls"),
-    ("busy", "Starting up"),
-    ("call-dcnow", "In a call on DCNow!"),
-    ("call-dcnet", "In a call on DCNET"),
-    ("call", "In another call (Netlink)"),
-    ("off", "DreamPi not running"),
-    ("unknown", "State unknown"),
+    # key, label, category, colour, effect, speed, enabled
+    ("no-network", "No network", "error", "#ff0000", "solid", "slow", True),
+    ("no-internet", "No internet", "error", "#ff7a00", "blink", "slow", True),
+    ("off", "DreamPi not running", "error", "#ff0000", "blink", "slow", True),
+    ("unknown", "State unknown", "error", "#3c3c3c", "solid", "slow", True),
+    ("busy", "Starting up", "info", "#ffaa00", "blink", "slow", True),
+    ("call-dcnow", "In a call on DCNow!", "info", "#ff5000", "solid", "slow", True),
+    ("call-dcnet", "In a call on DCNET", "info", "#0046ff", "solid", "slow", True),
+    ("call", "In another call (Netlink)", "info", "#aa00ff", "solid", "slow", True),
+    ("ok", "Ready for calls", "info", "#00ff00", "solid", "slow", True),
+    ("ethernet", "Ethernet connected", "info", "#ffffff", "solid", "slow", False),
+    ("wifi", "Wi-Fi connected", "info", "#00c8ff", "solid", "slow", False),
 ]
-_DEFAULT_COLOURS = {   # state -> (colour, effect, speed); used for both networks
-    "ok": ("#00ff00", "solid", "slow"),
-    "busy": ("#ffaa00", "blink", "slow"),
-    "call-dcnow": ("#ff5000", "solid", "slow"),
-    "call-dcnet": ("#0046ff", "solid", "slow"),
-    "call": ("#aa00ff", "solid", "slow"),
-    "off": ("#ff0000", "blink", "slow"),
-    "unknown": ("#3c3c3c", "solid", "slow"),
-}
+PRIORITY = dict((s[0], len(LED_STATES) - i) for i, s in enumerate(LED_STATES))   # higher wins
+_DEFAULT_COLOURS = dict((s[0], s[3:7]) for s in LED_STATES)
 # LED effects. The first four work on a single LED; the rest need a strip.
 # "rgb" ignores the colour and cycles through all colours (10 s slow, 4 s fast).
 EFFECTS = [
@@ -246,8 +343,9 @@ except NameError:
 
 def default_led_config():
     return {"brightness": 0.08,
-            "colours": dict((net, dict((st, {"color": c, "effect": e, "speed": sp, "brightness": None})
-                                       for st, (c, e, sp) in _DEFAULT_COLOURS.items()))
+            "colours": dict((net, dict((st, {"color": c, "effect": e, "speed": sp, "brightness": None,
+                                             "enabled": on, "leds": None})
+                                       for st, (c, e, sp, on) in _DEFAULT_COLOURS.items()))
                             for net in NETWORKS)}
 
 
@@ -280,6 +378,12 @@ def clean_led_config(data):
                     cfg["colours"][net][st]["effect"] = str(entry["effect"])
                 if entry.get("speed") in SPEEDS:
                     cfg["colours"][net][st]["speed"] = str(entry["speed"])
+                if isinstance(entry.get("enabled"), bool):
+                    cfg["colours"][net][st]["enabled"] = entry["enabled"]
+                leds = entry.get("leds")   # None = all LEDs, else [first, last], 1-based
+                if isinstance(leds, list) and len(leds) == 2 and \
+                        all(isinstance(x, int) and not isinstance(x, bool) and 1 <= x <= 300 for x in leds):
+                    cfg["colours"][net][st]["leds"] = [min(leds), max(leds)]
                 level = entry.get("brightness")   # None = use the global brightness
                 if isinstance(level, (int, float)) and not isinstance(level, bool):
                     cfg["colours"][net][st]["brightness"] = min(1.0, max(0.0, float(level)))
@@ -303,17 +407,44 @@ def save_led_config(data):
     return cfg
 
 
-def status_look(state=None):
-    """Colour, effect, speed and effective brightness for the current DreamPi state
-    and selected network, shared by the page's status dot and the NeoPixel."""
+def active_messages(state=None, net_state=None):
+    """Enabled LED messages that apply right now, lowest priority first (the
+    LED service draws them in this order, so later ones end up on top).
+    Each: key, category, color, effect, speed, brightness (effective), leds."""
     if state is None:
         state = dreampi_state()[0]
-    net = "dcnet" if os.path.exists(FLAG) else "dcnow"
+    if net_state is None:
+        net_state = network_state()
+    active = [state]
+    if net_state:
+        if not net_state.get("network"):
+            active.append("no-network")
+        elif net_state.get("internet") is False:
+            active.append("no-internet")
+        if net_state.get("ethernet"):
+            active.append("ethernet")
+        if net_state.get("wifi"):
+            active.append("wifi")
     cfg = led_config()
-    look = dict(cfg["colours"][net].get(state, cfg["colours"][net]["unknown"]))
-    if look.get("brightness") is None:
-        look["brightness"] = cfg["brightness"]
-    return look
+    looks = cfg["colours"]["dcnet" if os.path.exists(FLAG) else "dcnow"]
+    out = []
+    for key in sorted(set(active), key=lambda k: PRIORITY.get(k, 0)):
+        if key not in looks or not looks[key].get("enabled", True):
+            continue
+        look = dict(looks[key])
+        look["key"] = key
+        look["category"] = "error" if key in ("no-network", "no-internet", "off", "unknown") else "info"
+        if look.get("brightness") is None:
+            look["brightness"] = cfg["brightness"]
+        out.append(look)
+    return out
+
+
+def status_look(state=None):
+    """The most important active message (what a single LED shows), or None
+    when every active message is switched off."""
+    msgs = active_messages(state)
+    return msgs[-1] if msgs else None
 
 
 def api_state():
@@ -328,11 +459,21 @@ def api_state():
         warnings.append("DCNET unavailable: %s. All calls go to DCNow!" % problem)
     with _checks_lock:
         checks = json.loads(json.dumps(_checks))
+    net = network_state()
+    if net and not net.get("network"):
+        warnings.append("No network: the Pi has no working network connection.")
+    elif net and net.get("internet") is False:
+        why = "name lookups (DNS) fail" if "DNS" in checks["internet"]["text"] \
+            else "the network works, but the internet can't be reached"
+        warnings.append("No internet: %s. Dreamcast games can't get online right now." % why)
     return {"network": "dcnet" if os.path.exists(FLAG) else "dcnow",
             "autoreset": os.path.exists(AUTORESET),
             "default": "dcnet" if os.path.exists(DEFAULT_DCNET) else "dcnow",
             "debug": os.path.exists(DEBUG_DTMF),
-            "dreampi": {"state": dstate, "text": dtext, "look": status_look(dstate)},
+            # the dot next to DreamPi previews that status's LED message only;
+            # network problems show as warning boxes instead
+            "dreampi": {"state": dstate, "text": dtext,
+                        "look": (active_messages(dstate, {"network": True}) or [None])[-1]},
             "modem": {"text": mtext, "since": msince},
             "internet": checks["internet"],
             "warnings": warnings, "now": int(time.time())}
@@ -400,6 +541,11 @@ PAGE = u"""<!doctype html>
  .tabs .sel.dcnow{background:rgba(232,118,28,.82);border-color:rgba(246,178,122,.82)} .tabs .sel.dcnet{background:rgba(28,111,232,.82);border-color:rgba(128,177,246,.82)}
  .chip{display:inline-block;height:30px;padding:0 4px;border-radius:7px;border:2px solid #555;background:transparent;color:#ccc;font-size:.72em;line-height:1.1;vertical-align:middle}
  .fx{width:74px} .fx small{display:block;color:#888;font-size:.9em} .lvl{width:52px;color:#777}
+ .ledtab td.name{padding-left:0} .ledtab td.name .cbox{margin-right:8px;width:24px;height:24px;background-size:16px}
+ .ledtab tr.grp td{border-top:0;padding:14px 0 4px;color:var(--muted);font-size:.72em;text-transform:uppercase;letter-spacing:.08em}
+ .ledtab tr.dis td:not(.name),.ledtab tr.dis .lbl-t{opacity:.35}
+ .secrow{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+ .secrow input[type=number]{width:58px;padding:5px 6px;border-radius:8px;border:2px solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.85em}
  .lvl.on.dcnow{background:var(--dcnow);border-color:var(--dcnow);color:#fff} .lvl.on.dcnet{background:var(--dcnet);border-color:var(--dcnet);color:#fff}
  .in{position:relative}
  .pop{display:none;position:absolute;z-index:20;width:270px;padding:12px 16px;border-radius:var(--r);background:#262626;box-shadow:0 6px 24px rgba(0,0,0,.6)}
@@ -486,13 +632,16 @@ millisecond timing. Turn recording on, then dial.</div>
 <div class="card">
  <div class="range"><span>Global brightness</span><input type="range" id="led-bright" min="0" max="1000" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
  <div class="tabs"><button class="pill-s" type="button" id="tab-dcnow">DCNow! selected</button><button class="pill-s" type="button" id="tab-dcnet">DCNET selected</button></div>
- <table class="ledtab"><thead><tr><th>Status</th><th>colour</th><th>effect</th><th>level</th></tr></thead><tbody id="led-rows"></tbody></table>
+ <table class="ledtab"><thead><tr><th>Message</th><th>colour</th><th>effect</th><th>level</th></tr></thead><tbody id="led-rows"></tbody></table>
 </div>
 <div class="bar" style="margin-top:0"><button class="pill-s" id="led-reset" type="button">Reset LED settings to defaults</button></div>
-<div class="note">The tabs choose which network the table is for. Effect: tap to pick solid, blink, breathe, RGB or (with a strip) an animation, and its speed. Level: tap to give a status its own brightness; grey means it uses the global brightness above. The status dot on the main page previews colour and effect.</div>
+<div class="note">The tabs choose which selected network the table is for. Tick a message to use it; the LED is off when no ticked message applies. Errors always win over information. Effect: tap to pick solid, blink, breathe, RGB or (with a strip) an animation, its speed, and with a strip which LEDs it uses (later messages in the list draw underneath earlier ones). Level: its own brightness; grey means the global brightness above. The status dot on the main page previews the most important message.</div>
 <div id="fx-pop" class="pop"><div class="t" id="fx-t"></div>
  <div class="opts" id="fx-opts"></div>
  <div class="opts" id="fx-speed" style="align-items:center"><span class="sub" style="margin-right:4px">Speed</span><button class="pill-s" type="button" data-speed="slow">Slow</button><button class="pill-s" type="button" data-speed="fast">Fast</button></div>
+ <div class="secrow" id="fx-sec"><span class="sub">LEDs</span>
+  <button class="pill-s" type="button" id="sec-all">All</button>
+  <input type="number" id="sec-a" min="1" max="300" aria-label="First LED"><span class="sub">to</span><input type="number" id="sec-b" min="1" max="300" aria-label="Last LED"></div>
  <div class="bar" style="justify-content:flex-end"><button class="pill-s" id="fx-done" type="button">Done</button></div></div>
 <div id="lvl-pop" class="pop"><div class="t" id="lvl-t"></div>
  <div class="range"><input type="range" id="lvl-r" min="0" max="1000" step="1"><span id="lvl-v" style="width:3em;text-align:right"></span></div>
@@ -510,7 +659,8 @@ function dot(el,state){el.className="dot "+(state||"")}
 var DOT_FX={blink:["blink",1,.4,"steps(1)"],breathe:["breathe",4,1.6,"ease-in-out"],rgb:["rgbc",10,4,"linear"],
  rainbow:["rgbc",10,3,"linear"],scanner:["breathe",3,1.2,"ease-in-out"],comet:["breathe",3,1.2,"ease-in-out"],
  chase:["blink",.6,.24,"steps(1)"],twinkle:["breathe",3,1.2,"ease-in-out"]};
-function lookDot(el,look){var f=DOT_FX[look.effect];el.className="dot";el.style.background=look.color;
+function lookDot(el,look){if(!look){el.className="dot";el.style.background="#333";el.style.animation="none";return}
+ var f=DOT_FX[look.effect];el.className="dot";el.style.background=look.color;
  el.style.animation=f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none"}
 function render(d){
  $("warnings").innerHTML=d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("");
@@ -563,12 +713,16 @@ function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
   buildLed()};x.send()}
 function buildLed(){
  ["dcnow","dcnet"].forEach(function(n){$("tab-"+n).className="pill-s "+n+(n==ledNet?" sel":"")});
- $("led-rows").innerHTML=ledStates.map(function(s){var st=s[0];return '<tr><td>'+esc(s[1])+'</td>'+
+ var grp="";
+ $("led-rows").innerHTML=ledStates.map(function(s){var st=s[0],h="";
+  if(s[2]!=grp){grp=s[2];h='<tr class="grp"><td colspan="4">'+(grp=="error"?"Errors (always win)":"Information")+'</td></tr>'}
+  return h+'<tr id="r-'+st+'"><td class="name"><input type="checkbox" class="cbox '+ledNet+'" id="e-'+st+'" title="Show this message" aria-label="Show '+esc(s[1])+'"><span class="lbl-t">'+esc(s[1])+'</span></td>'+
   '<td class="c"><input type="color" id="c-'+st+'" data-state="'+st+'" aria-label="Colour"></td>'+
   '<td class="c"><button type="button" class="chip fx" id="f-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'"></button></td>'+
   '<td class="c"><button type="button" class="chip lvl" id="l-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'"></button></td></tr>'}).join("");
  ledStates.forEach(function(s){var st=s[0];
   $("c-"+st).addEventListener("input",function(){led.colours[ledNet][st].color=this.value;saveLed()});
+  $("e-"+st).onchange=function(){led.colours[ledNet][st].enabled=this.checked;showRow(st);saveLed()};
   $("f-"+st).onclick=function(e){e.stopPropagation();openFx(this)};
   $("l-"+st).onclick=function(e){e.stopPropagation();openLvl(this)}});
  showLed()}
@@ -577,9 +731,11 @@ function netName(n){return n=="dcnet"?"DCNET":"DCNow!"}
 function effectName(e){for(var i=0;i<ledEffects.length;i++)if(ledEffects[i][0]==e)return ledEffects[i][1];return e}
 function showLed(){$("led-bright").value=brightToSlider(led.brightness);$("led-bright-v").textContent=pct(led.brightness);
  ledStates.forEach(function(s){var st=s[0],c=led.colours[ledNet][st];
-  $("c-"+st).value=c.color;showFx(st);showLvl(st)})}
+  $("c-"+st).value=c.color;$("e-"+st).checked=c.enabled!==false;showRow(st);showFx(st);showLvl(st)})}
+function showRow(st){$("r-"+st).className=led.colours[ledNet][st].enabled===false?"dis":""}
 function showFx(st){var el=$("f-"+st);if(!el)return;var c=led.colours[ledNet][st];
- el.innerHTML=esc(effectName(c.effect))+(c.effect=="solid"?"":"<small>"+c.speed+"</small>")}
+ var sub=[];if(c.effect!="solid")sub.push(c.speed);if(ledCount>1&&c.leds)sub.push(c.leds[0]==c.leds[1]?"LED "+c.leds[0]:c.leds[0]+"-"+c.leds[1]);
+ el.innerHTML=esc(effectName(c.effect))+(sub.length?"<small>"+sub.join(" · ")+"</small>":"")}
 function showLvl(st){var el=$("l-"+st);if(!el)return;var b=led.colours[ledNet][st].brightness,own=b!==null&&b!==undefined;
  el.className="chip lvl "+ledNet+(own?" on":"");el.textContent=pct(own?b:led.brightness)}
 function placePop(pop,el){var box=pop.parentNode.getBoundingClientRect(),r=el.getBoundingClientRect();
@@ -593,12 +749,23 @@ function openFx(el){closePops();var st=el.dataset.state,c=led.colours[ledNet][st
  $("fx-opts").innerHTML=ledEffects.filter(function(e){return !e[2]||ledCount>1||e[0]==c.effect}).map(function(e){
   return '<button type="button" class="pill-s" data-fx="'+e[0]+'">'+esc(e[1])+'</button>'}).join("");
  Array.prototype.forEach.call($("fx-opts").querySelectorAll("button"),function(b){b.onclick=function(){c.effect=b.dataset.fx;fxMark();saveLed()}});
+ $("fx-sec").style.display=ledCount>1?"flex":"none";
+ $("sec-a").max=$("sec-b").max=ledCount;
  fxMark();placePop($("fx-pop"),el)}
 function fxMark(){if(!fxCur)return;var c=led.colours[ledNet][fxCur],fixed=c.effect=="solid";
  Array.prototype.forEach.call($("fx-opts").querySelectorAll("button"),function(b){b.className="pill-s "+ledNet+(b.dataset.fx==c.effect?" sel":"")});
  Array.prototype.forEach.call($("fx-speed").querySelectorAll("button"),function(b){b.disabled=fixed;
   b.className="pill-s "+ledNet+(!fixed&&b.dataset.speed==c.speed?" sel":"")});
+ var L=c.leds;$("sec-all").className="pill-s "+ledNet+(L?"":" sel");
+ $("sec-a").value=L?L[0]:"";$("sec-b").value=L?L[1]:"";$("sec-a").placeholder="1";$("sec-b").placeholder=ledCount;
  showFx(fxCur)}
+$("sec-all").onclick=function(){if(!fxCur)return;led.colours[ledNet][fxCur].leds=null;fxMark();saveLed()};
+function secInput(){if(!fxCur)return;var a=parseInt($("sec-a").value,10),b=parseInt($("sec-b").value,10);
+ if(isNaN(a)&&isNaN(b))return;if(isNaN(a))a=1;if(isNaN(b))b=ledCount;
+ a=Math.max(1,Math.min(ledCount,a));b=Math.max(1,Math.min(ledCount,b));
+ led.colours[ledNet][fxCur].leds=[Math.min(a,b),Math.max(a,b)];
+ $("sec-all").className="pill-s "+ledNet;showFx(fxCur);saveLed()}
+$("sec-a").onchange=$("sec-b").onchange=secInput;
 Array.prototype.forEach.call($("fx-speed").querySelectorAll("button"),function(b){b.onclick=function(){
  if(!fxCur)return;led.colours[ledNet][fxCur].speed=b.dataset.speed;fxMark();saveLed()}});
 $("fx-done").onclick=closePops;

@@ -7,7 +7,7 @@ It installs as an add-on and changes no DreamPi files, so DreamPi's auto-updates
 What you get:
 - A live status page at `http://dreampi.local` (also over HTTPS) with buttons to pick the network.
 - Special phone numbers that switch the network straight from the Dreamcast.
-- Optional status LEDs on GPIO18: one NeoPixel, several, or a strip, with colours and effects per status.
+- Optional status LEDs on GPIO18: one NeoPixel, several, or a strip. They show DreamPi's status and network or internet problems, with colours, effects and LED sections per message.
 - An optional animated Dreamcast-style background for the page.
 - A debug log for tracking down calls that go wrong.
 
@@ -78,7 +78,7 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 
 - **Status box:** shows the **DreamPi** row. Tap it (the small arrow) to also show:
   - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DCNow! or DCNET, call ended.
-  - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online`, checked every 30 seconds.
+  - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online`, and whether it's connected by Ethernet or Wi-Fi. A red warning box appears at the top of the page when the internet is down.
 - **Selected network**, orange for DCNow! or blue for DCNET, and the **DCNow! / DreamPi** and **DCNET / FLYCAST** buttons to change it.
 - **Debug log:** hidden unless switched on in the settings (see below).
 
@@ -100,13 +100,15 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 **Status LED** (only shown when LEDs are installed with `--led` or `--leds=N`; the title shows the number of LEDs for a strip)
 
 - **Global brightness** of the LEDs, 0 to 100% (default 8%). The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
-- Two tabs, **DCNow! selected** and **DCNET selected**, each with a table of every DreamPi status. For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
-- Per status: a **colour**, an **effect** and a **level**:
-  - **Effect:** tap it for a small menu. **Solid**, **Blink**, **Breathe** (fading up and down) and **RGB** (cycles through all colours, ignoring the colour set: about 10 seconds per round when slow, 4 when fast) work on any LED. With a strip there are also **Rainbow**, **Scanner** (a dot sweeping back and forth), **Comet**, **Chase** and **Twinkle**. Every effect except Solid has a **Slow** and a **Fast** speed.
-  - **Level:** the brightness for that status. Grey means it uses the global brightness; tap it to give the status its own brightness with a slider, and tap **Use global** to go back.
-- **Reset LED settings to defaults** restores the colours and effects in [Status colours](#status-colours) and the 8% global brightness.
+- Two tabs, **DCNow! selected** and **DCNET selected**, each with the full list of LED messages (see [LED messages](#led-messages)). For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
+- Per message:
+  - A **tick box** to use it or not. When no ticked message applies, the LED is off.
+  - **Colour.**
+  - **Effect:** tap it for a small menu. **Solid**, **Blink**, **Breathe** (fading up and down) and **RGB** (cycles through all colours, ignoring the colour set) work on any LED. With a strip there are also **Rainbow**, **Scanner** (a dot sweeping back and forth), **Comet**, **Chase** and **Twinkle**. Every effect except Solid has a **Slow** and a **Fast** speed. With a strip, the same menu sets which **LEDs** the message uses: **All**, or a range such as 1 to 1 or 2 to 8.
+  - **Level:** the brightness for that message. Grey means it uses the global brightness; tap it to give the message its own brightness with a slider, and tap **Use global** to go back.
+- **Reset LED settings to defaults** restores the defaults in [LED messages](#led-messages) and the 8% global brightness.
 
-The status dot on the main page shows the same colour and a matching animation, so it works as a preview.
+The status dot next to DreamPi on the main page previews that status's colour and effect. Network problems show as red warning boxes at the top of the page instead.
 
 `http://dreampi.local/api` returns the status as JSON, and `http://dreampi.local/status` as plain text:
 ```
@@ -118,23 +120,36 @@ modem=Dial tone on, waiting for a call
 internet=Connected (18 ms)
 ```
 
-## Status colours
+## LED messages
 
-The dot next to **DreamPi** on the web page and the optional NeoPixels show the same colour and effect. With LEDs installed you can change them in the settings; otherwise the dot uses these defaults, which are the same for both networks:
+The LEDs show messages about DreamPi and the network. **Errors always win over information**, and within each group the list is in order of importance (top wins):
 
-| Colour | DreamPi status |
-|---|---|
-| Green | Ready for calls |
-| Yellow, blinking slowly | Starting up, not answering calls yet |
-| Orange | In a call on DCNow! |
-| Blue | In a call on DCNET |
-| Purple | In another kind of call (e.g. Netlink) |
-| Red, blinking slowly | DreamPi not running |
-| Dim grey | State unknown |
+| Message | Group | Default look | On by default |
+|---|---|---|---|
+| No network | Error | Red | Yes |
+| No internet | Error | Orange, blinking slowly | Yes |
+| DreamPi not running | Error | Red, blinking slowly | Yes |
+| State unknown | Error | Dim grey | Yes |
+| Starting up | Information | Yellow, blinking slowly | Yes |
+| In a call on DCNow! | Information | Orange | Yes |
+| In a call on DCNET | Information | Blue | Yes |
+| In another call (Netlink) | Information | Purple | Yes |
+| Ready for calls | Information | Green | Yes |
+| Ethernet connected | Information | White | No |
+| Wi-Fi connected | Information | Light blue | No |
+
+- **No network:** the Pi has no route to your router, for example because the cable is unplugged or Wi-Fi isn't connected. You can't open the web page then, so the LED is the only thing that can tell you.
+- **No internet:** the Pi reaches your router, but not the internet, or name lookups (DNS) fail.
+- **Checking speed:** cables, Wi-Fi and the route are checked every 2 seconds. The internet is checked every 30 seconds while it works, every 5 seconds while it doesn't, and straight away when a connection changes.
+- **Several messages at once:**
+  - On a single LED, or when messages all use all LEDs, the most important one shows.
+  - With a strip, each message draws on its own LEDs, less important ones first, so an error on "All" takes over the whole strip.
+  - Give the errors LED 1 and "Ready for calls" LEDs 2 to 8, and LED 1 stays dark until something goes wrong while 2 to 8 keep showing DreamPi.
+  - LEDs that no active message covers stay dark.
 
 ## Status NeoPixels (optional)
 
-A single WS2812 / NeoPixel LED, several of them in a chain, or a WS2812 strip can show the DreamPi status next to the Pi.
+A single WS2812 / NeoPixel LED, several of them in a chain, or a WS2812 strip can show DreamPi's status and network problems next to the Pi.
 
 **Wiring, single LED:**
 - Data in to **GPIO18** (physical pin 12).

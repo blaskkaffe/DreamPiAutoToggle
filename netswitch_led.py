@@ -16,7 +16,9 @@
 # When the data runs out the pin stays low, which latches the colours.
 #
 # What it shows comes from the page's settings (led.json, see netswitch_web):
-# colour, effect, speed and brightness per DreamPi status and network.
+# per message (DreamPi status, network/internet errors, Ethernet/Wi-Fi) and
+# selected network: on/off, colour, effect, speed, brightness and LED section.
+# Errors outrank information; see netswitch_web.active_messages().
 # The number of LEDs is in /opt/dreampi-netswitch/led_count (install.sh).
 import array
 import colorsys
@@ -358,6 +360,24 @@ def scaled(colour, brightness):
     return to_bytes([hex_rgb(colour)], brightness)[0]
 
 
+# ---------------------------------------------------------------- composing
+def render(messages, t, count):
+    """Draw the active messages (lowest priority first) into one frame.
+    Each message covers all LEDs or its own section; later (more important)
+    messages draw over earlier ones, and uncovered LEDs stay dark."""
+    frame = [(0, 0, 0)] * count
+    for m in messages:
+        leds = m.get("leds")
+        first, last = (1, count) if not leds else (max(1, leds[0]), min(count, leds[1]))
+        if first > last:
+            continue          # section lies beyond the end of this strip
+        n = last - first + 1
+        part = to_bytes(effect_frame(m.get("effect", "solid"), m.get("speed", "slow"),
+                                     m.get("color", "#3c3c3c"), t, n), m.get("brightness", 0.08))
+        frame[first - 1:last] = part
+    return frame
+
+
 # ---------------------------------------------------------------- main loop
 def main():
     count = web.led_count() or 1
@@ -377,20 +397,18 @@ def main():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
-    look = {"color": "#3c3c3c", "effect": "solid", "speed": "slow", "brightness": 0.08}
+    messages = []
     next_read = 0.0
     start = time.time()
     while True:
         now = time.time()
         if now >= next_read:
             try:
-                look = web.status_look()
+                messages = web.active_messages()
             except Exception:   # never let a bad read stop the LED loop
                 pass
             next_read = now + REFRESH
-        frame = effect_frame(look.get("effect", "solid"), look.get("speed", "slow"),
-                             look.get("color", "#3c3c3c"), now - start, count)
-        out.show(to_bytes(frame, look.get("brightness", 0.08)))
+        out.show(render(messages, now - start, count))
         time.sleep(max(0.0, 1.0 / FPS - (time.time() - now)))
 
 
