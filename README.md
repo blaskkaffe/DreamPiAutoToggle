@@ -1,5 +1,7 @@
 # DreamPi Netswitch
 
+An add-on for [DreamPi](https://github.com/Kazade/dreampi), the Raspberry Pi bridge that takes a Sega Dreamcast online through its modem. It needs a working DreamPi and doesn't do anything on its own.
+
 Switch a DreamPi between **DCNow!** (the normal DreamPi / Dreamcast Live network) and **DCNET** (Flycast's network) from a web page, or by dialing special numbers from the Dreamcast.
 
 It installs as an add-on and changes no DreamPi files, so DreamPi's auto-updates keep working and uninstalling leaves DreamPi exactly as it was.
@@ -53,7 +55,8 @@ This removes the web page and LED services, the hook, all settings and the certi
 
 ## Requirements
 
-- DreamPi 2.x with the current `netlink.py` (eaudunord/Netlink, `dpi2` branch), which contains DreamPi's DCNET support.
+- A working [DreamPi](https://github.com/Kazade/dreampi) 2.x on a Raspberry Pi, with the Dreamcast already able to connect through it.
+- The current `netlink.py` ([eaudunord/Netlink](https://github.com/eaudunord/Netlink), `dpi2` branch), which DreamPi 2.x downloads itself and which contains DreamPi's DCNET support.
 - DCNET enabled in `netlink_config.ini` (`[DCNet]` with `enabled = yes`).
 - `/boot/noautoupdates.txt` must **not** exist, otherwise `netlink.py` skips its config and DCNET stays off.
 
@@ -193,5 +196,7 @@ The debug log is for tracking down calls that go wrong, such as misheard numbers
 - `cat /tmp/dreampi-netswitch.active` should say `active pid=<DreamPi's process id>`.
 
 ## Credits
+
+This add-on is built for [DreamPi](https://github.com/Kazade/dreampi) by Luke Benstead (Kazade), with DCNET and Netlink support from [eaudunord/Netlink](https://github.com/eaudunord/Netlink). It doesn't include or change any of their code; it only hooks into it while DreamPi runs.
 
 The optional **Dreamcast background** comes from the [VMU Icon Maker](http://dcvmuicons.net/maker/) by **Robert Dale Smith** ([source on GitHub](https://github.com/RobertDaleSmith/vmu-icon-maker), MIT License), part of his [DC VMU Icons](http://dcvmuicons.net/) site. The animated scene, its texture, the waves and the cylinder are his work; this add-on only wraps it so it can be switched on and off (`static/dc-background.js`). It runs on [Three.js](https://threejs.org) r128 (MIT License). The licence texts are in `static/LICENSES.txt`.
