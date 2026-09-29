@@ -83,6 +83,7 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 
 - **Status box:** shows the **DreamPi** row. Tap it (the small arrow) to also show:
   - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DCNow! or DCNET, call ended.
+  - **Pi:** CPU use, RAM, temperature and uptime, plus the Pi's own power and heat warnings (under-voltage, throttling) now and since boot. A weak power supply is a common cause of an unstable Pi, so a red warning box appears at the top of the page while the Pi is short of power or overheating.
   - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online`, and whether it's connected by Ethernet or Wi-Fi. A red warning box appears at the top of the page when the internet is down.
 - **Selected network**, orange for DCNow! or blue for DCNET, and the **DCNow! / DreamPi** and **DCNET / FLYCAST** buttons to change it.
 - **Debug log:** hidden unless switched on in the settings (see below).
@@ -101,6 +102,8 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 
 **Appearance**
 - **Dreamcast background:** an animated background in the style of the Dreamcast menu (see [Credits](#credits)). Off by default, and remembered per browser, so a phone can leave it off while a PC has it on. It pauses while the page is hidden. The Pi serves the files itself (about 600 KB, fetched once), so it works without internet; browsers without WebGL just show the blue gradient. The buttons are slightly see-through so the background shows through them.
+
+**About:** the add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model and the operating system.
 
 **Status LED** (only shown when LEDs are installed with `--led` or `--leds=N`; the title shows the number of LEDs for a strip)
 
@@ -123,6 +126,7 @@ autoreset=off
 dreampi=Ready for calls
 modem=Dial tone on, waiting for a call
 internet=Connected via Ethernet (18 ms)
+pi=CPU 7%, RAM 142 of 926 MB, 48°C, up 2 h 5 min
 ```
 
 ## LED messages
@@ -133,6 +137,7 @@ The LEDs show messages about DreamPi and the network. **Errors always have highe
 |---|---|---|---|
 | No network | Error | Red | Yes |
 | No internet | Error | Orange, blinking slowly | Yes |
+| Power or heat problem | Error | Pink, breathing slowly | Yes |
 | DreamPi not running | Error | Red, blinking slowly | Yes |
 | State unknown | Error | Dim grey | Yes |
 | Starting up | Information | Yellow, blinking slowly | Yes |
@@ -145,6 +150,7 @@ The LEDs show messages about DreamPi and the network. **Errors always have highe
 
 - **No network:** the Pi has no route to your router, for example because the cable is unplugged or Wi-Fi isn't connected. You can't open the web page then, so the LED is the only thing that can tell you.
 - **No internet:** the Pi reaches your router, but not the internet, or name lookups (DNS) fail.
+- **Power or heat problem:** the Pi reports under-voltage or throttling right now, or is at 80 °C or more.
 - **Checking speed:** cables, Wi-Fi and the route are checked every 2 seconds. The internet is checked every 30 seconds while it works, every 5 seconds while it doesn't, and straight away when a connection changes.
 - **Several messages at once:**
   - On a single LED, or when messages all use all LEDs, the most important one shows.

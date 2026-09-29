@@ -11,6 +11,7 @@ import os
 import re
 import socket
 import sys
+import subprocess
 import threading
 import time
 import traceback
@@ -56,7 +57,8 @@ LINK_EVERY = 2        # seconds between checks of cables / Wi-Fi / route
 NET_STATE = "/tmp/dreampi-netswitch.net"   # shared with the LED service
 NET_STALE = 20        # ignore NET_STATE when older than this (web service down)
 
-_checks = {"internet": {"state": "checking", "text": "Checking...", "time": 0}}
+_checks = {"internet": {"state": "checking", "text": "Checking...", "time": 0},
+           "pi": {"state": "checking", "text": "Checking...", "problem": False, "undervoltage": False}}
 _checks_lock = threading.Lock()
 
 
@@ -287,6 +289,163 @@ def internet_checker():
         _net["recheck"].wait(INTERNET_EVERY if result["state"] == "ok" else INTERNET_RETRY)
 
 
+# ------------------------------------------------------------- Pi health
+
+THROTTLED_SYSFS = "/sys/devices/platform/soc/soc:firmware/get_throttled"
+_cpu_prev = [None]
+_throttle = {"value": None, "time": 0}
+
+
+def _cpu_percent():
+    """CPU use since the previous call, from /proc/stat."""
+    try:
+        with open("/proc/stat") as f:
+            vals = [int(x) for x in f.readline().split()[1:9]]
+    except (IOError, OSError, ValueError):
+        return None
+    idle, total = vals[3] + vals[4], sum(vals)
+    prev, _cpu_prev[0] = _cpu_prev[0], (idle, total)
+    if not prev or total == prev[1]:
+        return None
+    return 100.0 * (1 - float(idle - prev[0]) / (total - prev[1]))
+
+
+def _meminfo():
+    info = {}
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                k, v = line.split(":", 1)
+                info[k] = int(v.split()[0])
+    except (IOError, OSError, ValueError):
+        return None
+    avail = info.get("MemAvailable", info.get("MemFree", 0) + info.get("Cached", 0))
+    return info.get("MemTotal", 0) // 1024, (info.get("MemTotal", 0) - avail) // 1024
+
+
+def _temperature():
+    raw = read_file("/sys/class/thermal/thermal_zone0/temp")
+    try:
+        return int(raw) / 1000.0
+    except (TypeError, ValueError):
+        return None
+
+
+def _throttled():
+    """The Pi firmware's power/heat flags (vcgencmd get_throttled), read at
+    most every 10 s. None when not a Raspberry Pi or not available."""
+    if time.time() - _throttle["time"] < 10:
+        return _throttle["value"]
+    value = None
+    raw = read_file(THROTTLED_SYSFS)
+    if raw is None:
+        for cmd in ("vcgencmd", "/usr/bin/vcgencmd", "/opt/vc/bin/vcgencmd"):
+            try:
+                out = subprocess.check_output([cmd, "get_throttled"], stderr=subprocess.STDOUT)
+                raw = out.decode("ascii", "replace").strip().split("=")[-1]
+                break
+            except (OSError, subprocess.CalledProcessError):
+                continue
+    try:
+        value = int(raw, 16) if raw else None
+    except ValueError:
+        value = None
+    _throttle.update(value=value, time=time.time())
+    return value
+
+
+def _duration(seconds):
+    m = int(seconds) // 60
+    if m < 60:
+        return "%d min" % m
+    h = m // 60
+    return "%d h %d min" % (h, m % 60) if h < 24 else "%d d %d h" % (h // 24, h % 24)
+
+
+def pi_health():
+    """CPU, RAM, temperature, uptime and the firmware's power/heat flags.
+    state: ok / warn (something happened since boot, or warm) / bad (now)."""
+    cpu, mem, temp, flags = _cpu_percent(), _meminfo(), _temperature(), _throttled()
+    try:
+        with open("/proc/uptime") as f:
+            up = float(f.read().split()[0])
+    except (IOError, OSError, ValueError):
+        up = None
+    parts = []
+    if cpu is not None:
+        parts.append("CPU %d%%" % round(cpu))
+    if mem:
+        parts.append("RAM %d of %d MB" % (mem[1], mem[0]))
+    if temp is not None:
+        parts.append("%.0f\u00b0C" % temp)
+    if up is not None:
+        parts.append("up " + _duration(up))
+    now, since = [], []
+    if flags is not None:
+        if flags & 0x1: now.append("under-voltage")
+        if flags & 0x4: now.append("slowed down (throttled)")
+        elif flags & 0x2: now.append("CPU speed capped")
+        if flags & 0x10000 and not flags & 0x1: since.append("under-voltage")
+        if flags & 0x40000 and not flags & 0x4: since.append("throttling")
+    hot = temp is not None and temp >= 80
+    warm = temp is not None and temp >= 70
+    if hot and "slowed down (throttled)" not in now:
+        now.append("very hot")
+    elif warm and not hot:
+        now.append("warm")
+    state = "bad" if (flags is not None and flags & 0x5) or hot else \
+        "warn" if now or since or warm else "ok"
+    text = ", ".join(parts) or "Unknown"
+    if now:
+        text += ". Now: " + ", ".join(now)
+    if since:
+        text += ". Since boot: " + ", ".join(since)
+    return {"state": state, "text": text, "cpu": cpu, "ram": mem, "temp": temp, "uptime": up,
+            "throttled": flags, "undervoltage": bool(flags is not None and flags & 0x1),
+            "problem": state == "bad"}
+
+
+# --------------------------------------------------------------- versions
+
+DREAMPI_DIR = "/home/pi/dreampi"
+ADDON_VERSION = os.path.join(BASE_DIR, "version")   # written by install.sh
+
+
+def script_version(path):
+    """DreamPi's own version line in a script ("#dreampi.py_version=
+    202512152004", the timestamp its updater compares) as a readable date."""
+    try:
+        with open(path, "rb") as f:
+            for raw in f:
+                line = raw.decode("utf-8", "replace")
+                if "_version=" in line:
+                    v = line.split("version=")[1].strip()
+                    if len(v) == 12 and v.isdigit():
+                        return "%s-%s-%s %s:%s" % (v[:4], v[4:6], v[6:8], v[8:10], v[10:12])
+                    return v or None
+    except (IOError, OSError):
+        return None
+    return None
+
+
+def about():
+    model = read_file("/proc/device-tree/model")
+    osname = None
+    try:
+        with open("/etc/os-release") as f:
+            for line in f:
+                if line.startswith("PRETTY_NAME="):
+                    osname = line.split("=", 1)[1].strip().strip('"')
+    except (IOError, OSError):
+        pass
+    rows = [("Add-on", read_file(ADDON_VERSION) or "unknown")]
+    for name in ("dreampi.py", "netlink.py", "dcnow.py"):
+        rows.append((name, script_version(os.path.join(DREAMPI_DIR, name)) or "not found"))
+    rows.append(("Raspberry Pi", (model or "unknown").replace("\x00", "")))
+    rows.append(("System", osname or "unknown"))
+    return rows
+
+
 def checker():
     """Cables / Wi-Fi / route every 2 s (cheap, so errors show quickly), and
     the shared state file for the LED service."""
@@ -305,10 +464,12 @@ def checker():
         if internet["state"] == "ok" and (links["ethernet"] or links["wifi"]):
             via = " and ".join(n for n, on in (("Ethernet", links["ethernet"]), ("Wi-Fi", links["wifi"])) if on)
             shown["text"] = internet["text"].replace("Connected", "Connected via " + via, 1)
+        pi = pi_health()
         with _checks_lock:
             _checks["internet"] = shown
+            _checks["pi"] = pi
         _write_net_state({"ethernet": links["ethernet"], "wifi": links["wifi"],
-                          "network": links["network"],
+                          "network": links["network"], "pi_problem": pi["problem"],
                           "internet": None if internet["state"] == "checking" else internet["state"] == "ok",
                           "time": time.time()})
         trim_log()
@@ -325,6 +486,7 @@ LED_STATES = [
     # key, label, category, colour, effect, speed, enabled
     ("no-network", "No network", "error", "#ff0000", "solid", "slow", True),
     ("no-internet", "No internet", "error", "#ff7a00", "blink", "slow", True),
+    ("pi", "Power or heat problem", "error", "#ff00aa", "breathe", "slow", True),
     ("off", "DreamPi not running", "error", "#ff0000", "blink", "slow", True),
     ("unknown", "State unknown", "error", "#3c3c3c", "solid", "slow", True),
     ("busy", "Starting up", "info", "#ffaa00", "blink", "slow", True),
@@ -335,7 +497,8 @@ LED_STATES = [
     ("ethernet", "Ethernet connected", "info", "#ffffff", "solid", "slow", False),
     ("wifi", "Wi-Fi connected", "info", "#00c8ff", "solid", "slow", False),
 ]
-PRIORITY = dict((s[0], len(LED_STATES) - i) for i, s in enumerate(LED_STATES))   # higher wins
+PRIORITY = dict((s[0], len(LED_STATES) - i) for i, s in enumerate(LED_STATES))   # higher = more important
+CATEGORY = dict((s[0], s[2]) for s in LED_STATES)
 _DEFAULT_COLOURS = dict((s[0], s[3:7]) for s in LED_STATES)
 # LED effects. The first four work on a single LED; the rest need a strip.
 # "rgb" ignores the colour and cycles through all colours (20 s slow, 10 s fast).
@@ -452,6 +615,8 @@ def active_messages(state=None, net_state=None):
             active.append("no-network")
         elif net_state.get("internet") is False:
             active.append("no-internet")
+        if net_state.get("pi_problem"):
+            active.append("pi")
         if net_state.get("ethernet"):
             active.append("ethernet")
         if net_state.get("wifi"):
@@ -464,7 +629,7 @@ def active_messages(state=None, net_state=None):
             continue
         look = dict(looks[key])
         look["key"] = key
-        look["category"] = "error" if key in ("no-network", "no-internet", "off", "unknown") else "info"
+        look["category"] = CATEGORY.get(key, "info")
         if look.get("brightness") is None:
             look["brightness"] = cfg["brightness"]
         out.append(look)
@@ -490,6 +655,13 @@ def api_state():
         warnings.append("DCNET unavailable: %s. All calls go to DCNow!" % problem)
     with _checks_lock:
         checks = json.loads(json.dumps(_checks))
+    pi = checks.get("pi", {})
+    if pi.get("undervoltage"):
+        warnings.append("Power: the Pi is getting too little power (under-voltage). Use a stronger power "
+                        "supply or a shorter, thicker cable; this can make the Pi unstable or drop off the network.")
+    elif pi.get("problem"):
+        warnings.append("Too hot: the Pi is at %.0f\u00b0C and slows itself down. Give it more air or a heatsink."
+                        % (pi.get("temp") or 0))
     net = network_state()
     if net and not net.get("network"):
         warnings.append("No network: the Pi has no working network connection.")
@@ -507,6 +679,7 @@ def api_state():
                         "look": (active_messages(dstate, {"network": True}) or [None])[-1]},
             "modem": {"text": mtext, "since": msince},
             "internet": checks["internet"],
+            "pi": {"state": pi.get("state"), "text": pi.get("text")},
             "warnings": warnings, "now": int(time.time())}
 
 
@@ -613,6 +786,7 @@ PAGE = u"""<!doctype html>
  <div class="row"><span class="k">DreamPi</span><span class="v"><span class="dot" id="d-dot"></span><span id="d-text">...</span></span><span class="arrow">&#9656;</span></div>
  <div class="row more"><span class="k">Modem</span><span class="v"><span id="m-text">...</span> <span class="sub" id="m-since"></span></span></div>
  <div class="row more"><span class="k">Internet</span><span class="v"><span class="dot" id="i-dot"></span><span id="i-text">...</span></span></div>
+ <div class="row more"><span class="k">Pi</span><span class="v"><span class="dot" id="p-dot"></span><span id="p-text">...</span></span></div>
 </div>
 <div class="now" id="net">Selected network:<br><b id="net-name">...</b></div>
 <form method="post" action="/dcnow"><button class="pill dcnow-b">DCNow! / DreamPi</button></form>
@@ -681,6 +855,9 @@ millisecond timing. Turn recording on, then dial.</div>
  <div class="range"><input type="range" id="lvl-r" min="0" max="1000" step="1"><span id="lvl-v" style="width:3em;text-align:right"></span></div>
  <div class="bar"><button class="pill-s" id="lvl-base" type="button">Use global</button><button class="pill-s" id="lvl-done" type="button">Done</button></div></div>
 </div>
+<h2>About</h2>
+<div class="card"><table class="about" id="about"></table></div>
+<div class="note">The DreamPi script versions are the dates DreamPi's own auto-update compares.</div>
 </div></div>
 
 <script>
@@ -702,6 +879,7 @@ function render(d){
  lookDot($("d-dot"),d.dreampi.look); $("d-text").textContent=d.dreampi.text;
  $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now);
  dot($("i-dot"),d.internet.state); $("i-text").textContent=d.internet.text;
+ dot($("p-dot"),d.pi.state); $("p-text").textContent=d.pi.text||"...";
  $("net").className="now "+d.network;
  if(d.network!=favNet){favNet=d.network;$("fav").href="/static/favicon-"+d.network+".png";$("touch").href="/static/touch-"+d.network+".png"} $("net-name").textContent=d.network=="dcnet"?"DCNET":"DCNow!";
  var defName=d.default=="dcnet"?"DCNET":"DCNow!";
@@ -716,7 +894,10 @@ function render(d){
 var logSize=0,debugOn=false,logBusy=false,debugOpen=false;
 $("rows").onclick=function(){this.classList.toggle("open")};
 function showSettings(open){$("settings").classList.toggle("open",open);
- document.body.classList.toggle("settings-open",open);if(open)loadLed()}
+ document.body.classList.toggle("settings-open",open);if(open){loadLed();loadAbout()}}
+function loadAbout(){var x=new XMLHttpRequest();x.open("GET","/about",true);
+ x.onload=function(){if(x.status!=200)return;$("about").innerHTML=JSON.parse(x.responseText).map(function(r){
+  return '<tr><td class="n">'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>'}).join("")};x.send()}
 $("cog").onclick=function(){showSettings(true)};
 $("close-settings").onclick=function(){showSettings(false)};
 document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(lvlCur||fxCur)closePops();else showSettings(false)}});
@@ -955,9 +1136,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send(json.dumps(read_log(int(m.group(1)) if m else 0)), "application/json")
         elif self.path == "/status":
             d = api_state()
-            self.send("network=%s\ndefault=%s\nautoreset=%s\ndreampi=%s\nmodem=%s\ninternet=%s\n" % (
+            self.send("network=%s\ndefault=%s\nautoreset=%s\ndreampi=%s\nmodem=%s\ninternet=%s\npi=%s\n" % (
                 d["network"], d["default"], "on" if d["autoreset"] else "off", d["dreampi"]["text"],
-                d["modem"]["text"], d["internet"]["text"]), "text/plain; charset=utf-8")
+                d["modem"]["text"], d["internet"]["text"], d["pi"]["text"]), "text/plain; charset=utf-8")
+        elif self.path == "/about":
+            self.send(json.dumps(about()), "application/json")
         elif self.path.startswith("/static/"):
             name = self.path[len("/static/"):].split("?")[0]
             body = _static(name)

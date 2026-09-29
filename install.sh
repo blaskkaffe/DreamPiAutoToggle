@@ -38,6 +38,12 @@ cp "$SRC/netswitch_hook.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SR
 mkdir -p "$DEST/static"
 cp "$SRC/static/three.min.js" "$SRC/static/dc-background.js" "$SRC/static/LICENSES.txt" "$SRC"/static/*.png "$DEST/static/"
 chmod +x "$DEST/uninstall.sh"
+# Add-on version for the settings page: date and commit of this checkout
+if command -v git >/dev/null 2>&1 && git -C "$SRC" rev-parse >/dev/null 2>&1; then
+    git -c safe.directory="$SRC" -C "$SRC" log -1 --format='%cd (%h)' --date=format:'%Y-%m-%d %H:%M' > "$DEST/version" 2>/dev/null || echo unknown > "$DEST/version"
+else
+    echo unknown > "$DEST/version"
+fi
 
 # Tell every installed Python to load the hook at startup (.pth file)
 : > "$DEST/pth_locations"
