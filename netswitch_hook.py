@@ -9,9 +9,9 @@ It then wraps Netlink.check_number() with these rules:
   1111111  openMenu's number. Always DCNow! If the reset toggle is on,
            it also switches the selected network back to the default
            network (DCNow! unless the file default_dcnet exists).
-  2222222  Selects DCNow! and connects through DCNow!
-  3333333  Selects DCNET and connects through DCNET.
-  others   Go to whichever network is selected (website or 2222222/3333333).
+  5550001  Selects DCNow! and connects through DCNow!
+  5550002  Selects DCNET and connects through DCNET.
+  others   Go to whichever network is selected (website or 5550001/5550002).
            Only calls DreamPi would send to its normal PPP are redirected;
            Netlink/XBAND codes and the built-in *69 prefix are untouched.
 
@@ -41,8 +41,8 @@ MODEM = "/tmp/dreampi-netswitch.modem"
 NETLINK_DIR = "/home/pi/dreampi"
 
 NUM_OPENMENU = "1111111"
-NUM_DCNOW = "2222222"
-NUM_DCNET = "3333333"
+NUM_DCNOW = "5550001"
+NUM_DCNET = "5550002"
 
 # __builtin__ first: on Python 2 the "future" package can provide a fake
 # "builtins" module, and patching that would do nothing.
@@ -171,7 +171,7 @@ def _select_dcnet(on):
 
 def _special(raw_string):
     """Which special number was dialed, matched on the last seven digits.
-    DreamPi often hears an extra leading digit (e.g. 13333333), and ISP
+    DreamPi often hears an extra leading digit (e.g. 15550002), and ISP
     settings may add a prefix or area code, so exact matching is unreliable."""
     for number in (NUM_OPENMENU, NUM_DCNOW, NUM_DCNET):
         if raw_string.endswith(number):

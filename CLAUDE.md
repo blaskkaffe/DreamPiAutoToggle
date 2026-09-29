@@ -62,19 +62,21 @@ Open question being investigated: on hardware DreamPi heard openMenu's `1111111`
 - If upstream renames `check_number`, the hook writes an error to the status file and does nothing, and DreamPi keeps working.
 
 ## Routing rules (see README table)
-Special numbers are matched with `endswith()` on the dialed string: on real hardware DreamPi hears an extra leading `1` (e.g. `13333333`, `11111111`), and ISP prefixes add digits too. Only calls the original `check_number` returns as `PPP` are redirected. Numbers ending in `1111111` or `2222222` always stay PPP. `3333333`, or any number while `dcnet_mode` exists, becomes `dcnet` if `self.dcnet` is true. With `autoreset`, `1111111` first sets the selection to the default network (`default_dcnet`); the openMenu call itself still stays PPP.
+Special numbers are matched with `endswith()` on the dialed string: on real hardware DreamPi hears an extra leading `1` (e.g. `15550002`, `11111111`), and ISP prefixes add digits too. Only calls the original `check_number` returns as `PPP` are redirected. Numbers ending in `1111111` or `5550001` always stay PPP. `5550002`, or any number while `dcnet_mode` exists, becomes `dcnet` if `self.dcnet` is true. With `autoreset`, `1111111` first sets the selection to the default network (`default_dcnet`); the openMenu call itself still stays PPP.
+`5550001`/`5550002` (555-0001/555-0002, the North American fictional-exchange prefix) replaced the original `2222222`/`3333333`: a run of seven identical digits is the hardest case for a DTMF decoder to count correctly (no frequency change marks a digit boundary, only a timing gap) - the same category of problem as the openMenu `1111111` mishearing below, but for numbers we actually control. `1111111` itself can't change (hardcoded in openMenu).
 
 ## Testing without a Pi
 Download the current `netlink.py`, place it at `/home/pi/dreampi/netlink.py`, stub the `serial`, `stun` and `sh` modules, load the `.pth` with `site.addsitedir()`, create the object with `Netlink.__new__(Netlink)`, set `logger`, `servers`, `dcnet`, `dial_modifier` and `mode`, then call `check_number()` for each rule. Also check that `netlink.py`'s hash is unchanged afterwards.
 
 ## Verified on hardware
 - The hook loads and patches under DreamPi's real Python 2.7.
-- A real DCNet call end to end via 333-3333.
+- A real DCNet call end to end by dialing its special number (`333-3333` at the time); the routing logic (`_special()`/`endswith()` matching, `dcnet_mode`, `dcnet_connect()`) is unchanged by the `555-0001`/`555-0002` renumbering, only the literal digits matched.
 - A single NeoPixel on GPIO18 (PWM FIFO path, `FifoPixel`).
 
 ## Not yet verified
 - The strip path (`DmaStrip`, PWM + DMA, `--leds=N` with N > 1); only tested against fake memory and mailbox.
 - Whether port 80 is free on every DreamPi image.
+- The current `555-0001`/`555-0002` special numbers themselves haven't been dialed on real hardware yet (only the now-superseded `222-2222`/`333-3333` were); the change is just which digits `NUM_DCNOW`/`NUM_DCNET` match, so it should behave the same, but hasn't been confirmed.
 - Everything in [Wi-Fi setup button](#wi-fi-setup-button): the button GPIO reading, `hostapd`/`dnsmasq` AP hosting, `wpa_supplicant.conf` writing and reconnecting, and the assumption that DreamPi's OS image uses `wpa_supplicant`/`dhcpcd` rather than NetworkManager. Only unit-tested off-hardware (scan-result parsing, `wpa_supplicant.conf` dedup/rewrite, LED default-effect selection, page rendering) - see the git history for what was checked and how before treating this as working.
 
 ## Ideas for later
