@@ -46,6 +46,13 @@ STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
 MODEM = "/tmp/dreampi-netswitch.modem"
 DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
+# Wi-Fi setup (netswitch_wifi.py, install.sh --wifi-button=<gpio>)
+WIFI_BUTTON_ENABLED = os.path.join(BASE_DIR, "wifi_button_enabled")  # written by install.sh
+WIFI_START = os.path.join(BASE_DIR, "wifi_start")   # touched to ask netswitch_wifi.py to start
+WIFI_STOP = os.path.join(BASE_DIR, "wifi_stop")     # touched to ask it to stop / cancel
+WIFI_STATE = "/tmp/dreampi-netswitch.wifi"          # written by netswitch_wifi.py
+WIFI_STALE = 30       # ignore WIFI_STATE when older than this (the service is down)
+WIFI_AP_SSID = "DreamPi WiFi Config"
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 80
 HTTPS_PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 443   # 0 = no HTTPS
 CERT = os.path.join(BASE_DIR, "https.crt")   # self-signed, made by install.sh
@@ -258,6 +265,22 @@ def network_state():
         return data
     except (IOError, OSError, ValueError):
         return None
+
+
+def wifi_state():
+    """Latest Wi-Fi setup state written by netswitch_wifi.py: state (idle /
+    scanning / hosting / connecting / ok / failed), ssid, networks (scan
+    results while hosting) and time. {"state": "idle"} when the service
+    hasn't run yet, or hasn't updated the file in a while (it isn't
+    running any more, or crashed mid-setup)."""
+    try:
+        with open(WIFI_STATE) as f:
+            data = json.load(f)
+    except (IOError, OSError, ValueError):
+        return {"state": "idle"}
+    if data.get("state", "idle") != "idle" and time.time() - data.get("time", 0) > WIFI_STALE:
+        return {"state": "idle"}
+    return data
 
 
 def _write_net_state(data):
@@ -505,6 +528,14 @@ def checker():
 # dreampi_state(); the network ones from the checker (NET_STATE).
 LED_STATES = [
     # key, label, category, colour, effect, speed, enabled
+    # Wi-Fi setup (netswitch_wifi.py) always outranks everything else: while
+    # it's in progress "no network"/"no internet" are usually also true, and
+    # would otherwise hide it. default_led_config() switches wifi-setup's
+    # default effect to "scanner" when a strip is installed (breathe on a
+    # single LED, see the user request); connecting keeps the same look.
+    ("wifi-setup", "Wi-Fi setup: choose a network", "wifi", "#0046ff", "breathe", "slow", True),
+    ("wifi-ok", "Wi-Fi setup: connected", "wifi", "#00ff00", "solid", "slow", True),
+    ("wifi-failed", "Wi-Fi setup: couldn't connect", "wifi", "#ff0000", "blink", "slow", True),
     ("no-network", "No network", "error", "#ff0000", "solid", "slow", True),
     ("no-internet", "No internet", "error", "#ff7a00", "blink", "slow", True),
     ("pi", "Power or heat problem", "error", "#ff00aa", "breathe", "slow", True),
@@ -557,11 +588,15 @@ except NameError:
 
 
 def default_led_config():
-    return {"brightness": 0.08,
-            "colours": dict((net, dict((st, {"color": c, "effect": e, "speed": sp, "brightness": None,
-                                             "enabled": on, "leds": None})
-                                       for st, (c, e, sp, on) in _DEFAULT_COLOURS.items()))
-                            for net in NETWORKS)}
+    cfg = {"brightness": 0.08,
+           "colours": dict((net, dict((st, {"color": c, "effect": e, "speed": sp, "brightness": None,
+                                            "enabled": on, "leds": None})
+                                      for st, (c, e, sp, on) in _DEFAULT_COLOURS.items()))
+                           for net in NETWORKS)}
+    if led_count() > 1:   # a strip: scanning animation instead of a breathing single LED
+        for net in NETWORKS:
+            cfg["colours"][net]["wifi-setup"]["effect"] = "scanner"
+    return cfg
 
 
 def clean_led_config(data):
@@ -622,10 +657,12 @@ def save_led_config(data):
     return cfg
 
 
-def active_messages(state=None, net_state=None):
+def active_messages(state=None, net_state=None, wifi=True):
     """Enabled LED messages that apply right now, lowest priority first (the
     LED service draws them in this order, so later ones end up on top).
-    Each: key, category, color, effect, speed, brightness (effective), leds."""
+    Each: key, category, color, effect, speed, brightness (effective), leds.
+    wifi=False skips netswitch_wifi.py's state (used for the DreamPi dot
+    preview, which only ever previews the DreamPi-state message)."""
     if state is None:
         state = dreampi_state()[0]
     if net_state is None:
@@ -642,6 +679,14 @@ def active_messages(state=None, net_state=None):
             active.append("ethernet")
         if net_state.get("wifi"):
             active.append("wifi")
+    if wifi:
+        ws = wifi_state().get("state", "idle")
+        if ws in ("scanning", "hosting", "connecting"):
+            active.append("wifi-setup")
+        elif ws == "ok":
+            active.append("wifi-ok")
+        elif ws == "failed":
+            active.append("wifi-failed")
     cfg = led_config()
     looks = cfg["colours"]["dcnet" if os.path.exists(FLAG) else "dcnow"]
     out = []
@@ -690,6 +735,15 @@ def api_state():
         why = "name lookups (DNS) fail" if "DNS" in checks["internet"]["text"] \
             else "the network works, but the internet can't be reached"
         warnings.append("No internet: %s. Dreamcast games can't get online right now." % why)
+    wf = wifi_state()
+    wf_state = wf.get("state", "idle")
+    if wf_state in ("scanning", "hosting"):
+        warnings.append("Wi-Fi setup: connect a phone or PC to the “%s” Wi-Fi network, then open "
+                        "http://192.168.4.1 to pick a network." % WIFI_AP_SSID)
+    elif wf_state == "connecting":
+        warnings.append("Wi-Fi setup: trying to connect to “%s”..." % (wf.get("ssid") or ""))
+    elif wf_state == "failed":
+        warnings.append("Wi-Fi setup: could not connect (%s)." % (wf.get("ssid") or "unknown reason"))
     return {"network": "dcnet" if os.path.exists(FLAG) else "dcnow",
             "autoreset": os.path.exists(AUTORESET),
             "default": "dcnet" if os.path.exists(DEFAULT_DCNET) else "dcnow",
@@ -697,11 +751,12 @@ def api_state():
             # the dot next to DreamPi previews that status's LED message only;
             # network problems show as warning boxes instead
             "dreampi": {"state": dstate, "text": dtext,
-                        "look": (active_messages(dstate, {"network": True}) or [None])[-1]},
+                        "look": (active_messages(dstate, {"network": True}, wifi=False) or [None])[-1]},
             "modem": {"text": mtext, "since": msince},
             "internet": checks["internet"],
             "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
                    "line2": pi.get("line2"), "warn": pi.get("warn")},
+            "wifi": {"state": wf_state, "ssid": wf.get("ssid"), "installed": os.path.exists(WIFI_BUTTON_ENABLED)},
             "warnings": warnings, "now": int(time.time())}
 
 
@@ -846,6 +901,8 @@ millisecond timing. Turn recording on, then dial.</div>
   <button class="cbox" id="reset-b" type="submit" aria-label="Auto reset"></button></form>
  <div class="srow"><span>Debug log<span class="sub">Show the debug log on the main page (this browser only)</span></span>
   <input type="checkbox" class="cbox dcnow" id="dbg-b" aria-label="Show debug log"></div>
+ <div class="srow" id="wifi-row" style="display:none"><span>Wi-Fi setup<span class="sub" id="wifi-sub">Search for a Wi-Fi network to connect the Pi to</span></span>
+  <button class="pill-s" id="wifi-b" type="button">Search</button></div>
 </div>
 
 <h2>Phone numbers</h2>
@@ -925,7 +982,22 @@ function render(d){
  $("log-tools").style.display=d.debug?"inline":"none";
  $("log").style.display=(d.debug||logSize)?"block":"none";
  debugOn=d.debug;
+ $("wifi-row").style.display=d.wifi.installed?"flex":"none";
+ var wl=WIFI_LABELS[d.wifi.state]||WIFI_LABELS.idle;
+ $("wifi-b").textContent=wl[0];
+ $("wifi-sub").textContent=wl[1].replace("%s",d.wifi.ssid||"");
+ $("wifi-b").disabled=d.wifi.state=="ok";
 }
+var WIFI_LABELS={
+ idle:["Search","Search for a Wi-Fi network to connect the Pi to"],
+ scanning:["Stop","Scanning for Wi-Fi networks..."],
+ hosting:["Stop","Connect to “DreamPi WiFi Config”, then open http://192.168.4.1"],
+ connecting:["Stop","Connecting to “%s”..."],
+ ok:["Connected","Connected to “%s”"],
+ failed:["Stop","Couldn't connect (%s)"]};
+$("wifi-b").onclick=function(){
+ var x=new XMLHttpRequest();x.open("POST","/wifitoggle",true);x.setRequestHeader("X-Requested-With","netswitch");
+ x.onload=refresh;x.send()};
 var logSize=0,debugOn=false,logBusy=false,debugOpen=false;
 $("net").onclick=function(){this.classList.toggle("open")};
 function showSettings(open){$("settings").classList.toggle("open",open);
@@ -967,7 +1039,7 @@ function buildLed(){
  ["dcnow","dcnet"].forEach(function(n){$("tab-"+n).className="pill-s "+n+(n==ledNet?" sel":"")});
  var grp="";
  $("led-rows").innerHTML=ledStates.map(function(s){var st=s[0],h="";
-  if(s[2]!=grp){grp=s[2];h='<tr class="grp"><td colspan="4">'+(grp=="error"?"Errors":"Information")+'</td></tr>'}
+  if(s[2]!=grp){grp=s[2];h='<tr class="grp"><td colspan="4">'+(grp=="error"?"Errors":grp=="wifi"?"Wi-Fi setup":"Information")+'</td></tr>'}
   return h+'<tr id="r-'+st+'"><td class="name"><input type="checkbox" class="cbox '+ledNet+'" id="e-'+st+'" title="Show this message" aria-label="Show '+esc(s[1])+'"><span class="lbl-t">'+esc(s[1])+'</span></td>'+
   '<td class="c"><input type="color" id="c-'+st+'" data-state="'+st+'" aria-label="Colour"></td>'+
   '<td class="c"><button type="button" class="chip fx" id="f-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'"></button></td>'+
@@ -1255,6 +1327,14 @@ class Handler(BaseHTTPRequestHandler):
             if os.path.exists(DTMF_LOG):
                 os.remove(DTMF_LOG)
             debug_log("web page: log cleared")
+        elif self.path == "/wifitoggle":
+            if os.path.exists(WIFI_BUTTON_ENABLED):
+                if wifi_state().get("state", "idle") == "idle":
+                    open(WIFI_START, "w").close()
+                    debug_log("web page: Wi-Fi setup started")
+                else:
+                    open(WIFI_STOP, "w").close()
+                    debug_log("web page: Wi-Fi setup stop requested")
         if self.headers.get("X-Requested-With"):
             self.send_response(204)   # the page's own buttons: nothing to reload
             self.send_header("Content-Length", "0")

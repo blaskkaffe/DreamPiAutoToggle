@@ -8,8 +8,10 @@
 #   sudo ./install.sh --led        also show the status on a NeoPixel on GPIO18
 #   sudo ./install.sh --leds=30    the same with several NeoPixels / a strip (30 LEDs)
 #   sudo ./install.sh --no-led     remove the NeoPixel service again
+#   sudo ./install.sh --wifi-button=17   a button on GPIO17: hold 3 s to set up Wi-Fi
+#   sudo ./install.sh --no-wifi-button   remove the Wi-Fi setup button/service again
 #
-# Once --led has been used, later updates keep the LED until --no-led.
+# Once --led or --wifi-button has been used, later updates keep it until --no-led / --no-wifi-button.
 set -e
 DEST=/opt/dreampi-netswitch
 SRC="$(cd "$(dirname "$0")" && pwd)"
@@ -17,6 +19,8 @@ PORT=80
 HTTPS_PORT=443
 LED=keep
 LED_COUNT=
+WIFI_BTN=keep
+WIFI_BTN_GPIO=
 for arg in "$@"; do
     case "$arg" in
         --led) LED=on; LED_COUNT=1 ;;
@@ -24,6 +28,10 @@ for arg in "$@"; do
                   case "$LED_COUNT" in ''|*[!0-9]*) echo "--leds needs a number, e.g. --leds=30"; exit 1 ;; esac
                   if [ "$LED_COUNT" -lt 1 ] || [ "$LED_COUNT" -gt 300 ]; then echo "--leds must be 1 to 300"; exit 1; fi ;;
         --no-led) LED=off ;;
+        --wifi-button=*) WIFI_BTN=on; WIFI_BTN_GPIO="${arg#--wifi-button=}"
+                  case "$WIFI_BTN_GPIO" in ''|*[!0-9]*) echo "--wifi-button needs a GPIO number, e.g. --wifi-button=17"; exit 1 ;; esac
+                  if [ "$WIFI_BTN_GPIO" -gt 53 ]; then echo "--wifi-button must be a valid GPIO number (0 to 53)"; exit 1; fi ;;
+        --no-wifi-button) WIFI_BTN=off ;;
         --https-port=*) HTTPS_PORT="${arg#--https-port=}" ;;
         --no-https) HTTPS_PORT=0 ;;
         [0-9]*) PORT="$arg" ;;
@@ -31,10 +39,11 @@ for arg in "$@"; do
     esac
 done
 
-if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--led|--leds=N|--no-led]"; exit 1; fi
+if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--led|--leds=N|--no-led] [--wifi-button=N|--no-wifi-button]"; exit 1; fi
 
 mkdir -p "$DEST"
-cp "$SRC/netswitch_hook.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
+cp "$SRC/netswitch_hook.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_wifi.py" \
+   "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/static"
 cp "$SRC/static/three.min.js" "$SRC/static/dc-background.js" "$SRC/static/LICENSES.txt" "$SRC"/static/*.png "$DEST/static/"
 chmod +x "$DEST/uninstall.sh"
@@ -143,12 +152,58 @@ elif [ "$LED" = off ]; then
     echo "NeoPixel service removed."
 fi
 
+# ----------------------------------------------------------- Wi-Fi setup button
+if [ "$WIFI_BTN" = keep ] && [ -f "$DEST/wifi_button_enabled" ]; then WIFI_BTN=on; fi
+if [ "$WIFI_BTN" = on ]; then
+    touch "$DEST/wifi_button_enabled"
+    if [ -n "$WIFI_BTN_GPIO" ]; then echo "$WIFI_BTN_GPIO" > "$DEST/wifi_button_gpio"; fi
+    echo "Wi-Fi setup button on GPIO$(cat "$DEST/wifi_button_gpio" 2>/dev/null || echo '?')"
+    # The Wi-Fi setup access point needs hostapd and dnsmasq. Install them if
+    # missing, and make sure their own systemd units stay off: this add-on
+    # starts and stops them itself (dreampi-netswitch-wifi.service), so a
+    # default dnsmasq listening on every interface would conflict with it.
+    if ! command -v hostapd >/dev/null 2>&1 || ! command -v dnsmasq >/dev/null 2>&1; then
+        if command -v apt-get >/dev/null 2>&1; then
+            echo "Installing hostapd and dnsmasq (needed to host the Wi-Fi setup access point)..."
+            apt-get update -q && apt-get install -y -q hostapd dnsmasq \
+                || echo "Could not install hostapd/dnsmasq automatically; install them yourself, then re-run this."
+        else
+            echo "hostapd and/or dnsmasq not found and apt-get isn't available; install them yourself for Wi-Fi setup to work."
+        fi
+    fi
+    systemctl disable --now hostapd.service 2>/dev/null || true
+    systemctl disable --now dnsmasq.service 2>/dev/null || true
+    cat > /etc/systemd/system/dreampi-netswitch-wifi.service <<EOF
+[Unit]
+Description=DreamPi Netswitch Wi-Fi setup button
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=$(command -v python3) $DEST/netswitch_wifi.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+elif [ "$WIFI_BTN" = off ]; then
+    systemctl disable --now dreampi-netswitch-wifi.service 2>/dev/null || true
+    rm -f /etc/systemd/system/dreampi-netswitch-wifi.service "$DEST/wifi_button_enabled" "$DEST/wifi_button_gpio" \
+          "$DEST/wifi_hostapd.conf" "$DEST/wifi_dnsmasq.conf"
+    echo "Wi-Fi setup button service removed."
+fi
+
 systemctl daemon-reload
 systemctl enable dreampi-netswitch.service >/dev/null 2>&1
 systemctl restart dreampi-netswitch.service
 if [ -f "$DEST/led_enabled" ]; then
     systemctl enable dreampi-netswitch-led.service >/dev/null 2>&1
     systemctl restart dreampi-netswitch-led.service
+fi
+if [ -f "$DEST/wifi_button_enabled" ]; then
+    systemctl enable dreampi-netswitch-wifi.service >/dev/null 2>&1
+    systemctl restart dreampi-netswitch-wifi.service
 fi
 systemctl restart dreampi.service 2>/dev/null || echo "Could not restart DreamPi, please reboot."
 

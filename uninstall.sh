@@ -4,7 +4,7 @@ DEST=/opt/dreampi-netswitch
 
 if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo $0"; exit 1; fi
 
-for SERVICE in dreampi-netswitch dreampi-netswitch-led; do
+for SERVICE in dreampi-netswitch dreampi-netswitch-led dreampi-netswitch-wifi; do
     systemctl disable --now "$SERVICE.service" 2>/dev/null
     rm -f "/etc/systemd/system/$SERVICE.service"
 done
@@ -26,6 +26,6 @@ if [ -f "$DEST/spi_added" ]; then
     echo "Removed the SPI setting from $CONFIG (takes effect after a reboot)."
 fi
 
-rm -rf "$DEST" /tmp/dreampi-netswitch.active /tmp/dreampi-netswitch.state /tmp/dreampi-netswitch-dtmf.log /tmp/dreampi-netswitch.modem /tmp/dreampi-netswitch.net
+rm -rf "$DEST" /tmp/dreampi-netswitch.active /tmp/dreampi-netswitch.state /tmp/dreampi-netswitch-dtmf.log /tmp/dreampi-netswitch.modem /tmp/dreampi-netswitch.net /tmp/dreampi-netswitch.wifi
 systemctl restart dreampi.service 2>/dev/null || echo "Could not restart DreamPi, please reboot."
 echo "Uninstalled. DreamPi is back to its original behavior."
