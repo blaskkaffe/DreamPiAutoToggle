@@ -33,7 +33,7 @@ STATIC_FILES = {   # only these are served from /static/
     "dc-background.js": "application/javascript; charset=utf-8",
     "LICENSES.txt": "text/plain; charset=utf-8",
     "favicon-dcnow.png": "image/png",   # DreamPi logo (without the text)
-    "favicon-dcnet.png": "image/png",   # purple swirl while DCNET is selected
+    "favicon-dcnet.png": "image/png",   # Flycast logo while DCNET is selected
     "touch-dcnow.png": "image/png",
     "touch-dcnet.png": "image/png",
 }
