@@ -4,6 +4,8 @@
 # optional debug timeline. It only creates/removes the files that
 # netswitch_hook.py reads.
 # Works on Python 3 and 2.7.
+import gzip
+import io
 import json
 import os
 import re
@@ -136,6 +138,29 @@ def debug_log(text):
             f.write("%s.%03d %9s  %s\n" % (time.strftime("%H:%M:%S", time.localtime(now)),
                                           int(now * 1000) % 1000, "", text))
     except IOError:
+        pass
+
+
+LOG_MAX = 1000000     # the debug log is trimmed to its newest LOG_KEEP bytes
+LOG_KEEP = 500000     # when it grows past LOG_MAX
+TEXT_TAIL = 256000    # "Open as text" shows this much unless ?all
+
+
+def trim_log():
+    """Keep the debug log from growing without limit while recording.
+    The hook opens the file for every line, so replacing it is safe."""
+    try:
+        if os.path.getsize(DTMF_LOG) <= LOG_MAX:
+            return
+        with open(DTMF_LOG, "rb") as f:
+            f.seek(-LOG_KEEP, 2)
+            data = f.read()
+        data = data[data.find(b"\n") + 1:]      # start at a whole line
+        tmp = DTMF_LOG + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(data)
+        os.rename(tmp, DTMF_LOG)
+    except (IOError, OSError):
         pass
 
 
@@ -281,6 +306,7 @@ def checker():
                           "network": links["network"],
                           "internet": None if internet["state"] == "checking" else internet["state"] == "ok",
                           "time": time.time()})
+        trim_log()
         time.sleep(LINK_EVERY)
 
 
@@ -484,7 +510,7 @@ PAGE = u"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DreamPi</title>
 <style>
- :root{--r:29px;--dcnow:#e8761c;--dcnow-l:#f6b27a;--dcnet:#1c6fe8;--dcnet-l:#80b1f6;--card:#1b1b1b;--line:#2a2a2a;--muted:#999}
+ :root{--r:29px;--bw:4px;--dcnow:#e8761c;--dcnow-l:#f6b27a;--dcnet:#1c6fe8;--dcnet-l:#80b1f6;--card:#1b1b1b;--line:#2a2a2a;--muted:#999}
  *{box-sizing:border-box}
  body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#111;color:#eee;max-width:460px;margin:24px auto;padding:0 16px}
  header{position:relative;margin-bottom:16px} h1{text-align:center;margin:0;font-size:1.9em}
@@ -492,7 +518,7 @@ PAGE = u"""<!doctype html>
  .card{background:var(--card);border-radius:var(--r);padding:6px 20px;margin-bottom:14px}
  .sub{color:#888;font-size:.85em} .note{color:var(--muted);font-size:.85em;margin:8px 4px} a{color:#8bf}
  button{font:inherit;cursor:pointer;border:0;color:#fff}
- .rows{cursor:pointer;user-select:none;border-radius:var(--r);border:5px solid #3a3a3a;padding:2px 20px}
+ .rows{cursor:pointer;user-select:none;border-radius:var(--r);border:var(--bw) solid #3a3a3a;padding:2px 20px}
  .row{display:flex;align-items:baseline;padding:11px 0;border-top:1px solid var(--line)} .row:first-child{border-top:0}
  .row .k{width:84px;color:var(--muted);flex:none} .row .v{flex:1}
  .rows .more{display:none} .rows.open .more{display:flex}
@@ -502,14 +528,14 @@ PAGE = u"""<!doctype html>
  @keyframes rgbc{0%,100%{background:#f00}17%{background:#ff0}33%{background:#0f0}50%{background:#0ff}67%{background:#00f}83%{background:#f0f}}
  .ok{background:#2c2} .busy,.warn{background:#e0b400} .call{background:#b04cff} .bad,.off{background:#d33}
  .call-dcnow{background:#ff7a1a} .call-dcnet{background:#2a7bff}
- .warnbox{background:#7a1f1f;border:5px solid #a84a4a;padding:10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.9em}
- .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r);text-align:center;background:#9e4f10;border:5px solid #c9793a;line-height:1.35}
+ .warnbox{background:#7a1f1f;border:var(--bw) solid #a84a4a;padding:10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.9em}
+ .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r);text-align:center;background:#9e4f10;border:var(--bw) solid #c9793a;line-height:1.35}
  .now b{font-size:1.25em} .now.dcnet{background:#1c4f9e;border-color:#5a86cf}
  .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r);font-size:1.1em;font-weight:600;letter-spacing:.02em}
- .dcnow-b{background:rgba(232,118,28,.82);border:5px solid rgba(246,178,122,.82)} .dcnet-b{background:rgba(28,111,232,.82);border:5px solid rgba(128,177,246,.82)}
+ .dcnow-b{background:rgba(232,118,28,.82);border:var(--bw) solid rgba(246,178,122,.82)} .dcnet-b{background:rgba(28,111,232,.82);border:var(--bw) solid rgba(128,177,246,.82)}
  .pill:active{filter:brightness(1.1)}
- .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:rgba(42,42,42,.82);border:3px solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
- .wide{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 20px;border-radius:var(--r);background:var(--card);border:5px solid #3a3a3a;color:#eee;font-size:1em;text-align:left}
+ .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
+ .wide{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 20px;border-radius:var(--r);background:var(--card);border:var(--bw) solid #3a3a3a;color:#eee;font-size:1em;text-align:left}
  .wide .arrow{margin-left:8px} .wide.open .arrow{transform:rotate(90deg)}
  .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 0}
  .cog{position:absolute;right:0;top:50%;transform:translateY(-50%);padding:6px;background:transparent;color:#3a3a3a;line-height:0}
@@ -520,12 +546,12 @@ PAGE = u"""<!doctype html>
  .srow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line);margin:0}
  .srow:first-child{border-top:0} .srow .sub{display:block;margin-top:2px}
  .switch{position:relative;flex:none;width:104px;height:40px;padding:0;border-radius:var(--r);font-size:.8em;font-weight:bold;
-         background:rgba(232,118,28,.82);border:5px solid rgba(246,178,122,.82);transition:background .2s,border-color .2s}
- .switch .knob{position:absolute;top:3px;left:67px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
- .switch .lbl{position:absolute;top:0;bottom:0;left:11px;line-height:30px}
- .switch.dcnet{background:rgba(28,111,232,.82);border-color:rgba(128,177,246,.82)} .switch.dcnet .knob{left:3px} .switch.dcnet .lbl{left:auto;right:12px}
- .cbox{-webkit-appearance:none;appearance:none;flex:none;display:inline-block;width:26px;height:26px;margin:0;padding:0;border-radius:7px;
-       border:2px solid #777;background:transparent center/18px no-repeat;vertical-align:middle;cursor:pointer}
+         background:rgba(232,118,28,.82);border:var(--bw) solid rgba(246,178,122,.82);transition:background .2s,border-color .2s}
+ .switch .knob{position:absolute;top:4px;left:68px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+ .switch .lbl{position:absolute;top:0;bottom:0;left:11px;line-height:32px}
+ .switch.dcnet{background:rgba(28,111,232,.82);border-color:rgba(128,177,246,.82)} .switch.dcnet .knob{left:4px} .switch.dcnet .lbl{left:auto;right:12px}
+ .cbox{-webkit-appearance:none;appearance:none;flex:none;display:inline-block;width:30px;height:30px;margin:0;padding:0;border-radius:8px;
+       border:var(--bw) solid #777;background:transparent center/18px no-repeat;vertical-align:middle;cursor:pointer}
  .cbox.on,.cbox:checked{background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")}
  .cbox.on.dcnow,.cbox.dcnow:checked{background-color:var(--dcnow);border-color:var(--dcnow)}
  .cbox.on.dcnet,.cbox.dcnet:checked{background-color:var(--dcnet);border-color:var(--dcnet)}
@@ -539,28 +565,28 @@ PAGE = u"""<!doctype html>
  .ledtab td.c{width:1%;padding:8px 4px;text-align:center}
  .tabs{display:flex;gap:8px;padding:10px 0 4px} .tabs button{flex:1;padding:7px 4px;font-size:.85em}
  .tabs .sel.dcnow{background:rgba(232,118,28,.82);border-color:rgba(246,178,122,.82)} .tabs .sel.dcnet{background:rgba(28,111,232,.82);border-color:rgba(128,177,246,.82)}
- .chip{display:inline-block;height:30px;padding:0 4px;border-radius:7px;border:2px solid #555;background:transparent;color:#ccc;font-size:.72em;line-height:1.1;vertical-align:middle}
+ .chip{display:inline-block;height:34px;padding:0 4px;border-radius:7px;border:var(--bw) solid #555;background:transparent;color:#ccc;font-size:.72em;line-height:1.1;vertical-align:middle}
  .fx{width:74px} .fx small{display:block;color:#888;font-size:.9em} .lvl{width:52px;color:#777}
- .ledtab td.name{padding-left:0} .ledtab td.name .cbox{margin-right:8px;width:24px;height:24px;background-size:16px}
+ .ledtab td.name{padding-left:0} .ledtab td.name .cbox{margin-right:8px}
  .ledtab tr.grp td{border-top:0;padding:14px 0 4px;color:var(--muted);font-size:.72em;text-transform:uppercase;letter-spacing:.08em}
  .ledtab tr.dis td:not(.name),.ledtab tr.dis .lbl-t{opacity:.35}
  .secrow{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
- .secrow input[type=number]{width:58px;padding:5px 6px;border-radius:8px;border:2px solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.85em}
+ .secrow input[type=number]{width:54px;padding:5px 6px;border-radius:8px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.85em}
  .lvl.on.dcnow{background:var(--dcnow);border-color:var(--dcnow);color:#fff} .lvl.on.dcnet{background:var(--dcnet);border-color:var(--dcnet);color:#fff}
  .in{position:relative}
- .pop{display:none;position:absolute;z-index:20;width:270px;padding:12px 16px;border-radius:var(--r);background:#262626;box-shadow:0 6px 24px rgba(0,0,0,.6)}
+ .pop{display:none;position:absolute;z-index:20;width:290px;padding:12px 16px;border-radius:var(--r);background:#262626;box-shadow:0 6px 24px rgba(0,0,0,.6)}
  .pop.open{display:block} .pop .t{font-size:.85em;color:#ccc;margin-bottom:8px}
  .pop .range{padding:6px 0 10px} .pop .bar{margin:0;justify-content:space-between}
  .opts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px} .opts button{padding:6px 12px;font-size:.82em}
- .opts .sel.dcnow{background:var(--dcnow);border-color:var(--dcnow-l)} .opts .sel.dcnet{background:var(--dcnet);border-color:var(--dcnet-l)}
+ .opts .sel.dcnow,.secrow .sel.dcnow{background:var(--dcnow);border-color:var(--dcnow-l)} .opts .sel.dcnet,.secrow .sel.dcnet{background:var(--dcnet);border-color:var(--dcnet-l)}
  .opts button:disabled{opacity:.35;cursor:default}
  .th-dcnow{color:var(--dcnow-l)!important} .th-dcnet{color:var(--dcnet-l)!important}
- input[type=color]{-webkit-appearance:none;appearance:none;width:30px;height:30px;padding:0;border:2px solid #555;border-radius:7px;background:none;vertical-align:middle;cursor:pointer}
+ input[type=color]{-webkit-appearance:none;appearance:none;width:34px;height:34px;padding:0;border:var(--bw) solid #555;border-radius:7px;background:none;vertical-align:middle;cursor:pointer}
  input[type=color]::-webkit-color-swatch-wrapper{padding:0} input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
  input[type=color]::-moz-color-swatch{border:0;border-radius:4px}
  .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range > span:first-child{white-space:nowrap} .range input{flex:1;min-width:60px;accent-color:var(--dcnow)}
  .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
- #log{background:#0a0a0a;border:1px solid var(--line);border-radius:12px;padding:8px;font-size:11px;line-height:1.45;
+ #log{background:#0a0a0a;border:var(--bw) solid var(--line);border-radius:12px;padding:8px;font-size:11px;line-height:1.45;
       height:55vh;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:12px}
  #log .dtmf{color:#6f6;font-weight:bold} #log .route{color:#8bf} #log .web{color:#e0b400}
  #log .modem{color:#aaa} #log .dim{color:#555} #log .err{color:#f66}
@@ -591,7 +617,7 @@ millisecond timing. Turn recording on, then dial.</div>
 <div class="bar" style="margin-top:6px"><form method="post" action="/debug"><button class="pill-s" id="debug-b">Recording</button></form>
 <span id="log-tools" style="display:none"><form method="post" action="/clearlog" style="display:inline"><button class="pill-s">Clear</button></form>
 <a class="pill-s" href="/dtmf" target="_blank" style="text-decoration:none">Open as text</a>
-<label class="sub" style="margin-left:6px"><input type="checkbox" class="cbox dcnow" id="follow" checked style="width:20px;height:20px;background-size:14px"> Follow</label></span></div>
+<label class="sub" style="margin-left:6px"><input type="checkbox" class="cbox dcnow" id="follow" checked> Follow</label></span></div>
 <pre id="log" style="display:none"></pre>
 </div>
 
@@ -834,8 +860,17 @@ class Handler(BaseHTTPRequestHandler):
     def send(self, body, ctype):
         if not isinstance(body, bytes):
             body = body.encode("utf-8")
+        gz = len(body) > 2000 and "gzip" in (self.headers.get("Accept-Encoding") or "")
+        if gz:
+            buf = io.BytesIO()
+            with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=5) as z:
+                z.write(body)
+            body = buf.getvalue()
         self.send_response(200)
         self.send_header("Content-Type", ctype)
+        if gz:
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Vary", "Accept-Encoding")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -875,12 +910,20 @@ class Handler(BaseHTTPRequestHandler):
                                   "states": LED_STATES,
                                   "effects": EFFECTS, "count": led_count(),
                                   "installed": os.path.exists(LED_ENABLED)}), "application/json")
-        elif self.path == "/dtmf":
+        elif self.path.split("?")[0] == "/dtmf":
             try:
                 with open(DTMF_LOG, "rb") as f:
+                    f.seek(0, 2)
+                    size = f.tell()
+                    full = "all" in self.path.split("?", 1)[-1] if "?" in self.path else False
+                    start = 0 if full or size <= TEXT_TAIL else size - TEXT_TAIL
+                    f.seek(start)
                     body = f.read()
+                if start:
+                    body = body[body.find(b"\n") + 1:]
+                    body = (b"(Newest %d KB of %d KB. Full log: /dtmf?all)\n\n" % (len(body) // 1000, size // 1000)) + body
             except IOError:
-                body = b"No DTMF log yet. Enable the debug log and dial.\n"
+                body = b"No debug log yet. Switch on Recording and dial.\n"
             self.send(body, "text/plain; charset=utf-8")
         else:
             self.send(PAGE, "text/html; charset=utf-8")
