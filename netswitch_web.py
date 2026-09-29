@@ -314,7 +314,7 @@ def checker():
 
 # DreamPi states (as returned by dreampi_state) in the order the settings show them
 # LED messages, highest priority first, with category and default look.
-# Errors always win over information. The DreamPi ones come from
+# Errors always have higher priority than information. The DreamPi ones come from
 # dreampi_state(); the network ones from the checker (NET_STATE).
 LED_STATES = [
     # key, label, category, colour, effect, speed, enabled
@@ -662,7 +662,7 @@ millisecond timing. Turn recording on, then dial.</div>
  <table class="ledtab"><thead><tr><th>Message</th><th>colour</th><th>effect</th><th>level</th></tr></thead><tbody id="led-rows"></tbody></table>
 </div>
 <div class="bar" style="margin-top:0"><button class="pill-s" id="led-reset" type="button">Reset LED settings to defaults</button></div>
-<div class="note">The tabs choose which selected network the table is for. Tick a message to use it; the LED is off when no ticked message applies. Errors always win over information. Effect: tap to pick solid, blink, breathe, RGB or (with a strip) an animation, its speed, and with a strip which LEDs it uses (later messages in the list draw underneath earlier ones). Level: its own brightness; grey means the global brightness above. The status dot on the main page previews the most important message.</div>
+<div class="note">The tabs choose which selected network the table is for. Tick a message to use it; the LED is off when no ticked message applies. Errors always have higher priority than information. Effect: tap to pick solid, blink, breathe, RGB or (with a strip) an animation, its speed, and with a strip which LEDs it uses (later messages in the list draw underneath earlier ones). Level: its own brightness; grey means the global brightness above. The status dot on the main page previews the most important message.</div>
 <div id="fx-pop" class="pop"><div class="t" id="fx-t"></div>
  <div class="opts" id="fx-opts"></div>
  <div class="opts" id="fx-speed" style="align-items:center"><span class="sub" style="margin-right:4px">Speed</span><button class="pill-s" type="button" data-speed="slow">Slow</button><button class="pill-s" type="button" data-speed="fast">Fast</button></div>

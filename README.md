@@ -125,7 +125,7 @@ internet=Connected (18 ms)
 
 ## LED messages
 
-The LEDs show messages about DreamPi and the network. **Errors always win over information**, and within each group the list is in order of importance (top wins):
+The LEDs show messages about DreamPi and the network. **Errors always have higher priority than information**, and within each group the list is in order of importance (highest priority first):
 
 | Message | Group | Default look | On by default |
 |---|---|---|---|
