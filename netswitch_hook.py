@@ -170,11 +170,23 @@ def _select_dcnet(on):
 
 
 def _special(raw_string):
-    """Which special number was dialed, matched on the last seven digits.
-    DreamPi often hears an extra leading digit (e.g. 13333333), and ISP
-    settings may add a prefix or area code, so exact matching is unreliable."""
+    """Which special number was dialed, matched on a run of the number's own
+    digit at the end of what was heard, one shorter than the number itself,
+    rather than an exact tail match. DreamPi often hears an extra leading
+    digit (e.g. 13333333), and ISP settings may add a prefix or area code,
+    so exact matching was already unreliable - and since each number is just
+    one digit repeated, losing a single repeat to a DTMF decode hiccup still
+    leaves which number was meant unambiguous. Confirmed on real hardware:
+    a capture of 3333333 with proper 2-second finalization (not a hang-up
+    cut short) still only reported six of the seven "3"s."""
     for number in (NUM_OPENMENU, NUM_DCNOW, NUM_DCNET):
-        if raw_string.endswith(number):
+        digit = number[0]
+        run = 0
+        for ch in reversed(raw_string):
+            if ch != digit:
+                break
+            run += 1
+        if run >= len(number) - 1:
             return number
     return None
 

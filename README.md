@@ -73,7 +73,7 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 | `333-3333` | Selects DCNET / FLYCAST and connects to it. Can be set in the Dreamcast ISP config to always connect to DCNET. |
 | Any other number | Connects to the currently selected network. Set your Dreamcast ISP config to any 7-digit number to use this feature. |
 
-- The numbers are matched on their last seven digits, so a leading `1` (long-distance prefix), an area code or an outside-line digit doesn't matter. DreamPi often hears an extra leading `1`, for example `13333333`.
+- The numbers are matched on a run of six or more of their own digit at the end of what was heard, not an exact seven-digit tail: a leading `1` (long-distance prefix), an area code or an outside-line digit doesn't matter (DreamPi often hears an extra leading `1`, for example `13333333`), and since each number is just one digit repeated, losing a single repeat to a DTMF decode hiccup still leaves which number was meant unambiguous.
 - openMenu always dials `111-1111`, so it always gets DCNow! (DCNET wouldn't accept openMenu's login).
 - Netlink/XBAND dial codes and DreamPi's built-in `*69` prefix ("this call to DCNET") keep working as before.
 
