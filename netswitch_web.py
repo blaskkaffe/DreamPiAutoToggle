@@ -808,7 +808,8 @@ PAGE = u"""<!doctype html>
  .now .row.main .k{display:none} .now .row.main .v{flex:none}
  .now .row .k{color:rgba(255,255,255,.65);width:68px} .now .row .v{min-width:0;display:flex;align-items:baseline} .now .row .v > .dot{flex:none} .now .row .v > span:last-child{min-width:0} .now .sub{color:rgba(255,255,255,.65)}
  .now .arrow{color:rgba(255,255,255,.7);font-size:.9em}
- .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .now .row.hang{justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;text-align:center}
+ .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .now .row.hang{justify-content:center;padding:12px 0 2px}
+ .now .row.hang form{width:100%} .now .row.hang .pill-s{display:block;width:100%;padding:9px 12px;font-size:1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .now .row.hang .pill-s{background:rgba(160,30,30,.85);border-color:rgba(230,110,110,.85)}
  .now .row.hang .pill-s.arm{background:#d33;border-color:#f99}
  .nw{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sub.blk{display:block}
@@ -892,8 +893,8 @@ PAGE = u"""<!doctype html>
  <div class="row more"><span class="k">Modem</span><span class="v"><span><span class="nw" id="m-text">...</span><span class="sub blk" id="m-since"></span></span></span></div>
  <div class="row more"><span class="k">Internet</span><span class="v"><span class="dot" id="i-dot"></span><span id="i-text">...</span></span></div>
  <div class="row more"><span class="k">Pi</span><span class="v"><span class="dot" id="p-dot"></span><span id="p-text">...</span></span></div>
- <div class="row more hang"><form method="post" action="/hangup" id="hang-f"><button class="pill-s" id="hang-b" type="submit">Hang up</button></form>
-  <span class="sub" id="hang-t">Ends the current call and gets the modem ready again</span></div>
+ <div class="row more hang"><form method="post" action="/hangup" id="hang-f"><button class="pill-s" id="hang-b" type="submit"
+  title="Ends the current call and gets the modem ready again">Hang up</button></form></div>
 </div>
 <form method="post" action="/dcnow"><button class="pill dcnow-b">DCNow! / DreamPi</button></form>
 <form method="post" action="/dcnet"><button class="pill dcnet-b">DCNET / FLYCAST</button></form>
@@ -981,9 +982,10 @@ function lookDot(el,look){if(!look){el.className="dot";el.style.background="#333
  el.style.animation=f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none"}
 var favNet="dcnow";
 function render(d){
- if(d.hangup){var hb=$("hang-b");if(d.hangup.busy){hb.disabled=true;hb.textContent="Hanging up...";hb.className="pill-s"}
-  else if(hb.disabled){hb.disabled=false;hb.textContent="Hang up"}
-  $("hang-t").textContent=d.hangup.text?d.hangup.text.charAt(0).toUpperCase()+d.hangup.text.slice(1):"Ends the current call and gets the modem ready again"}
+ if(d.hangup){var hb=$("hang-b");
+  if(d.hangup.busy){hb.disabled=true;hb.className="pill-s";
+   hb.textContent=d.hangup.text?d.hangup.text.charAt(0).toUpperCase()+d.hangup.text.slice(1):"Hanging up..."}
+  else if(hb.disabled){hb.disabled=false;hb.textContent="Hang up"}}
  $("warnings").innerHTML=d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("");
  lookDot($("d-dot"),d.dreampi.look); $("d-text").textContent=d.dreampi.text;
  $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now).replace(/[()]/g,"");
