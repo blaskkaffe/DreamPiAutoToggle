@@ -738,9 +738,9 @@ PAGE = u"""<!doctype html>
  .now .row{font-size:.62em;line-height:1.35;padding:9px 0;border-top:1px solid rgba(255,255,255,.18);text-align:left}
  .now .row.main{justify-content:center;border-top:0;padding:8px 0 2px}
  .now .row.main .k{display:none} .now .row.main .v{flex:none}
- .now .row .k{color:rgba(255,255,255,.65)} .now .sub{color:rgba(255,255,255,.65)}
+ .now .row .k{color:rgba(255,255,255,.65);width:68px} .now .row .v{min-width:0;display:flex;align-items:baseline} .now .row .v > .dot{flex:none} .now .row .v > span:last-child{min-width:0} .now .sub{color:rgba(255,255,255,.65)}
  .now .arrow{color:rgba(255,255,255,.7);font-size:.9em}
- .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .nw{white-space:nowrap}
+ .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .nw{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sub.blk{display:block}
  .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.18)}
  .now.open .row.main .k{display:block} .now.open .row.main .v{flex:1}
  .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r);font-size:1.1em;font-weight:600;letter-spacing:.02em}
@@ -805,7 +805,8 @@ PAGE = u"""<!doctype html>
  #dcbg{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100lvh;z-index:-1;overflow:hidden;pointer-events:none;
        background:linear-gradient(to bottom,#9cc3dc,#4d639c);transform:translateZ(0)}
  body.dcbg #dcbg{display:block} body.dcbg{background:transparent} html.dcbg{background:#4d639c}
- body.dcbg{--card:rgba(20,20,20,.78)} body.dcbg .rows,body.dcbg .wide{background:rgba(20,20,20,.78)}
+ body.dcbg{--card:rgba(20,20,20,.78)} body.dcbg .wide{background:rgba(20,20,20,.78)}
+ body.dcbg .now{background:rgba(158,79,16,.88)} body.dcbg .now.dcnet{background:rgba(28,79,158,.88)}
  body.dcbg h1{text-shadow:0 1px 4px rgba(0,0,0,.6)}
  body.settings-open > :not(#settings):not(#dcbg){visibility:hidden}
  body.dcbg #settings{background:transparent}
@@ -817,7 +818,7 @@ PAGE = u"""<!doctype html>
 <div class="now rows" id="net" title="Show or hide details">
  <div class="nlabel">Selected network:</div><b id="net-name">...</b>
  <div class="row main"><span class="k">DreamPi</span><span class="v"><span class="dot" id="d-dot"></span><span id="d-text">...</span></span><span class="arrow">&#9656;</span></div>
- <div class="row more"><span class="k">Modem</span><span class="v"><span id="m-text">...</span> <span class="sub" id="m-since"></span></span></div>
+ <div class="row more"><span class="k">Modem</span><span class="v"><span><span class="nw" id="m-text">...</span><span class="sub blk" id="m-since"></span></span></span></div>
  <div class="row more"><span class="k">Internet</span><span class="v"><span class="dot" id="i-dot"></span><span id="i-text">...</span></span></div>
  <div class="row more"><span class="k">Pi</span><span class="v"><span class="dot" id="p-dot"></span><span id="p-text">...</span></span></div>
 </div>
@@ -909,10 +910,10 @@ var favNet="dcnow";
 function render(d){
  $("warnings").innerHTML=d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("");
  lookDot($("d-dot"),d.dreampi.look); $("d-text").textContent=d.dreampi.text;
- $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now);
+ $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now).replace(/[()]/g,"");
  dot($("i-dot"),d.internet.state); $("i-text").textContent=d.internet.text;
  dot($("p-dot"),d.pi.state);
- $("p-text").innerHTML=d.pi.line1?'<span class="nw">'+esc(d.pi.line1)+'</span><br><span class="sub">'+esc(d.pi.line2)+
+ $("p-text").innerHTML=d.pi.line1?'<span class="nw">'+esc(d.pi.line1)+'</span><span class="sub blk">'+esc(d.pi.line2)+
   (d.pi.warn?'<br>'+esc(d.pi.warn):'')+'</span>':esc(d.pi.text||"...");
  $("net").className="now rows "+d.network+($("net").classList.contains("open")?" open":"");
  if(d.network!=favNet){favNet=d.network;$("fav").href="/static/favicon-"+d.network+".png";$("touch").href="/static/touch-"+d.network+".png"} $("net-name").textContent=d.network=="dcnet"?"DCNET":"DCNow!";
