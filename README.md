@@ -83,7 +83,7 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 
 - **Network box:** the selected network (orange for DCNow!, blue for DCNET) with DreamPi's status and its dot underneath, for example "Ready for calls". Tap the box (the small arrow) to show all status rows:
   - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DCNow! or DCNET, call ended.
-  - **Pi:** CPU use, RAM, temperature and uptime, plus the Pi's own power and heat warnings (under-voltage, throttling) now and since boot. A weak power supply is a common cause of an unstable Pi, so a red warning box appears at the top of the page while the Pi is short of power or overheating.
+  - **Pi:** CPU use, RAM and temperature on one line (for example "CPU 3%, RAM 128/923MB, 43°C"), with the uptime and the Pi's IP address underneath, plus the Pi's own power and heat warnings (under-voltage, throttling) now and since boot. A weak power supply is a common cause of an unstable Pi, so a red warning box appears at the top of the page while the Pi is short of power or overheating.
   - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online`, and whether it's connected by Ethernet or Wi-Fi. A red warning box appears at the top of the page when the internet is down.
 - The **DCNow! / DreamPi** and **DCNET / FLYCAST** buttons change the selected network.
 - **Debug log:** hidden unless switched on in the settings (see below).
@@ -126,7 +126,7 @@ autoreset=off
 dreampi=Ready for calls
 modem=Dial tone on, waiting for a call
 internet=Connected via Ethernet (18 ms)
-pi=CPU 7%, RAM 142 of 926 MB, 48°C, up 2 h 5 min
+pi=CPU 7%, RAM 142/926MB, 48°C. Uptime 2 h 5 min, IP: 192.168.1.55.
 ```
 
 ## LED messages

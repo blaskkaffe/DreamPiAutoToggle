@@ -362,6 +362,21 @@ def _duration(seconds):
     return "%d h %d min" % (h, m % 60) if h < 24 else "%d d %d h" % (h // 24, h % 24)
 
 
+def lan_ip():
+    """The Pi's address on the home network (the one its default route
+    uses; no packet is sent), or None."""
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.connect(("192.0.2.1", 9))   # documentation address, never contacted
+            ip = sock.getsockname()[0]
+        finally:
+            sock.close()
+        return None if ip.startswith("0.") else ip
+    except (socket.error, OSError):
+        return None
+
+
 def pi_health():
     """CPU, RAM, temperature, uptime and the firmware's power/heat flags.
     state: ok / warn (something happened since boot, or warm) / bad (now)."""
@@ -375,11 +390,14 @@ def pi_health():
     if cpu is not None:
         parts.append("CPU %d%%" % round(cpu))
     if mem:
-        parts.append("RAM %d of %d MB" % (mem[1], mem[0]))
+        parts.append("RAM %d/%dMB" % (mem[1], mem[0]))
     if temp is not None:
         parts.append("%.0f\u00b0C" % temp)
+    details = []
     if up is not None:
-        parts.append("up " + _duration(up))
+        details.append("Uptime " + _duration(up))
+    ip = lan_ip()
+    details.append("IP: " + (ip or "none"))
     now, since = [], []
     if flags is not None:
         if flags & 0x1: now.append("under-voltage")
@@ -395,12 +413,15 @@ def pi_health():
         now.append("warm")
     state = "bad" if (flags is not None and flags & 0x5) or hot else \
         "warn" if now or since or warm else "ok"
-    text = ", ".join(parts) or "Unknown"
+    line1 = ", ".join(parts) or "Unknown"
+    line2 = ", ".join(details)
+    warn = []
     if now:
-        text += ". Now: " + ", ".join(now)
+        warn.append("Now: " + ", ".join(now))
     if since:
-        text += ". Since boot: " + ", ".join(since)
-    return {"state": state, "text": text, "cpu": cpu, "ram": mem, "temp": temp, "uptime": up,
+        warn.append("Since boot: " + ", ".join(since))
+    text = line1 + ". " + line2 + ("." if not warn else ". " + ". ".join(warn))
+    return {"state": state, "text": text, "line1": line1, "line2": line2, "warn": ". ".join(warn), "ip": ip, "cpu": cpu, "ram": mem, "temp": temp, "uptime": up,
             "throttled": flags, "undervoltage": bool(flags is not None and flags & 0x1),
             "problem": state == "bad"}
 
@@ -679,7 +700,8 @@ def api_state():
                         "look": (active_messages(dstate, {"network": True}) or [None])[-1]},
             "modem": {"text": mtext, "since": msince},
             "internet": checks["internet"],
-            "pi": {"state": pi.get("state"), "text": pi.get("text")},
+            "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
+                   "line2": pi.get("line2"), "warn": pi.get("warn")},
             "warnings": warnings, "now": int(time.time())}
 
 
@@ -718,7 +740,7 @@ PAGE = u"""<!doctype html>
  .now .row.main .k{display:none} .now .row.main .v{flex:none}
  .now .row .k{color:rgba(255,255,255,.65)} .now .sub{color:rgba(255,255,255,.65)}
  .now .arrow{color:rgba(255,255,255,.7);font-size:.9em}
- .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)}
+ .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .nw{white-space:nowrap}
  .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.18)}
  .now.open .row.main .k{display:block} .now.open .row.main .v{flex:1}
  .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r);font-size:1.1em;font-weight:600;letter-spacing:.02em}
@@ -889,7 +911,9 @@ function render(d){
  lookDot($("d-dot"),d.dreampi.look); $("d-text").textContent=d.dreampi.text;
  $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now);
  dot($("i-dot"),d.internet.state); $("i-text").textContent=d.internet.text;
- dot($("p-dot"),d.pi.state); $("p-text").textContent=d.pi.text||"...";
+ dot($("p-dot"),d.pi.state);
+ $("p-text").innerHTML=d.pi.line1?'<span class="nw">'+esc(d.pi.line1)+'</span><br><span class="sub">'+esc(d.pi.line2)+
+  (d.pi.warn?'<br>'+esc(d.pi.warn):'')+'</span>':esc(d.pi.text||"...");
  $("net").className="now rows "+d.network+($("net").classList.contains("open")?" open":"");
  if(d.network!=favNet){favNet=d.network;$("fav").href="/static/favicon-"+d.network+".png";$("touch").href="/static/touch-"+d.network+".png"} $("net-name").textContent=d.network=="dcnet"?"DCNET":"DCNow!";
  var defName=d.default=="dcnet"?"DCNET":"DCNow!";
