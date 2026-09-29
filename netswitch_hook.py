@@ -24,9 +24,11 @@ it also logs every modem event while DreamPi listens for digits to
 No DreamPi file is modified. Written for both Python 2.7 and 3.
 """
 import logging
+import math
 import os
 import re
 import sys
+import threading
 import time
 
 BASE_DIR = "/opt/dreampi-netswitch"
@@ -162,6 +164,60 @@ def _watch_serial(modem):
         pass
 
 
+# ------------------------------------------------ "switch only" numbers (#)
+# A special number followed by # (e.g. 5550002#) only switches the network:
+# DreamPi doesn't answer (like its own *69 / *70 codes), and the dial tone is
+# replaced by a busy tone for a few seconds so the Dreamcast gives up at once
+# instead of waiting for an answer.
+BUSY_SECONDS = 4.0
+_busy_tone = [None]
+_busy_until = [0.0]
+
+
+def _make_busy_tone():
+    """North American busy tone (480 + 620 Hz, 0.5 s on / 0.5 s off) as
+    8-bit unsigned 8 kHz PCM, the format DreamPi streams its dial tone in."""
+    if _busy_tone[0] is None:
+        rate, out = 8000, bytearray()
+        for i in range(rate):          # one second: 0.5 s tone, 0.5 s silence
+            t = float(i) / rate
+            v = 0.0 if i >= rate // 2 else \
+                0.5 * (math.sin(2 * math.pi * 480 * t) + math.sin(2 * math.pi * 620 * t))
+            out.append(max(0, min(255, int(round(128 + 90 * v)))))
+        _busy_tone[0] = bytes(out)
+    return _busy_tone[0]
+
+
+def _play_busy(modem):
+    """Swap DreamPi's dial tone buffer for a busy tone, then swap it back.
+    modem.update() keeps streaming whatever buffer is set, so nothing else
+    in DreamPi changes."""
+    try:
+        busy = _make_busy_tone()
+        current = getattr(modem, "_dial_tone_wav", None)
+        if not current or not getattr(modem, "_sending_tone", False):
+            return False
+        if current is not busy:            # keep the real dial tone, even when
+            modem._netswitch_dial = current    # two switches come in quick succession
+        dial = getattr(modem, "_netswitch_dial", None)
+        if not dial:
+            return False
+        modem._dial_tone_wav = busy
+        modem._dial_tone_counter = 0
+        _busy_until[0] = time.time() + BUSY_SECONDS
+
+        def restore():
+            if time.time() >= _busy_until[0] - 0.05 and getattr(modem, "_dial_tone_wav", None) is busy:
+                modem._dial_tone_wav = dial
+                modem._dial_tone_counter = 0
+        timer = threading.Timer(BUSY_SECONDS, restore)
+        timer.daemon = True
+        timer.start()
+        return True
+    except Exception:
+        return False
+
+
 def _select_dcnet(on):
     if on:
         open(FLAG, "w").close()
@@ -189,6 +245,26 @@ def _patch(module):
         return
 
     def check_number(self, raw_string):
+        # "Switch only": special number + #  ->  select, don't answer, busy tone
+        if raw_string and raw_string.endswith("#") and not raw_string.startswith("#"):
+            only = _special(raw_string.rstrip("#"))
+            if only:
+                try:
+                    if only == NUM_OPENMENU:
+                        dcnet = os.path.exists(DEFAULT_DCNET)
+                    else:
+                        dcnet = only == NUM_DCNET
+                    _select_dcnet(dcnet)
+                    net = "DCNET" if dcnet else "DCNow!"
+                    busy = _play_busy(getattr(self, "modem", None))
+                    _log(self, "%s dialed: %s selected, not answering%s"
+                         % (raw_string, net, ", busy tone sent" if busy else ""))
+                    _dtmf_log("add-on: number heard %r: switch only, %s selected" % (raw_string, net))
+                    _write_modem("Switched to %s by %s, call not answered" % (net, raw_string))
+                except Exception as e:
+                    _log(self, "could not switch network: %s" % e)
+                self.mode = "idle"
+                return {"client": "idle", "dial_string": raw_string}
         special = _special(raw_string)
         if raw_string:
             _dtmf_log("add-on: number heard %r (matches %s)" % (raw_string, special or "no special number"))

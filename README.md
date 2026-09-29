@@ -72,6 +72,11 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 | `555-0001` | Selects DCNow! / DreamPi and connects to it. Can be set in the Dreamcast ISP config to always connect to DCNow! |
 | `555-0002` | Selects DCNET / FLYCAST and connects to it. Can be set in the Dreamcast ISP config to always connect to DCNET. |
 | Any other number | Connects to the currently selected network. Set your Dreamcast ISP config to any 7-digit number to use this feature. |
+| `555-0001#` | Switch only: selects DCNow! / DreamPi without connecting. |
+| `555-0002#` | Switch only: selects DCNET / FLYCAST without connecting. |
+| `111-1111#` | Switch only: resets the selection to the **default network** without connecting. |
+
+A number ending in `#` is a switch-only call. DreamPi doesn't answer it: the add-on changes the selection and plays a busy tone for 4 seconds, so the Dreamcast gives up straight away instead of waiting for an answer. After that the normal dial tone comes back and the next call goes to the newly selected network. Use it to change networks from the Dreamcast without opening the web page.
 
 - The numbers are matched on their last seven digits, so a leading `1` (long-distance prefix), an area code or an outside-line digit doesn't matter. DreamPi often hears an extra leading `1`, for example `15550002`.
 - openMenu always dials `111-1111`, so it always gets DCNow! (DCNET wouldn't accept openMenu's login).
