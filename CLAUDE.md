@@ -25,7 +25,7 @@ User-facing text (web page, README, log lines) spells the networks **DCNow!** an
 `netswitch_led.py` (Python 3, service `dreampi-netswitch-led` running as root, installed with `install.sh --led` (1 LED) or `--leds=N` (1-300, stored in `/opt/dreampi-netswitch/led_count`), remembered via `led_enabled`, removed with `--no-led`) drives WS2812s on **GPIO18** (PWM0, pin 12) with no driver or package. It maps the GPIO, clock-manager, PWM and DMA register blocks from `/dev/mem` (peripheral base from `/proc/device-tree/soc/ranges`; 32-bit accesses via `ctypes.c_uint32.from_buffer`), sets GPIO18 to ALT5 and clocks PWM from the crystal (19.2 MHz / 8 = 2.4 MHz; Pi 4: 54 MHz / 22), serialiser mode, 3 PWM bits per LED bit (`100` = 0, `110` = 1), GRB, MSB first (`_TABLE` maps a byte to 3 bytes).
 - 1 LED (`FifoPixel`): 3 words written straight into the FIFO; the pin idles low when it empties (`RPTL1` off), which latches.
 - 2+ LEDs (`DmaStrip`): like rpi_ws281x. GPU memory from the VideoCore mailbox (`/dev/vcio`, `_IOWR(100,0,char*)`; tags 0x3000C alloc (flags 0x4 on Pi 2+, 0xC on Pi 1), 0x3000D lock -> bus address, 0x3000E/F unlock/release on exit), mapped through `/dev/mem` at `bus & ~0xC0000000`. Control block at offset 0 (TI = NO_WIDE_BURSTS|WAIT_RESP|DEST_DREQ|PERMAP 5|SRC_INC, dest 0x7E20C018), data after it: the encoded stream byte-swapped per 32-bit word plus 24 zero words (reset). DMA channel 10, PWM DMAC = ENAB|PANIC 7|DREQ 3. Each frame: wait for the channel, write data, reset channel, load CONBLK_AD, start.
-- Only tested against fake memory/mailbox here; not yet on hardware.
+- Single LED verified on hardware; the DMA strip path only against fake memory/mailbox.
 - Loop: 50 fps; re-reads `web.active_messages()` every 0.25 s and composes them with `render()`. `effect_frame(effect, speed, colour, t, n)` gives floats per LED; `to_bytes()` applies brightness and keeps lit channels at >= 1. Effects: solid, blink, breathe, rgb (10 s slow / 4 s fast) for any count; rainbow, scanner, comet, chase, twinkle for strips (on 1 LED they fall back to rgb/breathe/blink-like output). Periods per effect in `PERIODS` (slow, fast).
 - Older versions used SPI on GPIO10 and added `dtparam=spi=on  # added by dreampi-netswitch` (recorded in `spi_added`); the installer and uninstaller remove only that line.
 
@@ -55,9 +55,10 @@ Download the current `netlink.py`, place it at `/home/pi/dreampi/netlink.py`, st
 ## Verified on hardware
 - The hook loads and patches under DreamPi's real Python 2.7.
 - A real DCNet call end to end via 333-3333.
+- A single NeoPixel on GPIO18 (PWM FIFO path, `FifoPixel`).
 
 ## Not yet verified
-- The GPIO18 PWM NeoPixel driver on real hardware, single LED (FIFO) and strip (DMA); both only tested against fake memory.
+- The strip path (`DmaStrip`, PWM + DMA, `--leds=N` with N > 1); only tested against fake memory and mailbox.
 - Whether port 80 is free on every DreamPi image.
 
 ## Ideas for later

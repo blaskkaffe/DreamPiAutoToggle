@@ -13,7 +13,7 @@ What you get:
 - An optional animated Dreamcast-style background for the page.
 - A debug log for tracking down calls that go wrong.
 
-**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `333-3333` works end to end. The LED driver hasn't been tried on real LEDs yet; feedback is welcome.
+**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `333-3333` works end to end. A single NeoPixel on GPIO18 works too. Several LEDs or a strip haven't been tried on real hardware yet; feedback is welcome.
 
 ## Install
 
