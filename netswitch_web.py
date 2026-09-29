@@ -742,7 +742,7 @@ function buildLed(){
  ["dcnow","dcnet"].forEach(function(n){$("tab-"+n).className="pill-s "+n+(n==ledNet?" sel":"")});
  var grp="";
  $("led-rows").innerHTML=ledStates.map(function(s){var st=s[0],h="";
-  if(s[2]!=grp){grp=s[2];h='<tr class="grp"><td colspan="4">'+(grp=="error"?"Errors (always win)":"Information")+'</td></tr>'}
+  if(s[2]!=grp){grp=s[2];h='<tr class="grp"><td colspan="4">'+(grp=="error"?"Errors":"Information")+'</td></tr>'}
   return h+'<tr id="r-'+st+'"><td class="name"><input type="checkbox" class="cbox '+ledNet+'" id="e-'+st+'" title="Show this message" aria-label="Show '+esc(s[1])+'"><span class="lbl-t">'+esc(s[1])+'</span></td>'+
   '<td class="c"><input type="color" id="c-'+st+'" data-state="'+st+'" aria-label="Colour"></td>'+
   '<td class="c"><button type="button" class="chip fx" id="f-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'"></button></td>'+
