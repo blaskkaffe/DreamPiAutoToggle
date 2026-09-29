@@ -184,7 +184,7 @@ The debug log is for tracking down calls that go wrong, such as misheard numbers
 - every message DreamPi logs (heard, mode, answering, carrier speed, hang-up),
 - the add-on's routing decisions and your button presses.
 
-**Clear** empties it, and pressing **Recording** again stops recording. **Open as text** shows the newest 256 KB as plain text (`http://dreampi.local/dtmf`); `http://dreampi.local/dtmf?all` shows everything. While recording, the log keeps its newest 500 KB to 1 MB, so it can't fill the SD card or get slow to open.
+**Clear** empties it, and pressing **Recording** again stops recording. **Newest 256 KB** and **Full log** open the log as plain text in a new tab (`http://dreampi.local/dtmf` and `http://dreampi.local/dtmf?all`). While recording, the log keeps its newest 500 KB to 1 MB, so it can't fill the SD card or get slow to open.
 
 ## Checking it works
 

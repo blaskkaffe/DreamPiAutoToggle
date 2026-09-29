@@ -616,8 +616,9 @@ PAGE = u"""<!doctype html>
 millisecond timing. Turn recording on, then dial.</div>
 <div class="bar" style="margin-top:6px"><form method="post" action="/debug"><button class="pill-s" id="debug-b">Recording</button></form>
 <span id="log-tools" style="display:none"><form method="post" action="/clearlog" style="display:inline"><button class="pill-s">Clear</button></form>
-<a class="pill-s" href="/dtmf" target="_blank" style="text-decoration:none">Open as text</a>
-<label class="sub" style="margin-left:6px"><input type="checkbox" class="cbox dcnow" id="follow" checked> Follow</label></span></div>
+<a class="pill-s" href="/dtmf" target="_blank" style="text-decoration:none">Newest 256 KB</a>
+<a class="pill-s" href="/dtmf?all" target="_blank" style="text-decoration:none">Full log</a>
+<label class="sub" style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:4px"><input type="checkbox" class="cbox dcnow" id="follow" checked>Follow</label></span></div>
 <pre id="log" style="display:none"></pre>
 </div>
 
@@ -920,8 +921,7 @@ class Handler(BaseHTTPRequestHandler):
                     f.seek(start)
                     body = f.read()
                 if start:
-                    body = body[body.find(b"\n") + 1:]
-                    body = (b"(Newest %d KB of %d KB. Full log: /dtmf?all)\n\n" % (len(body) // 1000, size // 1000)) + body
+                    body = body[body.find(b"\n") + 1:]   # start at a whole line
             except IOError:
                 body = b"No debug log yet. Switch on Recording and dial.\n"
             self.send(body, "text/plain; charset=utf-8")
