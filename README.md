@@ -10,11 +10,11 @@ What you get:
 - A live status page at `http://dreampi.local` (also over HTTPS) with buttons to pick the network.
 - Special phone numbers that switch the network straight from the Dreamcast.
 - Optional status LEDs on GPIO18: one NeoPixel, several, or a strip. They show DreamPi's status and network or internet problems, with colours, effects and LED sections per message.
-- An optional Wi-Fi setup: the Pi hosts a temporary "DreamPi WiFi Config" Wi-Fi network with a page to pick and connect to your home Wi-Fi, no keyboard or monitor needed.
+- An optional Wi-Fi setup button: tap it to switch networks, or hold it for 3 seconds and the Pi hosts a temporary "DreamPi WiFi Config" Wi-Fi network with a page to pick and connect to your home Wi-Fi, no keyboard or monitor needed.
 - An optional animated Dreamcast-style background for the page.
 - A debug log for tracking down calls that go wrong.
 
-**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `555-0002` works end to end. A single NeoPixel on GPIO18 works too. Several LEDs or a strip, and Wi-Fi setup, haven't been tried on real hardware yet; feedback is welcome.
+**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `555-0002` works end to end. A single NeoPixel on GPIO18 works too. Several LEDs or a strip, and the Wi-Fi setup button, haven't been tried on real hardware yet; feedback is welcome.
 
 ## Install
 
@@ -39,7 +39,7 @@ Options:
 - `sudo ./install.sh 8080` puts the HTTP page on another port, if port 80 is taken.
 - `sudo ./install.sh --https-port=8443` puts the HTTPS page on another port, and `--no-https` turns it off.
 - `sudo ./install.sh --led` adds one status NeoPixel, and `--leds=30` a chain or strip of 30 (see [Status NeoPixels](#status-neopixels-optional)). `--no-led` removes the LED service again.
-- `sudo ./install.sh --wifi` adds Wi-Fi setup, started from the web page's Settings (see [Wi-Fi setup](#wi-fi-setup-optional)). `--no-wifi` removes it again.
+- `sudo ./install.sh --wifi` adds the Wi-Fi setup button, enabled by default on GPIO17 (physical pin 11) (see [Wi-Fi setup button](#wi-fi-setup-button-optional)). `--no-wifi` removes it again.
 
 Options can be combined, for example `sudo ./install.sh --leds=8 --no-https`.
 
@@ -106,7 +106,7 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 - **Default network:** a switch, orange for DCNow! or blue for DCNET, that sets which network Auto reset goes back to. DCNow! unless changed.
 - **Auto reset:** when ticked, dialing `111-1111` resets the selected network to the default network. Off by default.
 - **Debug log:** when ticked, the **Debug log** bar appears at the bottom of the main page. Off by default and remembered per browser.
-- **Wi-Fi setup:** only shown when installed with `--wifi` (see [Wi-Fi setup](#wi-fi-setup-optional)). Starts or stops Wi-Fi setup, and while it's scanning or hosting, lists the networks it found right here too - tap one, enter its password if it needs one, and connect - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
+- **Wi-Fi setup:** only shown when installed with `--wifi` (see [Wi-Fi setup button](#wi-fi-setup-button-optional)). Starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too - tap one, enter its password if it needs one, and connect - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
 
 **Phone numbers:** the table above, as a reminder.
 
@@ -141,7 +141,7 @@ pi=CPU 7%, RAM 142/926MB, 48°C. Uptime 2 h 5 min, IP: 192.168.1.55.
 
 ## LED messages
 
-The LEDs show messages about DreamPi and the network. **Wi-Fi setup always outranks everything else** (see [Wi-Fi setup](#wi-fi-setup-optional)), then **errors always have higher priority than information**, and within each group the list is in order of importance (highest priority first):
+The LEDs show messages about DreamPi and the network. **Wi-Fi setup always outranks everything else** (see [Wi-Fi setup button](#wi-fi-setup-button-optional)), then **errors always have higher priority than information**, and within each group the list is in order of importance (highest priority first):
 
 | Message | Group | Default look | On by default |
 |---|---|---|---|
@@ -200,18 +200,21 @@ This starts the `dreampi-netswitch-led` service; no reboot is needed. Later upda
 
 If the LEDs stay dark, `systemctl status dreampi-netswitch-led` shows why.
 
-## Wi-Fi setup (optional)
+## Wi-Fi setup button (optional)
 
-A way to join a Wi-Fi network without a keyboard, monitor or SSH, started from the web page: tick the **Wi-Fi setup** control under Network in the settings, and the Pi:
+A momentary push button on **GPIO17 (physical pin 11)** doubles as a quick network switch and a way to join a Wi-Fi network without a keyboard, monitor or SSH. Wire it between GPIO17 and a **GND** pin:
+
+- **Tap it briefly** to switch the selected network between DCNow! and DCNET, the same as the web page's two buttons or dialing `555-0001`/`555-0002`.
+- **Hold it for 3 seconds** to start Wi-Fi setup. The Pi:
 
 1. Scans for Wi-Fi networks and hosts a temporary, unencrypted Wi-Fi network called **"DreamPi WiFi Config"**, styled like the main page.
 2. Connect a phone or PC to it and open `http://192.168.4.1` (most phones prompt for this automatically) - or, if the Pi's regular page is still reachable some other way (for example over Ethernet), open its Settings instead; the same network list appears there too (see [Settings](#settings-cogwheel)). Pick a network from the list (or enter one manually, for a hidden network), enter its password if it needs one, and tap **Connect**.
 3. The temporary network closes and the Pi tries to join the network you chose.
 4. If it gets online, the status LED (if installed) goes solid **green** for a few seconds and everything returns to normal; DreamPi keeps using this Wi-Fi network (and any others saved this way) after a reboot too. If it can't get online, the LED goes **red** for a few seconds and the Pi goes back to step 1, hosting "DreamPi WiFi Config" again so you can try another network or password.
 
-While it's scanning or hosting the setup network, a status LED shows a breathing blue light (a scanning animation instead, with a strip). The **Wi-Fi setup** control cancels it at any point and returns the Pi to its normal Wi-Fi connection.
+While it's scanning or hosting the setup network, a status LED shows a breathing blue light (a scanning animation instead, with a strip). Holding the button again, or the **Wi-Fi setup** control under Network in the settings, cancels it at any point and returns the Pi to its normal Wi-Fi connection.
 
-An earlier version of this feature used a physical GPIO button (hold 3 s for Wi-Fi setup, tap to switch networks). It's been removed: reconfiguring almost any GPIO pin for input risks fighting something else already using it, and on a DreamPi whose modem is wired through the Pi's own UART (GPIO14/15) rather than USB, it broke the modem connection outright - DreamPi hung at its own boot-time "looking for the modem" step. The web page's **Wi-Fi setup** control never touches GPIO and works exactly the same way; the DCNow!/DCNET buttons already cover the quick network switch.
+**Wiring:** no resistor needed; the Pi's internal pull-up is used, so the pin reads high normally and low while the button is held. GPIO17 was picked as the default because it has no other function on any Raspberry Pi model (earlier versions of this add-on defaulted to GPIO15, which doubles as the Pi's UART RX pin and could pick up noise from the serial console/Bluetooth if that's in use). If you'd rather use a different pin (GPIO4 also works well), edit `/opt/dreampi-netswitch/wifi_button_gpio` (a single GPIO number) after installing.
 
 **Install:** `sudo ./install.sh --wifi`. This installs `hostapd` and `dnsmasq` with `apt` if they aren't already present (needed to host the setup network) and starts the `dreampi-netswitch-wifi` service. Remove it again with `sudo ./install.sh --no-wifi`.
 
@@ -239,7 +242,7 @@ The debug log is for tracking down calls that go wrong, such as misheard numbers
   - Try the Pi's IP address instead of `dreampi.local`. Looking up `.local` names can take a few seconds on some phones and PCs, or fail now and then.
   - Wi-Fi power saving is a common cause of a Pi dropping off the network. The page service switches it off for every Wi-Fi adapter each time it starts; the setting resets on reboot, and the service switches it off again.
   - `journalctl -u dreampi-netswitch -n 50` shows whether the page service restarted or logged an error. It restarts itself within seconds if it ever stops answering.
-- With Wi-Fi setup installed, `journalctl -u dreampi-netswitch-wifi -n 50` shows what it's doing (scanning, hosting, connecting) and any error.
+- With the Wi-Fi setup button installed, `journalctl -u dreampi-netswitch-wifi -n 50` shows what it's doing (scanning, hosting, connecting) and any error.
 - `sudo grep netswitch /var/log/messages` shows lines like `netswitch: routing 5551234 to DCNET`.
 - `cat /tmp/dreampi-netswitch.active` should say `active pid=<DreamPi's process id>`.
 
