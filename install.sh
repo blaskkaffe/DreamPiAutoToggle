@@ -8,7 +8,7 @@
 #   sudo ./install.sh --led        also show the status on a NeoPixel on GPIO18
 #   sudo ./install.sh --leds=30    the same with several NeoPixels / a strip (30 LEDs)
 #   sudo ./install.sh --no-led     remove the NeoPixel service again
-#   sudo ./install.sh --wifi       Wi-Fi setup: hold the button on GPIO15 (pin 10) 3 s to set up Wi-Fi
+#   sudo ./install.sh --wifi       Wi-Fi setup: tap the button on GPIO17 (pin 11) to switch networks, hold 3 s to set up Wi-Fi
 #   sudo ./install.sh --no-wifi    remove the Wi-Fi setup button/service again
 #
 # Once --led or --wifi has been used, later updates keep it until --no-led / --no-wifi.
@@ -20,7 +20,7 @@ HTTPS_PORT=443
 LED=keep
 LED_COUNT=
 WIFI=keep
-WIFI_GPIO_DEFAULT=15   # GPIO15 / physical pin 10; edit $DEST/wifi_button_gpio for a different pin
+WIFI_GPIO_DEFAULT=17   # GPIO17 / physical pin 11; edit $DEST/wifi_button_gpio for a different pin
 for arg in "$@"; do
     case "$arg" in
         --led) LED=on; LED_COUNT=1 ;;

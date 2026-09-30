@@ -39,7 +39,7 @@ Options:
 - `sudo ./install.sh 8080` puts the HTTP page on another port, if port 80 is taken.
 - `sudo ./install.sh --https-port=8443` puts the HTTPS page on another port, and `--no-https` turns it off.
 - `sudo ./install.sh --led` adds one status NeoPixel, and `--leds=30` a chain or strip of 30 (see [Status NeoPixels](#status-neopixels-optional)). `--no-led` removes the LED service again.
-- `sudo ./install.sh --wifi` adds the Wi-Fi setup button, enabled by default on GPIO15 (physical pin 10) (see [Wi-Fi setup button](#wi-fi-setup-button-optional)). `--no-wifi` removes it again.
+- `sudo ./install.sh --wifi` adds the Wi-Fi setup button, enabled by default on GPIO17 (physical pin 11) (see [Wi-Fi setup button](#wi-fi-setup-button-optional)). `--no-wifi` removes it again.
 
 Options can be combined, for example `sudo ./install.sh --leds=8 --no-https`.
 
@@ -202,7 +202,7 @@ If the LEDs stay dark, `systemctl status dreampi-netswitch-led` shows why.
 
 ## Wi-Fi setup button (optional)
 
-A momentary push button on **GPIO15 (physical pin 10)** doubles as a quick network switch and a way to join a Wi-Fi network without a keyboard, monitor or SSH. Wire it between GPIO15 and a **GND** pin:
+A momentary push button on **GPIO17 (physical pin 11)** doubles as a quick network switch and a way to join a Wi-Fi network without a keyboard, monitor or SSH. Wire it between GPIO17 and a **GND** pin:
 
 - **Tap it briefly** to switch the selected network between DCNow! and DCNET, the same as the web page's two buttons or dialing `555-0001`/`555-0002`.
 - **Hold it for 3 seconds** to start Wi-Fi setup. The Pi:
@@ -214,7 +214,7 @@ A momentary push button on **GPIO15 (physical pin 10)** doubles as a quick netwo
 
 While it's scanning or hosting the setup network, a status LED shows a breathing blue light (a scanning animation instead, with a strip). Holding the button again, or the **Wi-Fi setup** control under Network in the settings, cancels it at any point and returns the Pi to its normal Wi-Fi connection.
 
-**Wiring:** no resistor needed; the Pi's internal pull-up is used, so the pin reads high normally and low while the button is held. GPIO15 is also the Pi's UART RX pin; if you use the Pi's serial console (rare on a DreamPi, which normally talks to the modem over USB), pick a different pin instead by editing `/opt/dreampi-netswitch/wifi_button_gpio` (a single GPIO number) after installing.
+**Wiring:** no resistor needed; the Pi's internal pull-up is used, so the pin reads high normally and low while the button is held. GPIO17 was picked as the default because it has no other function on any Raspberry Pi model (earlier versions of this add-on defaulted to GPIO15, which doubles as the Pi's UART RX pin and could pick up noise from the serial console/Bluetooth if that's in use). If you'd rather use a different pin (GPIO4 also works well), edit `/opt/dreampi-netswitch/wifi_button_gpio` (a single GPIO number) after installing.
 
 **Install:** `sudo ./install.sh --wifi`. This installs `hostapd` and `dnsmasq` with `apt` if they aren't already present (needed to host the setup network) and starts the `dreampi-netswitch-wifi` service. Remove it again with `sudo ./install.sh --no-wifi`.
 
