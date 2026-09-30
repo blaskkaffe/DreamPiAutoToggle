@@ -8,10 +8,10 @@
 #   sudo ./install.sh --led        also show the status on a NeoPixel on GPIO18
 #   sudo ./install.sh --leds=30    the same with several NeoPixels / a strip (30 LEDs)
 #   sudo ./install.sh --no-led     remove the NeoPixel service again
-#   sudo ./install.sh --wifi-button=17   a button on GPIO17: hold 3 s to set up Wi-Fi
-#   sudo ./install.sh --no-wifi-button   remove the Wi-Fi setup button/service again
+#   sudo ./install.sh --wifi       Wi-Fi setup: hold the button on GPIO15 (pin 10) 3 s to set up Wi-Fi
+#   sudo ./install.sh --no-wifi    remove the Wi-Fi setup button/service again
 #
-# Once --led or --wifi-button has been used, later updates keep it until --no-led / --no-wifi-button.
+# Once --led or --wifi has been used, later updates keep it until --no-led / --no-wifi.
 set -e
 DEST=/opt/dreampi-netswitch
 SRC="$(cd "$(dirname "$0")" && pwd)"
@@ -19,8 +19,8 @@ PORT=80
 HTTPS_PORT=443
 LED=keep
 LED_COUNT=
-WIFI_BTN=keep
-WIFI_BTN_GPIO=
+WIFI=keep
+WIFI_GPIO_DEFAULT=15   # GPIO15 / physical pin 10; edit $DEST/wifi_button_gpio for a different pin
 for arg in "$@"; do
     case "$arg" in
         --led) LED=on; LED_COUNT=1 ;;
@@ -28,10 +28,8 @@ for arg in "$@"; do
                   case "$LED_COUNT" in ''|*[!0-9]*) echo "--leds needs a number, e.g. --leds=30"; exit 1 ;; esac
                   if [ "$LED_COUNT" -lt 1 ] || [ "$LED_COUNT" -gt 300 ]; then echo "--leds must be 1 to 300"; exit 1; fi ;;
         --no-led) LED=off ;;
-        --wifi-button=*) WIFI_BTN=on; WIFI_BTN_GPIO="${arg#--wifi-button=}"
-                  case "$WIFI_BTN_GPIO" in ''|*[!0-9]*) echo "--wifi-button needs a GPIO number, e.g. --wifi-button=17"; exit 1 ;; esac
-                  if [ "$WIFI_BTN_GPIO" -gt 53 ]; then echo "--wifi-button must be a valid GPIO number (0 to 53)"; exit 1; fi ;;
-        --no-wifi-button) WIFI_BTN=off ;;
+        --wifi) WIFI=on ;;
+        --no-wifi) WIFI=off ;;
         --https-port=*) HTTPS_PORT="${arg#--https-port=}" ;;
         --no-https) HTTPS_PORT=0 ;;
         [0-9]*) PORT="$arg" ;;
@@ -39,7 +37,7 @@ for arg in "$@"; do
     esac
 done
 
-if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--led|--leds=N|--no-led] [--wifi-button=N|--no-wifi-button]"; exit 1; fi
+if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--led|--leds=N|--no-led] [--wifi|--no-wifi]"; exit 1; fi
 
 mkdir -p "$DEST"
 cp "$SRC/netswitch_hook.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_wifi.py" \
@@ -153,11 +151,11 @@ elif [ "$LED" = off ]; then
 fi
 
 # ----------------------------------------------------------- Wi-Fi setup button
-if [ "$WIFI_BTN" = keep ] && [ -f "$DEST/wifi_button_enabled" ]; then WIFI_BTN=on; fi
-if [ "$WIFI_BTN" = on ]; then
+if [ "$WIFI" = keep ] && [ -f "$DEST/wifi_button_enabled" ]; then WIFI=on; fi
+if [ "$WIFI" = on ]; then
     touch "$DEST/wifi_button_enabled"
-    if [ -n "$WIFI_BTN_GPIO" ]; then echo "$WIFI_BTN_GPIO" > "$DEST/wifi_button_gpio"; fi
-    echo "Wi-Fi setup button on GPIO$(cat "$DEST/wifi_button_gpio" 2>/dev/null || echo '?')"
+    [ -f "$DEST/wifi_button_gpio" ] || echo "$WIFI_GPIO_DEFAULT" > "$DEST/wifi_button_gpio"
+    echo "Wi-Fi setup button on GPIO$(cat "$DEST/wifi_button_gpio")"
     # The Wi-Fi setup access point needs hostapd and dnsmasq. Install them if
     # missing, and make sure their own systemd units stay off: this add-on
     # starts and stops them itself (dreampi-netswitch-wifi.service), so a
@@ -187,7 +185,7 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 EOF
-elif [ "$WIFI_BTN" = off ]; then
+elif [ "$WIFI" = off ]; then
     systemctl disable --now dreampi-netswitch-wifi.service 2>/dev/null || true
     rm -f /etc/systemd/system/dreampi-netswitch-wifi.service "$DEST/wifi_button_enabled" "$DEST/wifi_button_gpio" \
           "$DEST/wifi_hostapd.conf" "$DEST/wifi_dnsmasq.conf"

@@ -46,10 +46,15 @@ STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
 MODEM = "/tmp/dreampi-netswitch.modem"
 DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
-# Wi-Fi setup (netswitch_wifi.py, install.sh --wifi-button=<gpio>)
+# Wi-Fi setup (netswitch_wifi.py, install.sh --wifi)
 WIFI_BUTTON_ENABLED = os.path.join(BASE_DIR, "wifi_button_enabled")  # written by install.sh
 WIFI_START = os.path.join(BASE_DIR, "wifi_start")   # touched to ask netswitch_wifi.py to start
 WIFI_STOP = os.path.join(BASE_DIR, "wifi_stop")     # touched to ask it to stop / cancel
+WIFI_CONNECT = os.path.join(BASE_DIR, "wifi_connect")   # {"ssid":..., "password":...}, an alternative
+                                                         # to the setup access point's own /connect -
+                                                         # lets the regular page pick a network too,
+                                                         # useful when it's reachable some other way
+                                                         # (e.g. Ethernet) while Wi-Fi is being set up
 WIFI_STATE = "/tmp/dreampi-netswitch.wifi"          # written by netswitch_wifi.py
 WIFI_STALE = 30       # ignore WIFI_STATE when older than this (the service is down)
 WIFI_AP_SSID = "DreamPi WiFi Config"
@@ -824,7 +829,8 @@ def api_state():
             "internet": checks["internet"],
             "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
                    "line2": pi.get("line2"), "warn": pi.get("warn")},
-            "wifi": {"state": wf_state, "ssid": wf.get("ssid"), "installed": os.path.exists(WIFI_BUTTON_ENABLED)},
+            "wifi": {"state": wf_state, "ssid": wf.get("ssid"), "networks": wf.get("networks"),
+                     "installed": os.path.exists(WIFI_BUTTON_ENABLED)},
             "hangup": {"busy": _hangup["busy"], "text": _hangup["text"]},
             "warnings": warnings, "now": int(time.time())}
 
@@ -924,6 +930,10 @@ PAGE = u"""<!doctype html>
  input[type=color]{-webkit-appearance:none;appearance:none;width:34px;height:34px;padding:0;border:var(--bw) solid #555;border-radius:7px;background:none;vertical-align:middle;cursor:pointer}
  input[type=color]::-webkit-color-swatch-wrapper{padding:0} input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
  input[type=color]::-moz-color-swatch{border:0;border-radius:4px}
+ input[type=password],input[type=text]{width:100%;padding:10px 12px;margin:0 0 10px;border-radius:12px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.9em}
+ #wifi-networks{padding:10px 0 14px}
+ .wnet{display:block;width:100%;margin-bottom:6px;padding:9px 12px;text-align:left;border-radius:12px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
+ .wnet .sig{float:right;opacity:.6;font-size:.85em}
  .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range > span:first-child{white-space:nowrap} .range input{flex:1;min-width:60px;accent-color:var(--dcnow)}
  .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
  #log{background:#0a0a0a;border:var(--bw) solid var(--line);border-radius:12px;padding:8px;font-size:11px;line-height:1.45;
@@ -978,6 +988,15 @@ millisecond timing. Turn recording on, then dial.</div>
   <input type="checkbox" class="cbox dcnow" id="dbg-b" aria-label="Show debug log"></div>
  <div class="srow" id="wifi-row" style="display:none"><span>Wi-Fi setup<span class="sub" id="wifi-sub">Search for a Wi-Fi network to connect the Pi to</span></span>
   <button class="pill-s" id="wifi-b" type="button">Search</button></div>
+ <div id="wifi-networks" style="display:none">
+  <div id="wifi-list"></div>
+  <button type="button" class="pill-s" id="wifi-manual" style="margin-bottom:10px">Enter a network name manually</button>
+  <div id="wifi-form" style="display:none">
+   <input type="text" id="wifi-ssid" placeholder="Network name" readonly>
+   <input type="password" id="wifi-pass" placeholder="Password" style="display:none">
+   <button type="button" class="pill-s" id="wifi-connect-b" disabled>Connect</button>
+  </div>
+ </div>
 </div>
 
 <h2>Phone numbers</h2>
@@ -1068,17 +1087,43 @@ function render(d){
  $("wifi-b").textContent=wl[0];
  $("wifi-sub").textContent=wl[1].replace("%s",d.wifi.ssid||"");
  $("wifi-b").disabled=d.wifi.state=="ok";
+ var showNets=d.wifi.state=="hosting"||d.wifi.state=="scanning";
+ $("wifi-networks").style.display=showNets?"block":"none";
+ if(showNets&&d.wifi.networks){var key=JSON.stringify(d.wifi.networks);
+  if(key!=wifiListKey){wifiListKey=key;renderWifiList(d.wifi.networks)}}
+ else if(!showNets){wifiListKey=null;wifiChosen=null;$("wifi-form").style.display="none";$("wifi-list").innerHTML=""}
 }
 var WIFI_LABELS={
  idle:["Search","Search for a Wi-Fi network to connect the Pi to"],
  scanning:["Stop","Scanning for Wi-Fi networks..."],
- hosting:["Stop","Connect to “DreamPi WiFi Config”, then open http://192.168.4.1"],
+ hosting:["Stop","Pick a network below, or connect to “DreamPi WiFi Config” and open http://192.168.4.1"],
  connecting:["Stop","Connecting to “%s”..."],
  ok:["Connected","Connected to “%s”"],
  failed:["Stop","Couldn't connect (%s)"]};
 $("wifi-b").onclick=function(){
  var x=new XMLHttpRequest();x.open("POST","/wifitoggle",true);x.setRequestHeader("X-Requested-With","netswitch");
  x.onload=refresh;x.send()};
+// Wi-Fi network list, shown in Settings too while scanning/hosting (not just on the
+// temporary "DreamPi WiFi Config" page) - useful when this page is still reachable,
+// for example over Ethernet, while the Pi's Wi-Fi is being (re)configured.
+var wifiListKey=null,wifiChosen=null;
+function wifiBars(sig){if(sig==null)return"";var n=sig>=-55?4:sig>=-65?3:sig>=-75?2:1;return " "+"█".repeat(n)+"░".repeat(4-n)}
+function renderWifiList(nets){
+ $("wifi-list").innerHTML=nets.map(function(n,i){
+  return '<button type="button" class="wnet" data-i="'+i+'">'+(n.secured?"🔒 ":"")+esc(n.ssid)+
+   '<span class="sig">'+esc(wifiBars(n.signal))+'</span></button>'}).join("")||
+  '<div class="sub" style="margin:4px 0 10px">No networks found. Enter one manually.</div>';
+ Array.prototype.forEach.call($("wifi-list").querySelectorAll(".wnet"),function(b){
+  b.onclick=function(){wifiSelect(nets[+b.dataset.i])}})}
+function wifiSelect(n){wifiChosen=n;$("wifi-ssid").value=n.ssid;$("wifi-ssid").readOnly=true;
+ $("wifi-pass").style.display=n.secured?"block":"none";$("wifi-pass").value="";
+ $("wifi-connect-b").disabled=false;$("wifi-connect-b").textContent="Connect";$("wifi-form").style.display="block"}
+$("wifi-manual").onclick=function(){wifiSelect({ssid:"",secured:true});$("wifi-ssid").readOnly=false;$("wifi-ssid").focus()};
+$("wifi-connect-b").onclick=function(){
+ var ssid=$("wifi-ssid").value.trim();if(!ssid)return;
+ $("wifi-connect-b").disabled=true;$("wifi-connect-b").textContent="Connecting...";
+ var x=new XMLHttpRequest();x.open("POST","/wificonnect",true);x.setRequestHeader("Content-Type","application/json");
+ x.onload=refresh;x.send(JSON.stringify({ssid:ssid,password:$("wifi-pass").value}))};
 var logSize=0,debugOn=false,logBusy=false,debugOpen=false;
 $("net").onclick=function(e){if(e.target.closest&&e.target.closest(".hang"))return;this.classList.toggle("open")};
 // Hang up: tap once to arm, again within 4 s to confirm (a call in progress is easy to end by accident)
@@ -1426,6 +1471,25 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     open(WIFI_STOP, "w").close()
                     debug_log("web page: Wi-Fi setup stop requested")
+        elif self.path == "/wificonnect":
+            # An alternative to the setup access point's own /connect: lets
+            # this page pick a network too, reachable while it's up over
+            # Ethernet (or anything else besides the Wi-Fi being reconfigured).
+            if os.path.exists(WIFI_BUTTON_ENABLED):
+                ssid = ""
+                try:
+                    length = min(int(self.headers.get("Content-Length") or 0), 4096)
+                    data = json.loads(self.rfile.read(length).decode("utf-8"))
+                    ssid = str(data.get("ssid") or "").strip()
+                    password = str(data.get("password") or "")
+                except (ValueError, IOError, OSError):
+                    pass
+                if ssid:
+                    tmp = WIFI_CONNECT + ".tmp"
+                    with open(tmp, "w") as f:
+                        json.dump({"ssid": ssid, "password": password}, f)
+                    os.rename(tmp, WIFI_CONNECT)
+                    debug_log("web page: Wi-Fi connect requested for %s" % ssid)
         if self.headers.get("X-Requested-With"):
             self.send_response(204)   # the page's own buttons: nothing to reload
             self.send_header("Content-Length", "0")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# DreamPi Netswitch add-on - Wi-Fi setup (optional, install.sh --wifi-button=N).
+# DreamPi Netswitch add-on - Wi-Fi setup (optional, install.sh --wifi).
 #
 # Runs as root (service dreampi-netswitch-wifi). Watches one GPIO pin for a
 # 3-second hold (see netswitch_gpio.py) and, when held, or when the web page's
@@ -52,7 +52,8 @@ import netswitch_web as web  # noqa: E402  (paths, check_internet(), debug_log()
 from netswitch_gpio import peripheral_base, Block, GPIO_OFFSET, set_input_pullup, read_level  # noqa: E402
 
 BASE_DIR = web.BASE_DIR
-GPIO_FILE = os.path.join(BASE_DIR, "wifi_button_gpio")   # written by install.sh --wifi-button=N
+GPIO_FILE = os.path.join(BASE_DIR, "wifi_button_gpio")   # written by install.sh --wifi (default GPIO15/pin10)
+DEFAULT_GPIO = 15
 HOSTAPD_CONF = os.path.join(BASE_DIR, "wifi_hostapd.conf")
 DNSMASQ_CONF = os.path.join(BASE_DIR, "wifi_dnsmasq.conf")
 WPA_CONF = "/etc/wpa_supplicant/wpa_supplicant.conf"
@@ -129,11 +130,26 @@ def start_requested():
 
 
 def clear_flags():
-    for path in (web.WIFI_START, web.WIFI_STOP):
+    for path in (web.WIFI_START, web.WIFI_STOP, web.WIFI_CONNECT):
         try:
             os.remove(path)
         except OSError:
             pass
+
+
+def check_external_connect():
+    """A connect request dropped by the regular page (POST /wificonnect),
+    an alternative to the setup access point's own /connect for whenever
+    the regular page is reachable some other way (e.g. Ethernet) while
+    Wi-Fi is being set up. Returns (ssid, password) or None."""
+    try:
+        with open(web.WIFI_CONNECT) as f:
+            data = json.load(f)
+        os.remove(web.WIFI_CONNECT)
+    except (IOError, OSError, ValueError):
+        return None
+    ssid = str(data.get("ssid") or "").strip()
+    return (ssid, str(data.get("password") or "")) if ssid else None
 
 
 def wait_or_stop(seconds):
@@ -428,6 +444,9 @@ def run_ap_server(networks):
             except queue.Empty:
                 if stop_requested():
                     return ("stop", None, None)
+                external = check_external_connect()
+                if external:
+                    return ("connect", external[0], external[1])
     finally:
         server.shutdown()
         server.server_close()
@@ -534,9 +553,9 @@ def button_watcher(pin):
 
 def main():
     try:
-        pin = int((web.read_file(GPIO_FILE) or "").strip())
+        pin = int((web.read_file(GPIO_FILE) or str(DEFAULT_GPIO)).strip())
     except ValueError:
-        sys.exit("wifi_button_gpio does not contain a GPIO number; run install.sh --wifi-button=N")
+        sys.exit("wifi_button_gpio does not contain a GPIO number")
 
     t = threading.Thread(target=button_watcher, args=(pin,))
     t.daemon = True
