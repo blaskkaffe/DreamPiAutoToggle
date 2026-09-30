@@ -2,11 +2,10 @@
 # -*- coding: utf-8 -*-
 # DreamPi Netswitch add-on - Wi-Fi setup (optional, install.sh --wifi).
 #
-# Runs as root (service dreampi-netswitch-wifi). Watches one GPIO pin for a
-# 3-second hold (see netswitch_gpio.py) and, when held, or when the web page's
-# "Wi-Fi setup" button in Settings > Network is used (POST /wifitoggle, which
-# just touches wifi_start / wifi_stop under /opt/dreampi-netswitch - the same
-# files this service watches):
+# Runs as root (service dreampi-netswitch-wifi). Started from the web page's
+# "Wi-Fi setup" control in Settings > Network (POST /wifitoggle, which just
+# touches wifi_start / wifi_stop under /opt/dreampi-netswitch - the file this
+# service watches):
 #   1. Scans for Wi-Fi networks on the wireless interface and keeps the list
 #      in memory for the length of the setup session.
 #   2. Hosts an open access point named "DreamPi WiFi Config" (192.168.4.1)
@@ -18,11 +17,20 @@
 #   4. On success the LED (if installed) goes solid green for a few seconds,
 #      then Wi-Fi setup ends and everything returns to normal. On failure it
 #      goes red for a few seconds and the whole cycle repeats (rescans and
-#      re-hosts the access point) until the page or the button cancels it.
+#      re-hosts the access point) until the page cancels it.
 # The current state is written to /tmp/dreampi-netswitch.wifi for the web
 # page (a warning banner and the Settings button) and the LED service
 # (netswitch_led.py, via netswitch_web.active_messages()) to read; see
 # LED_STATES's "wifi-setup" / "wifi-ok" / "wifi-failed" in netswitch_web.py.
+#
+# An earlier version also watched a physical GPIO button for a long-press
+# (start/stop) and short-press (switch network). Removed: on a DreamPi whose
+# modem is wired through the Pi's own UART (GPIO14/15) rather than USB,
+# reconfiguring almost any GPIO pin for input risks fighting something else
+# already using it, and in this case broke the modem connection outright
+# ("hangs at modem check" - DreamPi's own boot-time search for the modem
+# never completes). The web page's toggle is the only way to start/stop
+# setup now; it never touches GPIO.
 #
 # This assumes the classic Raspberry Pi OS network stack DreamPi normally
 # runs on: wpa_supplicant + dhcpcd managing the wireless interface, and
@@ -49,11 +57,8 @@ from urllib.parse import parse_qs
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import netswitch_web as web  # noqa: E402  (paths, check_internet(), debug_log())
-from netswitch_gpio import peripheral_base, Block, GPIO_OFFSET, set_input_pullup, read_level  # noqa: E402
 
 BASE_DIR = web.BASE_DIR
-GPIO_FILE = os.path.join(BASE_DIR, "wifi_button_gpio")   # written by install.sh --wifi (default GPIO17/pin11)
-DEFAULT_GPIO = 17
 HOSTAPD_CONF = os.path.join(BASE_DIR, "wifi_hostapd.conf")
 DNSMASQ_CONF = os.path.join(BASE_DIR, "wifi_dnsmasq.conf")
 WPA_CONF = "/etc/wpa_supplicant/wpa_supplicant.conf"
@@ -62,10 +67,6 @@ AP_SSID = web.WIFI_AP_SSID
 AP_IP = "192.168.4.1"
 AP_DHCP_FROM, AP_DHCP_TO = "192.168.4.10", "192.168.4.100"
 
-HOLD_SECONDS = 3.0        # button hold before Wi-Fi setup starts/stops
-SHORT_PRESS_MIN = 0.03    # ignore a debounced press shorter than this
-BUTTON_POLL = 0.01        # 10 ms raw sample rate
-DEBOUNCE_SAMPLES = 3      # a level must read the same for this many samples running (30 ms) to count
 SCAN_WAIT = 4             # seconds to let a scan finish before reading results
 CONNECT_TIMEOUT = 25      # seconds to wait for an IP address after a connect attempt
 RESULT_PAUSE = 5          # seconds the green/red result shows before moving on
@@ -526,79 +527,7 @@ def _setup_cycle(iface):
     clear_flags()
 
 
-def toggle_network():
-    """Short press: switch the selected network, the same flag file the web
-    page's DCNow!/DCNET buttons and the special phone numbers use."""
-    if os.path.exists(web.FLAG):
-        os.remove(web.FLAG)
-        net = "DCNow!"
-    else:
-        open(web.FLAG, "w").close()
-        net = "DCNET"
-    web.debug_log("wifi button: short press, %s selected" % net)
-
-
-def _start_wifi_toggle():
-    if os.path.exists(web.WIFI_STATE) and web.wifi_state().get("state", "idle") != "idle":
-        open(web.WIFI_STOP, "w").close()
-    else:
-        open(web.WIFI_START, "w").close()
-
-
-def button_watcher(pin):
-    """Watches one GPIO pin (internal pull-up; pressed = pulled to GND).
-    A short press (released before HOLD_SECONDS, but long enough to not be
-    contact bounce) switches the selected network; a 3-second hold touches
-    wifi_start / wifi_stop, exactly like the web page's Wi-Fi setup button.
-
-    Debounced: a mechanical button's contacts flicker for a few ms around
-    each press and release, not just one clean transition, so the raw level
-    is only trusted once it reads the same for DEBOUNCE_SAMPLES samples in a
-    row. Without this, a single physical press could be seen as several
-    quick press/release pairs - at best two toggles cancelling out (looks
-    like nothing happened), at worst the short/long-press timing landing
-    right on a threshold and firing unpredictably ("works, but not
-    reliably")."""
-    fd = os.open("/dev/mem", os.O_RDWR | os.O_SYNC)
-    try:
-        base = peripheral_base()
-        gpio = Block(fd, base + GPIO_OFFSET)
-    finally:
-        os.close(fd)   # the mapping stays valid
-    set_input_pullup(gpio, pin, base)
-    stable = True                    # debounced level: True = released (idle high)
-    candidate, candidate_count = stable, 0
-    pressed_since, fired = None, False
-    while True:
-        level = read_level(gpio, pin)
-        if level == candidate:
-            candidate_count += 1
-        else:
-            candidate, candidate_count = level, 1
-        if candidate_count >= DEBOUNCE_SAMPLES and candidate != stable:
-            stable = candidate
-            if not stable:   # debounced press just started
-                pressed_since, fired = time.time(), False
-            else:            # debounced release just happened
-                if pressed_since is not None and not fired and time.time() - pressed_since >= SHORT_PRESS_MIN:
-                    toggle_network()
-                pressed_since = None
-        if not stable and pressed_since is not None and not fired and time.time() - pressed_since >= HOLD_SECONDS:
-            fired = True
-            _start_wifi_toggle()
-        time.sleep(BUTTON_POLL)
-
-
 def main():
-    try:
-        pin = int((web.read_file(GPIO_FILE) or str(DEFAULT_GPIO)).strip())
-    except ValueError:
-        sys.exit("wifi_button_gpio does not contain a GPIO number")
-
-    t = threading.Thread(target=button_watcher, args=(pin,))
-    t.daemon = True
-    t.start()
-
     set_state("idle")
     while True:
         iface = wifi_iface()

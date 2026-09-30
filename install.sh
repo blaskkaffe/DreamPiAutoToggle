@@ -8,8 +8,8 @@
 #   sudo ./install.sh --led        also show the status on a NeoPixel on GPIO18
 #   sudo ./install.sh --leds=30    the same with several NeoPixels / a strip (30 LEDs)
 #   sudo ./install.sh --no-led     remove the NeoPixel service again
-#   sudo ./install.sh --wifi       Wi-Fi setup: tap the button on GPIO17 (pin 11) to switch networks, hold 3 s to set up Wi-Fi
-#   sudo ./install.sh --no-wifi    remove the Wi-Fi setup button/service again
+#   sudo ./install.sh --wifi       Wi-Fi setup from the web page's Settings (no keyboard needed)
+#   sudo ./install.sh --no-wifi    remove the Wi-Fi setup service again
 #
 # Once --led or --wifi has been used, later updates keep it until --no-led / --no-wifi.
 set -e
@@ -20,7 +20,6 @@ HTTPS_PORT=443
 LED=keep
 LED_COUNT=
 WIFI=keep
-WIFI_GPIO_DEFAULT=17   # GPIO17 / physical pin 11; edit $DEST/wifi_button_gpio for a different pin
 for arg in "$@"; do
     case "$arg" in
         --led) LED=on; LED_COUNT=1 ;;
@@ -150,12 +149,16 @@ elif [ "$LED" = off ]; then
     echo "NeoPixel service removed."
 fi
 
-# ----------------------------------------------------------- Wi-Fi setup button
+# ----------------------------------------------------------- Wi-Fi setup
+# No GPIO button any more: on a DreamPi whose modem is wired through the
+# Pi's own UART rather than USB, reconfiguring almost any GPIO pin for input
+# risks fighting something else already using it (it broke the modem
+# connection outright when tried on GPIO14/15). Wi-Fi setup now starts and
+# stops only from the web page's Settings > Network > Wi-Fi setup control.
 if [ "$WIFI" = keep ] && [ -f "$DEST/wifi_button_enabled" ]; then WIFI=on; fi
 if [ "$WIFI" = on ]; then
     touch "$DEST/wifi_button_enabled"
-    [ -f "$DEST/wifi_button_gpio" ] || echo "$WIFI_GPIO_DEFAULT" > "$DEST/wifi_button_gpio"
-    echo "Wi-Fi setup button on GPIO$(cat "$DEST/wifi_button_gpio")"
+    echo "Wi-Fi setup enabled (start it from the web page's Settings > Network)"
     # The Wi-Fi setup access point needs hostapd and dnsmasq. Install them if
     # missing, and make sure their own systemd units stay off: this add-on
     # starts and stops them itself (dreampi-netswitch-wifi.service), so a
@@ -173,7 +176,7 @@ if [ "$WIFI" = on ]; then
     systemctl disable --now dnsmasq.service 2>/dev/null || true
     cat > /etc/systemd/system/dreampi-netswitch-wifi.service <<EOF
 [Unit]
-Description=DreamPi Netswitch Wi-Fi setup button
+Description=DreamPi Netswitch Wi-Fi setup
 After=network.target
 StartLimitIntervalSec=0
 
@@ -189,7 +192,7 @@ elif [ "$WIFI" = off ]; then
     systemctl disable --now dreampi-netswitch-wifi.service 2>/dev/null || true
     rm -f /etc/systemd/system/dreampi-netswitch-wifi.service "$DEST/wifi_button_enabled" "$DEST/wifi_button_gpio" \
           "$DEST/wifi_hostapd.conf" "$DEST/wifi_dnsmasq.conf"
-    echo "Wi-Fi setup button service removed."
+    echo "Wi-Fi setup service removed."
 fi
 
 systemctl daemon-reload
