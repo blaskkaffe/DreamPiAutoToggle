@@ -17,7 +17,10 @@ GPLEV0, GPLEV1 = 0x34, 0x38    # pin level, 0-31 / 32-53
 GPPUD, GPPUDCLK0, GPPUDCLK1 = 0x94, 0x98, 0x9C            # BCM2835/6/7 pull config
 GPIO_PUP_PDN_CNTRL_REG0 = 0xE4                             # BCM2711 (Pi 4) pull config
 
-PULL_NONE, PULL_UP, PULL_DOWN = 0, 1, 2
+# The two pull register encodings are the opposite way round from each other
+# (each per its own datasheet) - do not share one constant between them.
+PI4_PULL_NONE, PI4_PULL_UP, PI4_PULL_DOWN = 0, 1, 2          # GPIO_PUP_PDN_CNTRL_REGx
+GPPUD_OFF, GPPUD_PULL_DOWN, GPPUD_PULL_UP = 0, 1, 2          # classic GPPUD
 
 
 def peripheral_base():
@@ -63,13 +66,14 @@ def set_input_pullup(gpio, pin, base):
     if is_pi4(base):
         reg = GPIO_PUP_PDN_CNTRL_REG0 + (pin // 16) * 4
         shift = (pin % 16) * 2
-        gpio[reg] = (gpio[reg] & ~(3 << shift)) | (PULL_UP << shift)
+        gpio[reg] = (gpio[reg] & ~(3 << shift)) | (PI4_PULL_UP << shift)
     else:
         # Classic BCM2835/6/7 sequence: set GPPUD, clock it into the pin,
-        # then clear both (see the BCM2835 ARM Peripherals datasheet).
+        # then clear both (see the BCM2835 ARM Peripherals datasheet, where
+        # GPPUD = 10 is pull-up - the opposite way round from GPIO_PUP_PDN_CNTRL_REGx above).
         clk_reg = GPPUDCLK0 if pin < 32 else GPPUDCLK1
         bit = 1 << (pin % 32)
-        gpio[GPPUD] = PULL_UP
+        gpio[GPPUD] = GPPUD_PULL_UP
         time.sleep(0.00001)
         gpio[clk_reg] = bit
         time.sleep(0.00001)
