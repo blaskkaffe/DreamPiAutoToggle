@@ -14,7 +14,7 @@ What you get:
 - A debug log for tracking down calls that go wrong.
 - Modem plugged-in detection, its make/model and firmware, and a warning if it's not a modem known to work with DreamPi.
 
-**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `555-0002` works end to end. A single NeoPixel on GPIO18 works too. Several LEDs or a strip, the new LED colour calibration/wire order/dithering, and modem identification haven't been tried on real hardware yet; feedback is welcome.
+**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `555-0002` works end to end. A single NeoPixel on GPIO18 works too. Several LEDs or a strip, the new LED colour calibration/wire order/dithering, the GPIO10/12/21 output pins, and modem identification haven't been tried on real hardware yet; feedback is welcome.
 
 ## Install
 
@@ -38,7 +38,7 @@ Some browsers refuse or keep upgrading plain `http://` pages, so the page is als
 Options:
 - `sudo ./install.sh 8080` puts the HTTP page on another port, if port 80 is taken.
 - `sudo ./install.sh --https-port=8443` puts the HTTPS page on another port, and `--no-https` turns it off.
-- `sudo ./install.sh --led` adds one status NeoPixel, and `--leds=30` a chain or strip of 30 (see [Status NeoPixels](#status-neopixels-optional)). `--no-led` removes the LED service again.
+- `sudo ./install.sh --led` adds one status NeoPixel, and `--leds=30` a chain or strip of 30; `--led-gpio=10`/`12`/`21` uses a different pin than the default GPIO18 (see [Status NeoPixels](#status-neopixels-optional)). `--no-led` removes the LED service again.
 
 Options can be combined, for example `sudo ./install.sh --leds=8 --no-https`.
 
@@ -171,28 +171,31 @@ The LEDs show messages about DreamPi and the network. **Errors always have highe
 
 ## Status NeoPixels (optional)
 
-A single WS2812 / NeoPixel LED, several of them in a chain, or a WS2812 strip can show DreamPi's status and network problems next to the Pi.
+A single WS2812 / NeoPixel LED, several of them in a chain, or a WS2812 strip can show DreamPi's status and network problems next to the Pi, on any of four GPIO pins.
 
-**Wiring, single LED:**
-- Data in to **GPIO18** (physical pin 12).
+**Wiring, single LED, on GPIO18 (physical pin 12, the default):**
+- Data in to **GPIO18** (pin 12).
 - Power to **3.3 V** (pin 1).
 - Ground to **GND** (pin 6).
 
 Powering one pixel from 3.3 V keeps its data input compatible with the Pi's 3.3 V signal.
 
-**Wiring, several LEDs or a strip:**
+**Wiring, several LEDs or a strip, on GPIO18:**
 - Data in (DIN) to **GPIO18** (pin 12), ideally through a 300-500 ohm resistor.
 - Power the strip from **5 V**. A few LEDs at the low default brightness can use the Pi's 5 V pin (pin 2). Longer strips need their own 5 V supply, since each LED can draw up to 60 mA at full white.
 - Connect the strip's ground to the Pi's **GND** (pin 6) in every case.
 - Strips powered from 5 V usually accept the Pi's 3.3 V data signal. If yours flickers or shows wrong colours, add a 3.3 V to 5 V level shifter (for example a 74AHCT125).
 
+**Other pins:** the same wiring, just to a different data pin - **GPIO10** (pin 19), **GPIO12** (pin 32) or **GPIO21** (pin 40) - and, for GPIO10 only, with SPI enabled first (see Install below). Use another pin if GPIO18 is wanted for something else, or to keep the analog audio jack free (it also uses PWM, which GPIO12 and GPIO18 both drive the LEDs through; GPIO21 uses a different peripheral, PCM, instead).
+
 **Install:**
-- One LED: `sudo ./install.sh --led`
+- One LED on the default pin (GPIO18): `sudo ./install.sh --led`
 - Several LEDs or a strip: `sudo ./install.sh --leds=30` (the number of LEDs, 1 to 300)
+- A different pin: add `--led-gpio=10`, `--led-gpio=12` or `--led-gpio=21` (GPIO18 is the default; can be combined with `--leds=N`). **GPIO10 needs a reboot**: the installer enables SPI in `config.txt` for it, which only takes effect after rebooting, so the LEDs stay dark on that pin until then.
 
-This starts the `dreampi-netswitch-led` service; no reboot is needed. Later updates keep the LED setting until you run `sudo ./install.sh --no-led`. If an older version switched on SPI for the LED, the installer removes that setting again.
+This starts the `dreampi-netswitch-led` service; other than switching to GPIO10, no reboot is needed. Later updates keep the LED setting until you run `sudo ./install.sh --no-led`. If an older version switched on SPI for the LED, the installer removes that setting again unless GPIO10 is still selected. The LED count and pin can both be changed later from the page's settings too (Status LED > Output pin), without rerunning the installer - except switching *to* GPIO10 that way still needs SPI already enabled by `--led-gpio=10` beforehand, since enabling it needs root and a reboot that the page can't do itself; switching to it without that just leaves the LEDs dark until either SPI is enabled or another pin is picked again.
 
-**How it works:** the LEDs are driven by the Pi's PWM hardware on GPIO18, clocked from the crystal, which gives accurate NeoPixel timing without special drivers, extra Python packages or config changes. A single LED is fed directly; a strip is fed by a DMA channel from memory shared with the GPU, the same method the rpi_ws281x library uses. PWM is also what the Pi's analog (3.5 mm jack) audio uses, so don't play sound through the jack while the LEDs are running; DreamPi doesn't use it.
+**How it works:** GPIO12 and GPIO18 are driven by the Pi's PWM hardware, clocked from the crystal, which gives accurate NeoPixel timing without special drivers, extra Python packages or config changes; GPIO21 uses the PCM peripheral the same way, so the LEDs don't need the PWM hardware (and therefore not the analog audio jack) at all. A single LED on GPIO12/18 is fed directly; anything else on GPIO12/18/21 is fed by a DMA channel from memory shared with the GPU, the same method the rpi_ws281x library uses. GPIO10 instead goes through the kernel's own SPI driver (`dtparam=spi=on`), one SPI byte per NeoPixel bit - what this add-on used by default in its very first versions, before it moved to GPIO18.
 
 **Brightness, colours and effects:** set in the web page's settings (cogwheel). Effects run at 50 frames per second and start from the beginning whenever a message appears or changes (a blink starts lit, a breathe starts bright), and changes show up within a quarter of a second. They're stored in `/opt/dreampi-netswitch/led.json`.
 

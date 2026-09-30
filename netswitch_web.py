@@ -44,6 +44,7 @@ STATIC_FILES = {   # only these are served from /static/
 LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness, colours, wire order, calibration
 LED_ENABLED = os.path.join(BASE_DIR, "led_enabled")  # written by install.sh --led
 LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs, editable from the page
+LED_GPIO = os.path.join(BASE_DIR, "led_gpio")        # output pin (10, 12, 18 or 21), likewise
 LED_HIDDEN = os.path.join(BASE_DIR, "led_hidden")    # exists = LED settings hidden on the page
 STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
@@ -881,6 +882,31 @@ def save_led_count(n):
     os.rename(tmp, LED_COUNT)
 
 
+GPIO_PINS = (10, 12, 18, 21)   # allowed LED output pins; see netswitch_led.py for what each needs
+DEFAULT_GPIO = 18
+
+
+def led_gpio():
+    try:
+        n = int((read_file(LED_GPIO) or "").strip())
+        return n if n in GPIO_PINS else DEFAULT_GPIO
+    except ValueError:
+        return DEFAULT_GPIO
+
+
+def save_led_gpio(n):
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        return
+    if n not in GPIO_PINS:
+        return
+    tmp = LED_GPIO + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(str(n))
+    os.rename(tmp, LED_GPIO)
+
+
 def led_hidden():
     return os.path.exists(LED_HIDDEN)
 
@@ -1243,12 +1269,13 @@ millisecond timing. Turn recording on, then dial.</div>
 <h2>Status LED<span id="led-count-t"></span> <span class="saved" id="led-saved">Saved &#10003;</span></h2>
 <div class="card">
  <div class="secrow"><span class="sub">LEDs connected</span><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"></div>
+ <div class="secrow"><span class="sub">Output pin</span><select class="ord" id="led-gpio" aria-label="Output pin"></select></div>
  <div class="secrow"><span class="sub">Wire order</span><select class="ord" id="led-order" aria-label="Wire order"></select></div>
  <div class="range"><span>R</span><input type="range" id="cal-r" min="0" max="1000" step="1" style="accent-color:#f33"><span id="cal-r-v" style="width:3em;text-align:right"></span></div>
  <div class="range"><span>G</span><input type="range" id="cal-g" min="0" max="1000" step="1" style="accent-color:#3f3"><span id="cal-g-v" style="width:3em;text-align:right"></span></div>
  <div class="range"><span>B</span><input type="range" id="cal-b" min="0" max="1000" step="1" style="accent-color:#39f"><span id="cal-b-v" style="width:3em;text-align:right"></span></div>
 </div>
-<div class="note">LEDs connected and wire order (most WS2812 strips are GRB) take effect within a second. Calibration dims a channel that comes out too strong, so colours don't wash out at high brightness; 100% is no change.</div>
+<div class="note">LEDs connected, output pin and wire order (most WS2812 strips are GRB) take effect within a second. Calibration dims a channel that comes out too strong, so colours don't wash out at high brightness; 100% is no change. Switching the output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot); otherwise the LEDs just stay dark until it's switched back.</div>
 <div class="card">
  <div class="range"><span>Global brightness</span><input type="range" id="led-bright" min="0" max="1000" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
  <div class="tabs"><button class="pill-s" type="button" id="tab-dcnow">DCNow! selected</button><button class="pill-s" type="button" id="tab-dcnet">DCNET selected</button></div>
@@ -1361,15 +1388,17 @@ function setDebugMenu(on){
  $("dbg-b").checked=on;$("debug-bar").style.display=on?"flex":"none";
  if(!on){debugOpen=false;$("debug").style.display="none";$("show-debug").classList.remove("open")}}
 $("dbg-b").onchange=function(){setDebugMenu(this.checked)};
-var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledEffects=[],ledCount=1,ledNet="dcnow";
+var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledEffects=[],ledCount=1,ledGpio=18,ledNet="dcnow";
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
-  led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledEffects=r.effects;ledCount=r.count||1;
+  led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledEffects=r.effects;ledCount=r.count||1;ledGpio=r.gpio||18;
   $("led-section").style.display=(r.installed&&!r.hidden)?"block":"none";   // install.sh --led, not hidden
   $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";
   if(!$("led-order").options.length)$("led-order").innerHTML=r.orders.map(function(o){
    return '<option value="'+o+'">'+o+'</option>'}).join("");
-  $("led-count-i").value=ledCount;$("led-order").value=led.order;
+  if(!$("led-gpio").options.length)$("led-gpio").innerHTML=r.gpios.map(function(g){
+   return '<option value="'+g+'">GPIO'+g+'</option>'}).join("");
+  $("led-count-i").value=ledCount;$("led-gpio").value=ledGpio;$("led-order").value=led.order;
   ["r","g","b"].forEach(function(c){$("cal-"+c).value=Math.round(led.calibrate[c]*1000);
    $("cal-"+c+"-v").textContent=pct(led.calibrate[c])});
   buildLed()};x.send()}
@@ -1448,7 +1477,7 @@ $("lvl-pop").onclick=$("fx-pop").onclick=function(e){e.stopPropagation()};
 $("settings").addEventListener("click",function(){if(lvlCur||fxCur)closePops()});
 function saveLed(){clearTimeout(ledTimer);ledTimer=setTimeout(function(){
  var x=new XMLHttpRequest();x.open("POST","/ledconfig",true);x.setRequestHeader("Content-Type","application/json");
- led.count=ledCount;
+ led.count=ledCount;led.gpio=ledGpio;
  x.onload=function(){if(x.status!=200)return;var el=$("led-saved");el.classList.add("show");
   setTimeout(function(){el.classList.remove("show")},1200);refresh()};x.send(JSON.stringify(led))},250)}
 // Logarithmic slider: the left half covers 0-9 %, where an indicator LED is most useful.
@@ -1463,6 +1492,7 @@ $("led-reset").onclick=function(){var order=led.order,calib=led.calibrate;   // 
 $("led-count-i").onchange=function(){var n=parseInt(this.value,10);
  if(isNaN(n))return;ledCount=Math.max(1,Math.min(300,n));this.value=ledCount;
  $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";saveLed()};
+$("led-gpio").onchange=function(){ledGpio=parseInt(this.value,10);saveLed()};
 $("led-order").onchange=function(){led.order=this.value;saveLed()};
 ["r","g","b"].forEach(function(c){$("cal-"+c).oninput=function(){
  led.calibrate[c]=Math.round(this.value)/1000;$("cal-"+c+"-v").textContent=pct(led.calibrate[c]);saveLed()}});
@@ -1614,6 +1644,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send(json.dumps({"config": led_config(), "defaults": default_led_config(),
                                   "states": LED_STATES,
                                   "effects": EFFECTS, "orders": LED_ORDERS, "count": led_count(),
+                                  "gpio": led_gpio(), "gpios": GPIO_PINS,
                                   "installed": os.path.exists(LED_ENABLED), "hidden": led_hidden()}),
                      "application/json")
         elif self.path.split("?")[0] == "/dtmf":
@@ -1641,12 +1672,15 @@ class Handler(BaseHTTPRequestHandler):
                 cfg = save_led_config(data)
                 if "count" in data:
                     save_led_count(data["count"])
+                if "gpio" in data:
+                    save_led_gpio(data["gpio"])
             except (ValueError, IOError, OSError) as e:
                 self.send_response(400)
                 self.end_headers()
                 self.wfile.write(str(e).encode("utf-8"))
                 return
-            self.send(json.dumps({"config": cfg, "count": led_count()}), "application/json")
+            self.send(json.dumps({"config": cfg, "count": led_count(), "gpio": led_gpio()}),
+                     "application/json")
             return
         if self.path == "/ledhide":
             if os.path.exists(LED_HIDDEN):

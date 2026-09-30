@@ -1,18 +1,32 @@
 #!/usr/bin/env python3
-# DreamPi Netswitch add-on - status on NeoPixels (WS2812) on GPIO18.
+# DreamPi Netswitch add-on - status on NeoPixels (WS2812), GPIO18 by default.
 #
-# GPIO18 is the Pi's PWM0 output. The PWM block runs in serialiser mode from
-# the crystal (19.2 MHz / 8 = 2.4 MHz; 54 MHz / 22 on a Pi 4), independent of
-# CPU/core clock changes, so each PWM bit lasts about 417 ns. Every NeoPixel
-# bit becomes three PWM bits: 100 for a 0 (417 ns high) and 110 for a 1
-# (833 ns high). Registers are written directly through /dev/mem (the service
-# runs as root), so no driver or Python package is needed.
+# Four GPIO pins are supported, each through a different Pi peripheral, all
+# clocked from the crystal (independent of CPU/core clock changes) so every
+# NeoPixel bit is 3 output-clock ticks: 100 for a 0, 110 for a 1 (417/833 ns
+# at the 2.4 MHz - 19.2 MHz/8, or 54 MHz/22 on a Pi 4 - bit rate this scheme
+# needs). Registers are written directly through /dev/mem (the service runs
+# as root), so no driver or Python package is needed, except on GPIO10.
+# - GPIO12 and GPIO18: the Pi's PWM0 output (same peripheral, only the pin's
+#   ALT function differs - ALT0 on GPIO12, ALT5 on GPIO18).
+# - GPIO21: the Pi's PCM output (PCM_DOUT, ALT0), the same technique through
+#   a different peripheral - used instead of PWM so the analog audio jack
+#   (which also uses PWM) is free, or when GPIO12/18 are wanted for something
+#   else. Register values from github.com/jgarff/rpi_ws281x (pcm.h, ws2811.c).
+# - GPIO10: the Pi's hardware SPI0 (MOSI), through the kernel's own spidev
+#   driver (needs `dtparam=spi=on`, which install.sh adds when this pin is
+#   chosen) instead of /dev/mem. A whole SPI *byte* stands for one NeoPixel
+#   bit (0xF8/0xC0 at ~6.4 MHz, close enough to WS2812 timing) since spidev
+#   only deals in whole bytes; this is what older versions of this add-on
+#   always used, just generalised here to any LED count. No DMA: the kernel
+#   driver blocks until the whole buffer is sent.
 #
-# - One LED: its 72 PWM bits fit in the PWM FIFO and are written by the CPU.
-# - A strip (2 or more LEDs): the frame is too long for the FIFO, so it is
-#   put in GPU-shared memory (allocated through the VideoCore mailbox,
-#   /dev/vcio) and a DMA channel feeds it to the PWM FIFO, the same way the
-#   rpi_ws281x library does it.
+# - One LED on GPIO12/18: its 72 PWM bits fit in the PWM FIFO and are written
+#   by the CPU (FifoPixel).
+# - Everything else on GPIO12/18/21: the frame is put in GPU-shared memory
+#   (allocated through the VideoCore mailbox, /dev/vcio) and a DMA channel
+#   feeds it to the PWM/PCM FIFO, the same way the rpi_ws281x library does it
+#   (DmaStrip; PcmStrip is the same idea against the PCM peripheral).
 # When the data runs out the pin stays low, which latches the colours.
 #
 # What it shows comes from the page's settings (led.json, see netswitch_web):
@@ -38,19 +52,28 @@ import netswitch_web as web  # noqa: E402  (reuses the page's status logic)
 FPS = 50
 REFRESH = 0.25     # seconds between re-reading DreamPi's state and led.json
 
+GPIO_PINS = (10, 12, 18, 21)   # allowed LED output pins
+DEFAULT_GPIO = 18
+
 # ---------------------------------------------------------------- registers
 GPIO_OFFSET = 0x200000
 CLOCK_OFFSET = 0x101000
 PWM_OFFSET = 0x20C000
+PCM_OFFSET = 0x203000
 DMA_OFFSET = 0x007000
 DMA_CHANNEL = 10               # same default as rpi_ws281x
 PWM_FIFO_BUS = 0x7E20C018      # PWM FIF1 as seen by the DMA engine
+PCM_FIFO_BUS = 0x7E203004      # PCM's fifo register, likewise
 
-GPFSEL1 = 0x04                 # GPIO 10-19 function select
+GPFSEL1 = 0x04                 # GPIO 10-19 function select (GPIO10, 12, 18)
+GPFSEL2 = 0x08                 # GPIO 20-29 function select (GPIO21)
+_PWM_ALT = {12: 0b100, 18: 0b010}   # ALT0, ALT5
+_PCM_ALT = {21: 0b100}             # ALT0
 CM_PWMCTL, CM_PWMDIV = 0xA0, 0xA4
+CM_PCMCTL, CM_PCMDIV = 0x98, 0x9C
 CM_PASSWD = 0x5A000000
 CM_ENAB, CM_BUSY, CM_SRC_OSC = 0x10, 0x80, 1
-PWM_BIT_HZ = 2400000           # 3 PWM bits per NeoPixel bit = 800 kHz
+PWM_BIT_HZ = 2400000           # 3 output-clock ticks per NeoPixel bit = 800 kHz
 
 PWM_CTL, PWM_STA, PWM_DMAC, PWM_RNG1, PWM_FIF1 = 0x00, 0x04, 0x08, 0x10, 0x18
 PWEN1, MODE1, USEF1, CLRF1 = 0x01, 0x02, 0x20, 0x40
@@ -58,13 +81,37 @@ STA_EMPT1 = 0x02
 STA_ERRORS = 0x1FC             # write 1 to clear WERR/RERR/GAPO/BERR
 DMAC_ENAB = 1 << 31
 
+PCM_CS, PCM_FIFO, PCM_MODE, PCM_TXC, PCM_DREQ = 0x00, 0x04, 0x08, 0x10, 0x14
+PCM_CS_EN, PCM_CS_TXON, PCM_CS_TXCLR, PCM_CS_DMAEN = 1 << 0, 1 << 2, 1 << 3, 1 << 9
+
+
+def _pcm_mode(flen, fslen):
+    return ((flen & 0x3FF) << 10) | (fslen & 0x3FF)
+
+
+def _pcm_txc(pos, wid):
+    return (1 << 31) | (1 << 30) | ((pos & 0x3FF) << 20) | ((wid & 0xF) << 16)   # CH1WEX|CH1EN|CH1POS|CH1WID
+
+
+def _pcm_dreq(tx, panic):
+    return ((panic & 0x7F) << 24) | ((tx & 0x7F) << 8)
+
+
+PERMAP_PWM, PERMAP_PCM = 5, 2
+
 DMA_CS, DMA_CONBLK, DMA_DEBUG = 0x00, 0x04, 0x20
 CS_ACTIVE, CS_END, CS_INT = 1 << 0, 1 << 1, 1 << 2
 CS_WAIT_WRITES, CS_RESET = 1 << 28, 1 << 31
 TI_WAIT_RESP, TI_DEST_DREQ, TI_SRC_INC, TI_NO_WIDE = 1 << 3, 1 << 6, 1 << 8, 1 << 26
-PERMAP_PWM = 5
 
 RESET_WORDS = 24               # > 300 us of low level after the data
+
+# ---------------------------------------------------------- SPI (GPIO10)
+SPI_IOC_WR_MODE = 0x40016B01
+SPI_IOC_WR_MAX_SPEED_HZ = 0x40046B04
+SPI_HZ = 6400000                # the Pi rounds this down to 6.25 MHz
+SPI_ONE, SPI_ZERO = 0xF8, 0xC0  # one SPI byte per NeoPixel bit (0.8/0.3 us high at 6.25 MHz)
+SPI_RESET_BYTES = 80            # > 50 us low after the data
 
 
 def peripheral_base():
@@ -133,22 +180,31 @@ def encode(r, g, b, order=DEFAULT_ORDER):
 
 
 # ---------------------------------------------------------------- hardware
-class PwmOutput(object):
-    """GPIO18 as PWM0 in serialiser mode, clocked from the crystal."""
+def _set_alt(gpio_block, fsel_offset, pin_shift, alt):
+    gpio_block[fsel_offset] = (gpio_block[fsel_offset] & ~(7 << pin_shift)) | (alt << pin_shift)
 
-    def __init__(self, gpio, clock, pwm, osc_hz=19200000):
+
+def _init_clock(clock, ctl_off, div_off, osc_hz, bit_hz):
+    """Point a clock generator (PWM's or PCM's - same register layout, a
+    different pair of offsets) at the crystal, divided down to bit_hz."""
+    divider = int(round(float(osc_hz) / bit_hz))
+    clock[ctl_off] = CM_PASSWD | (clock[ctl_off] & 0xFF & ~CM_ENAB)
+    _wait(lambda: not clock[ctl_off] & CM_BUSY)
+    clock[div_off] = CM_PASSWD | (divider << 12)
+    clock[ctl_off] = CM_PASSWD | CM_SRC_OSC
+    clock[ctl_off] = CM_PASSWD | CM_SRC_OSC | CM_ENAB
+    _wait(lambda: clock[ctl_off] & CM_BUSY)
+
+
+class PwmOutput(object):
+    """GPIO12 or GPIO18 as PWM0 in serialiser mode, clocked from the crystal."""
+
+    def __init__(self, gpio, clock, pwm, osc_hz=19200000, pin=DEFAULT_GPIO):
         self.gpio, self.clock, self.pwm = gpio, clock, pwm
         self.order = DEFAULT_ORDER
-        divider = int(round(float(osc_hz) / PWM_BIT_HZ))
-        # GPIO18 -> ALT5 (PWM0): bits 24-26 of GPFSEL1 = 0b010
-        self.gpio[GPFSEL1] = (self.gpio[GPFSEL1] & ~(7 << 24)) | (2 << 24)
+        _set_alt(self.gpio, GPFSEL1, (pin - 10) * 3, _PWM_ALT[pin])   # GPIO10-19 share GPFSEL1
         self.pwm[PWM_CTL] = 0
-        self.clock[CM_PWMCTL] = CM_PASSWD | (self.clock[CM_PWMCTL] & 0xFF & ~CM_ENAB)
-        _wait(lambda: not self.clock[CM_PWMCTL] & CM_BUSY)
-        self.clock[CM_PWMDIV] = CM_PASSWD | (divider << 12)
-        self.clock[CM_PWMCTL] = CM_PASSWD | CM_SRC_OSC
-        self.clock[CM_PWMCTL] = CM_PASSWD | CM_SRC_OSC | CM_ENAB
-        _wait(lambda: self.clock[CM_PWMCTL] & CM_BUSY)
+        _init_clock(self.clock, CM_PWMCTL, CM_PWMDIV, osc_hz, PWM_BIT_HZ)
         self.pwm[PWM_RNG1] = 32
 
 
@@ -191,38 +247,47 @@ class Mailbox(object):
         os.close(self.fd)
 
 
-class DmaStrip(PwmOutput):
-    """Several LEDs: frame in GPU memory, fed to the PWM FIFO by DMA."""
+def _alloc_gpu(fd, base, size):
+    """GPU-shared memory the DMA engine can read, via the VideoCore mailbox."""
+    mbox = Mailbox()
+    # Pi 1 uses the L2-cached alias (flags 0xC); Pi 2 and later "direct" (0x4)
+    flags = 0xC if base == 0x20000000 else 0x4
+    handle = mbox.call(0x3000C, size, 4096, flags)   # allocate
+    if not handle:
+        raise OSError("could not allocate GPU memory for the LED strip")
+    bus = mbox.call(0x3000D, handle)                 # lock
+    mem = mmap.mmap(fd, size, mmap.MAP_SHARED, mmap.PROT_READ | mmap.PROT_WRITE,
+                    offset=bus & ~0xC0000000)
+    return mbox, handle, bus, mem
 
-    def __init__(self, fd, base, count, osc_hz):
+
+def _free_gpu(mbox, handle):
+    try:
+        mbox.call(0x3000E, handle)   # unlock
+        mbox.call(0x3000F, handle)   # release
+    finally:
+        mbox.close()
+
+
+class _DmaOutput(object):
+    """Shared plumbing for a strip fed by DMA from GPU memory into a fixed
+    peripheral FIFO - what DmaStrip (PWM) and PcmStrip (PCM) both are.
+    Subclasses set up their own peripheral (GPIO ALT function, clock, FIFO
+    enable) and then call _dma_setup(); show()/close() don't otherwise
+    differ between the two peripherals."""
+
+    def _dma_setup(self, fd, base, count, dest_bus, permap):
         self.count = count
         self.data_len = len(encode_bytes([(0, 0, 0)] * count)) + 4 * RESET_WORDS
-        self.size = (32 + self.data_len + 4095) // 4096 * 4096
-        self.mbox = Mailbox()
-        # Pi 1 uses the L2-cached alias (flags 0xC); Pi 2 and later "direct" (0x4)
-        flags = 0xC if base == 0x20000000 else 0x4
-        self.handle = self.mbox.call(0x3000C, self.size, 4096, flags)   # allocate
-        if not self.handle:
-            raise OSError("could not allocate GPU memory for the LED strip")
-        self.bus = self.mbox.call(0x3000D, self.handle)                 # lock
-        self.mem = mmap.mmap(fd, self.size, mmap.MAP_SHARED,
-                             mmap.PROT_READ | mmap.PROT_WRITE,
-                             offset=self.bus & ~0xC0000000)
+        size = (32 + self.data_len + 4095) // 4096 * 4096
+        self.mbox, self.handle, self.bus, self.mem = _alloc_gpu(fd, base, size)
         self.dma = Block(fd, base + DMA_OFFSET)          # channels 0-14, 0x100 apart
         self.dma_off = DMA_CHANNEL * 0x100
-        PwmOutput.__init__(self, Block(fd, base + GPIO_OFFSET), Block(fd, base + CLOCK_OFFSET),
-                           Block(fd, base + PWM_OFFSET), osc_hz)
         # Control block at offset 0, data right after it
-        cb = struct.pack("<8I", TI_NO_WIDE | TI_WAIT_RESP | TI_DEST_DREQ | TI_SRC_INC | (PERMAP_PWM << 16),
-                         self.bus + 32, PWM_FIFO_BUS, self.data_len, 0, 0, 0, 0)
+        cb = struct.pack("<8I", TI_NO_WIDE | TI_WAIT_RESP | TI_DEST_DREQ | TI_SRC_INC | (permap << 16),
+                         self.bus + 32, dest_bus, self.data_len, 0, 0, 0, 0)
         self.mem[0:32] = cb
         self.mem[32:32 + self.data_len] = b"\0" * self.data_len
-        pwm = self.pwm
-        pwm[PWM_CTL] = CLRF1
-        time.sleep(0.0001)
-        pwm[PWM_STA] = STA_ERRORS
-        pwm[PWM_DMAC] = DMAC_ENAB | (7 << 8) | 3     # panic 7, dreq 3
-        pwm[PWM_CTL] = PWEN1 | MODE1 | USEF1
 
     def _reg(self, offset, value=None):
         if value is None:
@@ -233,7 +298,7 @@ class DmaStrip(PwmOutput):
         _wait(lambda: not self._reg(DMA_CS) & CS_ACTIVE, 0.05)
         data = encode_bytes(pixels, self.order)
         words = array.array("I", data)
-        words.byteswap()                     # PWM shifts each word MSB first
+        words.byteswap()                     # PWM and PCM both shift each word MSB first
         data = words.tobytes() + b"\0" * (4 * RESET_WORDS)
         self.mem[32:32 + len(data)] = data
         self._reg(DMA_CS, CS_RESET)
@@ -243,29 +308,113 @@ class DmaStrip(PwmOutput):
         self._reg(DMA_DEBUG, 7)              # clear error flags
         self._reg(DMA_CS, CS_WAIT_WRITES | (15 << 20) | (15 << 16) | CS_ACTIVE)
 
-    def close(self):
+    def _dma_close(self):
         try:
             _wait(lambda: not self._reg(DMA_CS) & CS_ACTIVE, 0.05)
             self._reg(DMA_CS, CS_RESET)
+        finally:
+            _free_gpu(self.mbox, self.handle)
+
+
+class DmaStrip(PwmOutput, _DmaOutput):
+    """Several LEDs on GPIO12/18: frame in GPU memory, fed to the PWM FIFO
+    by DMA."""
+
+    def __init__(self, fd, base, count, osc_hz, pin=DEFAULT_GPIO):
+        PwmOutput.__init__(self, Block(fd, base + GPIO_OFFSET), Block(fd, base + CLOCK_OFFSET),
+                           Block(fd, base + PWM_OFFSET), osc_hz, pin=pin)
+        self._dma_setup(fd, base, count, PWM_FIFO_BUS, PERMAP_PWM)
+        pwm = self.pwm
+        pwm[PWM_CTL] = CLRF1
+        time.sleep(0.0001)
+        pwm[PWM_STA] = STA_ERRORS
+        pwm[PWM_DMAC] = DMAC_ENAB | (7 << 8) | 3     # panic 7, dreq 3
+        pwm[PWM_CTL] = PWEN1 | MODE1 | USEF1
+
+    def close(self):
+        try:
+            self._dma_close()
+        finally:
             self.pwm[PWM_DMAC] = 0
             self.pwm[PWM_CTL] = 0
+
+
+class PcmStrip(_DmaOutput):
+    """Any LED count on GPIO21 (PCM_DOUT): the PCM-peripheral equivalent of
+    DmaStrip, used so GPIO12/18 (and the PWM-driven analog audio jack) stay
+    free. Register values are from rpi_ws281x (pcm.h, ws2811.c setup_pcm());
+    not yet verified on real hardware."""
+
+    def __init__(self, fd, base, count, osc_hz):
+        self.order = DEFAULT_ORDER
+        gpio = Block(fd, base + GPIO_OFFSET)
+        _set_alt(gpio, GPFSEL2, (21 - 20) * 3, _PCM_ALT[21])   # GPIO21 -> ALT0 (PCM_DOUT)
+        self.pcm = Block(fd, base + PCM_OFFSET)
+        self.pcm[PCM_CS] = PCM_CS_EN
+        _init_clock(Block(fd, base + CLOCK_OFFSET), CM_PCMCTL, CM_PCMDIV, osc_hz, PWM_BIT_HZ)
+        self.pcm[PCM_MODE] = _pcm_mode(31, 1)
+        self.pcm[PCM_TXC] = _pcm_txc(0, 8)               # channel 1, 8-bit samples, position 0
+        self._dma_setup(fd, base, count, PCM_FIFO_BUS, PERMAP_PCM)
+        self.pcm[PCM_CS] |= PCM_CS_TXCLR
+        time.sleep(0.00001)
+        self.pcm[PCM_CS] |= PCM_CS_DMAEN
+        self.pcm[PCM_DREQ] = _pcm_dreq(0x3F, 0x10)
+        self.pcm[PCM_CS] |= PCM_CS_TXON
+
+    def close(self):
+        try:
+            self._dma_close()
         finally:
-            try:
-                self.mbox.call(0x3000E, self.handle)   # unlock
-                self.mbox.call(0x3000F, self.handle)   # release
-            finally:
-                self.mbox.close()
+            self.pcm[PCM_CS] = 0
 
 
-def open_output(count):
+def _spi_symbols(byte):
+    return bytes(SPI_ONE if (byte >> i) & 1 else SPI_ZERO for i in range(7, -1, -1))
+
+
+_SPI_TABLE = [_spi_symbols(b) for b in range(256)]
+
+
+class SpiStrip(object):
+    """Any LED count on GPIO10 (SPI0 MOSI), through the kernel's own spidev
+    driver (needs `dtparam=spi=on`, which install.sh adds when this pin is
+    chosen) instead of /dev/mem. One whole SPI byte stands for one NeoPixel
+    bit (0xF8/0xC0 at ~6.4 MHz, close enough to WS2812 timing), the
+    technique older versions of this add-on always used on this pin - see
+    `git show 479cb3b:netswitch_led.py`. No DMA: the kernel driver blocks
+    until the whole buffer is sent, which is plenty fast at 50 fps even for
+    a long strip."""
+
+    def __init__(self, count, bus=0, device=0):
+        self.count, self.order = count, DEFAULT_ORDER
+        self.fd = os.open("/dev/spidev%d.%d" % (bus, device), os.O_RDWR)
+        fcntl.ioctl(self.fd, SPI_IOC_WR_MODE, struct.pack("B", 0))
+        fcntl.ioctl(self.fd, SPI_IOC_WR_MAX_SPEED_HZ, struct.pack("I", SPI_HZ))
+
+    def show(self, pixels):
+        a, b, c = self.order
+        out = b"".join(_SPI_TABLE[px[a]] + _SPI_TABLE[px[b]] + _SPI_TABLE[px[c]] for px in pixels)
+        os.write(self.fd, out + bytes(SPI_RESET_BYTES))
+
+    def close(self):
+        os.close(self.fd)
+
+
+def open_output(count, gpio=DEFAULT_GPIO):
+    if gpio not in GPIO_PINS:
+        gpio = DEFAULT_GPIO
+    if gpio == 10:
+        return SpiStrip(count)
     base = peripheral_base()
     osc_hz = 54000000 if base == 0xFE000000 else 19200000   # Pi 4 crystal
     fd = os.open("/dev/mem", os.O_RDWR | os.O_SYNC)
     try:
-        if count <= 1:
-            return FifoPixel(Block(fd, base + GPIO_OFFSET), Block(fd, base + CLOCK_OFFSET),
-                             Block(fd, base + PWM_OFFSET), osc_hz)
-        return DmaStrip(fd, base, count, osc_hz)
+        if gpio in _PWM_ALT:
+            if count <= 1:
+                return FifoPixel(Block(fd, base + GPIO_OFFSET), Block(fd, base + CLOCK_OFFSET),
+                                 Block(fd, base + PWM_OFFSET), osc_hz, pin=gpio)
+            return DmaStrip(fd, base, count, osc_hz, pin=gpio)
+        return PcmStrip(fd, base, count, osc_hz)   # gpio == 21
     finally:
         os.close(fd)   # the mappings stay valid
 
@@ -437,13 +586,14 @@ def _calib_tuple(cfg):
 
 # ---------------------------------------------------------------- main loop
 def main():
-    count = web.led_count() or 1
+    count, gpio = web.led_count() or 1, web.led_gpio()
     cfg = web.led_config()
     order, calib = ORDERS.get(cfg.get("order"), DEFAULT_ORDER), _calib_tuple(cfg)
     try:
-        out = open_output(count)
+        out = open_output(count, gpio)
     except (IOError, OSError) as e:
-        sys.exit("Cannot drive the LEDs on GPIO18 (%s). The LED service must run as root." % e)
+        sys.exit("Cannot drive the LEDs on GPIO%d (%s). The LED service must run as root "
+                 "(and, for GPIO10, SPI must be enabled)." % (gpio, e))
     out.order = order
 
     def stop(*_):
@@ -468,15 +618,20 @@ def main():
                 messages = web.active_messages()
                 cfg = web.led_config()
                 order, calib = ORDERS.get(cfg.get("order"), DEFAULT_ORDER), _calib_tuple(cfg)
-                new_count = web.led_count() or 1
-                if new_count != count:   # changed on the web page: reopen the hardware output
-                    out.show([(0, 0, 0)] * count)
-                    time.sleep(0.02)
-                    out.close()
-                    out = open_output(new_count)
-                    count = new_count
-                    clocks = {}
-                    reset_dither()
+                new_count, new_gpio = web.led_count() or 1, web.led_gpio()
+                if new_count != count or new_gpio != gpio:   # changed on the page: reopen the output
+                    try:
+                        new_out = open_output(new_count, new_gpio)
+                    except (IOError, OSError) as e:
+                        sys.stderr.write("could not switch to GPIO%d, %d LED(s) (%s), keeping the "
+                                         "current output\n" % (new_gpio, new_count, e))
+                    else:
+                        out.show([(0, 0, 0)] * count)
+                        time.sleep(0.02)
+                        out.close()
+                        out, count, gpio = new_out, new_count, new_gpio
+                        clocks = {}
+                        reset_dither()
                 out.order = order
             except Exception:   # never let a bad read stop the LED loop
                 pass

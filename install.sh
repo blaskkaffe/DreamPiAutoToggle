@@ -7,11 +7,14 @@
 #   sudo ./install.sh --no-https   plain HTTP only
 #   sudo ./install.sh --led        also show the status on a NeoPixel on GPIO18
 #   sudo ./install.sh --leds=30    the same with several NeoPixels / a strip (starting count: 30)
+#   sudo ./install.sh --led-gpio=21   use GPIO10, 12, 18 (default) or 21 instead
 #   sudo ./install.sh --no-led     remove the NeoPixel service again
 #
 # Once --led has been used, later updates keep the LED until --no-led. The LED
-# count, wire order and colour calibration can all be changed later from the
-# page's Settings, without --leds=N or a reinstall.
+# count, output pin, wire order and colour calibration can all be changed
+# later from the page's Settings, without --leds=N/--led-gpio=N or a
+# reinstall - except switching to GPIO10, which needs SPI enabled first
+# (this installer does that for --led-gpio=10, but it needs a reboot).
 set -e
 DEST=/opt/dreampi-netswitch
 SRC="$(cd "$(dirname "$0")" && pwd)"
@@ -19,12 +22,15 @@ PORT=80
 HTTPS_PORT=443
 LED=keep
 LED_COUNT=
+LED_GPIO=
 for arg in "$@"; do
     case "$arg" in
         --led) LED=on; LED_COUNT=1 ;;
         --leds=*) LED=on; LED_COUNT="${arg#--leds=}"
                   case "$LED_COUNT" in ''|*[!0-9]*) echo "--leds needs a number, e.g. --leds=30"; exit 1 ;; esac
                   if [ "$LED_COUNT" -lt 1 ] || [ "$LED_COUNT" -gt 300 ]; then echo "--leds must be 1 to 300"; exit 1; fi ;;
+        --led-gpio=*) LED=on; LED_GPIO="${arg#--led-gpio=}"
+                  case "$LED_GPIO" in 10|12|18|21) ;; *) echo "--led-gpio must be 10, 12, 18 or 21"; exit 1 ;; esac ;;
         --no-led) LED=off ;;
         --https-port=*) HTTPS_PORT="${arg#--https-port=}" ;;
         --no-https) HTTPS_PORT=0 ;;
@@ -33,7 +39,7 @@ for arg in "$@"; do
     esac
 done
 
-if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--led|--leds=N|--no-led]"; exit 1; fi
+if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--led|--leds=N|--led-gpio=N|--no-led]"; exit 1; fi
 
 mkdir -p "$DEST"
 cp "$SRC/netswitch_hook.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
@@ -115,17 +121,33 @@ if [ "$LED" = on ]; then
     touch "$DEST/led_enabled"
     if [ -n "$LED_COUNT" ]; then echo "$LED_COUNT" > "$DEST/led_count"; fi
     [ -f "$DEST/led_count" ] || echo 1 > "$DEST/led_count"
-    echo "NeoPixel output on GPIO18: $(cat "$DEST/led_count") LED(s)"
-    # The LED uses GPIO18's PWM directly. Older versions used SPI on GPIO10:
-    # take back the SPI line they added, it isn't needed any more.
-    if [ -f "$DEST/spi_added" ]; then
+    if [ -n "$LED_GPIO" ]; then echo "$LED_GPIO" > "$DEST/led_gpio"; fi
+    [ -f "$DEST/led_gpio" ] || echo 18 > "$DEST/led_gpio"
+    GPIO=$(cat "$DEST/led_gpio")
+    echo "NeoPixel output on GPIO$GPIO: $(cat "$DEST/led_count") LED(s)"
+    # GPIO10 needs the kernel's SPI driver; GPIO12/18/21 use /dev/mem directly
+    # and don't. Track what we changed in spi_added, so switching away from
+    # GPIO10 later (here or from the page) takes the setting back out again.
+    CONFIG_TXT=
+    for candidate in /boot/firmware/config.txt /boot/config.txt; do
+        [ -f "$candidate" ] && CONFIG_TXT="$candidate" && break
+    done
+    if [ "$GPIO" = 10 ]; then
+        if [ -n "$CONFIG_TXT" ] && ! grep -q '^dtparam=spi=on' "$CONFIG_TXT"; then
+            printf '\ndtparam=spi=on  # added by dreampi-netswitch\n' >> "$CONFIG_TXT"
+            echo "$CONFIG_TXT" > "$DEST/spi_added"
+            echo "Enabled SPI in $CONFIG_TXT for GPIO10; reboot before the LEDs will work on it."
+        elif [ -z "$CONFIG_TXT" ]; then
+            echo "Could not find config.txt to enable SPI for GPIO10 - add dtparam=spi=on yourself and reboot."
+        fi
+    elif [ -f "$DEST/spi_added" ]; then
         sed -i '/^dtparam=spi=on  # added by dreampi-netswitch$/d' "$(cat "$DEST/spi_added")"
         rm -f "$DEST/spi_added"
-        echo "Removed the SPI setting added by an older version (not needed any more)."
+        echo "Removed the SPI setting added for GPIO10 (not needed for GPIO$GPIO)."
     fi
     cat > /etc/systemd/system/dreampi-netswitch-led.service <<EOF
 [Unit]
-Description=DreamPi Netswitch status NeoPixel (GPIO18)
+Description=DreamPi Netswitch status NeoPixel
 After=network.target
 StartLimitIntervalSec=0
 
@@ -141,7 +163,11 @@ WantedBy=multi-user.target
 EOF
 elif [ "$LED" = off ]; then
     systemctl disable --now dreampi-netswitch-led.service 2>/dev/null || true
-    rm -f /etc/systemd/system/dreampi-netswitch-led.service "$DEST/led_enabled" "$DEST/led_count"
+    rm -f /etc/systemd/system/dreampi-netswitch-led.service "$DEST/led_enabled" "$DEST/led_count" "$DEST/led_gpio"
+    if [ -f "$DEST/spi_added" ]; then
+        sed -i '/^dtparam=spi=on  # added by dreampi-netswitch$/d' "$(cat "$DEST/spi_added")"
+        rm -f "$DEST/spi_added"
+    fi
     echo "NeoPixel service removed."
 fi
 
