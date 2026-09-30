@@ -111,17 +111,24 @@ def _symbols(byte):
 
 _TABLE = [_symbols(b) for b in range(256)]
 
+# Wire order: which of (r, g, b) goes out first/second/third. Most WS2812s
+# are GRB; a few clones are RGB or another order, hence the config option.
+ORDERS = {"RGB": (0, 1, 2), "RBG": (0, 2, 1), "GRB": (1, 0, 2),
+         "GBR": (1, 2, 0), "BRG": (2, 0, 1), "BGR": (2, 1, 0)}
+DEFAULT_ORDER = ORDERS["GRB"]
 
-def encode_bytes(pixels):
-    """[(r, g, b), ...] -> PWM bit stream, GRB order, MSB first, padded to
-    whole 32-bit words."""
-    out = b"".join(_TABLE[g] + _TABLE[r] + _TABLE[b] for r, g, b in pixels)
+
+def encode_bytes(pixels, order=DEFAULT_ORDER):
+    """[(r, g, b), ...] -> PWM bit stream in the given wire order, MSB
+    first, padded to whole 32-bit words."""
+    a, b, c = order
+    out = b"".join(_TABLE[px[a]] + _TABLE[px[b]] + _TABLE[px[c]] for px in pixels)
     return out + b"\0" * (-len(out) % 4)
 
 
-def encode(r, g, b):
+def encode(r, g, b, order=DEFAULT_ORDER):
     """One pixel -> 3 FIFO words."""
-    data = encode_bytes([(r, g, b)])
+    data = encode_bytes([(r, g, b)], order)
     return [int.from_bytes(data[i:i + 4], "big") for i in range(0, len(data), 4)]
 
 
@@ -131,6 +138,7 @@ class PwmOutput(object):
 
     def __init__(self, gpio, clock, pwm, osc_hz=19200000):
         self.gpio, self.clock, self.pwm = gpio, clock, pwm
+        self.order = DEFAULT_ORDER
         divider = int(round(float(osc_hz) / PWM_BIT_HZ))
         # GPIO18 -> ALT5 (PWM0): bits 24-26 of GPFSEL1 = 0b010
         self.gpio[GPFSEL1] = (self.gpio[GPFSEL1] & ~(7 << 24)) | (2 << 24)
@@ -153,7 +161,7 @@ class FifoPixel(PwmOutput):
         pwm[PWM_STA] = STA_ERRORS
         pwm[PWM_CTL] = CLRF1                 # empty the FIFO
         time.sleep(0.0001)
-        for w in encode(*pixels[0]):
+        for w in encode(pixels[0][0], pixels[0][1], pixels[0][2], self.order):
             pwm[PWM_FIF1] = w
         pwm[PWM_CTL] = PWEN1 | MODE1 | USEF1  # shift it out once, then stay low
         _wait(lambda: pwm[PWM_STA] & STA_EMPT1, 0.01)
@@ -223,7 +231,7 @@ class DmaStrip(PwmOutput):
 
     def show(self, pixels):
         _wait(lambda: not self._reg(DMA_CS) & CS_ACTIVE, 0.05)
-        data = encode_bytes(pixels)
+        data = encode_bytes(pixels, self.order)
         words = array.array("I", data)
         words.byteswap()                     # PWM shifts each word MSB first
         data = words.tobytes() + b"\0" * (4 * RESET_WORDS)
@@ -342,26 +350,54 @@ def effect_frame(effect, speed, colour, t, n):
     return [c] * n
 
 
-def to_bytes(frame, brightness):
-    """Floats 0..1 -> 0..255 with brightness. A channel that is on never
-    rounds down to 0, so colours stay recognisable at low brightness."""
+_dither_err = {}   # (led index, channel) -> carried-over rounding error
+
+
+def to_bytes(frame, brightness, calib=(1.0, 1.0, 1.0), dither=True, start=0):
+    """Floats 0..1 -> 0..255 with brightness and per-channel calibration.
+    A channel that is on never rounds down to 0, so colours stay
+    recognisable at low brightness. With dither, the rounding error is
+    carried over to the next frame instead of discarded, so a value the
+    8-bit output can't represent exactly (typical at low brightness, where
+    slow effects like breathe would otherwise visibly step) is approximated
+    by alternating the neighbouring levels over time instead. start is the
+    absolute LED index of frame[0], so a section keeps its own dither state
+    even though render() quantizes one message's section at a time."""
     out = []
-    for r, g, b in frame:
+    for i, (r, g, b) in enumerate(frame):
+        idx = start + i
         px = []
-        for v in (r, g, b):
-            x = v * 255 * brightness
-            px.append(0 if x <= 0 else max(1, min(255, int(round(x)))))
+        for c, v in enumerate((r, g, b)):
+            x = v * 255 * brightness * calib[c]
+            if x <= 0:
+                px.append(0)
+                if dither:
+                    _dither_err.pop((idx, c), None)
+                continue
+            if dither:
+                key = (idx, c)
+                x += _dither_err.get(key, 0.0)
+                q = max(1, min(255, int(round(x))))
+                _dither_err[key] = x - q
+            else:
+                q = max(1, min(255, int(round(x))))
+            px.append(q)
         out.append(tuple(px))
     return out
 
 
-def scaled(colour, brightness):
+def reset_dither():
+    """Forget carried-over error, e.g. when the LED count changes."""
+    _dither_err.clear()
+
+
+def scaled(colour, brightness, calib=(1.0, 1.0, 1.0)):
     """'#rrggbb' at a brightness, for a single solid pixel."""
-    return to_bytes([hex_rgb(colour)], brightness)[0]
+    return to_bytes([hex_rgb(colour)], brightness, calib, dither=False)[0]
 
 
 # ---------------------------------------------------------------- composing
-def render(messages, now, count, clocks=None):
+def render(messages, now, count, clocks=None, calib=(1.0, 1.0, 1.0)):
     """Draw the active messages (lowest priority first) into one frame.
     Each message covers all LEDs or its own section; later (more important)
     messages draw over earlier ones, and uncovered LEDs stay dark.
@@ -386,7 +422,7 @@ def render(messages, now, count, clocks=None):
         n = last - first + 1
         part = to_bytes(effect_frame(m.get("effect", "solid"), m.get("speed", "slow"),
                                      m.get("color", "#3c3c3c"), now - clocks[key][1], n),
-                        m.get("brightness", 0.08))
+                        m.get("brightness", 0.08), calib, start=first - 1)
         frame[first - 1:last] = part
     for key in list(clocks):
         if key not in seen:
@@ -394,13 +430,21 @@ def render(messages, now, count, clocks=None):
     return frame
 
 
+def _calib_tuple(cfg):
+    c = cfg.get("calibrate") or {}
+    return (c.get("r", 1.0), c.get("g", 1.0), c.get("b", 1.0))
+
+
 # ---------------------------------------------------------------- main loop
 def main():
     count = web.led_count() or 1
+    cfg = web.led_config()
+    order, calib = ORDERS.get(cfg.get("order"), DEFAULT_ORDER), _calib_tuple(cfg)
     try:
         out = open_output(count)
     except (IOError, OSError) as e:
         sys.exit("Cannot drive the LEDs on GPIO18 (%s). The LED service must run as root." % e)
+    out.order = order
 
     def stop(*_):
         try:
@@ -422,10 +466,22 @@ def main():
         if now >= next_read:
             try:
                 messages = web.active_messages()
+                cfg = web.led_config()
+                order, calib = ORDERS.get(cfg.get("order"), DEFAULT_ORDER), _calib_tuple(cfg)
+                new_count = web.led_count() or 1
+                if new_count != count:   # changed on the web page: reopen the hardware output
+                    out.show([(0, 0, 0)] * count)
+                    time.sleep(0.02)
+                    out.close()
+                    out = open_output(new_count)
+                    count = new_count
+                    clocks = {}
+                    reset_dither()
+                out.order = order
             except Exception:   # never let a bad read stop the LED loop
                 pass
             next_read = now + REFRESH
-        frame = render(messages, now, count, clocks)
+        frame = render(messages, now, count, clocks, calib)
         # Unchanged frames (solid colours) are only resent twice a second,
         # which fixes any garbled frame and keeps the CPU free for DreamPi.
         if frame != last_frame or now - last_sent >= 0.5:

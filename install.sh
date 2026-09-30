@@ -6,10 +6,12 @@
 #   sudo ./install.sh --https-port=8443   HTTPS on another port (default 443)
 #   sudo ./install.sh --no-https   plain HTTP only
 #   sudo ./install.sh --led        also show the status on a NeoPixel on GPIO18
-#   sudo ./install.sh --leds=30    the same with several NeoPixels / a strip (30 LEDs)
+#   sudo ./install.sh --leds=30    the same with several NeoPixels / a strip (starting count: 30)
 #   sudo ./install.sh --no-led     remove the NeoPixel service again
 #
-# Once --led has been used, later updates keep the LED until --no-led.
+# Once --led has been used, later updates keep the LED until --no-led. The LED
+# count, wire order and colour calibration can all be changed later from the
+# page's Settings, without --leds=N or a reinstall.
 set -e
 DEST=/opt/dreampi-netswitch
 SRC="$(cd "$(dirname "$0")" && pwd)"

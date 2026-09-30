@@ -9,9 +9,11 @@ import io
 import json
 import os
 import re
+import select
 import socket
 import sys
 import subprocess
+import termios
 import threading
 import time
 import traceback
@@ -39,9 +41,10 @@ STATIC_FILES = {   # only these are served from /static/
     "touch-dcnow.png": "image/png",
     "touch-dcnet.png": "image/png",
 }
-LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness + colours
+LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness, colours, wire order, calibration
 LED_ENABLED = os.path.join(BASE_DIR, "led_enabled")  # written by install.sh --led
-LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs (install.sh --leds=N)
+LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs, editable from the page
+LED_HIDDEN = os.path.join(BASE_DIR, "led_hidden")    # exists = LED settings hidden on the page
 STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
 MODEM = "/tmp/dreampi-netswitch.modem"
@@ -532,7 +535,253 @@ def about():
         rows.append((name, script_version(os.path.join(DREAMPI_DIR, name)) or "not found"))
     rows.append(("Raspberry Pi", (model or "unknown").replace("\x00", "")))
     rows.append(("System", osname or "unknown"))
+    usb = _usb_info(modem_port())
+    info = load_modem_info()
+    compat, label = modem_compat(usb, " ".join(info.get(k, "") for k in ("ati", "model", "revision")))
+    if usb:
+        text = label
+        if info.get("revision"):
+            text += ", firmware " + info["revision"]
+        elif info.get("error"):
+            text += " (could not query it: %s)" % info["error"]
+        if compat is False:
+            text += " — not known to work with DreamPi"
+        elif compat is None:
+            text += " — not a modem DreamPi is confirmed to work with yet"
+        rows.append(("Modem", text))
+    elif modem_plugged() is False:
+        rows.append(("Modem", "Not detected (check the USB connection)"))
     return rows
+
+
+# ----------------------------------------------------- modem identification
+MODEM_PORT = "/tmp/dreampi-netswitch.port"              # written by the hook
+MODEM_INFO = os.path.join(BASE_DIR, "modem_info.json")  # cached USB id + AT probe result
+
+# Modems the DreamPi community has reported working, matched (case-insensitive,
+# either direction) against the USB descriptor's manufacturer + product
+# strings. Most of these are the same board sold under different brands, all
+# built around a Conexant CX93010 hardmodem chip; MODEM_CHIPSET below catches
+# ones not listed here by name once an AT probe has been run. Source and more
+# reports: https://www.segacity.de/viewtopic.php?t=7649 (a softmodem, which
+# needs the host's own drivers to do part of the modem's job, is never a
+# substitute: DreamPi needs the modem to handle the call by itself).
+KNOWN_MODEMS = (
+    "usrobotics 5637", "usr5637",
+    "dell rd02-d400", "lenovo rd02-d400", "rd02-d400",
+    "longshine lcs-8156c1",
+    "trendnet tfm-561u",
+    "zoom 3095",
+    "startech usb56kemh",
+    "conceptronic bvrp se", "conceptronic c56u-v2", "c56u-v2",
+    "v.top um02", "vtop um02",
+)
+# Reported NOT to work: same case as the good ones above, but an older/
+# different chip inside. Checked first isn't right here - see modem_compat().
+UNKNOWN_MODEMS = (
+    "conceptronic c56u",   # the original, without "-v2"/"se"
+)
+MODEM_CHIPSET = "conexant"
+MODEM_CHIPSET_MODEL = "93010"   # CX93010, the chip the known-good modems share
+
+
+def modem_port():
+    return read_file(MODEM_PORT)
+
+
+def _usb_info(port):
+    """USB descriptor info for the serial port DreamPi opened (vendor,
+    product, manufacturer and product strings, serial number), or None if
+    it isn't known yet or isn't a USB device. Pure sysfs reads: never
+    touches the modem itself."""
+    if not port:
+        return None
+    try:
+        iface = os.path.realpath("/sys/class/tty/%s/device" % os.path.basename(port))
+        d = iface
+        for _ in range(4):
+            if os.path.isfile(os.path.join(d, "idVendor")):
+                break
+            d = os.path.dirname(d)
+        else:
+            return None
+        vendor, product = read_file(os.path.join(d, "idVendor")), read_file(os.path.join(d, "idProduct"))
+        if not vendor or not product:
+            return None
+        return {"vendor": vendor, "product": product,
+                "manufacturer": read_file(os.path.join(d, "manufacturer")) or "",
+                "product_name": read_file(os.path.join(d, "product")) or "",
+                "serial": read_file(os.path.join(d, "serial")) or ""}
+    except OSError:
+        return None
+
+
+def _usb_id(usb):
+    if not usb:
+        return None
+    return "%s:%s:%s" % (usb["vendor"], usb["product"], usb["serial"])
+
+
+def modem_plugged():
+    """Whether the serial port DreamPi opened for the modem is present
+    right now, or None while the port isn't known yet (DreamPi hasn't
+    logged it, e.g. it hasn't started since the last reboot)."""
+    port = modem_port()
+    if not port:
+        return None
+    return os.path.exists(port)
+
+
+def modem_compat(usb, at_text=None):
+    """(compat, label). compat is True (known good), False (known not to
+    work) or None (can't tell, or nothing plugged in). label is what to
+    show for the modem's make/model."""
+    if not usb:
+        return None, None
+    name = (usb.get("manufacturer", "") + " " + usb.get("product_name", "")).strip()
+    label = name or "Unknown USB modem"
+    low = name.lower()
+    if low:
+        # Only "descriptor contains the known name", not the other way round:
+        # a bad entry like "conceptronic c56u" must not match the good
+        # "conceptronic c56u-v2" just because it's a prefix of it.
+        if any(good in low for good in KNOWN_MODEMS):
+            return True, label
+        if any(bad in low for bad in UNKNOWN_MODEMS):
+            return False, label
+    if at_text and MODEM_CHIPSET in at_text.lower() and MODEM_CHIPSET_MODEL in at_text:
+        return True, label + " (Conexant %s)" % MODEM_CHIPSET_MODEL
+    return None, label
+
+
+_AT_BAUDS = dict((n, getattr(termios, "B%d" % n)) for n in (1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200))
+
+
+def _open_at(port, baud=57600):
+    """Open the modem's serial port directly (no pyserial dependency) in
+    raw 8N1 mode. Only call this while nothing else (i.e. DreamPi) has the
+    port open."""
+    fd = os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+    cflag = termios.CS8 | termios.CREAD | termios.CLOCAL
+    speed = _AT_BAUDS.get(baud, termios.B57600)
+    termios.tcsetattr(fd, termios.TCSANOW, [0, 0, cflag, 0, speed, speed, [b"\0"] * len(termios.tcgetattr(fd)[6])])
+    termios.tcflush(fd, termios.TCIOFLUSH)
+    return fd
+
+
+def _at_read(fd, timeout):
+    end, buf = time.time() + timeout, b""
+    while time.time() < end:
+        r, _, _ = select.select([fd], [], [], max(0, end - time.time()))
+        if not r:
+            break
+        try:
+            chunk = os.read(fd, 256)
+        except OSError:
+            break
+        if not chunk:
+            break
+        buf += chunk
+        if buf.endswith((b"OK\r\n", b"ERROR\r\n")):
+            break
+    return buf.decode("ascii", "replace")
+
+
+def _at_query(fd, cmd, timeout=1.5):
+    os.write(fd, (cmd + "\r").encode("ascii"))
+    lines = [ln.strip() for ln in _at_read(fd, timeout).splitlines()]
+    lines = [ln for ln in lines if ln and ln not in (cmd, "OK", "ERROR")]
+    return lines[0] if lines else ""
+
+
+def probe_modem(port):
+    """Send basic AT identification commands (chipset info, manufacturer,
+    model, firmware revision). Only safe while DreamPi isn't using the
+    port - run_modem_check() stops it first."""
+    fd = None
+    try:
+        fd = _open_at(port)
+        _at_query(fd, "AT", 1.0)    # wakes it up; a stray reply/garbage is ignored
+        return {"ati": _at_query(fd, "ATI"), "manufacturer": _at_query(fd, "AT+GMI"),
+                "model": _at_query(fd, "AT+GMM"), "revision": _at_query(fd, "AT+GMR")}
+    except (OSError, termios.error) as e:
+        return {"error": str(e)}
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def load_modem_info():
+    try:
+        with open(MODEM_INFO) as f:
+            return json.load(f)
+    except (IOError, OSError, ValueError):
+        return {}
+
+
+def _save_modem_info(data):
+    tmp = MODEM_INFO + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=1, sort_keys=True)
+    os.rename(tmp, MODEM_INFO)
+
+
+_modem_check = {"busy": False, "text": ""}
+_modem_check_lock = threading.Lock()
+
+
+def run_modem_check(usb_id):
+    """Stop DreamPi, send AT identification commands, start it again. Runs
+    in its own thread; progress is shown on the page. usb_id is cached
+    (success or failure) so the same device isn't re-probed on its own -
+    only a plugged-in device change or the page's Check button does that."""
+    def say(text):
+        _modem_check["text"] = text
+        debug_log("web page: " + text)
+        sys.stderr.write("modem check: %s\n" % text)
+
+    try:
+        port = modem_port()
+        if not port:
+            say("modem port unknown, can't check yet")
+            return
+        say("stopping DreamPi to check the modem")
+        _run(["systemctl", "stop", "dreampi.service"])
+        time.sleep(1)
+        say("querying the modem")
+        info = probe_modem(port)
+        data = load_modem_info()
+        if "error" not in info:
+            data.pop("error", None)   # clear a stale error from an earlier failed check
+        data.update(info)
+        data["usb_id"], data["checked_at"] = usb_id, int(time.time())
+        _save_modem_info(data)
+        say("starting DreamPi again")
+        _run(["systemctl", "start", "dreampi.service"])
+        say("modem check failed: %s" % info["error"] if "error" in info else "modem check done")
+    finally:
+        time.sleep(3)
+        _modem_check["busy"] = False
+
+
+def start_modem_check(force=False):
+    """False if a check is already running, nothing is plugged in, or
+    (without force) this exact device was already checked."""
+    usb_id = _usb_id(_usb_info(modem_port()))
+    if not usb_id:
+        return False
+    if not force and load_modem_info().get("usb_id") == usb_id:
+        return False
+    if dreampi_state()[0].startswith("call"):   # never interrupt a call
+        return False
+    with _modem_check_lock:
+        if _modem_check["busy"]:
+            return False
+        _modem_check.update(busy=True, text="starting modem check...")
+    t = threading.Thread(target=run_modem_check, args=(usb_id,))
+    t.daemon = True
+    t.start()
+    return True
 
 
 def checker():
@@ -562,6 +811,10 @@ def checker():
                           "internet": None if internet["state"] == "checking" else internet["state"] == "ok",
                           "time": time.time()})
         trim_log()
+        try:
+            start_modem_check()   # no-ops unless a new (or never checked) USB modem showed up
+        except Exception:
+            pass
         time.sleep(LINK_EVERY)
 
 
@@ -607,13 +860,29 @@ SPEEDS = ("slow", "fast")
 
 
 def led_count():
-    """LEDs installed: 0 = no LED service, 1 = single LED, more = strip."""
+    """LEDs installed: 0 = no LED service, 1 = single LED, more = strip.
+    Set at install time (install.sh --leds=N) and editable from the page."""
     if not os.path.exists(LED_ENABLED):
         return 0
     try:
         return max(1, min(300, int((read_file(LED_COUNT) or "1").strip())))
     except ValueError:
         return 1
+
+
+def save_led_count(n):
+    try:
+        n = max(1, min(300, int(n)))
+    except (TypeError, ValueError):
+        return
+    tmp = LED_COUNT + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(str(n))
+    os.rename(tmp, LED_COUNT)
+
+
+def led_hidden():
+    return os.path.exists(LED_HIDDEN)
 
 
 NETWORKS = ("dcnow", "dcnet")
@@ -624,8 +893,11 @@ except NameError:
     _TEXT = str
 
 
+LED_ORDERS = ("RGB", "RBG", "GRB", "GBR", "BRG", "BGR")   # wire order of the WS2812 strip; most are GRB
+
+
 def default_led_config():
-    return {"brightness": 0.08,
+    return {"brightness": 0.08, "order": "GRB", "calibrate": {"r": 1.0, "g": 1.0, "b": 1.0},
             "colours": dict((net, dict((st, {"color": c, "effect": e, "speed": sp, "brightness": None,
                                              "enabled": on, "leds": None})
                                        for st, (c, e, sp, on) in _DEFAULT_COLOURS.items()))
@@ -641,6 +913,16 @@ def clean_led_config(data):
         cfg["brightness"] = min(1.0, max(0.0, float(data.get("brightness", cfg["brightness"]))))
     except (TypeError, ValueError):
         pass
+    if data.get("order") in LED_ORDERS:
+        cfg["order"] = data["order"]
+    calibrate = data.get("calibrate")
+    if isinstance(calibrate, dict):
+        for ch in ("r", "g", "b"):
+            try:
+                if ch in calibrate:
+                    cfg["calibrate"][ch] = min(1.0, max(0.0, float(calibrate[ch])))
+            except (TypeError, ValueError):
+                pass
     colours = data.get("colours")
     if isinstance(colours, dict):
         for net in NETWORKS:
@@ -758,6 +1040,15 @@ def api_state():
         why = "name lookups (DNS) fail" if "DNS" in checks["internet"]["text"] \
             else "the network works, but the internet can't be reached"
         warnings.append("No internet: %s. Dreamcast games can't get online right now." % why)
+    plugged = modem_plugged()
+    cached_info = load_modem_info()
+    compat, label = modem_compat(_usb_info(modem_port()),
+                                 " ".join(cached_info.get(k, "") for k in ("ati", "model", "revision")))
+    if plugged is False:
+        warnings.append("Modem not detected: its USB serial port is gone. Check the cable/connection.")
+    elif compat is False:
+        warnings.append("Modem: %s is known not to work reliably with DreamPi. "
+                        "See the Modem row in Settings." % label)
     return {"network": "dcnet" if os.path.exists(FLAG) else "dcnow",
             "autoreset": os.path.exists(AUTORESET),
             "default": "dcnet" if os.path.exists(DEFAULT_DCNET) else "dcnow",
@@ -766,7 +1057,9 @@ def api_state():
             # network problems show as warning boxes instead
             "dreampi": {"state": dstate, "text": dtext,
                         "look": (active_messages(dstate, {"network": True}) or [None])[-1]},
-            "modem": {"text": mtext, "since": msince},
+            "modem": {"text": mtext, "since": msince, "plugged": plugged, "label": label, "compat": compat,
+                      "info": cached_info if cached_info.get("usb_id") else None,
+                      "check": {"busy": _modem_check["busy"], "text": _modem_check["text"]}},
             "internet": checks["internet"],
             "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
                    "line2": pi.get("line2"), "warn": pi.get("warn")},
@@ -857,6 +1150,7 @@ PAGE = u"""<!doctype html>
  .ledtab tr.dis td:not(.name),.ledtab tr.dis .lbl-t{opacity:.35}
  .secrow{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
  .secrow input[type=number]{width:54px;padding:5px 6px;border-radius:8px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.85em}
+ select.ord{padding:5px 6px;border-radius:8px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.85em}
  .lvl.on.dcnow{background:var(--dcnow);border-color:var(--dcnow);color:#fff} .lvl.on.dcnet{background:var(--dcnet);border-color:var(--dcnet);color:#fff}
  .in{position:relative}
  .pop{display:none;position:absolute;z-index:20;width:290px;padding:12px 16px;border-radius:var(--r);background:#262626;box-shadow:0 6px 24px rgba(0,0,0,.6)}
@@ -891,7 +1185,9 @@ PAGE = u"""<!doctype html>
 <div class="now rows" id="net" title="Show or hide details">
  <div class="nlabel">Selected network:</div><b id="net-name">...</b>
  <div class="row main"><span class="k">DreamPi</span><span class="v"><span class="dot" id="d-dot"></span><span id="d-text">...</span></span><span class="arrow">&#9656;</span></div>
- <div class="row more"><span class="k">Modem</span><span class="v"><span><span class="nw" id="m-text">...</span><span class="sub blk" id="m-since"></span></span></span></div>
+ <div class="row more"><span class="k">Modem</span><span class="v"><span><span class="nw" id="m-text">...</span><span class="sub blk" id="m-since"></span></span>
+  <button class="pill-s" id="modem-check-b" type="button" style="flex:none;margin-left:8px;padding:4px 10px;font-size:.78em"
+   title="Identify the modem (briefly restarts DreamPi)">Check</button></span></div>
  <div class="row more"><span class="k">Internet</span><span class="v"><span class="dot" id="i-dot"></span><span id="i-text">...</span></span></div>
  <div class="row more"><span class="k">Pi</span><span class="v"><span class="dot" id="p-dot"></span><span id="p-text">...</span></span></div>
  <div class="row more hang" id="hang-row" style="display:none"><form method="post" action="/hangup" id="hang-f"><button class="pill-s" id="hang-b" type="submit"
@@ -946,12 +1242,24 @@ millisecond timing. Turn recording on, then dial.</div>
 <div id="led-section" style="display:none;position:relative">
 <h2>Status LED<span id="led-count-t"></span> <span class="saved" id="led-saved">Saved &#10003;</span></h2>
 <div class="card">
+ <div class="secrow"><span class="sub">LEDs connected</span><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"></div>
+ <div class="secrow"><span class="sub">Wire order</span><select class="ord" id="led-order" aria-label="Wire order"></select></div>
+ <div class="range"><span>R</span><input type="range" id="cal-r" min="0" max="1000" step="1" style="accent-color:#f33"><span id="cal-r-v" style="width:3em;text-align:right"></span></div>
+ <div class="range"><span>G</span><input type="range" id="cal-g" min="0" max="1000" step="1" style="accent-color:#3f3"><span id="cal-g-v" style="width:3em;text-align:right"></span></div>
+ <div class="range"><span>B</span><input type="range" id="cal-b" min="0" max="1000" step="1" style="accent-color:#39f"><span id="cal-b-v" style="width:3em;text-align:right"></span></div>
+</div>
+<div class="note">LEDs connected and wire order (most WS2812 strips are GRB) take effect within a second. Calibration dims a channel that comes out too strong, so colours don't wash out at high brightness; 100% is no change.</div>
+<div class="card">
  <div class="range"><span>Global brightness</span><input type="range" id="led-bright" min="0" max="1000" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
  <div class="tabs"><button class="pill-s" type="button" id="tab-dcnow">DCNow! selected</button><button class="pill-s" type="button" id="tab-dcnet">DCNET selected</button></div>
  <table class="ledtab"><thead><tr><th>Message</th><th>colour</th><th>effect</th><th>level</th></tr></thead><tbody id="led-rows"></tbody></table>
 </div>
 <div class="bar" style="margin-top:0"><button class="pill-s" id="led-reset" type="button">Reset LED settings to defaults</button></div>
 <div class="note">The tabs choose which selected network the table is for. Tick a message to use it; the LED is off when no ticked message applies. Errors always have higher priority than information. Effect: tap to pick solid, blink, breathe, RGB or (with a strip) an animation, its speed, and with a strip which LEDs it uses (later messages in the list draw underneath earlier ones). Level: its own brightness; grey means the global brightness above. The status dot on the main page previews the most important message.</div>
+<div class="card">
+ <div class="srow"><span>Hide these settings<span class="sub">Removes this Status LED section from Settings; only reversible by deleting led_hidden in /opt/dreampi-netswitch</span></span>
+  <button class="pill-s" id="led-hide-b" type="button">Hide</button></div>
+</div>
 <div id="fx-pop" class="pop"><div class="t" id="fx-t"></div>
  <div class="opts" id="fx-opts"></div>
  <div class="opts" id="fx-speed" style="align-items:center"><span class="sub" style="margin-right:4px">Speed</span><button class="pill-s" type="button" data-speed="slow">Slow</button><button class="pill-s" type="button" data-speed="fast">Fast</button></div>
@@ -992,6 +1300,10 @@ function render(d){
  $("warnings").innerHTML=d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("");
  lookDot($("d-dot"),d.dreampi.look); $("d-text").textContent=d.dreampi.text;
  $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now).replace(/[()]/g,"");
+ var mcb=$("modem-check-b");
+ if(d.modem.check&&d.modem.check.busy){mcb.disabled=true;
+  mcb.textContent=d.modem.check.text?d.modem.check.text.charAt(0).toUpperCase()+d.modem.check.text.slice(1):"Checking..."}
+ else if(mcb.disabled){mcb.disabled=false;mcb.textContent="Check"}
  dot($("i-dot"),d.internet.state); $("i-text").textContent=d.internet.text;
  dot($("p-dot"),d.pi.state);
  $("p-text").innerHTML=d.pi.line1?'<span class="nw">'+esc(d.pi.line1)+'</span><span class="sub blk">'+esc(d.pi.line2)+
@@ -1008,7 +1320,11 @@ function render(d){
  debugOn=d.debug;
 }
 var logSize=0,debugOn=false,logBusy=false,debugOpen=false;
-$("net").onclick=function(e){if(e.target.closest&&e.target.closest(".hang"))return;this.classList.toggle("open")};
+$("net").onclick=function(e){if(e.target.closest&&(e.target.closest(".hang")||e.target.closest("#modem-check-b")))return;this.classList.toggle("open")};
+$("modem-check-b").onclick=function(){if(this.disabled)return;
+ if(!confirm("Check the modem? This briefly stops and restarts DreamPi, so don't do it during a call."))return;
+ this.disabled=true;this.textContent="Checking...";
+ var x=new XMLHttpRequest();x.open("POST","/modemcheck",true);x.setRequestHeader("X-Requested-With","netswitch");x.onload=refresh;x.send()};
 // Hang up: tap once to arm, again within 4 s to confirm (a call in progress is easy to end by accident)
 var hangArm=0;
 $("hang-f").onsubmit=function(e){e.preventDefault();e.stopPropagation();var b=$("hang-b");
@@ -1049,8 +1365,13 @@ var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledEffects=[],ledCount=
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
   led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledEffects=r.effects;ledCount=r.count||1;
-  $("led-section").style.display=r.installed?"block":"none";   // only with install.sh --led
+  $("led-section").style.display=(r.installed&&!r.hidden)?"block":"none";   // install.sh --led, not hidden
   $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";
+  if(!$("led-order").options.length)$("led-order").innerHTML=r.orders.map(function(o){
+   return '<option value="'+o+'">'+o+'</option>'}).join("");
+  $("led-count-i").value=ledCount;$("led-order").value=led.order;
+  ["r","g","b"].forEach(function(c){$("cal-"+c).value=Math.round(led.calibrate[c]*1000);
+   $("cal-"+c+"-v").textContent=pct(led.calibrate[c])});
   buildLed()};x.send()}
 function buildLed(){
  ["dcnow","dcnet"].forEach(function(n){$("tab-"+n).className="pill-s "+n+(n==ledNet?" sel":"")});
@@ -1071,6 +1392,9 @@ function buildLed(){
 function netName(n){return n=="dcnet"?"DCNET":"DCNow!"}
 function effectName(e){for(var i=0;i<ledEffects.length;i++)if(ledEffects[i][0]==e)return ledEffects[i][1];return e}
 function showLed(){$("led-bright").value=brightToSlider(led.brightness);$("led-bright-v").textContent=pct(led.brightness);
+ $("led-order").value=led.order;
+ ["r","g","b"].forEach(function(c){$("cal-"+c).value=Math.round(led.calibrate[c]*1000);
+  $("cal-"+c+"-v").textContent=pct(led.calibrate[c])});
  ledStates.forEach(function(s){var st=s[0],c=led.colours[ledNet][st];
   $("c-"+st).value=c.color;$("e-"+st).checked=c.enabled!==false;showRow(st);showFx(st);showLvl(st)})}
 function showRow(st){$("r-"+st).className=led.colours[ledNet][st].enabled===false?"dis":""}
@@ -1124,6 +1448,7 @@ $("lvl-pop").onclick=$("fx-pop").onclick=function(e){e.stopPropagation()};
 $("settings").addEventListener("click",function(){if(lvlCur||fxCur)closePops()});
 function saveLed(){clearTimeout(ledTimer);ledTimer=setTimeout(function(){
  var x=new XMLHttpRequest();x.open("POST","/ledconfig",true);x.setRequestHeader("Content-Type","application/json");
+ led.count=ledCount;
  x.onload=function(){if(x.status!=200)return;var el=$("led-saved");el.classList.add("show");
   setTimeout(function(){el.classList.remove("show")},1200);refresh()};x.send(JSON.stringify(led))},250)}
 // Logarithmic slider: the left half covers 0-9 %, where an indicator LED is most useful.
@@ -1133,7 +1458,18 @@ function brightToSlider(b){return Math.round(1000*Math.log(1+b*(LOG_BASE-1))/Mat
 function pct(b){var v=b*100;return (v<10&&v>0?v.toFixed(1):Math.round(v))+"%"}
 $("led-bright").oninput=function(){led.brightness=Math.round(sliderToBright(this.value)*1000)/1000;$("led-bright-v").textContent=pct(led.brightness);
  ledStates.forEach(function(s){showLvl(s[0])});saveLed()};
-$("led-reset").onclick=function(){led=JSON.parse(JSON.stringify(ledDefaults));showLed();saveLed()};
+$("led-reset").onclick=function(){var order=led.order,calib=led.calibrate;   // wiring facts, not a look to reset
+ led=JSON.parse(JSON.stringify(ledDefaults));led.order=order;led.calibrate=calib;showLed();saveLed()};
+$("led-count-i").onchange=function(){var n=parseInt(this.value,10);
+ if(isNaN(n))return;ledCount=Math.max(1,Math.min(300,n));this.value=ledCount;
+ $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";saveLed()};
+$("led-order").onchange=function(){led.order=this.value;saveLed()};
+["r","g","b"].forEach(function(c){$("cal-"+c).oninput=function(){
+ led.calibrate[c]=Math.round(this.value)/1000;$("cal-"+c+"-v").textContent=pct(led.calibrate[c]);saveLed()}});
+$("led-hide-b").onclick=function(){
+ if(!confirm("Hide the Status LED settings? This can only be undone on the Pi itself, by deleting led_hidden in /opt/dreampi-netswitch."))return;
+ var x=new XMLHttpRequest();x.open("POST","/ledhide",true);x.setRequestHeader("X-Requested-With","netswitch");
+ x.onload=function(){$("led-section").style.display="none"};x.send()};
 $("show-debug").onclick=function(){debugOpen=!debugOpen;
  $("debug").style.display=debugOpen?"block":"none";
  this.classList.toggle("open",debugOpen);
@@ -1277,8 +1613,9 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/ledconfig":
             self.send(json.dumps({"config": led_config(), "defaults": default_led_config(),
                                   "states": LED_STATES,
-                                  "effects": EFFECTS, "count": led_count(),
-                                  "installed": os.path.exists(LED_ENABLED)}), "application/json")
+                                  "effects": EFFECTS, "orders": LED_ORDERS, "count": led_count(),
+                                  "installed": os.path.exists(LED_ENABLED), "hidden": led_hidden()}),
+                     "application/json")
         elif self.path.split("?")[0] == "/dtmf":
             try:
                 with open(DTMF_LOG, "rb") as f:
@@ -1302,13 +1639,22 @@ class Handler(BaseHTTPRequestHandler):
                 length = min(int(self.headers.get("Content-Length") or 0), 65536)
                 data = json.loads(self.rfile.read(length).decode("utf-8"))
                 cfg = save_led_config(data)
+                if "count" in data:
+                    save_led_count(data["count"])
             except (ValueError, IOError, OSError) as e:
                 self.send_response(400)
                 self.end_headers()
                 self.wfile.write(str(e).encode("utf-8"))
                 return
-            self.send(json.dumps(cfg), "application/json")
+            self.send(json.dumps({"config": cfg, "count": led_count()}), "application/json")
             return
+        if self.path == "/ledhide":
+            if os.path.exists(LED_HIDDEN):
+                os.remove(LED_HIDDEN)
+                debug_log("web page: LED settings shown again")
+            else:
+                open(LED_HIDDEN, "w").close()
+                debug_log("web page: LED settings hidden")
         if self.path == "/dcnet":
             open(FLAG, "w").close()
             debug_log("web page: DCNET selected")
@@ -1342,6 +1688,9 @@ class Handler(BaseHTTPRequestHandler):
                           ("DCNET" if os.path.exists(FLAG) else "DCNow!"))
         elif self.path == "/hangup":
             start_hangup()
+        elif self.path == "/modemcheck":
+            debug_log("web page: modem check requested")
+            start_modem_check(force=True)
         elif self.path == "/clearlog":
             if os.path.exists(DTMF_LOG):
                 os.remove(DTMF_LOG)

@@ -26,6 +26,6 @@ if [ -f "$DEST/spi_added" ]; then
     echo "Removed the SPI setting from $CONFIG (takes effect after a reboot)."
 fi
 
-rm -rf "$DEST" /tmp/dreampi-netswitch.active /tmp/dreampi-netswitch.state /tmp/dreampi-netswitch-dtmf.log /tmp/dreampi-netswitch.modem /tmp/dreampi-netswitch.net
+rm -rf "$DEST" /tmp/dreampi-netswitch.active /tmp/dreampi-netswitch.state /tmp/dreampi-netswitch-dtmf.log /tmp/dreampi-netswitch.modem /tmp/dreampi-netswitch.net /tmp/dreampi-netswitch.port
 systemctl restart dreampi.service 2>/dev/null || echo "Could not restart DreamPi, please reboot."
 echo "Uninstalled. DreamPi is back to its original behavior."

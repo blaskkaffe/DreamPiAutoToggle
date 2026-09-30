@@ -40,6 +40,7 @@ STATE = "/tmp/dreampi-netswitch.state"
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")  # exists = log modem events
 DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
 MODEM = "/tmp/dreampi-netswitch.modem"
+MODEM_PORT = "/tmp/dreampi-netswitch.port"   # the serial device DreamPi opened, e.g. /dev/ttyUSB0
 NETLINK_DIR = "/home/pi/dreampi"
 
 NUM_OPENMENU = "1111111"
@@ -320,7 +321,7 @@ _MODEM_EVENTS = [
     (r"^Detecting connection and modem", "Looking for the modem", None),
     (r"^Unable to find a modem device", "No modem found, retrying", None),
     (r"^Unable to detect an internet connection", "Waiting for internet", None),
-    (r"^Opening serial interface to (\S+)", "Opening modem on %s", None),
+    (r"^Opening serial interface to (\S+)", "Opening modem on %s", "port"),
     (r"^<LISTENING>", "Dial tone on, waiting for a call", "clear"),
     (r"^Heard: (\S+)", "Number dialed: %s", None),
     (r"^(?:Response: )?CONNECT (\d+)", "Carrier up at %s bps", "speed"),
@@ -343,6 +344,14 @@ def _write_modem(text):
         pass
 
 
+def _write_port(port):
+    try:
+        with open(MODEM_PORT, "w") as f:
+            f.write(port + "\n")
+    except Exception:
+        pass
+
+
 class _ModemStatusHandler(logging.Handler):
     """Turns DreamPi's own log lines into a short modem status."""
     def emit(self, record):
@@ -357,6 +366,8 @@ class _ModemStatusHandler(logging.Handler):
                         _speed[0] = m.group(1)
                     elif action == "clear":
                         _speed[0] = ""
+                    elif action == "port":
+                        _write_port(m.group(1))
                     text = text % m.groups() if m.groups() else text
                     _write_modem(text.replace("{speed}", " at %s bps" % _speed[0] if _speed[0] else ""))
                     return

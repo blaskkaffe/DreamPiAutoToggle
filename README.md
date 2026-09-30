@@ -12,8 +12,9 @@ What you get:
 - Optional status LEDs on GPIO18: one NeoPixel, several, or a strip. They show DreamPi's status and network or internet problems, with colours, effects and LED sections per message.
 - An optional animated Dreamcast-style background for the page.
 - A debug log for tracking down calls that go wrong.
+- Modem plugged-in detection, its make/model and firmware, and a warning if it's not a modem known to work with DreamPi.
 
-**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `555-0002` works end to end. A single NeoPixel on GPIO18 works too. Several LEDs or a strip haven't been tried on real hardware yet; feedback is welcome.
+**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `555-0002` works end to end. A single NeoPixel on GPIO18 works too. Several LEDs or a strip, the new LED colour calibration/wire order/dithering, and modem identification haven't been tried on real hardware yet; feedback is welcome.
 
 ## Install
 
@@ -87,7 +88,7 @@ A number ending in `#` is a switch-only call. DreamPi doesn't answer it: the add
 `http://dreampi.local` updates live, every second.
 
 - **Network box:** the selected network (orange for DCNow!, blue for DCNET) with DreamPi's status and its dot underneath, for example "Ready for calls". Tap the box (the small arrow) to show all status rows:
-  - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DCNow! or DCNET, call ended.
+  - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DCNow! or DCNET, call ended. A red warning box appears if the modem's USB connection goes away, or if it's a modem not known to work with DreamPi. The small **Check** button at the end of the row identifies the modem (make/model from its USB info, plus firmware/revision by asking it directly): this briefly stops and restarts DreamPi, so don't use it during a call. It also runs once by itself the first time a modem is seen (including at boot) and again whenever a different one is plugged in, so it usually doesn't need pressing at all; the result (and a note if it's not a known-working modem) is in the **About** card in Settings.
   - **Pi:** CPU use, RAM and temperature on one line (for example "CPU 3%, RAM 128/923MB, 43°C"), with the uptime and the Pi's IP address underneath, plus the Pi's own power and heat warnings (under-voltage, throttling) now and since boot. A weak power supply is a common cause of an unstable Pi, so a red warning box appears at the top of the page while the Pi is short of power or overheating.
   - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online`, and whether it's connected by Ethernet or Wi-Fi. A red warning box appears at the top of the page when the internet is down.
   - **Hang up** (at the bottom when the box is open, only while DreamPi is in a call): ends a call that got stuck and gets the modem ready again. Tap it twice to confirm. It ends the call the way DreamPi ends one itself, by stopping `pppd` for DCNow! or `dcnet.rpi` for DCNET, after which DreamPi hangs up the modem and starts the dial tone. If DreamPi isn't ready for calls within 30 seconds, or the call process is already gone, it restarts the DreamPi service.
@@ -111,8 +112,11 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 
 **About:** the add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model and the operating system.
 
-**Status LED** (only shown when LEDs are installed with `--led` or `--leds=N`; the title shows the number of LEDs for a strip)
+**Status LED** (only shown when LEDs are installed with `--led` or `--leds=N`, and not hidden - see below; the title shows the number of LEDs for a strip)
 
+- **LEDs connected:** how many LEDs are wired up, 1 to 300. Takes effect within a second, no reinstall or `--leds=N` needed; this is just where the count starts out.
+- **Wire order:** the strip's wiring, `RGB`, `RBG`, `GRB` (most WS2812 strips), `GBR`, `BRG` or `BGR`. Wrong order shows the right brightness with the wrong colour (for example a red status looks green).
+- **Colour calibration:** an R, G and B slider, 0 to 100% each (default 100%, i.e. no change). If colours wash out toward white or a wrong colour at high brightness, one channel is coming out stronger than the others; turn that channel down until white looks white.
 - **Global brightness** of the LEDs, 0 to 100% (default 8%). The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
 - Two tabs, **DCNow! selected** and **DCNET selected**, each with the full list of LED messages, grouped into **Errors** and **Information** (see [LED messages](#led-messages)). For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
 - Per message:
@@ -120,7 +124,8 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
   - **Colour.**
   - **Effect:** tap it for a small menu. **Solid**, **Blink**, **Breathe** (fading up and down) and **RGB** (cycles through all colours, ignoring the colour set: one round every 20 seconds when slow, every 10 when fast) work on any LED. With a strip there are also **Rainbow**, **Scanner** (a dot sweeping back and forth), **Comet**, **Chase** and **Twinkle**. Every effect except Solid has a **Slow** and a **Fast** speed. With a strip, the same menu sets which **LEDs** the message uses: **All**, or a range such as 1 to 1 or 2 to 8.
   - **Level:** the brightness for that message. Grey means it uses the global brightness; tap it to give the message its own brightness with a slider, and tap **Use global** to go back.
-- **Reset LED settings to defaults** restores the defaults in [LED messages](#led-messages) and the 8% global brightness.
+- **Reset LED settings to defaults** restores the defaults in [LED messages](#led-messages) and the 8% global brightness (not the LED count, wire order or calibration - those describe your wiring, not a look to reset).
+- **Hide these settings:** removes the whole Status LED section from Settings, for shipping a Pi with the LEDs already set up and keeping them from being changed by accident. There's a confirmation, because the only way back is deleting `led_hidden` in `/opt/dreampi-netswitch` on the Pi itself (or reinstalling).
 
 The status dot next to DreamPi on the main page previews that status's colour and effect. Network problems show as red warning boxes at the top of the page instead.
 
