@@ -449,6 +449,74 @@ def pi_health():
             "problem": state == "bad"}
 
 
+# ------------------------------------------------------------ force hang up
+
+_hangup = {"busy": False, "text": ""}
+_hangup_lock = threading.Lock()
+HANGUP_WAIT = 30      # seconds to wait for DreamPi to be ready before restarting it
+
+
+def _run(cmd):
+    try:
+        return subprocess.call(cmd, stdout=subprocess.DEVNULL if hasattr(subprocess, "DEVNULL") else None,
+                               stderr=subprocess.STDOUT)
+    except OSError:
+        return -1
+
+
+def force_hangup():
+    """End the current call the way DreamPi itself ends one, so it hangs up
+    the modem and starts the dial tone again:
+    - DCNow! (PPP): DreamPi waits for pppd to exit, then sends ATH0.
+    - DCNET: netlink waits for dcnet.rpi to exit, then resets the modem.
+    If DreamPi isn't ready for calls within HANGUP_WAIT seconds (or wasn't
+    in a call at all, e.g. stuck), restart the dreampi service.
+    Runs in its own thread; progress is shown on the page."""
+    def say(text):
+        _hangup["text"] = text
+        debug_log("web page: " + text)
+        sys.stderr.write("hang up: %s\n" % text)
+
+    try:
+        state = dreampi_state()[0]
+        ended = []
+        if _run(["pkill", "-TERM", "-x", "pppd"]) == 0:
+            ended.append("pppd")
+        if _run(["pkill", "-TERM", "-f", "dcnet.rpi"]) == 0:
+            ended.append("dcnet.rpi")
+        if ended:
+            say("hanging up (ended %s), waiting for DreamPi" % " and ".join(ended))
+            end = time.time() + HANGUP_WAIT
+            while time.time() < end:
+                time.sleep(1)
+                if dreampi_state()[0] == "ok":
+                    say("hung up, DreamPi is ready for calls")
+                    return
+            say("DreamPi didn't get ready, restarting it")
+        else:
+            say("the call seems stuck (no call process found), restarting DreamPi")
+        rc = _run(["systemctl", "restart", "dreampi.service"])
+        say("DreamPi restarted, it takes a few seconds to be ready" if rc == 0
+            else "could not restart DreamPi (systemctl returned %s)" % rc)
+    finally:
+        time.sleep(5)
+        _hangup["busy"] = False
+
+
+def start_hangup():
+    """Only while DreamPi is in a call (the button is hidden otherwise)."""
+    if not dreampi_state()[0].startswith("call"):
+        return False
+    with _hangup_lock:
+        if _hangup["busy"]:
+            return False
+        _hangup.update(busy=True, text="hanging up...")
+    t = threading.Thread(target=force_hangup)
+    t.daemon = True
+    t.start()
+    return True
+
+
 # --------------------------------------------------------------- versions
 
 DREAMPI_DIR = "/home/pi/dreampi"
@@ -757,6 +825,7 @@ def api_state():
             "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
                    "line2": pi.get("line2"), "warn": pi.get("warn")},
             "wifi": {"state": wf_state, "ssid": wf.get("ssid"), "installed": os.path.exists(WIFI_BUTTON_ENABLED)},
+            "hangup": {"busy": _hangup["busy"], "text": _hangup["text"]},
             "warnings": warnings, "now": int(time.time())}
 
 
@@ -795,7 +864,11 @@ PAGE = u"""<!doctype html>
  .now .row.main .k{display:none} .now .row.main .v{flex:none}
  .now .row .k{color:rgba(255,255,255,.65);width:68px} .now .row .v{min-width:0;display:flex;align-items:baseline} .now .row .v > .dot{flex:none} .now .row .v > span:last-child{min-width:0} .now .sub{color:rgba(255,255,255,.65)}
  .now .arrow{color:rgba(255,255,255,.7);font-size:.9em}
- .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .nw{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sub.blk{display:block}
+ .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .now .row.hang{justify-content:center;padding:12px 0 2px}
+ .now .row.hang form{width:100%} .now .row.hang .pill-s{display:block;width:100%;padding:9px 12px;font-size:1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .now .row.hang .pill-s{background:rgba(160,30,30,.85);border-color:rgba(230,110,110,.85)}
+ .now .row.hang .pill-s.arm{background:#d33;border-color:#f99}
+ .nw{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sub.blk{display:block}
  .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.18)}
  .now.open .row.main .k{display:block} .now.open .row.main .v{flex:1}
  .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r);font-size:1.1em;font-weight:600;letter-spacing:.02em}
@@ -876,6 +949,8 @@ PAGE = u"""<!doctype html>
  <div class="row more"><span class="k">Modem</span><span class="v"><span><span class="nw" id="m-text">...</span><span class="sub blk" id="m-since"></span></span></span></div>
  <div class="row more"><span class="k">Internet</span><span class="v"><span class="dot" id="i-dot"></span><span id="i-text">...</span></span></div>
  <div class="row more"><span class="k">Pi</span><span class="v"><span class="dot" id="p-dot"></span><span id="p-text">...</span></span></div>
+ <div class="row more hang" id="hang-row" style="display:none"><form method="post" action="/hangup" id="hang-f"><button class="pill-s" id="hang-b" type="submit"
+  title="Ends the current call and gets the modem ready again">Hang up</button></form></div>
 </div>
 <form method="post" action="/dcnow"><button class="pill dcnow-b">DCNow! / DreamPi</button></form>
 <form method="post" action="/dcnet"><button class="pill dcnet-b">DCNET / FLYCAST</button></form>
@@ -965,6 +1040,12 @@ function lookDot(el,look){if(!look){el.className="dot";el.style.background="#333
  el.style.animation=f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none"}
 var favNet="dcnow";
 function render(d){
+ // Hang up only while in a call (or while a hang up is still running)
+ $("hang-row").style.display=(d.dreampi.state.indexOf("call")==0||(d.hangup&&d.hangup.busy))?"":"none";
+ if(d.hangup){var hb=$("hang-b");
+  if(d.hangup.busy){hb.disabled=true;hb.className="pill-s";
+   hb.textContent=d.hangup.text?d.hangup.text.charAt(0).toUpperCase()+d.hangup.text.slice(1):"Hanging up..."}
+  else if(hb.disabled){hb.disabled=false;hb.textContent="Hang up"}}
  $("warnings").innerHTML=d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("");
  lookDot($("d-dot"),d.dreampi.look); $("d-text").textContent=d.dreampi.text;
  $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now).replace(/[()]/g,"");
@@ -999,7 +1080,15 @@ $("wifi-b").onclick=function(){
  var x=new XMLHttpRequest();x.open("POST","/wifitoggle",true);x.setRequestHeader("X-Requested-With","netswitch");
  x.onload=refresh;x.send()};
 var logSize=0,debugOn=false,logBusy=false,debugOpen=false;
-$("net").onclick=function(){this.classList.toggle("open")};
+$("net").onclick=function(e){if(e.target.closest&&e.target.closest(".hang"))return;this.classList.toggle("open")};
+// Hang up: tap once to arm, again within 4 s to confirm (a call in progress is easy to end by accident)
+var hangArm=0;
+$("hang-f").onsubmit=function(e){e.preventDefault();e.stopPropagation();var b=$("hang-b");
+ if(b.disabled)return;
+ if(Date.now()-hangArm>4000){hangArm=Date.now();b.textContent="Tap again to hang up";b.className="pill-s arm";
+  setTimeout(function(){if(Date.now()-hangArm>=4000&&!b.disabled){b.textContent="Hang up";b.className="pill-s"}},4100);return}
+ hangArm=0;b.disabled=true;b.textContent="Hanging up...";b.className="pill-s";
+ var x=new XMLHttpRequest();x.open("POST","/hangup",true);x.setRequestHeader("X-Requested-With","netswitch");x.onload=refresh;x.send()};
 function showSettings(open){$("settings").classList.toggle("open",open);
  document.body.classList.toggle("settings-open",open);if(open){loadLed();loadAbout()}}
 function loadAbout(){var x=new XMLHttpRequest();x.open("GET","/about",true);
@@ -1145,7 +1234,7 @@ function pollLog(){
 }
 function refresh(){var x=new XMLHttpRequest();x.open("GET","/api",true);
  x.onload=function(){if(x.status==200)render(JSON.parse(x.responseText))};x.send()}
-Array.prototype.forEach.call(document.forms,function(f){f.onsubmit=function(e){e.preventDefault();
+Array.prototype.forEach.call(document.forms,function(f){if(f.id=="hang-f")return;f.onsubmit=function(e){e.preventDefault();
  var x=new XMLHttpRequest();x.open("POST",f.getAttribute("action"),true);x.setRequestHeader("X-Requested-With","netswitch");
  x.onload=function(){refresh();pollLog()};x.send()}});
 refresh(); setInterval(refresh,1000);
@@ -1323,6 +1412,8 @@ class Handler(BaseHTTPRequestHandler):
                     os.remove(DTMF_LOG)  # start a fresh log
                 debug_log("web page: debug log started (network: %s)" %
                           ("DCNET" if os.path.exists(FLAG) else "DCNow!"))
+        elif self.path == "/hangup":
+            start_hangup()
         elif self.path == "/clearlog":
             if os.path.exists(DTMF_LOG):
                 os.remove(DTMF_LOG)

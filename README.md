@@ -14,7 +14,7 @@ What you get:
 - An optional animated Dreamcast-style background for the page.
 - A debug log for tracking down calls that go wrong.
 
-**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET by dialing its special number worked end to end (dialed as `333-3333` at the time; the routing logic is unchanged but the current `555-0002` hasn't been dialed on hardware yet). A single NeoPixel on GPIO18 works too. Several LEDs or a strip, and the Wi-Fi setup button, haven't been tried on real hardware yet; feedback is welcome.
+**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `555-0002` works end to end. A single NeoPixel on GPIO18 works too. Several LEDs or a strip, and the Wi-Fi setup button, haven't been tried on real hardware yet; feedback is welcome.
 
 ## Install
 
@@ -74,6 +74,11 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 | `555-0001` | Selects DCNow! / DreamPi and connects to it. Can be set in the Dreamcast ISP config to always connect to DCNow! |
 | `555-0002` | Selects DCNET / FLYCAST and connects to it. Can be set in the Dreamcast ISP config to always connect to DCNET. |
 | Any other number | Connects to the currently selected network. Set your Dreamcast ISP config to any 7-digit number to use this feature. |
+| `555-0001#` | Switch only: selects DCNow! / DreamPi without connecting. |
+| `555-0002#` | Switch only: selects DCNET / FLYCAST without connecting. |
+| `111-1111#` | Switch only: resets the selection to the **default network** without connecting. |
+
+A number ending in `#` is a switch-only call. DreamPi doesn't answer it: the add-on changes the selection and plays a busy tone for 4 seconds, so the Dreamcast gives up straight away instead of waiting for an answer. After that the normal dial tone comes back and the next call goes to the newly selected network. Use it to change networks from the Dreamcast without opening the web page.
 
 - The numbers are matched on their last seven digits, so a leading `1` (long-distance prefix), an area code or an outside-line digit doesn't matter. DreamPi often hears an extra leading `1`, for example `15550002`.
 - `555-0001` and `555-0002` (the North American fictional-exchange prefix) replace the older `222-2222`/`333-3333`: a run of seven identical digits is the hardest pattern for a DTMF decoder to count correctly (no frequency change marks a digit boundary, only a timing gap), the same kind of issue the [Debug log](#debug-log) helps track down for misheard numbers. If you had `222-2222` or `333-3333` set in a Dreamcast ISP config, update it to the new numbers.
@@ -88,6 +93,7 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
   - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DCNow! or DCNET, call ended.
   - **Pi:** CPU use, RAM and temperature on one line (for example "CPU 3%, RAM 128/923MB, 43°C"), with the uptime and the Pi's IP address underneath, plus the Pi's own power and heat warnings (under-voltage, throttling) now and since boot. A weak power supply is a common cause of an unstable Pi, so a red warning box appears at the top of the page while the Pi is short of power or overheating.
   - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online`, and whether it's connected by Ethernet or Wi-Fi. A red warning box appears at the top of the page when the internet is down.
+  - **Hang up** (at the bottom when the box is open, only while DreamPi is in a call): ends a call that got stuck and gets the modem ready again. Tap it twice to confirm. It ends the call the way DreamPi ends one itself, by stopping `pppd` for DCNow! or `dcnet.rpi` for DCNET, after which DreamPi hangs up the modem and starts the dial tone. If DreamPi isn't ready for calls within 30 seconds, or the call process is already gone, it restarts the DreamPi service.
 - The **DCNow! / DreamPi** and **DCNET / FLYCAST** buttons change the selected network.
 - **Debug log:** hidden unless switched on in the settings (see below).
 
