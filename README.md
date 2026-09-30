@@ -10,7 +10,7 @@ What you get:
 - A live status page at `http://dreampi.local` (also over HTTPS) with buttons to pick the network.
 - Special phone numbers that switch the network straight from the Dreamcast.
 - Optional status LEDs on GPIO18: one NeoPixel, several, or a strip. They show DreamPi's status and network or internet problems, with colours, effects and LED sections per message.
-- An optional Wi-Fi setup button: hold it for 3 seconds and the Pi hosts a temporary "DreamPi WiFi Config" Wi-Fi network with a page to pick and connect to your home Wi-Fi, no keyboard or monitor needed.
+- An optional Wi-Fi setup button: tap it to switch networks, or hold it for 3 seconds and the Pi hosts a temporary "DreamPi WiFi Config" Wi-Fi network with a page to pick and connect to your home Wi-Fi, no keyboard or monitor needed.
 - An optional animated Dreamcast-style background for the page.
 - A debug log for tracking down calls that go wrong.
 
@@ -202,7 +202,10 @@ If the LEDs stay dark, `systemctl status dreampi-netswitch-led` shows why.
 
 ## Wi-Fi setup button (optional)
 
-A momentary push button on **GPIO15 (physical pin 10)** gives the Pi a way to join a Wi-Fi network without a keyboard, monitor or SSH: wire it between GPIO15 and a **GND** pin, hold it for **3 seconds**, and the Pi:
+A momentary push button on **GPIO15 (physical pin 10)** doubles as a quick network switch and a way to join a Wi-Fi network without a keyboard, monitor or SSH. Wire it between GPIO15 and a **GND** pin:
+
+- **Tap it briefly** to switch the selected network between DCNow! and DCNET, the same as the web page's two buttons or dialing `555-0001`/`555-0002`.
+- **Hold it for 3 seconds** to start Wi-Fi setup. The Pi:
 
 1. Scans for Wi-Fi networks and hosts a temporary, unencrypted Wi-Fi network called **"DreamPi WiFi Config"**, styled like the main page.
 2. Connect a phone or PC to it and open `http://192.168.4.1` (most phones prompt for this automatically) - or, if the Pi's regular page is still reachable some other way (for example over Ethernet), open its Settings instead; the same network list appears there too (see [Settings](#settings-cogwheel)). Pick a network from the list (or enter one manually, for a hidden network), enter its password if it needs one, and tap **Connect**.
@@ -211,7 +214,7 @@ A momentary push button on **GPIO15 (physical pin 10)** gives the Pi a way to jo
 
 While it's scanning or hosting the setup network, a status LED shows a breathing blue light (a scanning animation instead, with a strip). Holding the button again, or the **Wi-Fi setup** control under Network in the settings, cancels it at any point and returns the Pi to its normal Wi-Fi connection.
 
-**Wiring:** the button between **GPIO15 (physical pin 10)** and any **GND** pin. No resistor needed; the Pi's internal pull-up is used, so the pin reads high normally and low while the button is held. GPIO15 is also the Pi's UART RX pin; if you use the Pi's serial console (rare on a DreamPi, which normally talks to the modem over USB), pick a different pin instead by editing `/opt/dreampi-netswitch/wifi_button_gpio` (a single GPIO number) after installing.
+**Wiring:** no resistor needed; the Pi's internal pull-up is used, so the pin reads high normally and low while the button is held. GPIO15 is also the Pi's UART RX pin; if you use the Pi's serial console (rare on a DreamPi, which normally talks to the modem over USB), pick a different pin instead by editing `/opt/dreampi-netswitch/wifi_button_gpio` (a single GPIO number) after installing.
 
 **Install:** `sudo ./install.sh --wifi`. This installs `hostapd` and `dnsmasq` with `apt` if they aren't already present (needed to host the setup network) and starts the `dreampi-netswitch-wifi` service. Remove it again with `sudo ./install.sh --no-wifi`.
 

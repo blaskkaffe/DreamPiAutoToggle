@@ -63,6 +63,7 @@ AP_IP = "192.168.4.1"
 AP_DHCP_FROM, AP_DHCP_TO = "192.168.4.10", "192.168.4.100"
 
 HOLD_SECONDS = 3.0        # button hold before Wi-Fi setup starts/stops
+SHORT_PRESS_MIN = 0.05    # ignore anything shorter than this (contact bounce)
 BUTTON_POLL = 0.05
 SCAN_WAIT = 4             # seconds to let a scan finish before reading results
 CONNECT_TIMEOUT = 25      # seconds to wait for an IP address after a connect attempt
@@ -524,10 +525,23 @@ def _setup_cycle(iface):
     clear_flags()
 
 
+def toggle_network():
+    """Short press: switch the selected network, the same flag file the web
+    page's DCNow!/DCNET buttons and the special phone numbers use."""
+    if os.path.exists(web.FLAG):
+        os.remove(web.FLAG)
+        net = "DCNow!"
+    else:
+        open(web.FLAG, "w").close()
+        net = "DCNET"
+    web.debug_log("wifi button: short press, %s selected" % net)
+
+
 def button_watcher(pin):
-    """Watches one GPIO pin (internal pull-up; pressed = pulled to GND) and
-    touches wifi_start / wifi_stop on a 3-second hold, exactly like the
-    web page's Wi-Fi setup button does."""
+    """Watches one GPIO pin (internal pull-up; pressed = pulled to GND).
+    A short press (released before HOLD_SECONDS, but long enough to not be
+    contact bounce) switches the selected network; a 3-second hold touches
+    wifi_start / wifi_stop, exactly like the web page's Wi-Fi setup button."""
     fd = os.open("/dev/mem", os.O_RDWR | os.O_SYNC)
     try:
         base = peripheral_base()
@@ -546,7 +560,9 @@ def button_watcher(pin):
                     open(web.WIFI_STOP, "w").close()
                 else:
                     open(web.WIFI_START, "w").close()
-        else:
+        else:   # released
+            if pressed_since is not None and not fired and time.time() - pressed_since >= SHORT_PRESS_MIN:
+                toggle_network()
             pressed_since, fired = None, False
         time.sleep(BUTTON_POLL)
 
