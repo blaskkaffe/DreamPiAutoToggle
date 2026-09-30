@@ -502,22 +502,98 @@ def effect_frame(effect, speed, colour, t, n):
 _dither_err = {}   # (led index, channel) -> carried-over rounding error
 
 
-def to_bytes(frame, brightness, calib=(1.0, 1.0, 1.0), dither=True, start=0):
-    """Floats 0..1 -> 0..255 with brightness and per-channel calibration.
-    A channel that is on never rounds down to 0, so colours stay
-    recognisable at low brightness. With dither, the rounding error is
-    carried over to the next frame instead of discarded, so a value the
-    8-bit output can't represent exactly (typical at low brightness, where
-    slow effects like breathe would otherwise visibly step) is approximated
-    by alternating the neighbouring levels over time instead. start is the
-    absolute LED index of frame[0], so a section keeps its own dither state
-    even though render() quantizes one message's section at a time."""
+# ------------------------------------------------------------- calibration
+# The swatch grid (web.CALIB_COLUMNS x web.CALIB_ROWS) gives, for each cell
+# that's been calibrated, the difference between its reference swatch and
+# the colour the page found the LED actually needs to look like it. To
+# correct an arbitrary colour: split it into hue/lightness/saturation,
+# interpolate that cell's offset circularly across the 8 hue columns at the
+# matching lightness, do the same for "white" (which only has a lightness
+# axis), and blend the two by saturation - a fully saturated colour uses
+# the hue-interpolated offset, a grey one uses white's, anything between
+# blends smoothly instead of jumping at some saturation cutoff.
+def calib_table(cfg):
+    """{(column, row): (dr, dg, db)} in -255..255, 0 for an uncalibrated
+    (or never-loaded) cell. Built once per config read, not per pixel."""
+    raw = (cfg or {}).get("calibrate") or {}
+    table = {}
+    for col in web.CALIB_COLUMNS:
+        for row in web.CALIB_ROWS:
+            hexval = (raw.get(col) or {}).get(row)
+            if not hexval:
+                table[(col, row)] = (0.0, 0.0, 0.0)
+                continue
+            cr, cg, cb = hex_rgb(hexval)
+            rr, rg, rb = hex_rgb(web.calib_swatch(col, row))
+            table[(col, row)] = ((cr - rr) * 255.0, (cg - rg) * 255.0, (cb - rb) * 255.0)
+    return table
+
+
+def _lerp3(a, b, t):
+    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t)
+
+
+def _row_interp(table, col, lightness):
+    """A column's offset at a lightness, interpolated across (or clamped
+    to) the light/medium/dark rows."""
+    lt = web.CALIB_LIGHTNESS
+    if lightness >= lt["light"]:
+        return table[(col, "light")]
+    if lightness <= lt["dark"]:
+        return table[(col, "dark")]
+    if lightness >= lt["medium"]:
+        lo, hi = "medium", "light"
+    else:
+        lo, hi = "dark", "medium"
+    t = (lightness - lt[lo]) / (lt[hi] - lt[lo])
+    return _lerp3(table[(col, lo)], table[(col, hi)], t)
+
+
+def _hue_interp(table, hue_deg, lightness):
+    """The chromatic offset at a hue (0..360) and lightness, interpolated
+    circularly across the 8 hue columns (their spacing isn't even)."""
+    pts = web.CALIB_HUES   # already ascending by degree
+    n = len(pts)
+    for i in range(n):
+        name0, deg0 = pts[i]
+        name1, deg1 = pts[(i + 1) % n]
+        span = (deg1 - deg0) % 360 or 360
+        pos = (hue_deg - deg0) % 360
+        if pos <= span:
+            t = pos / span
+            return _lerp3(_row_interp(table, name0, lightness), _row_interp(table, name1, lightness), t)
+    return _row_interp(table, pts[0][0], lightness)   # unreachable
+
+
+def calib_offset(table, r, g, b):
+    """(dr, dg, db) to add to (r, g, b) (0..255 each)."""
+    h, l, s = colorsys.rgb_to_hls(r / 255.0, g / 255.0, b / 255.0)
+    white = _row_interp(table, "white", l)
+    if s <= 0.0:
+        return white
+    return _lerp3(white, _hue_interp(table, h * 360.0, l), s)
+
+
+def to_bytes(frame, brightness, calib=None, dither=True, start=0):
+    """Floats 0..1 -> 0..255 with brightness and the calibration offset
+    table (from calib_table(), or None for no correction). A channel that
+    is on never rounds down to 0, so colours stay recognisable at low
+    brightness. With dither, the rounding error is carried over to the
+    next frame instead of discarded, so a value the 8-bit output can't
+    represent exactly (typical at low brightness, where slow effects like
+    breathe would otherwise visibly step) is approximated by alternating
+    the neighbouring levels over time instead. start is the absolute LED
+    index of frame[0], so a section keeps its own dither state even though
+    render() quantizes one message's section at a time."""
     out = []
     for i, (r, g, b) in enumerate(frame):
         idx = start + i
+        raw = (r * 255 * brightness, g * 255 * brightness, b * 255 * brightness)
+        if calib:
+            raw = tuple(raw[c] + d for c, d in enumerate(calib_offset(calib, *raw)))
         px = []
-        for c, v in enumerate((r, g, b)):
-            x = v * 255 * brightness * calib[c]
+        for c, x in enumerate(raw):
+            x = max(0.0, min(255.0, x))
             if x <= 0:
                 px.append(0)
                 if dither:
@@ -540,17 +616,17 @@ def reset_dither():
     _dither_err.clear()
 
 
-def scaled(colour, brightness, calib=(1.0, 1.0, 1.0)):
+def scaled(colour, brightness, calib=None):
     """'#rrggbb' at a brightness, for a single solid pixel."""
     return to_bytes([hex_rgb(colour)], brightness, calib, dither=False)[0]
 
 
 # ---------------------------------------------------------------- composing
-def render(messages, now, count, clocks=None, calib=(1.0, 1.0, 1.0)):
+def render(messages, now, count, clocks=None, calib=None):
     """Draw the active messages (lowest priority first) into one frame.
     Each message covers all LEDs or its own section; later (more important)
     messages draw over earlier ones, and uncovered LEDs stay dark.
-    Every message's effect starts from its beginning (blink on, breathe
+    Every message's effect restarts from its beginning (blink on, breathe
     bright) when the message appears or its look changes, so a change shows
     straight away instead of landing somewhere in the middle of a cycle.
     clocks keeps those start times between frames."""
@@ -579,16 +655,11 @@ def render(messages, now, count, clocks=None, calib=(1.0, 1.0, 1.0)):
     return frame
 
 
-def _calib_tuple(cfg):
-    c = cfg.get("calibrate") or {}
-    return (c.get("r", 1.0), c.get("g", 1.0), c.get("b", 1.0))
-
-
 # ---------------------------------------------------------------- main loop
 def main():
     count, gpio = web.led_count() or 1, web.led_gpio()
     cfg = web.led_config()
-    order, calib = ORDERS.get(cfg.get("order"), DEFAULT_ORDER), _calib_tuple(cfg)
+    order, calib = ORDERS.get(cfg.get("order"), DEFAULT_ORDER), calib_table(cfg)
     try:
         out = open_output(count, gpio)
     except (IOError, OSError) as e:
@@ -608,6 +679,7 @@ def main():
     signal.signal(signal.SIGINT, stop)
 
     messages = []
+    preview = None
     clocks = {}
     last_frame, last_sent = None, 0.0
     next_read = 0.0
@@ -615,9 +687,10 @@ def main():
         now = time.time()
         if now >= next_read:
             try:
+                preview = web.calib_preview()
                 messages = web.active_messages()
                 cfg = web.led_config()
-                order, calib = ORDERS.get(cfg.get("order"), DEFAULT_ORDER), _calib_tuple(cfg)
+                order, calib = ORDERS.get(cfg.get("order"), DEFAULT_ORDER), calib_table(cfg)
                 new_count, new_gpio = web.led_count() or 1, web.led_gpio()
                 if new_count != count or new_gpio != gpio:   # changed on the page: reopen the output
                     try:
@@ -636,7 +709,10 @@ def main():
             except Exception:   # never let a bad read stop the LED loop
                 pass
             next_read = now + REFRESH
-        frame = render(messages, now, count, clocks, calib)
+        # Colour calibration popup open on the page: show its raw sliders
+        # directly (no effects, no calibration correction - that's what's
+        # being figured out) so the LED can be compared to the swatch.
+        frame = [preview] * count if preview else render(messages, now, count, clocks, calib)
         # Unchanged frames (solid colours) are only resent twice a second,
         # which fixes any garbled frame and keeps the CPU free for DreamPi.
         if frame != last_frame or now - last_sent >= 0.5:

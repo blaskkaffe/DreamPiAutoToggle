@@ -4,6 +4,7 @@
 # optional debug timeline. It only creates/removes the files that
 # netswitch_hook.py reads.
 # Works on Python 3 and 2.7.
+import colorsys
 import gzip
 import io
 import json
@@ -921,9 +922,35 @@ except NameError:
 
 LED_ORDERS = ("RGB", "RBG", "GRB", "GBR", "BRG", "BGR")   # wire order of the WS2812 strip; most are GRB
 
+# Colour calibration: a 9 (hue) x 3 (lightness) grid of reference swatches.
+# Calibrating a cell means the page found (by eye, sliding R/G/B while the
+# LED shows the result live) which actual colour to send so the LED looks
+# like that swatch; led.json keeps that colour, or null for an uncalibrated
+# (identity) cell. netswitch_led.py turns the difference between a cell's
+# swatch and its calibrated colour into a hue/lightness-interpolated
+# correction applied to every colour the LEDs show - see calib_offset()
+# there. Hues are plain HSL degrees, not evenly spaced (matching how the
+# eye tells hues apart); "white" is the grey (zero-saturation) anchor every
+# hue's correction is blended towards as saturation drops.
+CALIB_HUES = (("red", 0), ("orange", 30), ("yellow", 60), ("green", 120),
+             ("cyan", 180), ("blue", 240), ("purple", 270), ("magenta", 300))
+CALIB_COLUMNS = tuple(name for name, _ in CALIB_HUES) + ("white",)
+CALIB_ROWS = ("light", "medium", "dark")
+CALIB_LIGHTNESS = {"light": 0.75, "medium": 0.5, "dark": 0.25}
+_CALIB_HUE_DEG = dict(CALIB_HUES)
+
+
+def calib_swatch(column, row):
+    """The reference '#rrggbb' for one grid cell."""
+    lightness = CALIB_LIGHTNESS[row]
+    hue, sat = (0.0, 0.0) if column == "white" else (_CALIB_HUE_DEG[column] / 360.0, 1.0)
+    r, g, b = colorsys.hls_to_rgb(hue, lightness, sat)
+    return "#%02x%02x%02x" % (round(r * 255), round(g * 255), round(b * 255))
+
 
 def default_led_config():
-    return {"brightness": 0.08, "order": "GRB", "calibrate": {"r": 1.0, "g": 1.0, "b": 1.0},
+    return {"brightness": 0.08, "order": "GRB",
+            "calibrate": dict((col, dict((row, None) for row in CALIB_ROWS)) for col in CALIB_COLUMNS),
             "colours": dict((net, dict((st, {"color": c, "effect": e, "speed": sp, "brightness": None,
                                              "enabled": on, "leds": None})
                                        for st, (c, e, sp, on) in _DEFAULT_COLOURS.items()))
@@ -943,12 +970,14 @@ def clean_led_config(data):
         cfg["order"] = data["order"]
     calibrate = data.get("calibrate")
     if isinstance(calibrate, dict):
-        for ch in ("r", "g", "b"):
-            try:
-                if ch in calibrate:
-                    cfg["calibrate"][ch] = min(1.0, max(0.0, float(calibrate[ch])))
-            except (TypeError, ValueError):
-                pass
+        for col in CALIB_COLUMNS:
+            cell = calibrate.get(col)
+            if not isinstance(cell, dict):
+                continue
+            for row in CALIB_ROWS:
+                v = cell.get(row)
+                if isinstance(v, _TEXT) and _COLOUR_RE.match(v):
+                    cfg["calibrate"][col][row] = v.lower()
     colours = data.get("colours")
     if isinstance(colours, dict):
         for net in NETWORKS:
@@ -996,6 +1025,40 @@ def save_led_config(data):
         json.dump(cfg, f, indent=1, sort_keys=True)
     os.rename(tmp, LED_CONFIG)   # the LED service never sees a half-written file
     return cfg
+
+
+CALIB_PREVIEW = "/tmp/dreampi-netswitch.calibpreview"   # live "#rrggbb" while matching a swatch
+CALIB_PREVIEW_STALE = 3   # seconds; a closed/crashed tab stops driving the LED after this
+
+
+def calib_preview():
+    """(r, g, b) 0..255 the page wants the LED to show right now while the
+    settings' colour calibration popup is open, or None (use the normal
+    status effects) if nothing is being previewed or the page went quiet."""
+    raw = read_file(CALIB_PREVIEW)
+    if not raw:
+        return None
+    try:
+        when, r, g, b = raw.split()
+        if time.time() - float(when) > CALIB_PREVIEW_STALE:
+            return None
+        return tuple(max(0, min(255, int(v))) for v in (r, g, b))
+    except ValueError:
+        return None
+
+
+def save_calib_preview(r, g, b):
+    tmp = CALIB_PREVIEW + ".tmp"
+    with open(tmp, "w") as f:
+        f.write("%f %d %d %d" % (time.time(), r, g, b))
+    os.rename(tmp, CALIB_PREVIEW)
+
+
+def clear_calib_preview():
+    try:
+        os.remove(CALIB_PREVIEW)
+    except OSError:
+        pass
 
 
 def active_messages(state=None, net_state=None):
@@ -1177,6 +1240,12 @@ PAGE = u"""<!doctype html>
  .secrow{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
  .secrow input[type=number]{width:54px;padding:5px 6px;border-radius:8px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.85em}
  select.ord{padding:5px 6px;border-radius:8px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.85em}
+ .calib-grid{display:flex;flex-direction:column;gap:6px}
+ .calib-row{display:flex;gap:6px}
+ .calib-sw{flex:1;aspect-ratio:1;min-width:0;padding:0;border-radius:8px;border:var(--bw) solid rgba(255,255,255,.28);position:relative}
+ .calib-sw.done::after{content:"";position:absolute;right:3px;bottom:3px;width:7px;height:7px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.45)}
+ .calib-swatches{display:flex;gap:10px;margin-bottom:4px}
+ .calib-sq{width:36px;height:36px;border-radius:8px;border:var(--bw) solid #555}
  .lvl.on.dcnow{background:var(--dcnow);border-color:var(--dcnow);color:#fff} .lvl.on.dcnet{background:var(--dcnet);border-color:var(--dcnet);color:#fff}
  .in{position:relative}
  .pop{display:none;position:absolute;z-index:20;width:290px;padding:12px 16px;border-radius:var(--r);background:#262626;box-shadow:0 6px 24px rgba(0,0,0,.6)}
@@ -1271,11 +1340,12 @@ millisecond timing. Turn recording on, then dial.</div>
  <div class="secrow"><span class="sub">LEDs connected</span><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"></div>
  <div class="secrow"><span class="sub">Output pin</span><select class="ord" id="led-gpio" aria-label="Output pin"></select></div>
  <div class="secrow"><span class="sub">Wire order</span><select class="ord" id="led-order" aria-label="Wire order"></select></div>
- <div class="range"><span>R</span><input type="range" id="cal-r" min="0" max="1000" step="1" style="accent-color:#f33"><span id="cal-r-v" style="width:3em;text-align:right"></span></div>
- <div class="range"><span>G</span><input type="range" id="cal-g" min="0" max="1000" step="1" style="accent-color:#3f3"><span id="cal-g-v" style="width:3em;text-align:right"></span></div>
- <div class="range"><span>B</span><input type="range" id="cal-b" min="0" max="1000" step="1" style="accent-color:#39f"><span id="cal-b-v" style="width:3em;text-align:right"></span></div>
 </div>
-<div class="note">LEDs connected, output pin and wire order (most WS2812 strips are GRB) take effect within a second. Calibration dims a channel that comes out too strong, so colours don't wash out at high brightness; 100% is no change. Switching the output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot); otherwise the LEDs just stay dark until it's switched back.</div>
+<div class="note">LEDs connected, output pin and wire order (most WS2812 strips are GRB) take effect within a second. Switching the output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot); otherwise the LEDs just stay dark until it's switched back.</div>
+<div class="card">
+ <div class="calib-grid" id="calib-grid"></div>
+</div>
+<div class="note">Colour calibration: tap a swatch, then move the sliders until the LED (it shows them live) matches the swatch as closely as you can, and tap Done. A dot marks swatches you've matched; every other colour the LEDs show blends the nearest ones. Fixes a wrong-looking hue as well as washing out at high brightness, not just overall brightness.</div>
 <div class="card">
  <div class="range"><span>Global brightness</span><input type="range" id="led-bright" min="0" max="1000" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
  <div class="tabs"><button class="pill-s" type="button" id="tab-dcnow">DCNow! selected</button><button class="pill-s" type="button" id="tab-dcnet">DCNET selected</button></div>
@@ -1297,6 +1367,12 @@ millisecond timing. Turn recording on, then dial.</div>
 <div id="lvl-pop" class="pop"><div class="t" id="lvl-t"></div>
  <div class="range"><input type="range" id="lvl-r" min="0" max="1000" step="1"><span id="lvl-v" style="width:3em;text-align:right"></span></div>
  <div class="bar"><button class="pill-s" id="lvl-base" type="button">Use global</button><button class="pill-s" id="lvl-done" type="button">Done</button></div></div>
+<div id="calib-pop" class="pop"><div class="t" id="calib-t"></div>
+ <div class="calib-swatches"><span class="calib-sq" id="calib-ref" title="Swatch"></span><span class="calib-sq" id="calib-live" title="Your sliders"></span></div>
+ <div class="range"><span>R</span><input type="range" id="calib-r" min="0" max="255" step="1" style="accent-color:#f33"><span id="calib-r-v" style="width:2.5em;text-align:right"></span></div>
+ <div class="range"><span>G</span><input type="range" id="calib-g" min="0" max="255" step="1" style="accent-color:#3f3"><span id="calib-g-v" style="width:2.5em;text-align:right"></span></div>
+ <div class="range"><span>B</span><input type="range" id="calib-b" min="0" max="255" step="1" style="accent-color:#39f"><span id="calib-b-v" style="width:2.5em;text-align:right"></span></div>
+ <div class="bar"><button class="pill-s" id="calib-reset" type="button">Reset</button><button class="pill-s" id="calib-done" type="button">Done</button></div></div>
 </div>
 <h2>About</h2>
 <div class="card"><table class="about" id="about"></table></div>
@@ -1361,13 +1437,14 @@ $("hang-f").onsubmit=function(e){e.preventDefault();e.stopPropagation();var b=$(
  hangArm=0;b.disabled=true;b.textContent="Hanging up...";b.className="pill-s";
  var x=new XMLHttpRequest();x.open("POST","/hangup",true);x.setRequestHeader("X-Requested-With","netswitch");x.onload=refresh;x.send()};
 function showSettings(open){$("settings").classList.toggle("open",open);
+ if(!open)closePops();
  document.body.classList.toggle("settings-open",open);if(open){loadLed();loadAbout()}}
 function loadAbout(){var x=new XMLHttpRequest();x.open("GET","/about",true);
  x.onload=function(){if(x.status!=200)return;$("about").innerHTML=JSON.parse(x.responseText).map(function(r){
   return '<tr><td class="n">'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>'}).join("")};x.send()}
 $("cog").onclick=function(){showSettings(true)};
 $("close-settings").onclick=function(){showSettings(false)};
-document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(lvlCur||fxCur)closePops();else showSettings(false)}});
+document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(lvlCur||fxCur||calibCur)closePops();else showSettings(false)}});
 // Optional Dreamcast background (static/dc-background.js), remembered per browser
 function bgWanted(){try{return localStorage.getItem("netswitch-bg")==="on"}catch(e){return false}}
 function loadScript(src,done){var sc=document.createElement("script");sc.src=src;sc.onload=done;
@@ -1389,9 +1466,11 @@ function setDebugMenu(on){
  if(!on){debugOpen=false;$("debug").style.display="none";$("show-debug").classList.remove("open")}}
 $("dbg-b").onchange=function(){setDebugMenu(this.checked)};
 var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledEffects=[],ledCount=1,ledGpio=18,ledNet="dcnow";
+var calibColumns=[],calibRows=[],calibSwatches={};
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
   led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledEffects=r.effects;ledCount=r.count||1;ledGpio=r.gpio||18;
+  calibColumns=r.calib_columns;calibRows=r.calib_rows;calibSwatches=r.calib_swatches;
   $("led-section").style.display=(r.installed&&!r.hidden)?"block":"none";   // install.sh --led, not hidden
   $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";
   if(!$("led-order").options.length)$("led-order").innerHTML=r.orders.map(function(o){
@@ -1399,8 +1478,7 @@ function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
   if(!$("led-gpio").options.length)$("led-gpio").innerHTML=r.gpios.map(function(g){
    return '<option value="'+g+'">GPIO'+g+'</option>'}).join("");
   $("led-count-i").value=ledCount;$("led-gpio").value=ledGpio;$("led-order").value=led.order;
-  ["r","g","b"].forEach(function(c){$("cal-"+c).value=Math.round(led.calibrate[c]*1000);
-   $("cal-"+c+"-v").textContent=pct(led.calibrate[c])});
+  buildCalib();
   buildLed()};x.send()}
 function buildLed(){
  ["dcnow","dcnet"].forEach(function(n){$("tab-"+n).className="pill-s "+n+(n==ledNet?" sel":"")});
@@ -1422,10 +1500,19 @@ function netName(n){return n=="dcnet"?"DCNET":"DCNow!"}
 function effectName(e){for(var i=0;i<ledEffects.length;i++)if(ledEffects[i][0]==e)return ledEffects[i][1];return e}
 function showLed(){$("led-bright").value=brightToSlider(led.brightness);$("led-bright-v").textContent=pct(led.brightness);
  $("led-order").value=led.order;
- ["r","g","b"].forEach(function(c){$("cal-"+c).value=Math.round(led.calibrate[c]*1000);
-  $("cal-"+c+"-v").textContent=pct(led.calibrate[c])});
+ buildCalib();
  ledStates.forEach(function(s){var st=s[0],c=led.colours[ledNet][st];
   $("c-"+st).value=c.color;$("e-"+st).checked=c.enabled!==false;showRow(st);showFx(st);showLvl(st)})}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1)}
+function buildCalib(){
+ $("calib-grid").innerHTML=calibRows.map(function(row){
+  return '<div class="calib-row">'+calibColumns.map(function(col){
+   var ref=calibSwatches[col][row],v=(led.calibrate[col]||{})[row];
+   return '<button type="button" class="calib-sw'+(v?' done':'')+'" style="background:'+ref+
+    '" data-col="'+col+'" data-row="'+row+'" title="'+cap(col)+', '+row+'" aria-label="'+cap(col)+', '+row+'"></button>';
+  }).join('')+'</div>'}).join('');
+ Array.prototype.forEach.call($("calib-grid").querySelectorAll("button"),function(b){
+  b.onclick=function(e){e.stopPropagation();openCalib(this)}})}
 function showRow(st){$("r-"+st).className=led.colours[ledNet][st].enabled===false?"dis":""}
 function showFx(st){var el=$("f-"+st);if(!el)return;var c=led.colours[ledNet][st];
  var sub=[];if(c.effect!="solid")sub.push(c.speed);if(ledCount>1&&c.leds)sub.push(c.leds[0]==c.leds[1]?"LED "+c.leds[0]:c.leds[0]+"-"+c.leds[1]);
@@ -1436,8 +1523,10 @@ function placePop(pop,el){var box=pop.parentNode.getBoundingClientRect(),r=el.ge
  pop.classList.add("open");
  pop.style.left=Math.min(Math.max(r.right-box.left-pop.offsetWidth,0),box.width-pop.offsetWidth)+"px";
  pop.style.top=(r.bottom-box.top+6)+"px"}
-var lvlCur=null,fxCur=null;
-function closePops(){$("lvl-pop").classList.remove("open");$("fx-pop").classList.remove("open");lvlCur=fxCur=null}
+var lvlCur=null,fxCur=null,calibCur=null;
+function closePops(){$("lvl-pop").classList.remove("open");$("fx-pop").classList.remove("open");$("calib-pop").classList.remove("open");
+ if(calibCur)stopCalibPreview();
+ lvlCur=fxCur=calibCur=null}
 function openFx(el){closePops();var st=el.dataset.state,c=led.colours[ledNet][st];fxCur=st;
  $("fx-t").textContent=el.dataset.label+", "+netName(ledNet)+" selected";
  $("fx-opts").innerHTML=ledEffects.filter(function(e){return !e[2]||ledCount>1||e[0]==c.effect}).map(function(e){
@@ -1473,8 +1562,34 @@ $("lvl-r").oninput=function(){if(!lvlCur)return;var b=Math.round(sliderToBright(
  led.colours[ledNet][lvlCur].brightness=b;$("lvl-v").textContent=pct(b);showLvl(lvlCur);saveLed()};
 $("lvl-base").onclick=function(){if(!lvlCur)return;led.colours[ledNet][lvlCur].brightness=null;showLvl(lvlCur);saveLed();closePops()};
 $("lvl-done").onclick=closePops;
-$("lvl-pop").onclick=$("fx-pop").onclick=function(e){e.stopPropagation()};
-$("settings").addEventListener("click",function(){if(lvlCur||fxCur)closePops()});
+$("lvl-pop").onclick=$("fx-pop").onclick=$("calib-pop").onclick=function(e){e.stopPropagation()};
+$("settings").addEventListener("click",function(){if(lvlCur||fxCur||calibCur)closePops()});
+function hexToRgb(hex){var n=parseInt(hex.slice(1),16);return [n>>16&255,n>>8&255,n&255]}
+function rgbToHex(rgb){return "#"+rgb.map(function(v){var h=Math.max(0,Math.min(255,Math.round(v))).toString(16);
+ return h.length<2?"0"+h:h}).join("")}
+function openCalib(el){closePops();var col=el.dataset.col,row=el.dataset.row;calibCur={col:col,row:row};
+ var ref=calibSwatches[col][row],v=(led.calibrate[col]||{})[row]||ref;
+ $("calib-t").textContent=cap(col)+", "+row;
+ $("calib-ref").style.background=ref;
+ setCalibSliders(hexToRgb(v));
+ placePop($("calib-pop"),el)}
+function setCalibSliders(rgb){["r","g","b"].forEach(function(c,i){$("calib-"+c).value=rgb[i];$("calib-"+c+"-v").textContent=rgb[i]});
+ calibLive()}
+function calibRgb(){return ["r","g","b"].map(function(c){return parseInt($("calib-"+c).value,10)})}
+function calibLive(){var rgb=calibRgb();$("calib-live").style.background=rgbToHex(rgb);sendCalibPreview(rgb)}
+var calibTimer=null;
+function sendCalibPreview(rgb){clearTimeout(calibTimer);calibTimer=setTimeout(function(){
+ var x=new XMLHttpRequest();x.open("POST","/calibpreview",true);x.setRequestHeader("Content-Type","application/json");
+ x.setRequestHeader("X-Requested-With","netswitch");x.send(JSON.stringify({r:rgb[0],g:rgb[1],b:rgb[2]}))},100)}
+function stopCalibPreview(){clearTimeout(calibTimer);
+ var x=new XMLHttpRequest();x.open("POST","/calibdone",true);x.setRequestHeader("X-Requested-With","netswitch");x.send()}
+["r","g","b"].forEach(function(c){$("calib-"+c).oninput=function(){$("calib-"+c+"-v").textContent=this.value;calibLive()}});
+$("calib-reset").onclick=function(){if(!calibCur)return;
+ led.calibrate[calibCur.col][calibCur.row]=null;
+ setCalibSliders(hexToRgb(calibSwatches[calibCur.col][calibCur.row]));
+ buildCalib();saveLed()};
+$("calib-done").onclick=function(){if(calibCur)led.calibrate[calibCur.col][calibCur.row]=rgbToHex(calibRgb());
+ buildCalib();saveLed();closePops()};
 function saveLed(){clearTimeout(ledTimer);ledTimer=setTimeout(function(){
  var x=new XMLHttpRequest();x.open("POST","/ledconfig",true);x.setRequestHeader("Content-Type","application/json");
  led.count=ledCount;led.gpio=ledGpio;
@@ -1494,8 +1609,6 @@ $("led-count-i").onchange=function(){var n=parseInt(this.value,10);
  $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";saveLed()};
 $("led-gpio").onchange=function(){ledGpio=parseInt(this.value,10);saveLed()};
 $("led-order").onchange=function(){led.order=this.value;saveLed()};
-["r","g","b"].forEach(function(c){$("cal-"+c).oninput=function(){
- led.calibrate[c]=Math.round(this.value)/1000;$("cal-"+c+"-v").textContent=pct(led.calibrate[c]);saveLed()}});
 $("led-hide-b").onclick=function(){
  if(!confirm("Hide the Status LED settings? This can only be undone on the Pi itself, by deleting led_hidden in /opt/dreampi-netswitch."))return;
  var x=new XMLHttpRequest();x.open("POST","/ledhide",true);x.setRequestHeader("X-Requested-With","netswitch");
@@ -1641,10 +1754,14 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self.send(body, STATIC_FILES[name], cache=86400, fixed=True)
         elif self.path == "/ledconfig":
+            swatches = dict((col, dict((row, calib_swatch(col, row)) for row in CALIB_ROWS))
+                            for col in CALIB_COLUMNS)
             self.send(json.dumps({"config": led_config(), "defaults": default_led_config(),
                                   "states": LED_STATES,
                                   "effects": EFFECTS, "orders": LED_ORDERS, "count": led_count(),
                                   "gpio": led_gpio(), "gpios": GPIO_PINS,
+                                  "calib_columns": CALIB_COLUMNS, "calib_rows": CALIB_ROWS,
+                                  "calib_swatches": swatches,
                                   "installed": os.path.exists(LED_ENABLED), "hidden": led_hidden()}),
                      "application/json")
         elif self.path.split("?")[0] == "/dtmf":
@@ -1689,6 +1806,15 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 open(LED_HIDDEN, "w").close()
                 debug_log("web page: LED settings hidden")
+        if self.path == "/calibpreview":
+            try:
+                length = min(int(self.headers.get("Content-Length") or 0), 1024)
+                data = json.loads(self.rfile.read(length).decode("utf-8"))
+                save_calib_preview(*(max(0, min(255, int(data[k]))) for k in ("r", "g", "b")))
+            except (ValueError, KeyError, TypeError, IOError, OSError):
+                pass
+        elif self.path == "/calibdone":
+            clear_calib_preview()
         if self.path == "/dcnet":
             open(FLAG, "w").close()
             debug_log("web page: DCNET selected")
