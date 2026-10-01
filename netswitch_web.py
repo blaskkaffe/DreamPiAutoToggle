@@ -1247,6 +1247,8 @@ PAGE = u"""<!doctype html>
  #wifi-networks{padding:10px 0 14px}
  .wnet{display:block;width:100%;margin-bottom:6px;padding:9px 12px;text-align:left;border-radius:12px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
  .wnet .sig{float:right;opacity:.6;font-size:.85em}
+ .range.wb{display:grid;grid-template-columns:4.5em minmax(0,1fr) 2.6em;gap:12px}   /* same slider length for R, G and B */
+ .range.wb span:last-child{text-align:right}
  .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range > span:first-child{white-space:nowrap} .range input{flex:1;min-width:60px;accent-color:var(--dcnow)}
  .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
  #log{background:#0a0a0a;border:var(--bw) solid var(--line);border-radius:12px;padding:8px;font-size:11px;line-height:1.45;
@@ -1357,9 +1359,9 @@ millisecond timing. Turn recording on, then dial.</div>
 <div id="led-section" class="sec" style="display:none;position:relative">
 <h2>Status LED<span id="led-count-t"></span> <span class="saved" id="led-saved">Saved &#10003;</span></h2>
 <div class="card">
- <div class="range"><span>Red</span><input type="range" id="wb-r" min="0" max="100" step="1" style="accent-color:#f33"><span id="wb-r-v" style="width:3em;text-align:right"></span></div>
- <div class="range"><span>Green</span><input type="range" id="wb-g" min="0" max="100" step="1" style="accent-color:#3f3"><span id="wb-g-v" style="width:3em;text-align:right"></span></div>
- <div class="range"><span>Blue</span><input type="range" id="wb-b" min="0" max="100" step="1" style="accent-color:#39f"><span id="wb-b-v" style="width:3em;text-align:right"></span></div>
+ <div class="range wb"><span>Red</span><input type="range" id="wb-r" min="0" max="255" step="1" style="accent-color:#f33"><span id="wb-r-v"></span></div>
+ <div class="range wb"><span>Green</span><input type="range" id="wb-g" min="0" max="255" step="1" style="accent-color:#3f3"><span id="wb-g-v"></span></div>
+ <div class="range wb"><span>Blue</span><input type="range" id="wb-b" min="0" max="255" step="1" style="accent-color:#39f"><span id="wb-b-v"></span></div>
  <div class="bar" style="justify-content:center;margin:12px 0 10px"><button class="pill-s" id="wb-preview" type="button">Preview on LED</button><button class="pill-s" id="wb-reset" type="button">Reset to neutral</button></div>
 </div>
 <div class="note">White balance: tap <strong>Preview on LED</strong> to show solid white, then turn down whichever of R, G or B looks too strong until it looks neutral - leave the others at 100%. Tap Preview again when done. This corrects every colour the LEDs show, not just white, and takes about 30 seconds.</div>
@@ -1554,8 +1556,8 @@ function showLed(){$("led-bright").value=brightToSlider(led.max_brightness);$("l
  showWb();
  ledStates.forEach(function(s){var st=s[0],c=led.colours[ledNet][st];
   $("c-"+st).value=c.color;$("e-"+st).checked=c.enabled!==false;showRow(st);showFx(st);showLvl(st)})}
-function showWb(){["r","g","b"].forEach(function(c){var v=Math.round(led.white_balance[c]*100);
- $("wb-"+c).value=v;$("wb-"+c+"-v").textContent=v+"%"})}
+function showWb(){["r","g","b"].forEach(function(c){var v=Math.round(led.white_balance[c]*255);
+ $("wb-"+c).value=v;$("wb-"+c+"-v").textContent=v})}
 function showRow(st){$("r-"+st).className=led.colours[ledNet][st].enabled===false?"dis":""}
 function showFx(st){var el=$("f-"+st);if(!el)return;var c=led.colours[ledNet][st];
  var sub=[];if(c.effect!="solid")sub.push(c.speed);if(ledCount>1&&c.leds)sub.push(c.leds[0]==c.leds[1]?"LED "+c.leds[0]:c.leds[0]+"-"+c.leds[1]);
@@ -1607,7 +1609,7 @@ $("lvl-done").onclick=closePops;
 $("lvl-pop").onclick=$("fx-pop").onclick=function(e){e.stopPropagation()};
 $("settings").addEventListener("click",function(){if(lvlCur||fxCur)closePops()});
 ["r","g","b"].forEach(function(c){$("wb-"+c).oninput=function(){
- led.white_balance[c]=Math.round(this.value)/100;$("wb-"+c+"-v").textContent=Math.round(this.value)+"%";saveLed()}});
+ led.white_balance[c]=Math.round(this.value)/255;$("wb-"+c+"-v").textContent=Math.round(this.value);saveLed()}});
 function setWbPreview(on){wbPreviewOn=on;$("wb-preview").classList.toggle("on",on);
  $("wb-preview").textContent=on?"Stop preview":"Preview on LED";
  clearInterval(wbHeartbeat);
