@@ -534,13 +534,19 @@ def _lerp3(a, b, t):
 
 
 def _row_interp(table, col, lightness):
-    """A column's offset at a lightness, interpolated across (or clamped
-    to) the light/medium/dark rows."""
+    """A column's offset at a lightness, interpolated across the
+    light/medium/dark rows (clamped above "light"). Below "dark" it fades
+    to no correction at all by lightness 0, so a fully-off/black pixel
+    (blink's off-phase, breathe's trough, an unlit strip section) is never
+    tinted by a dark-row calibration - only pixels at or above the dark
+    anchor get that row's full offset."""
     lt = web.CALIB_LIGHTNESS
     if lightness >= lt["light"]:
         return table[(col, "light")]
+    if lightness <= 0.0:
+        return (0.0, 0.0, 0.0)
     if lightness <= lt["dark"]:
-        return table[(col, "dark")]
+        return _lerp3((0.0, 0.0, 0.0), table[(col, "dark")], lightness / lt["dark"])
     if lightness >= lt["medium"]:
         lo, hi = "medium", "light"
     else:

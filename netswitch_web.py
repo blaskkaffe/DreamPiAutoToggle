@@ -1415,16 +1415,17 @@ function openCalib(el){closePops();var col=el.dataset.col,row=el.dataset.row;cal
  $("calib-t").textContent=cap(col)+", "+row;
  $("calib-ref").style.background=ref;
  setCalibSliders(hexToRgb(v));
- placePop($("calib-pop"),el)}
+ placePop($("calib-pop"),el);
+ clearInterval(calibHeartbeat);calibHeartbeat=setInterval(function(){sendCalibPreview(calibRgb())},1000)}
 function setCalibSliders(rgb){["r","g","b"].forEach(function(c,i){$("calib-"+c).value=rgb[i];$("calib-"+c+"-v").textContent=rgb[i]});
  calibLive()}
 function calibRgb(){return ["r","g","b"].map(function(c){return parseInt($("calib-"+c).value,10)})}
 function calibLive(){var rgb=calibRgb();$("calib-live").style.background=rgbToHex(rgb);sendCalibPreview(rgb)}
-var calibTimer=null;
+var calibTimer=null,calibHeartbeat=null;
 function sendCalibPreview(rgb){clearTimeout(calibTimer);calibTimer=setTimeout(function(){
  var x=new XMLHttpRequest();x.open("POST","/calibpreview",true);x.setRequestHeader("Content-Type","application/json");
  x.setRequestHeader("X-Requested-With","netswitch");x.send(JSON.stringify({r:rgb[0],g:rgb[1],b:rgb[2]}))},100)}
-function stopCalibPreview(){clearTimeout(calibTimer);
+function stopCalibPreview(){clearTimeout(calibTimer);clearInterval(calibHeartbeat);calibHeartbeat=null;
  var x=new XMLHttpRequest();x.open("POST","/calibdone",true);x.setRequestHeader("X-Requested-With","netswitch");x.send()}
 ["r","g","b"].forEach(function(c){$("calib-"+c).oninput=function(){$("calib-"+c+"-v").textContent=this.value;calibLive()}});
 $("calib-reset").onclick=function(){if(!calibCur)return;
