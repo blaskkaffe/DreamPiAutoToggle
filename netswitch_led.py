@@ -48,6 +48,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import netswitch_web as web  # noqa: E402  (reuses the page's status logic)
+from netswitch_gpio import peripheral_base, Block  # noqa: E402  (shared with netswitch_wifi.py)
 
 FPS = 50
 REFRESH = 0.25     # seconds between re-reading DreamPi's state and led.json
@@ -112,33 +113,6 @@ SPI_IOC_WR_MAX_SPEED_HZ = 0x40046B04
 SPI_HZ = 6400000                # the Pi rounds this down to 6.25 MHz
 SPI_ONE, SPI_ZERO = 0xF8, 0xC0  # one SPI byte per NeoPixel bit (0.8/0.3 us high at 6.25 MHz)
 SPI_RESET_BYTES = 80            # > 50 us low after the data
-
-
-def peripheral_base():
-    """Physical peripheral address (Pi 1/Zero, Pi 2/3 and Pi 4 differ)."""
-    try:
-        with open("/proc/device-tree/soc/ranges", "rb") as f:
-            ranges = bytearray(f.read(12))
-        base = int.from_bytes(ranges[4:8], "big")
-        if base == 0:   # Pi 4: 64-bit parent address
-            base = int.from_bytes(ranges[8:12], "big")
-        return base
-    except (IOError, OSError):
-        return 0x3F000000   # Pi 2/3
-
-
-class Block(object):
-    """A register block mapped from /dev/mem, 32-bit accesses only."""
-
-    def __init__(self, fd, address, size=4096):
-        self.mem = mmap.mmap(fd, size, mmap.MAP_SHARED,
-                             mmap.PROT_READ | mmap.PROT_WRITE, offset=address)
-
-    def __getitem__(self, offset):
-        return ctypes.c_uint32.from_buffer(self.mem, offset).value
-
-    def __setitem__(self, offset, value):
-        ctypes.c_uint32.from_buffer(self.mem, offset).value = value & 0xFFFFFFFF
 
 
 def _wait(done, timeout=0.1):

@@ -49,6 +49,18 @@ STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
 MODEM = "/tmp/dreampi-netswitch.modem"
 DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
+# Wi-Fi setup (netswitch_wifi.py, install.sh --wifi)
+WIFI_BUTTON_ENABLED = os.path.join(BASE_DIR, "wifi_button_enabled")  # written by install.sh
+WIFI_START = os.path.join(BASE_DIR, "wifi_start")   # touched to ask netswitch_wifi.py to start
+WIFI_STOP = os.path.join(BASE_DIR, "wifi_stop")     # touched to ask it to stop / cancel
+WIFI_CONNECT = os.path.join(BASE_DIR, "wifi_connect")   # {"ssid":..., "password":...}, an alternative
+                                                         # to the setup access point's own /connect -
+                                                         # lets the regular page pick a network too,
+                                                         # useful when it's reachable some other way
+                                                         # (e.g. Ethernet) while Wi-Fi is being set up
+WIFI_STATE = "/tmp/dreampi-netswitch.wifi"          # written by netswitch_wifi.py
+WIFI_STALE = 30       # ignore WIFI_STATE when older than this (the service is down)
+WIFI_AP_SSID = "DreamPi WiFi Config"
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 80
 HTTPS_PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 443   # 0 = no HTTPS
 CERT = os.path.join(BASE_DIR, "https.crt")   # self-signed, made by install.sh
@@ -261,6 +273,22 @@ def network_state():
         return data
     except (IOError, OSError, ValueError):
         return None
+
+
+def wifi_state():
+    """Latest Wi-Fi setup state written by netswitch_wifi.py: state (idle /
+    scanning / hosting / connecting / ok / failed), ssid, networks (scan
+    results while hosting) and time. {"state": "idle"} when the service
+    hasn't run yet, or hasn't updated the file in a while (it isn't
+    running any more, or crashed mid-setup)."""
+    try:
+        with open(WIFI_STATE) as f:
+            data = json.load(f)
+    except (IOError, OSError, ValueError):
+        return {"state": "idle"}
+    if data.get("state", "idle") != "idle" and time.time() - data.get("time", 0) > WIFI_STALE:
+        return {"state": "idle"}
+    return data
 
 
 def _write_net_state(data):
@@ -685,6 +713,14 @@ def checker():
 # dreampi_state(); the network ones from the checker (NET_STATE).
 LED_STATES = [
     # key, label, category, colour, effect, speed, enabled
+    # Wi-Fi setup (netswitch_wifi.py) always outranks everything else: while
+    # it's in progress "no network"/"no internet" are usually also true, and
+    # would otherwise hide it. default_led_config() switches wifi-setup's
+    # default effect to "scanner" when a strip is installed (breathe on a
+    # single LED, see the user request); connecting keeps the same look.
+    ("wifi-setup", "Wi-Fi setup: choose a network", "wifi", "#0046ff", "breathe", "slow", True),
+    ("wifi-ok", "Wi-Fi setup: connected", "wifi", "#00ff00", "solid", "slow", True),
+    ("wifi-failed", "Wi-Fi setup: couldn't connect", "wifi", "#ff0000", "blink", "slow", True),
     ("no-network", "No network", "error", "#ff0000", "solid", "slow", True),
     ("no-internet", "No internet", "error", "#ff7a00", "blink", "slow", True),
     ("pi", "Power or heat problem", "error", "#ff00aa", "breathe", "slow", True),
@@ -806,12 +842,16 @@ def calib_swatch(column, row):
 
 
 def default_led_config():
-    return {"brightness": 0.08, "order": "GRB",
-            "calibrate": dict((col, dict((row, None) for row in CALIB_ROWS)) for col in CALIB_COLUMNS),
-            "colours": dict((net, dict((st, {"color": c, "effect": e, "speed": sp, "brightness": None,
-                                             "enabled": on, "leds": None})
-                                       for st, (c, e, sp, on) in _DEFAULT_COLOURS.items()))
-                            for net in NETWORKS)}
+    cfg = {"brightness": 0.08, "order": "GRB",
+           "calibrate": dict((col, dict((row, None) for row in CALIB_ROWS)) for col in CALIB_COLUMNS),
+           "colours": dict((net, dict((st, {"color": c, "effect": e, "speed": sp, "brightness": None,
+                                            "enabled": on, "leds": None})
+                                      for st, (c, e, sp, on) in _DEFAULT_COLOURS.items()))
+                           for net in NETWORKS)}
+    if led_count() > 1:   # a strip: scanning animation instead of a breathing single LED
+        for net in NETWORKS:
+            cfg["colours"][net]["wifi-setup"]["effect"] = "scanner"
+    return cfg
 
 
 def clean_led_config(data):
@@ -918,10 +958,12 @@ def clear_calib_preview():
         pass
 
 
-def active_messages(state=None, net_state=None):
+def active_messages(state=None, net_state=None, wifi=True):
     """Enabled LED messages that apply right now, lowest priority first (the
     LED service draws them in this order, so later ones end up on top).
-    Each: key, category, color, effect, speed, brightness (effective), leds."""
+    Each: key, category, color, effect, speed, brightness (effective), leds.
+    wifi=False skips netswitch_wifi.py's state (used for the DreamPi dot
+    preview, which only ever previews the DreamPi-state message)."""
     if state is None:
         state = dreampi_state()[0]
     if net_state is None:
@@ -938,6 +980,14 @@ def active_messages(state=None, net_state=None):
             active.append("ethernet")
         if net_state.get("wifi"):
             active.append("wifi")
+    if wifi:
+        ws = wifi_state().get("state", "idle")
+        if ws in ("scanning", "hosting", "connecting"):
+            active.append("wifi-setup")
+        elif ws == "ok":
+            active.append("wifi-ok")
+        elif ws == "failed":
+            active.append("wifi-failed")
     cfg = led_config()
     looks = cfg["colours"]["dcnet" if os.path.exists(FLAG) else "dcnow"]
     out = []
@@ -993,6 +1043,15 @@ def api_state():
     elif compat is False:
         warnings.append("Modem: %s is known not to work reliably with DreamPi. "
                         "See the Modem row in Settings." % label)
+    wf = wifi_state()
+    wf_state = wf.get("state", "idle")
+    if wf_state in ("scanning", "hosting"):
+        warnings.append("Wi-Fi setup: connect a phone or PC to the “%s” Wi-Fi network, then open "
+                        "http://192.168.4.1 to pick a network." % WIFI_AP_SSID)
+    elif wf_state == "connecting":
+        warnings.append("Wi-Fi setup: trying to connect to “%s”..." % (wf.get("ssid") or ""))
+    elif wf_state == "failed":
+        warnings.append("Wi-Fi setup: could not connect (%s)." % (wf.get("ssid") or "unknown reason"))
     return {"network": "dcnet" if os.path.exists(FLAG) else "dcnow",
             "autoreset": os.path.exists(AUTORESET),
             "default": "dcnet" if os.path.exists(DEFAULT_DCNET) else "dcnow",
@@ -1000,11 +1059,13 @@ def api_state():
             # the dot next to DreamPi previews that status's LED message only;
             # network problems show as warning boxes instead
             "dreampi": {"state": dstate, "text": dtext,
-                        "look": (active_messages(dstate, {"network": True}) or [None])[-1]},
+                        "look": (active_messages(dstate, {"network": True}, wifi=False) or [None])[-1]},
             "modem": {"text": mtext, "since": msince, "plugged": plugged, "label": label, "compat": compat},
             "internet": checks["internet"],
             "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
                    "line2": pi.get("line2"), "warn": pi.get("warn")},
+            "wifi": {"state": wf_state, "ssid": wf.get("ssid"), "networks": wf.get("networks"),
+                     "installed": os.path.exists(WIFI_BUTTON_ENABLED)},
             "hangup": {"busy": _hangup["busy"], "text": _hangup["text"]},
             "warnings": warnings, "now": int(time.time())}
 
@@ -1111,6 +1172,10 @@ PAGE = u"""<!doctype html>
  input[type=color]{-webkit-appearance:none;appearance:none;width:34px;height:34px;padding:0;border:var(--bw) solid #555;border-radius:7px;background:none;vertical-align:middle;cursor:pointer}
  input[type=color]::-webkit-color-swatch-wrapper{padding:0} input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
  input[type=color]::-moz-color-swatch{border:0;border-radius:4px}
+ input[type=password],input[type=text]{width:100%;padding:10px 12px;margin:0 0 10px;border-radius:12px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.9em}
+ #wifi-networks{padding:10px 0 14px}
+ .wnet{display:block;width:100%;margin-bottom:6px;padding:9px 12px;text-align:left;border-radius:12px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
+ .wnet .sig{float:right;opacity:.6;font-size:.85em}
  .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range > span:first-child{white-space:nowrap} .range input{flex:1;min-width:60px;accent-color:var(--dcnow)}
  .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
  #log{background:#0a0a0a;border:var(--bw) solid var(--line);border-radius:12px;padding:8px;font-size:11px;line-height:1.45;
@@ -1163,6 +1228,17 @@ millisecond timing. Turn recording on, then dial.</div>
   <button class="cbox" id="reset-b" type="submit" aria-label="Auto reset"></button></form>
  <div class="srow"><span>Debug log<span class="sub">Show the debug log on the main page (this browser only)</span></span>
   <input type="checkbox" class="cbox dcnow" id="dbg-b" aria-label="Show debug log"></div>
+ <div class="srow" id="wifi-row" style="display:none"><span>Wi-Fi setup<span class="sub" id="wifi-sub">Search for a Wi-Fi network to connect the Pi to</span></span>
+  <button class="pill-s" id="wifi-b" type="button">Search</button></div>
+ <div id="wifi-networks" style="display:none">
+  <div id="wifi-list"></div>
+  <button type="button" class="pill-s" id="wifi-manual" style="margin-bottom:10px">Enter a network name manually</button>
+  <div id="wifi-form" style="display:none">
+   <input type="text" id="wifi-ssid" placeholder="Network name" readonly>
+   <input type="password" id="wifi-pass" placeholder="Password" style="display:none">
+   <button type="button" class="pill-s" id="wifi-connect-b" disabled>Connect</button>
+  </div>
+ </div>
 </div>
 
 <h2>Phone numbers</h2>
@@ -1268,7 +1344,48 @@ function render(d){
  $("log-tools").style.display=d.debug?"inline":"none";
  $("log").style.display=(d.debug||logSize)?"block":"none";
  debugOn=d.debug;
+ $("wifi-row").style.display=d.wifi.installed?"flex":"none";
+ var wl=WIFI_LABELS[d.wifi.state]||WIFI_LABELS.idle;
+ $("wifi-b").textContent=wl[0];
+ $("wifi-sub").textContent=wl[1].replace("%s",d.wifi.ssid||"");
+ $("wifi-b").disabled=d.wifi.state=="ok";
+ var showNets=d.wifi.state=="hosting"||d.wifi.state=="scanning";
+ $("wifi-networks").style.display=showNets?"block":"none";
+ if(showNets&&d.wifi.networks){var key=JSON.stringify(d.wifi.networks);
+  if(key!=wifiListKey){wifiListKey=key;renderWifiList(d.wifi.networks)}}
+ else if(!showNets){wifiListKey=null;wifiChosen=null;$("wifi-form").style.display="none";$("wifi-list").innerHTML=""}
 }
+var WIFI_LABELS={
+ idle:["Search","Search for a Wi-Fi network to connect the Pi to"],
+ scanning:["Stop","Scanning for Wi-Fi networks..."],
+ hosting:["Stop","Pick a network below, or connect to “DreamPi WiFi Config” and open http://192.168.4.1"],
+ connecting:["Stop","Connecting to “%s”..."],
+ ok:["Connected","Connected to “%s”"],
+ failed:["Stop","Couldn't connect (%s)"]};
+$("wifi-b").onclick=function(){
+ var x=new XMLHttpRequest();x.open("POST","/wifitoggle",true);x.setRequestHeader("X-Requested-With","netswitch");
+ x.onload=refresh;x.send()};
+// Wi-Fi network list, shown in Settings too while scanning/hosting (not just on the
+// temporary "DreamPi WiFi Config" page) - useful when this page is still reachable,
+// for example over Ethernet, while the Pi's Wi-Fi is being (re)configured.
+var wifiListKey=null,wifiChosen=null;
+function wifiBars(sig){if(sig==null)return"";var n=sig>=-55?4:sig>=-65?3:sig>=-75?2:1;return " "+"█".repeat(n)+"░".repeat(4-n)}
+function renderWifiList(nets){
+ $("wifi-list").innerHTML=nets.map(function(n,i){
+  return '<button type="button" class="wnet" data-i="'+i+'">'+(n.secured?"🔒 ":"")+esc(n.ssid)+
+   '<span class="sig">'+esc(wifiBars(n.signal))+'</span></button>'}).join("")||
+  '<div class="sub" style="margin:4px 0 10px">No networks found. Enter one manually.</div>';
+ Array.prototype.forEach.call($("wifi-list").querySelectorAll(".wnet"),function(b){
+  b.onclick=function(){wifiSelect(nets[+b.dataset.i])}})}
+function wifiSelect(n){wifiChosen=n;$("wifi-ssid").value=n.ssid;$("wifi-ssid").readOnly=true;
+ $("wifi-pass").style.display=n.secured?"block":"none";$("wifi-pass").value="";
+ $("wifi-connect-b").disabled=false;$("wifi-connect-b").textContent="Connect";$("wifi-form").style.display="block"}
+$("wifi-manual").onclick=function(){wifiSelect({ssid:"",secured:true});$("wifi-ssid").readOnly=false;$("wifi-ssid").focus()};
+$("wifi-connect-b").onclick=function(){
+ var ssid=$("wifi-ssid").value.trim();if(!ssid)return;
+ $("wifi-connect-b").disabled=true;$("wifi-connect-b").textContent="Connecting...";
+ var x=new XMLHttpRequest();x.open("POST","/wificonnect",true);x.setRequestHeader("Content-Type","application/json");
+ x.onload=refresh;x.send(JSON.stringify({ssid:ssid,password:$("wifi-pass").value}))};
 var logSize=0,debugOn=false,logBusy=false,debugOpen=false;
 $("net").onclick=function(e){if(e.target.closest&&e.target.closest(".hang"))return;this.classList.toggle("open")};
 // Hang up: tap once to arm, again within 4 s to confirm (a call in progress is easy to end by accident)
@@ -1327,7 +1444,7 @@ function buildLed(){
  ["dcnow","dcnet"].forEach(function(n){$("tab-"+n).className="pill-s "+n+(n==ledNet?" sel":"")});
  var grp="";
  $("led-rows").innerHTML=ledStates.map(function(s){var st=s[0],h="";
-  if(s[2]!=grp){grp=s[2];h='<tr class="grp"><td colspan="4">'+(grp=="error"?"Errors":"Information")+'</td></tr>'}
+  if(s[2]!=grp){grp=s[2];h='<tr class="grp"><td colspan="4">'+(grp=="error"?"Errors":grp=="wifi"?"Wi-Fi setup":"Information")+'</td></tr>'}
   return h+'<tr id="r-'+st+'"><td class="name"><input type="checkbox" class="cbox '+ledNet+'" id="e-'+st+'" title="Show this message" aria-label="Show '+esc(s[1])+'"><span class="lbl-t">'+esc(s[1])+'</span></td>'+
   '<td class="c"><input type="color" id="c-'+st+'" data-state="'+st+'" aria-label="Colour"></td>'+
   '<td class="c"><button type="button" class="chip fx" id="f-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'"></button></td>'+
@@ -1696,6 +1813,33 @@ class Handler(BaseHTTPRequestHandler):
             if os.path.exists(DTMF_LOG):
                 os.remove(DTMF_LOG)
             debug_log("web page: log cleared")
+        elif self.path == "/wifitoggle":
+            if os.path.exists(WIFI_BUTTON_ENABLED):
+                if wifi_state().get("state", "idle") == "idle":
+                    open(WIFI_START, "w").close()
+                    debug_log("web page: Wi-Fi setup started")
+                else:
+                    open(WIFI_STOP, "w").close()
+                    debug_log("web page: Wi-Fi setup stop requested")
+        elif self.path == "/wificonnect":
+            # An alternative to the setup access point's own /connect: lets
+            # this page pick a network too, reachable while it's up over
+            # Ethernet (or anything else besides the Wi-Fi being reconfigured).
+            if os.path.exists(WIFI_BUTTON_ENABLED):
+                ssid = ""
+                try:
+                    length = min(int(self.headers.get("Content-Length") or 0), 4096)
+                    data = json.loads(self.rfile.read(length).decode("utf-8"))
+                    ssid = str(data.get("ssid") or "").strip()
+                    password = str(data.get("password") or "")
+                except (ValueError, IOError, OSError):
+                    pass
+                if ssid:
+                    tmp = WIFI_CONNECT + ".tmp"
+                    with open(tmp, "w") as f:
+                        json.dump({"ssid": ssid, "password": password}, f)
+                    os.rename(tmp, WIFI_CONNECT)
+                    debug_log("web page: Wi-Fi connect requested for %s" % ssid)
         if self.headers.get("X-Requested-With"):
             self.send_response(204)   # the page's own buttons: nothing to reload
             self.send_header("Content-Length", "0")
