@@ -1233,7 +1233,7 @@ PAGE = u"""<!doctype html>
  .ledtab tr.grp td{border-top:0;padding:14px 0 4px;color:var(--muted);font-size:.72em;text-transform:uppercase;letter-spacing:.08em}
  .ledtab tr.dis td:not(.name),.ledtab tr.dis .lbl-t{opacity:.35}
  .secrow{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
- .secrow input[type=number]{width:54px;padding:5px 6px;border-radius:8px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.85em}
+ .secrow input[type=number],.srow input[type=number]{width:54px;padding:5px 6px;border-radius:8px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.85em}
  select.ord{padding:5px 6px;border-radius:8px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.85em}
  .calib-grid{display:flex;flex-direction:column;gap:6px}
  .calib-row{display:flex;gap:6px}
@@ -1345,17 +1345,16 @@ millisecond timing. Turn recording on, then dial.</div>
 <div id="gpio-section" style="display:none;position:relative">
 <h2>GPIO <span class="saved" id="gpio-saved">Saved &#10003;</span></h2>
 <div class="card">
- <div class="secrow" id="gpio-led-row" style="display:none"><span class="sub">LEDs connected</span><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"></div>
- <div class="secrow" id="gpio-led-gpio-row" style="display:none"><span class="sub">LED output pin</span><select class="ord" id="led-gpio" aria-label="LED output pin"></select></div>
+ <div class="srow" id="gpio-led-row" style="display:none"><span>LED<span class="sub">LEDs connected and output pin</span></span>
+  <div style="display:flex;gap:8px"><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"><select class="ord" id="led-gpio" aria-label="LED output pin"></select></div></div>
+ <div class="srow" id="gpio-btn1-row" style="display:none"><span>Button 1<span class="sub">Function and pin</span></span>
+  <div style="display:flex;gap:8px"><select class="ord" id="btn1-fn" aria-label="Button 1 function"></select><select class="ord" id="btn1-gpio" aria-label="Button 1 pin"></select></div></div>
+ <div class="srow" id="gpio-btn2-row" style="display:none"><span>Button 2<span class="sub">Function and pin</span></span>
+  <div style="display:flex;gap:8px"><select class="ord" id="btn2-fn" aria-label="Button 2 function"></select><select class="ord" id="btn2-gpio" aria-label="Button 2 pin"></select></div></div>
+ <div class="srow" id="gpio-wifi-row" style="display:none"><span>Wi-Fi setup<span class="sub">Which button (or both) starts it</span></span>
+  <select class="ord" id="wifi-btn-sel" aria-label="Wi-Fi setup button"></select></div>
 </div>
-<div class="card" id="gpio-buttons-card" style="display:none">
- <div class="secrow"><span class="sub">Button 1 pin</span><select class="ord" id="btn1-gpio" aria-label="Button 1 pin"></select></div>
- <div class="secrow"><span class="sub">Button 1 function</span><select class="ord" id="btn1-fn" aria-label="Button 1 function"></select></div>
- <div class="secrow"><span class="sub">Button 2 pin</span><select class="ord" id="btn2-gpio" aria-label="Button 2 pin"></select></div>
- <div class="secrow"><span class="sub">Button 2 function</span><select class="ord" id="btn2-fn" aria-label="Button 2 function"></select></div>
- <div class="secrow"><span class="sub">Wi-Fi setup button</span><select class="ord" id="wifi-btn-sel" aria-label="Wi-Fi setup button"></select></div>
-</div>
-<div class="note">LED count and output pin take effect within a second; switching the LED output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot). Button pin and function changes take effect within a couple of seconds - pick two different pins for the two buttons. A button's own function (Off, Toggle network, Select DCNow!, Select DCNET) fires on a short press; "Wi-Fi setup button" is which button, or both held together, starts Wi-Fi setup with a 3-second hold.</div>
+<div class="note">LED count and output pin take effect within a second; switching the LED output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot). Button pin and function changes take effect within a couple of seconds - pick two different pins for the two buttons. A button's own function (Off, Toggle network, Select DCNow!, Select DCNET) fires on a short press; "Wi-Fi setup" is which button, or both held together, starts Wi-Fi setup with a 3-second hold.</div>
 </div>
 
 <div id="led-section" style="display:none;position:relative">
@@ -1526,8 +1525,9 @@ var ledInstalled=false,ledHiddenFlag=false,buttonsInstalled=false;
 function updateGpioSection(){
  var ledOn=ledInstalled&&!ledHiddenFlag;
  $("gpio-led-row").style.display=ledOn?"flex":"none";
- $("gpio-led-gpio-row").style.display=ledOn?"flex":"none";
- $("gpio-buttons-card").style.display=buttonsInstalled?"block":"none";
+ $("gpio-btn1-row").style.display=buttonsInstalled?"flex":"none";
+ $("gpio-btn2-row").style.display=buttonsInstalled?"flex":"none";
+ $("gpio-wifi-row").style.display=buttonsInstalled?"flex":"none";
  $("gpio-section").style.display=(ledOn||buttonsInstalled)?"block":"none"}
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
