@@ -59,15 +59,15 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(ledconfig.led_gpio(), 12)
         ledconfig.save_led_gpio(7)               # not an LED pin: ignored
         self.assertEqual(ledconfig.led_gpio(), 12)
-        self.assertEqual(ledconfig.led_count(), 0)           # 0 = LED service not installed
-        open(core.LED_ENABLED, "w").close()
-        self.assertEqual(ledconfig.led_count(), 1)
+        self.assertEqual(ledconfig.led_count(), 1)           # on by default with one LED
         ledconfig.save_led_count(30)
         self.assertEqual(ledconfig.led_count(), 30)
-        ledconfig.save_led_count(9999)                       # clamped to the 1-300 range
+        ledconfig.save_led_count(9999)                       # clamped to the 0-300 range
         self.assertEqual(ledconfig.led_count(), 300)
         ledconfig.save_led_count("many")                     # ignored
         self.assertEqual(ledconfig.led_count(), 300)
+        ledconfig.save_led_count(0)                          # 0 = no LEDs
+        self.assertEqual(ledconfig.led_count(), 0)
 
     def test_button_config_defaults_and_validation(self):
         self.assertEqual((core.button_gpio(1), core.button_gpio(2)), (17, 4))
@@ -144,7 +144,6 @@ class HttpTests(unittest.TestCase):
         self.post("/default")
 
     def test_ledconfig_round_trip(self):
-        open(core.LED_ENABLED, "w").close()
         r = json.loads(self.get("/ledconfig")[2].decode())
         for key in ("config", "defaults", "states", "effects", "orders", "count", "gpio", "gpios", "installed", "hidden"):
             self.assertIn(key, r)
@@ -155,6 +154,16 @@ class HttpTests(unittest.TestCase):
         self.assertAlmostEqual(out["config"]["white_balance"]["g"], 200 / 255.0)
         self.assertEqual((out["count"], out["gpio"]), (5, 21))
         self.assertEqual(json.loads(self.get("/ledconfig")[2].decode())["count"], 5)
+        self.assertTrue(json.loads(self.get("/ledconfig")[2].decode())["installed"])
+
+    def test_zero_leds_hides_the_led_settings(self):
+        cfg = json.loads(self.get("/ledconfig")[2].decode())["config"]
+        cfg["count"] = 0
+        self.post("/ledconfig", cfg)
+        self.assertFalse(json.loads(self.get("/ledconfig")[2].decode())["installed"])
+        cfg["count"] = 1
+        self.post("/ledconfig", cfg)
+        self.assertTrue(json.loads(self.get("/ledconfig")[2].decode())["installed"])
 
     def test_buttonconfig_rejects_shared_pin(self):
         before = json.loads(self.get("/buttonconfig")[2].decode())["config"]

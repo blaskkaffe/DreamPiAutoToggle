@@ -227,7 +227,7 @@ class Handler(BaseHTTPRequestHandler):
                                   "states": ledconfig.LED_STATES,
                                   "effects": ledconfig.EFFECTS, "orders": ledconfig.LED_ORDERS, "count": ledconfig.led_count(),
                                   "gpio": ledconfig.led_gpio(), "gpios": ledconfig.GPIO_PINS,
-                                  "installed": os.path.exists(core.LED_ENABLED), "hidden": ledconfig.led_hidden()}),
+                                  "installed": ledconfig.led_count() > 0, "hidden": ledconfig.led_hidden()}),
                      "application/json")
         elif self.path == "/buttonconfig":
             self.send(json.dumps({"config": {"button1_gpio": core.button_gpio(1), "button2_gpio": core.button_gpio(2),

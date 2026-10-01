@@ -5,11 +5,11 @@
 #   sudo ./install.sh 8080         use another port for the web page
 #   sudo ./install.sh --https-port=8443   HTTPS on another port (default 443)
 #   sudo ./install.sh --no-https   plain HTTP only
-#   sudo ./install.sh --led        also show the status on a NeoPixel on GPIO18 (1 LED, or the
-#                                  count already set)
-#   sudo ./install.sh --led=30     the same with several NeoPixels / a strip (starting count: 30)
+#   sudo ./install.sh --leds=30    NeoPixels on GPIO18: starting count 30 (a strip). The status
+#                                  LED is on by default with 1 LED; --leds=0 turns it off and
+#                                  hides the LED settings on the page
 #   sudo ./install.sh --led-gpio=21   use GPIO10, 12, 18 (default) or 21 instead
-#   sudo ./install.sh --no-led     remove the NeoPixel service again
+#   (--led, --led=N and --no-led still work: same as the default, --leds=N and --leds=0)
 #   sudo ./install.sh --wifi       add Wi-Fi setup (a temporary access point for joining a network
 #                                  without a keyboard; installs hostapd + dnsmasq): its page controls
 #                                  and the button hold that starts it
@@ -17,10 +17,10 @@
 #
 # The two GPIO buttons (GPIO17/pin11 toggles the network, GPIO4/pin7 is off by
 # default) are always installed; their pins and functions are editable from the
-# page's Settings > GPIO. Once --led or --wifi has been used, later updates keep
-# it until --no-led / --no-wifi. The LED count, output pin, wire order and white
+# page's Settings > GPIO. Once --wifi has been used, later updates keep it until
+# --no-wifi; the LED count is kept too. The LED count, output pin, wire order and white
 # balance can all be changed later from the page's Settings, without
-# --led=N/--led-gpio=N or a reinstall - except switching to GPIO10, which needs
+# --leds=N/--led-gpio=N or a reinstall - except switching to GPIO10, which needs
 # SPI enabled first (this installer does that for --led-gpio=10, but it needs a
 # reboot).
 set -e
@@ -28,7 +28,6 @@ DEST=/opt/dreampi-netswitch
 SRC="$(cd "$(dirname "$0")" && pwd)"
 PORT=80
 HTTPS_PORT=443
-LED=keep
 LED_COUNT=
 LED_GPIO=
 WIFI=keep
@@ -36,13 +35,13 @@ BUTTON1_GPIO_DEFAULT=17   # GPIO17 / physical pin 11; editable later from the pa
 BUTTON2_GPIO_DEFAULT=4    # GPIO4 / physical pin 7
 for arg in "$@"; do
     case "$arg" in
-        --led) LED=on ;;
-        --led=*) LED=on; LED_COUNT="${arg#--led=}"
-                  case "$LED_COUNT" in ''|*[!0-9]*) echo "--led needs a number, e.g. --led=30"; exit 1 ;; esac
-                  if [ "$LED_COUNT" -lt 1 ] || [ "$LED_COUNT" -gt 300 ]; then echo "--led must be 1 to 300"; exit 1; fi ;;
-        --led-gpio=*) LED=on; LED_GPIO="${arg#--led-gpio=}"
+        --led) ;;   # old option: the LED is on by default now
+        --leds=*|--led=*) LED_COUNT="${arg#*=}"
+                  case "$LED_COUNT" in ''|*[!0-9]*) echo "--leds needs a number, e.g. --leds=30"; exit 1 ;; esac
+                  if [ "$LED_COUNT" -gt 300 ]; then echo "--leds must be 0 to 300"; exit 1; fi ;;
+        --led-gpio=*) LED_GPIO="${arg#--led-gpio=}"
                   case "$LED_GPIO" in 10|12|18|21) ;; *) echo "--led-gpio must be 10, 12, 18 or 21"; exit 1 ;; esac ;;
-        --no-led) LED=off ;;
+        --no-led) LED_COUNT=0 ;;
         --wifi) WIFI=on ;;
         --no-wifi) WIFI=off ;;
         --https-port=*) HTTPS_PORT="${arg#--https-port=}" ;;
@@ -52,7 +51,7 @@ for arg in "$@"; do
     esac
 done
 
-if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--led[=N]|--led-gpio=N|--no-led] [--wifi|--no-wifi]"; exit 1; fi
+if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--leds=N|--led-gpio=N] [--wifi|--no-wifi]"; exit 1; fi
 
 mkdir -p "$DEST"
 cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_ledconfig.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_led_drivers.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" "$SRC/netswitch_wifi_setup.py" \
@@ -131,36 +130,41 @@ WantedBy=multi-user.target
 EOF
 
 # ---------------------------------------------------------------- NeoPixel
-if [ "$LED" = keep ] && [ -f "$DEST/led_enabled" ]; then LED=on; fi
-if [ "$LED" = on ]; then
-    touch "$DEST/led_enabled"
-    if [ -n "$LED_COUNT" ]; then echo "$LED_COUNT" > "$DEST/led_count"; fi
-    [ -f "$DEST/led_count" ] || echo 1 > "$DEST/led_count"
-    if [ -n "$LED_GPIO" ]; then echo "$LED_GPIO" > "$DEST/led_gpio"; fi
-    [ -f "$DEST/led_gpio" ] || echo 18 > "$DEST/led_gpio"
-    GPIO=$(cat "$DEST/led_gpio")
+# Always installed: the status LED service runs by default with 1 LED on GPIO18.
+# The count (0 = none: the service idles and the page hides the LED settings),
+# output pin, wire order and colours are editable from the page afterwards.
+rm -f "$DEST/led_enabled"   # old marker, no longer used
+if [ -n "$LED_COUNT" ]; then echo "$LED_COUNT" > "$DEST/led_count"; fi
+[ -f "$DEST/led_count" ] || echo 1 > "$DEST/led_count"
+if [ -n "$LED_GPIO" ]; then echo "$LED_GPIO" > "$DEST/led_gpio"; fi
+[ -f "$DEST/led_gpio" ] || echo 18 > "$DEST/led_gpio"
+GPIO=$(cat "$DEST/led_gpio")
+if [ "$(cat "$DEST/led_count")" = 0 ]; then
+    echo "NeoPixels off (0 LEDs); set a count with --leds=N."
+else
     echo "NeoPixel output on GPIO$GPIO: $(cat "$DEST/led_count") LED(s)"
-    # GPIO10 needs the kernel's SPI driver; GPIO12/18/21 use /dev/mem directly
-    # and don't. Track what we changed in spi_added, so switching away from
-    # GPIO10 later (here or from the page) takes the setting back out again.
-    CONFIG_TXT=
-    for candidate in /boot/firmware/config.txt /boot/config.txt; do
-        [ -f "$candidate" ] && CONFIG_TXT="$candidate" && break
-    done
-    if [ "$GPIO" = 10 ]; then
-        if [ -n "$CONFIG_TXT" ] && ! grep -q '^dtparam=spi=on' "$CONFIG_TXT"; then
-            printf '\ndtparam=spi=on  # added by dreampi-netswitch\n' >> "$CONFIG_TXT"
-            echo "$CONFIG_TXT" > "$DEST/spi_added"
-            echo "Enabled SPI in $CONFIG_TXT for GPIO10; reboot before the LEDs will work on it."
-        elif [ -z "$CONFIG_TXT" ]; then
-            echo "Could not find config.txt to enable SPI for GPIO10 - add dtparam=spi=on yourself and reboot."
-        fi
-    elif [ -f "$DEST/spi_added" ]; then
-        sed -i '/^dtparam=spi=on  # added by dreampi-netswitch$/d' "$(cat "$DEST/spi_added")"
-        rm -f "$DEST/spi_added"
-        echo "Removed the SPI setting added for GPIO10 (not needed for GPIO$GPIO)."
+fi
+# GPIO10 needs the kernel's SPI driver; GPIO12/18/21 use /dev/mem directly
+# and don't. Track what we changed in spi_added, so switching away from
+# GPIO10 later (here or from the page) takes the setting back out again.
+CONFIG_TXT=
+for candidate in /boot/firmware/config.txt /boot/config.txt; do
+    [ -f "$candidate" ] && CONFIG_TXT="$candidate" && break
+done
+if [ "$GPIO" = 10 ]; then
+    if [ -n "$CONFIG_TXT" ] && ! grep -q '^dtparam=spi=on' "$CONFIG_TXT"; then
+        printf '\ndtparam=spi=on  # added by dreampi-netswitch\n' >> "$CONFIG_TXT"
+        echo "$CONFIG_TXT" > "$DEST/spi_added"
+        echo "Enabled SPI in $CONFIG_TXT for GPIO10; reboot before the LEDs will work on it."
+    elif [ -z "$CONFIG_TXT" ]; then
+        echo "Could not find config.txt to enable SPI for GPIO10 - add dtparam=spi=on yourself and reboot."
     fi
-    cat > /etc/systemd/system/dreampi-netswitch-led.service <<EOF
+elif [ -f "$DEST/spi_added" ]; then
+    sed -i '/^dtparam=spi=on  # added by dreampi-netswitch$/d' "$(cat "$DEST/spi_added")"
+    rm -f "$DEST/spi_added"
+    echo "Removed the SPI setting added for GPIO10 (not needed for GPIO$GPIO)."
+fi
+cat > /etc/systemd/system/dreampi-netswitch-led.service <<EOF
 [Unit]
 Description=DreamPi Netswitch status NeoPixel
 After=network.target
@@ -176,15 +180,6 @@ Nice=10
 [Install]
 WantedBy=multi-user.target
 EOF
-elif [ "$LED" = off ]; then
-    systemctl disable --now dreampi-netswitch-led.service 2>/dev/null || true
-    rm -f /etc/systemd/system/dreampi-netswitch-led.service "$DEST/led_enabled" "$DEST/led_count" "$DEST/led_gpio"
-    if [ -f "$DEST/spi_added" ]; then
-        sed -i '/^dtparam=spi=on  # added by dreampi-netswitch$/d' "$(cat "$DEST/spi_added")"
-        rm -f "$DEST/spi_added"
-    fi
-    echo "NeoPixel service removed."
-fi
 
 # ------------------------------------------------------------------ buttons
 # Always installed: two GPIO buttons with a short-press function each (pins and
@@ -243,10 +238,8 @@ fi
 systemctl daemon-reload
 systemctl enable dreampi-netswitch.service >/dev/null 2>&1
 systemctl restart dreampi-netswitch.service
-if [ -f "$DEST/led_enabled" ]; then
-    systemctl enable dreampi-netswitch-led.service >/dev/null 2>&1
-    systemctl restart dreampi-netswitch-led.service
-fi
+systemctl enable dreampi-netswitch-led.service >/dev/null 2>&1
+systemctl restart dreampi-netswitch-led.service
 systemctl enable dreampi-netswitch-buttons.service >/dev/null 2>&1
 systemctl restart dreampi-netswitch-buttons.service
 systemctl restart dreampi.service 2>/dev/null || echo "Could not restart DreamPi, please reboot."

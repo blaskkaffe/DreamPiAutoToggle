@@ -224,8 +224,8 @@ $("wb-reset").onclick=function(){led.white_balance={r:1,g:1,b:1};showWb();saveLe
 function saveLed(){clearTimeout(ledTimer);ledTimer=setTimeout(function(){
  var x=new XMLHttpRequest();x.open("POST","/ledconfig",true);x.setRequestHeader("Content-Type","application/json");
  led.count=ledCount;led.gpio=ledGpio;
- x.onload=function(){if(x.status!=200)return;var el=$("led-saved");el.classList.add("show");
-  setTimeout(function(){el.classList.remove("show")},1200);refresh()};x.send(JSON.stringify(led))},250)}
+ x.onload=function(){if(x.status!=200)return;var els=document.querySelectorAll(".led-saved");Array.prototype.forEach.call(els,function(e){e.classList.add("show")});
+  setTimeout(function(){Array.prototype.forEach.call(els,function(e){e.classList.remove("show")})},1200);refresh()};x.send(JSON.stringify(led))},250)}
 // Logarithmic slider: the left half covers 0-9 %, where an indicator LED is most useful.
 var LOG_BASE=100;
 function sliderToBright(p){return (Math.pow(LOG_BASE,p/1000)-1)/(LOG_BASE-1)}

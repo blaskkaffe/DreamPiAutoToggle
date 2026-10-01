@@ -74,6 +74,19 @@ class ButtonTests(unittest.TestCase):
         self.clock.t += 60
         self.assertFalse(b.check_wifi_hold(s1, s2, True, ""))
 
+    def test_pin_already_low_at_start_does_not_fire_on_release(self):
+        st = b.new_button_state(False)               # read low before anything pressed it
+        res = self.feed(st, [False] * 5 + [True] * 6)
+        self.assertNotIn("released", res)
+        self.assertTrue(st[0])                       # back to idle...
+        res = self.feed(st, [False] * 5 + [True] * 5)
+        self.assertEqual(res.count("released"), 1)   # ...and the next real press works
+
+    def test_stuck_low_pin_never_fires_a_wifi_hold(self):
+        s1, s2 = b.new_button_state(False), b.new_button_state()
+        self.clock.t += 60
+        self.assertFalse(b.check_wifi_hold(s1, s2, True, "1"))
+
     def test_toggle_and_select(self):
         import os
         self.assertFalse(os.path.exists(core.FLAG))

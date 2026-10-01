@@ -88,6 +88,64 @@ class RenderTests(unittest.TestCase):
         self.assertNotIn("a", clocks)
 
 
+class SwitchOutputTests(unittest.TestCase):
+    """Changing the LED count/pin on the page (including to 0 = off)."""
+    class Fake(object):
+        def __init__(self, count, gpio):
+            self.count, self.gpio, self.closed, self.shown = count, gpio, False, []
+        def show(self, frame):
+            self.shown.append(frame)
+        def close(self):
+            self.closed = True
+
+    def setUp(self):
+        self._open = drivers.open_output
+        self.opened = []
+        def fake_open(count, gpio):
+            o = self.Fake(count, gpio)
+            self.opened.append(o)
+            return o
+        drivers.open_output = fake_open
+        self._sleep, led.time.sleep = led.time.sleep, lambda s: None
+
+    def tearDown(self):
+        drivers.open_output = self._open
+        led.time.sleep = self._sleep
+
+    def test_unchanged_does_nothing(self):
+        out = self.Fake(3, 18)
+        self.assertEqual(led.switch_output(out, 3, 18, 3, 18), (out, 3, 18, False))
+        self.assertEqual(self.opened, [])
+
+    def test_count_change_opens_new_then_closes_old(self):
+        old = self.Fake(3, 18)
+        out, count, gpio, switched = led.switch_output(old, 3, 18, 10, 18)
+        self.assertTrue(switched)
+        self.assertEqual((out.count, count, gpio), (10, 10, 18))
+        self.assertTrue(old.closed)
+        self.assertEqual(old.shown[-1], [(0, 0, 0)] * 3)          # blanked before closing
+
+    def test_zero_closes_and_leaves_no_output(self):
+        old = self.Fake(3, 18)
+        out, count, gpio, switched = led.switch_output(old, 3, 18, 0, 18)
+        self.assertEqual((out, count, switched), (None, 0, True))
+        self.assertTrue(old.closed)
+        self.assertEqual(self.opened, [])
+
+    def test_from_zero_opens(self):
+        out, count, gpio, switched = led.switch_output(None, 0, 18, 2, 18)
+        self.assertTrue(switched)
+        self.assertEqual((out.count, count), (2, 2))
+
+    def test_failed_open_keeps_the_old_output(self):
+        def boom(count, gpio):
+            raise IOError("no spi")
+        drivers.open_output = boom
+        old = self.Fake(3, 18)
+        self.assertEqual(led.switch_output(old, 3, 18, 3, 10), (old, 3, 18, False))
+        self.assertFalse(old.closed)
+
+
 class ActiveMessageTests(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox()

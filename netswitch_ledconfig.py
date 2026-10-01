@@ -59,19 +59,18 @@ SPEEDS = ("slow", "fast")
 
 
 def led_count():
-    """LEDs installed: 0 = no LED service, 1 = single LED, more = strip.
-    Set at install time (install.sh --led=N) and editable from the page."""
-    if not os.path.exists(core.LED_ENABLED):
-        return 0
+    """LEDs connected: 1 = a single LED (the default), more = a strip, 0 = none:
+    the LED service then idles and the page hides the LED settings. Set at
+    install time (install.sh --leds=N) and editable from the page."""
     try:
-        return max(1, min(300, int((core.read_file(core.LED_COUNT) or "1").strip())))
+        return max(0, min(300, int((core.read_file(core.LED_COUNT) or "1").strip())))
     except ValueError:
         return 1
 
 
 def save_led_count(n):
     try:
-        n = max(1, min(300, int(n)))
+        n = max(0, min(300, int(n)))
     except (TypeError, ValueError):
         return
     tmp = core.LED_COUNT + ".tmp"

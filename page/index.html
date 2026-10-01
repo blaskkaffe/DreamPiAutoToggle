@@ -97,16 +97,17 @@ millisecond timing. Turn recording on, then dial.</div>
 </div>
 
 <div id="led-section" class="sec" style="display:none;position:relative">
-<h2>Status LED<span id="led-count-t"></span> <span class="saved" id="led-saved">Saved &#10003;</span></h2>
+<h2>NeoPixel calibration <span class="saved led-saved">Saved &#10003;</span></h2>
 <div class="card">
  <div class="range wb"><span>Red</span><input type="range" id="wb-r" min="0" max="255" step="1" style="accent-color:#f33"><span id="wb-r-v"></span></div>
  <div class="range wb"><span>Green</span><input type="range" id="wb-g" min="0" max="255" step="1" style="accent-color:#3f3"><span id="wb-g-v"></span></div>
  <div class="range wb"><span>Blue</span><input type="range" id="wb-b" min="0" max="255" step="1" style="accent-color:#39f"><span id="wb-b-v"></span></div>
  <div class="bar" style="justify-content:center;margin:12px 0 10px"><button class="pill-s" id="wb-preview" type="button">Preview on LED</button><button class="pill-s" id="wb-reset" type="button">Reset to neutral</button></div>
+ <div class="range wb" style="border-top:1px solid var(--line)"><span>Brightness</span><input type="range" id="led-bright" min="0" max="1000" step="1"><span id="led-bright-v"></span></div>
 </div>
-<div class="note">White balance: tap <strong>Preview on LED</strong> to show solid white, then turn down whichever of R, G or B looks too strong until it looks neutral - leave the others at 100%. Tap Preview again when done. This corrects every colour the LEDs show, not just white, and takes about 30 seconds.</div>
+<div class="note">White balance: tap <strong>Preview on LED</strong> to show solid white, then turn down whichever of R, G or B looks too strong until it looks neutral - leave the others at 255. Tap Preview again when done. This corrects every colour the LEDs show, not just white, and takes about 30 seconds. Brightness is the maximum for the whole strip, applied after the correction (logarithmic: the left half is the low range that suits an indicator LED).</div>
+<h2>Status LED<span id="led-count-t"></span> <span class="saved led-saved">Saved &#10003;</span></h2>
 <div class="card">
- <div class="range"><span>Maximum brightness</span><input type="range" id="led-bright" min="0" max="1000" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
  <div class="tabs"><button class="pill-s" type="button" id="tab-dcnow">DCNow! selected</button><button class="pill-s" type="button" id="tab-dcnet">DCNET selected</button></div>
  <table class="ledtab"><thead><tr><th>Message</th><th>colour</th><th>effect</th><th>level</th></tr></thead><tbody id="led-rows"></tbody></table>
 </div>

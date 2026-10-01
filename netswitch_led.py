@@ -205,23 +205,48 @@ def render(messages, now, count, clocks=None, white_balance=None, gamma=ledconfi
 
 
 # ---------------------------------------------------------------- main loop
+def switch_output(out, count, gpio, new_count, new_gpio):
+    """Reopen the hardware output when the LED count or pin was changed on the
+    page. Returns (out, count, gpio, switched). out is None while the count is
+    0 (LEDs off). The new output is opened before the old one is closed, and
+    if it can't be opened the current output (and its count/pin) is kept."""
+    if new_count == count and new_gpio == gpio:
+        return out, count, gpio, False
+    new_out = None
+    if new_count > 0:
+        try:
+            new_out = drivers.open_output(new_count, new_gpio)
+        except (IOError, OSError) as e:
+            sys.stderr.write("could not switch to GPIO%d, %d LED(s) (%s), keeping the "
+                             "current output\n" % (new_gpio, new_count, e))
+            return out, count, gpio, False
+    if out is not None:
+        out.show([(0, 0, 0)] * count)
+        time.sleep(0.02)
+        out.close()
+    return new_out, new_count, new_gpio, True
+
+
 def main():
-    count, gpio = ledconfig.led_count() or 1, ledconfig.led_gpio()
+    count, gpio = ledconfig.led_count(), ledconfig.led_gpio()
     cfg = ledconfig.led_config()
     order = drivers.ORDERS.get(cfg.get("order"), drivers.DEFAULT_ORDER)
     white_balance, gamma = _wb(cfg), cfg.get("gamma", ledconfig.GAMMA)
-    try:
-        out = drivers.open_output(count, gpio)
-    except (IOError, OSError) as e:
-        sys.exit("Cannot drive the LEDs on GPIO%d (%s). The LED service must run as root "
-                 "(and, for GPIO10, SPI must be enabled)." % (gpio, e))
-    out.order = order
+    out = None   # stays None while the LED count is 0 (the service just waits for it to change)
+    if count > 0:
+        try:
+            out = drivers.open_output(count, gpio)
+        except (IOError, OSError) as e:
+            sys.exit("Cannot drive the LEDs on GPIO%d (%s). The LED service must run as root "
+                     "(and, for GPIO10, SPI must be enabled)." % (gpio, e))
+        out.order = order
 
     def stop(*_):
         try:
-            out.show([(0, 0, 0)] * count)
-            time.sleep(0.02)
-            out.close()
+            if out is not None:
+                out.show([(0, 0, 0)] * count)
+                time.sleep(0.02)
+                out.close()
         finally:
             sys.exit(0)
 
@@ -242,24 +267,19 @@ def main():
                 cfg = ledconfig.led_config()
                 order = drivers.ORDERS.get(cfg.get("order"), drivers.DEFAULT_ORDER)
                 white_balance, gamma = _wb(cfg), cfg.get("gamma", ledconfig.GAMMA)
-                new_count, new_gpio = ledconfig.led_count() or 1, ledconfig.led_gpio()
-                if new_count != count or new_gpio != gpio:   # changed on the page: reopen the output
-                    try:
-                        new_out = drivers.open_output(new_count, new_gpio)
-                    except (IOError, OSError) as e:
-                        sys.stderr.write("could not switch to GPIO%d, %d LED(s) (%s), keeping the "
-                                         "current output\n" % (new_gpio, new_count, e))
-                    else:
-                        out.show([(0, 0, 0)] * count)
-                        time.sleep(0.02)
-                        out.close()
-                        out, count, gpio = new_out, new_count, new_gpio
-                        clocks = {}
-                        reset_dither()
-                out.order = order
+                out, count, gpio, switched = switch_output(out, count, gpio, ledconfig.led_count(), ledconfig.led_gpio())
+                if switched:
+                    clocks = {}
+                    last_frame = None
+                    reset_dither()
+                if out is not None:
+                    out.order = order
             except Exception:   # never let a bad read stop the LED loop
                 pass
             next_read = now + REFRESH
+        if out is None:   # no LEDs configured
+            time.sleep(REFRESH)
+            continue
         # White-balance test open on the page: hold the strip at solid white,
         # run through the same gamma/white-balance/brightness pipeline as
         # everything else, so what's previewed is exactly what's being

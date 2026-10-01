@@ -101,7 +101,7 @@
  #wifi-networks{padding:10px 0 14px}
  .wnet{display:block;width:100%;margin-bottom:6px;padding:9px 12px;text-align:left;border-radius:12px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
  .wnet .sig{float:right;opacity:.6;font-size:.85em}
- .range.wb{display:grid;grid-template-columns:4.5em minmax(0,1fr) 2.6em;gap:12px}   /* same slider length for R, G and B */
+ .range.wb{display:grid;grid-template-columns:5.6em minmax(0,1fr) 3.1em;gap:12px}   /* same slider length for R, G and B */
  .range.wb span:last-child{text-align:right}
  .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range > span:first-child{white-space:nowrap} .range input{flex:1;min-width:60px;accent-color:var(--dcnow)}
  .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}

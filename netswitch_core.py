@@ -14,7 +14,6 @@ AUTORESET = os.path.join(BASE_DIR, "autoreset")
 DEFAULT_DCNET = os.path.join(BASE_DIR, "default_dcnet")
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
 LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness, colours, wire order, white balance
-LED_ENABLED = os.path.join(BASE_DIR, "led_enabled")  # written by install.sh --led
 LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs, editable from the page
 LED_GPIO = os.path.join(BASE_DIR, "led_gpio")        # output pin (10, 12, 18 or 21), likewise
 LED_HIDDEN = os.path.join(BASE_DIR, "led_hidden")    # exists = LED settings hidden on the page

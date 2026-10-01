@@ -39,17 +39,17 @@ Some browsers refuse or keep upgrading plain `http://` pages, so the page is als
 Options:
 - `sudo ./install.sh 8080` puts the HTTP page on another port, if port 80 is taken.
 - `sudo ./install.sh --https-port=8443` puts the HTTPS page on another port, and `--no-https` turns it off.
-- `sudo ./install.sh --led` adds a status NeoPixel (1 LED, or the count already set), and `--led=30` a chain or strip of 30 (the count can also be changed later in Settings); `--led-gpio=10`/`12`/`21` uses a different pin than the default GPIO18 (see [Status NeoPixels](#status-neopixels-optional)). `--no-led` removes the LED service again.
+- The status NeoPixel is on by default (1 LED on GPIO18). `sudo ./install.sh --leds=30` sets the starting count for a chain or strip of 30 (the count can also be changed later in Settings), and `--leds=0` turns the LEDs off and hides the LED settings; `--led-gpio=10`/`12`/`21` uses a different pin than the default GPIO18 (see [Status NeoPixels](#status-neopixels-optional)). The older `--led`, `--led=N` and `--no-led` still work.
 - `sudo ./install.sh --wifi` adds Wi-Fi setup: the temporary access point for joining a network without a keyboard (installs `hostapd` and `dnsmasq`), plus its Settings controls and the button hold that starts it (see [Wi-Fi setup button](#buttons-and-wi-fi-setup)). `--no-wifi` removes it again. The two buttons themselves (GPIO17 and GPIO4 by default) are always installed.
 
-Options can be combined, for example `sudo ./install.sh --led=8 --no-https`.
+Options can be combined, for example `sudo ./install.sh --leds=8 --no-https`.
 
 ### Update
 
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
 ```
-Your settings are kept: selected network, default network, Auto reset, the LED setup and its colours, and the HTTPS certificate. You don't need to repeat `--led`, `--led=N` or `--wifi`; the installer remembers them until `--no-led` / `--no-wifi`. If the page still looks old afterwards, reload it in the browser.
+Your settings are kept: selected network, default network, Auto reset, the LED setup and its colours, and the HTTPS certificate. You don't need to repeat `--leds=N` or `--wifi`; the installer remembers them (`--leds=0` / `--no-wifi` switch them off). If the page still looks old afterwards, reload it in the browser.
 
 ### Uninstall
 
@@ -120,10 +120,10 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 - **Button 1** / **Button 2:** each button's **function** - **Off**, **Toggle network** (switches between DCNow! and DCNET, the default for button 1), **Select DCNow!** or **Select DCNET** (the default for button 2 is **Off**) - and **pin** (see [Wi-Fi setup button](#buttons-and-wi-fi-setup) for the physical wiring and defaults, GPIO17 and GPIO4). Pick two different pins; a change takes effect within a couple of seconds, no reinstall needed.
 - **Wi-Fi setup:** which button, or **Button 1 + 2** held together, starts Wi-Fi setup with a 3-second hold. A button's own short-press function above still works normally either way - only a press that's actually held long enough to start Wi-Fi setup skips it.
 
-**Status LED** (only shown when LEDs are installed with `--led` or `--led=N`, and not hidden - see below; the title shows the number of LEDs for a strip) - how the LEDs look, separate from the GPIO wiring settings above:
+**NeoPixel calibration** and **Status LED** (only shown when the LED count is above 0 - `--leds=0` hides them - and not hidden, see below; the Status LED title shows the number of LEDs for a strip) - how the LEDs look, separate from the GPIO wiring settings above. The calibration box holds the white-balance sliders and the brightness:
 
 - **White balance:** three sliders, **Red**, **Green** and **Blue** (0 to 255, all at 255 by default - no correction). Tap **Preview on LED** to hold the LED at solid white, then turn down whichever channel looks too strong until it looks neutral white rather than tinted - leave the others at 255, don't turn any of them up. Tap **Preview on LED** again (now labelled **Stop preview**) when you're done; it also stops automatically if you close Settings. **Reset to neutral** sets all three back to 255. This corrects every colour the LEDs show, not just white, and takes about 30 to 60 seconds - there's no need to calibrate individual colours.
-- **Maximum brightness** of the LEDs, 0 to 100% (default 8%), applied after white balance as a ceiling on the whole strip regardless of colour. The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
+- **Brightness** (the maximum brightness) of the LEDs, in the same box as the white balance, 0 to 100% (default 8%), applied after white balance as a ceiling on the whole strip regardless of colour. The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
 - Two tabs, **DCNow! selected** and **DCNET selected**, each with the full list of LED messages, grouped into **Errors** and **Information** (see [LED messages](#led-messages)). For example, "Ready for calls" can be green with DCNow! selected and blue with DCNET selected.
 - Per message:
   - A **tick box** to use it or not. When no ticked message applies, the LED is off.
@@ -200,11 +200,11 @@ Powering one pixel from 3.3 V keeps its data input compatible with the Pi's 3.3 
 **Other pins:** the same wiring, just to a different data pin - **GPIO10** (pin 19), **GPIO12** (pin 32) or **GPIO21** (pin 40) - and, for GPIO10 only, with SPI enabled first (see Install below). Use another pin if GPIO18 is wanted for something else, or to keep the analog audio jack free (it also uses PWM, which GPIO12 and GPIO18 both drive the LEDs through; GPIO21 uses a different peripheral, PCM, instead).
 
 **Install:**
-- One LED on the default pin (GPIO18): `sudo ./install.sh --led`
-- Several LEDs or a strip: `sudo ./install.sh --led=30` (the number of LEDs, 1 to 300; only the starting count, it can be changed later in Settings > GPIO)
-- A different pin: add `--led-gpio=10`, `--led-gpio=12` or `--led-gpio=21` (GPIO18 is the default; can be combined with `--led=N`). **GPIO10 needs a reboot**: the installer enables SPI in `config.txt` for it, which only takes effect after rebooting, so the LEDs stay dark on that pin until then.
+- One LED on the default pin (GPIO18): nothing to do, it's on by default
+- Several LEDs or a strip: `sudo ./install.sh --leds=30` (the number of LEDs, 0 to 300; only the starting count, it can be changed later in Settings > GPIO; `0` turns the LED off and hides the LED settings)
+- A different pin: add `--led-gpio=10`, `--led-gpio=12` or `--led-gpio=21` (GPIO18 is the default; can be combined with `--leds=N`). **GPIO10 needs a reboot**: the installer enables SPI in `config.txt` for it, which only takes effect after rebooting, so the LEDs stay dark on that pin until then.
 
-This starts the `dreampi-netswitch-led` service; other than switching to GPIO10, no reboot is needed. Later updates keep the LED setting until you run `sudo ./install.sh --no-led`. If an older version switched on SPI for the LED, the installer removes that setting again unless GPIO10 is still selected. The LED count and pin can both be changed later from the page's settings too (Settings > GPIO), without rerunning the installer - except switching *to* GPIO10 that way still needs SPI already enabled by `--led-gpio=10` beforehand, since enabling it needs root and a reboot that the page can't do itself; switching to it without that just leaves the LEDs dark until either SPI is enabled or another pin is picked again.
+This starts the `dreampi-netswitch-led` service; other than switching to GPIO10, no reboot is needed. Later updates keep the LED count and pin. If an older version switched on SPI for the LED, the installer removes that setting again unless GPIO10 is still selected. The LED count and pin can both be changed later from the page's settings too (Settings > GPIO), without rerunning the installer - except switching *to* GPIO10 that way still needs SPI already enabled by `--led-gpio=10` beforehand, since enabling it needs root and a reboot that the page can't do itself; switching to it without that just leaves the LEDs dark until either SPI is enabled or another pin is picked again.
 
 **How it works:** GPIO12 and GPIO18 are driven by the Pi's PWM hardware, clocked from the crystal, which gives accurate NeoPixel timing without special drivers, extra Python packages or config changes; GPIO21 uses the PCM peripheral the same way, so the LEDs don't need the PWM hardware (and therefore not the analog audio jack) at all. A single LED on GPIO12/18 is fed directly; anything else on GPIO12/18/21 is fed by a DMA channel from memory shared with the GPU, the same method the rpi_ws281x library uses. GPIO10 instead goes through the kernel's own SPI driver (`dtparam=spi=on`), one SPI byte per NeoPixel bit - what this add-on used by default in its very first versions, before it moved to GPIO18.
 

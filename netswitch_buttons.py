@@ -26,6 +26,8 @@ SHORT_PRESS_MIN = 0.03    # ignore a debounced press shorter than this
 BUTTON_POLL = 0.01        # 10 ms raw sample rate
 DEBOUNCE_SAMPLES = 3      # a level must read the same for this many samples running (30 ms) to count
 HEARTBEAT = 2             # seconds between state-file rewrites (so it can't go stale while idle)
+PULLUP_SETTLE = 0.05         # seconds for the internal pull-up to take effect before the first read
+PULLUP_RETRY = 1.0           # re-apply the pull-up this often while a pin sits low (a stuck-low pin never reports a release)
 
 
 def toggle_network():
@@ -65,11 +67,16 @@ def _start_wifi_toggle():
     core.debug_log("button: hold, Wi-Fi setup toggled")
 
 
-def new_button_state():
+def new_button_state(level=True):
     """[stable, candidate, candidate_count, pressed_since, fired]. stable/
     candidate: True = released (idle high). fired: a long-press action (the
-    Wi-Fi hold) already happened for the press in progress."""
-    return [True, True, 0, None, False]
+    Wi-Fi hold) already happened for the press in progress. level seeds the
+    state from the pin's real level at start: a pin that already reads low
+    then counts as a press that began before we looked (no pressed_since,
+    marked fired), so letting go of it never triggers a function."""
+    if level:
+        return [True, True, 0, None, False]
+    return [False, False, 0, None, True]
 
 
 def debounce_poll(level, st):
@@ -144,13 +151,23 @@ def button_watcher(gpio1, gpio2, function1, function2, wifi_assignment, stop_eve
     finally:
         os.close(fd)   # the mapping stays valid
     two_buttons = gpio2 != gpio1
-    set_input_pullup(gpio_block, gpio1, base)
-    if two_buttons:
-        set_input_pullup(gpio_block, gpio2, base)
+    pins = [gpio1] + ([gpio2] if two_buttons else [])
+
+    def apply_pullups():
+        for pin in pins:
+            set_input_pullup(gpio_block, pin, base)
+
+    apply_pullups()
+    time.sleep(PULLUP_SETTLE)   # let the pull-up take effect before the first read
+    levels = [read_level(gpio_block, pin) for pin in pins]
+    core.debug_log("button: watching GPIO%s, idle level %s" % (
+        "+".join(str(p) for p in pins), "/".join("high" if lv else "LOW" for lv in levels)))
 
     fn1 = _BUTTON_FUNCTIONS.get(function1, _BUTTON_FUNCTIONS["off"])
     fn2 = _BUTTON_FUNCTIONS.get(function2, _BUTTON_FUNCTIONS["off"])
-    st1, st2 = new_button_state(), new_button_state()
+    st1 = new_button_state(levels[0])
+    st2 = new_button_state(levels[1] if two_buttons else True)
+    last_pullup = time.time()
 
     while not stop_event.is_set():
         r1 = debounce_poll(read_level(gpio_block, gpio1), st1)
@@ -160,9 +177,17 @@ def button_watcher(gpio1, gpio2, function1, function2, wifi_assignment, stop_eve
             _start_wifi_toggle()
 
         if r1 == "released":
+            core.debug_log("button 1 (GPIO%d): short press" % gpio1)
             fn1()
         if two_buttons and r2 == "released":
+            core.debug_log("button 2 (GPIO%d): short press" % gpio2)
             fn2()
+        # A pin that sits low with nothing pressing it (pull-up not in effect)
+        # never reports a release; re-apply the pull-up now and then so it heals.
+        now = time.time()
+        if now - last_pullup >= PULLUP_RETRY and (not st1[0] or (two_buttons and not st2[0])):
+            apply_pullups()
+            last_pullup = now
         time.sleep(BUTTON_POLL)
 
 
