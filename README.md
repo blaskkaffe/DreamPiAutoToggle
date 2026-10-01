@@ -9,10 +9,10 @@ It changes no DreamPi files, so DreamPi's auto-updates keep working and uninstal
 What you get:
 - A live status page at `http://dreampi.local` (also over HTTPS) with buttons to pick the network.
 - Special phone numbers that switch the network straight from the Dreamcast.
-- Optional status LEDs on GPIO18: one NeoPixel, several, or a strip. They show DreamPi's status and network or internet problems, with colours, effects and LED sections per message.
+- Optional status LEDs, on GPIO18 by default or GPIO10/12/21: one NeoPixel, several, or a strip. They show DreamPi's status and network or internet problems, with colours, effects, LED sections per message and a swatch-based colour calibration.
 - An optional animated Dreamcast-style background for the page.
 - A debug log for tracking down calls that go wrong.
-- Modem plugged-in detection, its make/model and firmware, and a warning if it's not a modem known to work with DreamPi.
+- Modem plugged-in detection and its make/model, with a warning if it's not a modem known to work with DreamPi.
 
 **Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `555-0002` works end to end. A single NeoPixel on GPIO18 works too. Several LEDs or a strip, the new LED colour calibration/wire order/dithering, and the GPIO10/12/21 output pins haven't been tried on real hardware yet; feedback is welcome.
 
@@ -110,7 +110,7 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 **Appearance**
 - **Dreamcast background:** an animated background in the style of the Dreamcast menu (see [Credits](#credits)). Off by default, and remembered per browser, so a phone can leave it off while a PC has it on. It pauses while the page is hidden. The Pi serves the files itself (about 600 KB, fetched once), so it works without internet; browsers without WebGL just show the blue gradient. The buttons are slightly see-through so the background shows through them.
 
-**About:** the add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model and the operating system.
+**About:** the add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model, the operating system, and - once a modem has been detected - its make/model, with a note if it isn't a known-working one.
 
 **Status LED** (only shown when LEDs are installed with `--led` or `--leds=N`, and not hidden - see below; the title shows the number of LEDs for a strip)
 
