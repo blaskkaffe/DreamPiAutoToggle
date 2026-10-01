@@ -10,10 +10,10 @@
  var css=document.createElement("style");
  css.textContent=
   "#pl-box{margin:0 0 14px;padding:14px 24px 10px;border-radius:var(--r);text-align:center;background:#9e4f10;border:var(--bw) solid #c9793a;line-height:1.35;cursor:pointer;user-select:none}#pl-box.dcnet{background:#1c4f9e;border-color:#5a86cf}#pl-box.off{display:none}"+
-  "#pl-box .nlabel{display:block;margin:0 0 4px;padding:0 0 2px;font-size:1.08em;font-weight:600;color:rgba(255,255,255,.8);text-align:left;letter-spacing:.01em}"+
+  "#pl-box .nlabel{display:block;margin:0 0 6px;padding:0 0 2px;font-size:1.08em;font-weight:600;color:rgba(255,255,255,.8);text-align:center;letter-spacing:.01em}"+
   "#pl-box .row{font-size:.62em;line-height:1.35;padding:9px 0;border-top:1px solid rgba(255,255,255,.18);text-align:left}#pl-box .row.main{justify-content:center;border-top:0;padding:8px 0 4px}#pl-box .row.main .k{display:none}#pl-box .row.main .v{width:100%;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;font-size:1.05em}#pl-box .row .k{color:rgba(255,255,255,.65);width:90px;flex:none}#pl-box .row .v{min-width:0;display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}#pl-box .more{display:none}#pl-box.open .more{display:flex}#pl-box .arrow{color:rgba(255,255,255,.7);font-size:.9em;transition:transform .15s;flex:none;margin-left:8px}#pl-box.open .arrow{transform:rotate(90deg)}"+
-  "#pl-box .pl-net{display:inline-block;white-space:nowrap}#pl-box .pl-net-dcnow{color:var(--dcnow-l)}#pl-box .pl-net-dcnet{color:var(--dcnet-l)}"+
-  "#pl-box #pl-games,#pl-box #pl-players,#pl-box #pl-msg,#pl-box #pl-links{display:block;white-space:normal;overflow-wrap:anywhere}#pl-box #pl-links{display:flex;flex-wrap:wrap;gap:6px}#pl-box #pl-links a{text-decoration:none}#pl-box .pl-entry{display:block}#pl-box .pl-entry + .pl-entry{margin-top:4px}#pl-box .pl-game{display:inline-block;margin-left:6px;opacity:.82}";
+  "#pl-box .pl-net{display:inline-block;white-space:nowrap;font-size:1.05em;font-weight:600;color:inherit}#pl-box .pl-net-dcnow{color:var(--dcnow-l)}#pl-box .pl-net-dcnet{color:var(--dcnet-l)}"+
+  "#pl-box #pl-games,#pl-box #pl-players,#pl-box #pl-msg,#pl-box #pl-links{display:block;white-space:normal;overflow-wrap:anywhere}#pl-box #pl-games{display:block;overflow:hidden;white-space:nowrap;width:100%;padding:2px 0}#pl-box .pl-games-track{display:inline-block;white-space:nowrap;padding-left:100%;animation:pl-scroll 16s linear infinite;will-change:transform}#pl-box #pl-links{display:flex;flex-wrap:wrap;gap:6px}#pl-box #pl-links a{text-decoration:none}#pl-box #pl-players{display:flex;flex-direction:column;gap:4px}#pl-box .pl-row{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1.4fr) auto;gap:8px;align-items:center;padding:5px 0;border-top:1px solid rgba(255,255,255,.12)}#pl-box .pl-row:first-child{border-top:0}#pl-box .pl-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}#pl-box .pl-game{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.82}#pl-box .pl-network{justify-self:end;white-space:nowrap;font-size:.78em;font-weight:700;letter-spacing:.04em;text-transform:uppercase}#pl-box .pl-network.dcnow{color:var(--dcnow-l)}#pl-box .pl-network.dcnet{color:var(--dcnet-l)}@keyframes pl-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}";
  document.head.appendChild(css);
  var box=document.createElement("div");box.id="pl-box";box.className="now rows";box.title="Show or hide details";box.setAttribute("role","button");box.setAttribute("tabindex","0");box.setAttribute("aria-expanded","false");
  box.innerHTML='<div class="nlabel">Online players:</div>'+ 
@@ -51,9 +51,16 @@
     if(!p.game||seen[p.game])return;
     seen[p.game]=true;gameNames.push(p.game);
    });
-   games.textContent=gameNames.length?gameNames.slice(0,12).join(" • "):"Nobody is listed as online right now.";
+   if(gameNames.length){
+    var gamesText=gameNames.slice(0,12).join(" • ");
+    var scrollText=gamesText.length>36?gamesText+" • "+gamesText:"";
+    games.innerHTML=scrollText?'<span class="pl-games-track">'+esc(scrollText)+'</span>':esc(gamesText);
+   }else{
+    games.textContent="Nobody is listed as online right now.";
+   }
    playersbox.innerHTML=players.map(function(p){
-    return '<span class="pl-entry">'+esc(p.player)+(p.game?' <span class="pl-game">'+esc(p.game)+'</span>':'')+'</span>';
+    var net=(p.network||"DCNow!")=='DCNET'?'dcnet':'dcnow';
+    return '<div class="pl-row"><span class="pl-name">'+esc(p.player||'Unknown')+'</span><span class="pl-game">'+esc(p.game||'—')+'</span><span class="pl-network '+net+'">'+esc(p.network||'DCNow!')+'</span></div>';
    }).join("");
   }else{
    games.textContent="Nobody is listed as online right now.";

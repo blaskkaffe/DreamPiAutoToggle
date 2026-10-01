@@ -201,6 +201,7 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn("Online players:", js)
             self.assertIn("DCNow!:", js)
             self.assertIn("pl-toggle", js)
+            self.assertIn("pl-row", js)
             r = json.loads(urlopen(base + "/players", timeout=10).read().decode())
             self.assertTrue(r["configured"])
             self.assertIn("links", r)
