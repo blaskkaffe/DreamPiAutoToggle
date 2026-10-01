@@ -101,6 +101,8 @@
  #wifi-networks{padding:10px 0 14px}
  .wnet{display:block;width:100%;margin-bottom:6px;padding:9px 12px;text-align:left;border-radius:12px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
  .wnet .sig{float:right;opacity:.6;font-size:.85em}
+ details.guide{margin:6px 4px 14px;color:var(--muted);font-size:.85em} details.guide summary{cursor:pointer;padding:6px 0}
+ details.guide code{background:#222;border-radius:6px;padding:1px 6px;color:#ddd} details.guide ol{margin:6px 0;padding-left:20px} details.guide li{margin:4px 0}
  .nrow{padding:12px 0;border-top:1px solid var(--line)} .nrow:first-child{border-top:0}
  .nrow .sub{display:block;margin-top:2px}
  .nchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}

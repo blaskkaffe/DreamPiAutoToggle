@@ -133,6 +133,20 @@ millisecond timing. Turn recording on, then dial.</div>
 <h2>About</h2>
 <div class="card"><table class="about" id="about"></table></div>
 <div class="note">The DreamPi script versions are the dates DreamPi's own auto-update compares.</div>
+<h2>Updates</h2>
+<div class="card">
+ <div class="srow"><span>Check for updates<span class="sub" id="upd-text">Not checked yet</span></span>
+  <button class="pill-s" id="upd-check" type="button">Check</button></div>
+ <div id="upd-dreampi" class="sub" style="display:none;padding:0 0 12px"></div>
+ <div class="srow" id="upd-do-row" style="display:none"><span>Update the add-on<span class="sub" id="upd-do-sub"></span></span>
+  <button class="pill-s" id="upd-do" type="button">Update now</button></div>
+ <div id="upd-log" class="sub" style="display:none;white-space:pre-wrap;word-break:break-word;padding:0 0 12px"></div>
+</div>
+<details class="guide" id="upd-guide"><summary>How to update by hand</summary>
+ <p><b>This add-on</b> (a newer version is found on GitHub; your settings are kept):</p>
+ <ol><li>Open a terminal on the Pi (SSH).</li><li><code id="upd-cd">cd DreamPiAutoToggle</code></li><li><code>git pull</code></li><li><code>sudo ./install.sh</code> (add the same options you used before, such as <code>--wifi</code> or <code>--leds=30</code>)</li></ol>
+ <p><b>DreamPi itself</b> updates its own scripts when the Pi starts and has internet. Restart the Pi (<code>sudo reboot</code>) to get a newer version. If <code>/boot/noautoupdates.txt</code> exists, DreamPi does not update itself: remove that file first.</p>
+</details>
 </section>
 </div>
 </div></div>

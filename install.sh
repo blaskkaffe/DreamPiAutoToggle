@@ -30,6 +30,12 @@ DEST=/opt/dreampi-netswitch
 SRC="$(cd "$(dirname "$0")" && pwd)"
 PORT=80
 HTTPS_PORT=443
+# an update keeps the ports used last time unless they are given again
+if [ -f "$DEST/install_ports" ]; then
+    read -r OLD_PORT OLD_HTTPS < "$DEST/install_ports" || true
+    case "$OLD_PORT" in ''|*[!0-9]*) ;; *) PORT=$OLD_PORT ;; esac
+    case "$OLD_HTTPS" in ''|*[!0-9]*) ;; *) HTTPS_PORT=$OLD_HTTPS ;; esac
+fi
 LED_COUNT=
 LED_GPIO=
 WIFI=keep
@@ -59,7 +65,7 @@ done
 if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--leds=N|--led-gpio=N] [--wifi|--no-wifi|--wifi-demo|--no-wifi-demo]"; exit 1; fi
 
 mkdir -p "$DEST"
-cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_ledconfig.py" "$SRC/netswitch_numbers.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_led_drivers.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" "$SRC/netswitch_wifi_setup.py" \
+cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_ledconfig.py" "$SRC/netswitch_numbers.py" "$SRC/netswitch_update.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_led_drivers.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" "$SRC/netswitch_wifi_setup.py" \
    "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/static"
 cp "$SRC/page/index.html" "$SRC/page/page.css" "$SRC/page/page.js" "$DEST/page/"
@@ -71,6 +77,11 @@ if command -v git >/dev/null 2>&1 && git -C "$SRC" rev-parse >/dev/null 2>&1; th
 else
     echo unknown > "$DEST/version"
 fi
+# For the update check and the page's "Update now": which commit this is, where
+# the checkout lives, and the ports to keep when the installer is re-run.
+git -c safe.directory="$SRC" -C "$SRC" rev-parse HEAD > "$DEST/version_commit" 2>/dev/null || rm -f "$DEST/version_commit"
+echo "$SRC" > "$DEST/src_dir"
+echo "$PORT $HTTPS_PORT" > "$DEST/install_ports"
 
 # Tell every installed Python to load the hook at startup (.pth file)
 : > "$DEST/pth_locations"

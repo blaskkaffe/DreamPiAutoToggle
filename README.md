@@ -46,10 +46,12 @@ Options can be combined, for example `sudo ./install.sh --leds=8 --no-https`.
 
 ### Update
 
+The page can do it for you: **Settings > Updates** checks GitHub for a newer version of this add-on (and tells you if DreamPi has newer scripts), and **Update now** fetches and installs it from the checkout you installed from (settings and ports are kept; the page is gone for a few seconds). The same tab has a short guide for updating by hand, which is what the rest of this section describes.
+
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
 ```
-Your settings are kept: selected network, default network, Auto reset, the LED setup and its colours, and the HTTPS certificate. You don't need to repeat `--leds=N` or `--wifi`; the installer remembers them (`--leds=0` / `--no-wifi` switch them off). If the page still looks old afterwards, reload it in the browser.
+Your settings are kept: selected network, default network, Auto reset, the LED setup and its colours, and the HTTPS certificate. You don't need to repeat `--leds=N`, `--wifi` or the port options; the installer remembers them (`--leds=0` / `--no-wifi` switch them off, `--https-port=443` turns HTTPS back on after `--no-https`). If the page still looks old afterwards, reload it in the browser.
 
 ### Uninstall
 

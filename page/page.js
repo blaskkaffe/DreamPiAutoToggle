@@ -90,7 +90,7 @@ $("hang-f").onsubmit=function(e){e.preventDefault();e.stopPropagation();var b=$(
  var x=new XMLHttpRequest();x.open("POST","/hangup",true);x.setRequestHeader("X-Requested-With","netswitch");x.onload=refresh;x.send()};
 function showSettings(open){$("settings").classList.toggle("open",open);
  if(!open){closePops();if(wbPreviewOn)setWbPreview(false)}
- document.body.classList.toggle("settings-open",open);if(open){loadLed();loadButtons();loadNumbers();loadAbout()}}
+ document.body.classList.toggle("settings-open",open);if(open){loadLed();loadButtons();loadNumbers();loadAbout();loadUpdate()}}
 // Phone numbers: five lists (one per action) kept in numbers.json; the hook matches what was dialed against their endings.
 var numCfg=null,numTimer=null;
 function loadNumbers(){var x=new XMLHttpRequest();x.open("GET","/numbers",true);
@@ -120,6 +120,45 @@ function saveNumbers(){clearTimeout(numTimer);numTimer=setTimeout(function(){
  x.onload=function(){if(x.status!=200)return;numCfg=JSON.parse(x.responseText);renderNumbers();var el=$("num-saved");el.classList.add("show");
   setTimeout(function(){el.classList.remove("show")},1200)};x.send(JSON.stringify(numCfg.numbers))},100)}
 $("num-defaults").onclick=function(){if(!numCfg)return;numCfg.numbers=JSON.parse(JSON.stringify(numCfg.defaults));saveNumbers()};
+// Updates: GET /update (cached GitHub check), POST /update/check, POST /update/start (runs git pull + the installer on the Pi).
+var updTimer=null;
+function xhrJson(method,url,cb){var x=new XMLHttpRequest();x.open(method,url,true);
+ if(method=="POST")x.setRequestHeader("X-Requested-With","netswitch");
+ x.onload=function(){var r=null;try{r=JSON.parse(x.responseText)}catch(e){}cb(x.status==200?r:null)};x.onerror=function(){cb(null)};x.send()}
+function loadUpdate(){xhrJson("GET","/update",function(r){if(r)renderUpdate(r);else if(updRunning)$("upd-text").textContent="Restarting the services..."})}
+var updRunning=false;
+function renderUpdate(r){var a=r.addon,d=r.dreampi,msg;
+ updRunning=r.state=="running";
+ if(r.state=="running")msg="Updating... the page is unavailable for a few seconds while the services restart.";
+ else if(r.state=="ok")msg="Updated. Reloading...";
+ else if(r.state=="failed")msg="The update failed. Details below; the guide shows how to update by hand.";
+ else if(r.checking)msg="Checking...";
+ else if(!r.time)msg="Not checked yet";
+ else if(r.error)msg=r.error;
+ else if(a&&a.available)msg="A newer add-on version is available: "+a.latest+(a.latest_date?" ("+a.latest_date.slice(0,10)+")":"")+(a.behind?", "+a.behind+" new change"+(a.behind>1?"s":""):"")+". You have "+a.current+".";
+ else if(a&&a.available===false)msg="The add-on is up to date ("+a.current+").";
+ else msg=(a&&a.note)||"Couldn't tell if the add-on is current.";
+ if(a&&a.note&&a.available!==null&&!updRunning&&r.state=="idle")msg+=" "+a.note;
+ $("upd-text").textContent=msg;
+ var dp=$("upd-dreampi");dp.style.display="none";
+ if(d&&d.newer&&r.state=="idle"){dp.style.display="block";
+  dp.textContent="DreamPi has newer scripts: "+d.files.filter(function(f){return f.newer}).map(function(f){return f.name+" "+f.current+" \u2192 "+f.latest}).join(", ")+
+   (d.auto_updates?". It updates itself when the Pi restarts with internet.":". Automatic updates are off (/boot/noautoupdates.txt exists): see the guide below.")}
+ var show=!!(a&&a.available&&r.can_update&&r.state=="idle");
+ $("upd-do-row").style.display=show?"flex":"none";
+ $("upd-do-sub").textContent="Fetches the new version from GitHub and installs it ("+(r.branch||"main")+" branch). Settings are kept.";
+ $("upd-check").disabled=!!r.checking||updRunning;
+ var lg=$("upd-log");lg.style.display=(r.log&&r.log.length&&r.state!="idle")?"block":"none";lg.textContent=(r.log||[]).join("\n");
+ $("upd-cd").textContent="cd "+(r.src||"DreamPiAutoToggle");
+ if(r.state=="ok"){setTimeout(function(){location.reload()},3000)}
+ clearTimeout(updTimer);
+ if(r.state=="running"||r.checking)updTimer=setTimeout(loadUpdate,2000)}
+$("upd-check").onclick=function(){$("upd-text").textContent="Checking...";xhrJson("POST","/update/check",function(r){if(r)renderUpdate(r.status);
+ clearTimeout(updTimer);updTimer=setTimeout(loadUpdate,1500)})};
+$("upd-do").onclick=function(){if(!confirm("Update the add-on now? It is fetched from GitHub and installed; this page is unavailable for a few seconds."))return;
+ updRunning=true;$("upd-text").textContent="Starting the update...";
+ xhrJson("POST","/update/start",function(r){if(r&&r.message&&r.message!="Update started")$("upd-text").textContent=r.message;
+  clearTimeout(updTimer);updTimer=setTimeout(loadUpdate,2000)})};
 function loadAbout(){var x=new XMLHttpRequest();x.open("GET","/about",true);
  x.onload=function(){if(x.status!=200)return;$("about").innerHTML=JSON.parse(x.responseText).map(function(r){
   return '<tr><td class="n">'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>'}).join("")};x.send()}

@@ -27,6 +27,7 @@ import netswitch_core as core
 import netswitch_ledconfig as ledconfig
 import netswitch_numbers as numbers
 import netswitch_probes as probes
+import netswitch_update as updater
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 STATIC_FILES = {   # only these are served from /static/
@@ -238,6 +239,8 @@ class Handler(BaseHTTPRequestHandler):
                      "application/json")
         elif self.path == "/numbers":
             self.send(json.dumps(_numbers_reply()), "application/json")
+        elif self.path == "/update":
+            self.send(json.dumps(updater.status()), "application/json")
         elif self.path == "/buttonconfig":
             self.send(json.dumps({"config": {"button1_gpio": core.button_gpio(1), "button2_gpio": core.button_gpio(2),
                                              "button1_function": core.button_function(1),
@@ -281,6 +284,21 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self.send(json.dumps({"config": cfg, "count": ledconfig.led_count(), "gpio": ledconfig.led_gpio()}),
                      "application/json")
+            return
+        if self.path in ("/update/check", "/update/start"):
+            # Runs a git pull and the installer as root: only the page's own requests
+            # (custom header, which another website can't add to a cross-site form post).
+            if not self.headers.get("X-Requested-With"):
+                self.send_response(403)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            message = ""
+            if self.path == "/update/check":
+                updater.check_in_background()
+            else:
+                started, message = updater.start_update()
+            self.send(json.dumps({"message": message, "status": updater.status()}), "application/json")
             return
         if self.path == "/numbers":
             try:
