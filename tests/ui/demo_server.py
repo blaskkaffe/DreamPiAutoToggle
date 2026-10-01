@@ -2,7 +2,7 @@
 service on a sandbox (all paths in a temp dir). Switches via environment:
 LEDS=n (default 3), WIFI=1, WIFIDEMO=1 (dummy Wi-Fi networks + the setup loop),
 FAKEUPDATE=1 (fake GitHub: an update is available), FAKEPLAYERS=1 (made-up
-players), PORT=n (default 8734)."""
+players), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
 import sys, os, threading, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from support import web, core, probes, sandbox
@@ -29,6 +29,7 @@ if os.environ.get("FAKEUPDATE"):
     src = os.path.join(tmp, "DreamPiAutoToggle"); os.mkdir(src)
     env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
     subprocess.check_call(["git", "init", "-q", "-b", "main"], cwd=src)
+    subprocess.check_call(["git", "remote", "add", "origin", "https://github.com/blaskkaffe/DreamPiAutoToggle.git"], cwd=src)
     open(os.path.join(src, "install.sh"), "w").write("#!/bin/sh\n")
     subprocess.check_call(["git", "add", "."], cwd=src); subprocess.check_call(["git", "commit", "-q", "-m", "x"], cwd=src, env=env)
     open(core.ADDON_SRC, "w").write(src); open(core.ADDON_COMMIT, "w").write("a"*40)
@@ -41,6 +42,10 @@ if os.environ.get("FAKEUPDATE"):
         return "#dreampi.py_version=202608171113\n"
     up.fetch = fake
     up._spawn = lambda cmd: open(core.UPDATE_STATUS, "w").write("running")
+if os.environ.get("PIN"):
+    import netswitch_security
+    netswitch_security.set_pin(os.environ["PIN"])
+    netswitch_probes = __import__("netswitch_probes"); netswitch_probes._spawn_reboot = lambda: None
 if os.environ.get("FAKEPLAYERS"):
     import json
     import netswitch_players as pl

@@ -16,6 +16,10 @@
 #   sudo ./install.sh --no-wifi    remove Wi-Fi setup again
 #   sudo ./install.sh --wifi-demo  try Wi-Fi setup on dummy networks (no hostapd, nothing is changed on the
 #                                  Pi's network; password "demo" connects); --no-wifi-demo ends it
+#   sudo ./install.sh --pin        ask for a PIN that the page then wants before it updates, restarts
+#                                  the Pi or connects Wi-Fi (--pin=1234 gives it on the command line,
+#                                  which shows in the shell history); --no-pin removes it. It is kept
+#                                  across updates. Without a PIN anybody on your network can use those.
 #
 # The two GPIO buttons (GPIO17/pin11 toggles the network, GPIO4/pin7 is off by
 # default) are always installed; their pins and functions are editable from the
@@ -40,6 +44,7 @@ LED_COUNT=
 LED_GPIO=
 WIFI=keep
 WIFI_DEMO=keep
+PIN=keep
 BUTTON1_GPIO_DEFAULT=17   # GPIO17 / physical pin 11; editable later from the page's Settings > GPIO
 BUTTON2_GPIO_DEFAULT=4    # GPIO4 / physical pin 7
 for arg in "$@"; do
@@ -53,6 +58,10 @@ for arg in "$@"; do
         --no-led) LED_COUNT=0 ;;
         --wifi) WIFI=on ;;
         --no-wifi) WIFI=off ;;
+        --pin) PIN=ask ;;
+        --pin=*) PIN="${arg#--pin=}"
+                  if [ "${#PIN}" -lt 4 ] || [ "${#PIN}" -gt 64 ]; then echo "The PIN must be 4 to 64 characters"; exit 1; fi ;;
+        --no-pin) PIN=off ;;
         --wifi-demo) WIFI_DEMO=on ;;
         --no-wifi-demo) WIFI_DEMO=off ;;
         --https-port=*) HTTPS_PORT="${arg#--https-port=}" ;;
@@ -65,7 +74,8 @@ done
 if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--leds=N|--led-gpio=N] [--wifi|--no-wifi|--wifi-demo|--no-wifi-demo]"; exit 1; fi
 
 mkdir -p "$DEST"
-cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_ledconfig.py" "$SRC/netswitch_numbers.py" "$SRC/netswitch_update.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_led_drivers.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" "$SRC/netswitch_wifi_setup.py" \
+chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
+cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_ledconfig.py" "$SRC/netswitch_numbers.py" "$SRC/netswitch_update.py" "$SRC/netswitch_security.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_led_drivers.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" "$SRC/netswitch_wifi_setup.py" \
    "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/static"
 cp "$SRC"/page/*.html "$SRC"/page/*.css "$SRC"/page/*.js "$DEST/page/"
@@ -86,6 +96,26 @@ fi
 git -c safe.directory="$SRC" -C "$SRC" rev-parse HEAD > "$DEST/version_commit" 2>/dev/null || rm -f "$DEST/version_commit"
 echo "$SRC" > "$DEST/src_dir"
 echo "$PORT $HTTPS_PORT" > "$DEST/install_ports"
+# "Update now" only pulls from the address the checkout had when it was installed
+if command -v git >/dev/null 2>&1; then
+    git -c safe.directory="$SRC" -C "$SRC" config --get remote.origin.url > "$DEST/update_origin" 2>/dev/null || rm -f "$DEST/update_origin"
+fi
+
+# Optional PIN for update / restart / Wi-Fi connect on the page (stored as a salted hash)
+if [ "$PIN" = ask ]; then
+    printf "New PIN (4-64 characters, not shown): "
+    stty -echo 2>/dev/null || true
+    read -r PIN || PIN=
+    stty echo 2>/dev/null || true
+    echo
+    if [ "${#PIN}" -lt 4 ] || [ "${#PIN}" -gt 64 ]; then echo "The PIN must be 4 to 64 characters"; exit 1; fi
+fi
+case "$PIN" in
+    keep) ;;
+    off) (cd "$DEST" && python3 netswitch_security.py clear) && echo "PIN removed" ;;
+    *) (cd "$DEST" && NS_PIN="$PIN" python3 netswitch_security.py set) && echo "PIN set: the page asks for it before an update, restart or Wi-Fi connect" ;;
+esac
+PIN=
 
 # Tell every installed Python to load the hook at startup (.pth file)
 : > "$DEST/pth_locations"
@@ -144,6 +174,12 @@ ExecStart=$WEBPY $DEST/netswitch_web.py $PORT $HTTPS_PORT
 Restart=always
 RestartSec=3
 Nice=-5
+# The page runs as root, so it is fenced in: no setuid tricks, no writes to /usr, /boot or /etc,
+# no cgroup or kernel-module changes. (The update runs in its own transient unit, see netswitch_update.py.)
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectControlGroups=yes
+ProtectKernelModules=yes
 
 [Install]
 WantedBy=multi-user.target

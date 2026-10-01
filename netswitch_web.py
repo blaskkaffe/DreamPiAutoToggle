@@ -27,6 +27,7 @@ import netswitch_core as core
 import netswitch_ledconfig as ledconfig
 import netswitch_numbers as numbers
 import netswitch_probes as probes
+import netswitch_security as security
 import netswitch_update as updater
 try:
     import netswitch_players as players   # optional: delete it and page/players.js to drop the online-players list
@@ -106,6 +107,7 @@ def api_state():
             "wifi": {"state": wf_state, "ssid": wf.get("ssid"), "networks": wf.get("networks"),
                      "installed": os.path.exists(core.WIFI_ENABLED), "demo": os.path.exists(core.WIFI_DEMO)},
             "hangup": {"busy": probes._hangup["busy"], "text": probes._hangup["text"]},
+            "pin": security.pin_required(),     # the page asks for it before update / restart / Wi-Fi connect
             "warnings": warnings, "now": int(time.time())}
 
 
@@ -186,6 +188,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Encoding", "gzip")
             self.send_header("Vary", "Accept-Encoding")
         self.send_header("Cache-Control", "max-age=%d" % cache if cache else "no-store")
+        # nobody may frame the page (clickjacking the update/restart buttons) or have it guessed as another type
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Content-Security-Policy", "frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "same-origin")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -207,11 +214,27 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
+    def _refuse(self, status, message):
+        self.send(message + "\n", "text/plain; charset=utf-8", status=status)
+
     def do_GET(self):
+        if not security.host_allowed(self.headers.get("Host")):
+            return self._refuse(421, "Unknown host name: use the Pi's IP address or its .local name "
+                                     "(or list the name in /opt/dreampi-netswitch/allowed_hosts)")
         self._safely(self._get)
 
     def do_POST(self):
+        if not security.host_allowed(self.headers.get("Host")):
+            return self._refuse(421, "Unknown host name")
         self._safely(self._post)
+
+    def _body(self, limit):
+        """The request body, at most `limit` bytes (a negative or bad Content-Length counts as none)."""
+        try:
+            length = max(0, min(int(self.headers.get("Content-Length") or 0), limit))
+        except ValueError:
+            length = 0
+        return self.rfile.read(length) if length else b""
 
     def _get(self):
         if self.path == "/ping":
@@ -232,7 +255,10 @@ class Handler(BaseHTTPRequestHandler):
                 d["network"], core.tag(), d["default"], "on" if d["autoreset"] else "off", d["dreampi"]["text"],
                 d["modem"]["text"], d["internet"]["text"], d["pi"]["text"]), "text/plain; charset=utf-8")
         elif self.path == "/about":
-            self.send(json.dumps(probes.about()), "application/json")
+            rows = probes.about()
+            rows.append(("PIN", "Asked before update, restart and Wi-Fi connect" if security.pin_required()
+                         else "Off: anyone on your network can update or restart (install.sh --pin sets one)"))
+            self.send(json.dumps(rows), "application/json")
         elif self.path.startswith("/static/"):
             name = self.path[len("/static/"):].split("?")[0]
             body = _static(name)
@@ -285,10 +311,22 @@ class Handler(BaseHTTPRequestHandler):
             self.send(PAGE_BYTES, "text/html; charset=utf-8", fixed=True)
 
     def _post(self):
+        path = self.path.split("?")[0]
+        # Everything here changes something, and some of it runs as root: only the page itself may ask
+        # (not another site's form or script), and the actions that reboot, update or change Wi-Fi
+        # also need the PIN when one is set.
+        if not security.post_allowed(self.headers, strict=path in security.PROTECTED):
+            return self._refuse(403, "Refused: this request did not come from the page")
+        if path in security.PROTECTED:
+            ok, message = security.check_pin(self.headers.get("X-Netswitch-Pin") or "")
+            if not ok:
+                core.debug_log("web page: %s refused (%s)" % (path, message))
+                self.send(json.dumps({"started": False, "message": message}), "application/json",
+                          status=429 if message.startswith("Too many") else 401)
+                return
         if self.path == "/ledconfig":
             try:
-                length = min(int(self.headers.get("Content-Length") or 0), 65536)
-                data = json.loads(self.rfile.read(length).decode("utf-8"))
+                data = json.loads(self._body(65536).decode("utf-8"))
                 cfg = ledconfig.save_led_config(data)
                 if "count" in data:
                     ledconfig.save_led_count(data["count"])
@@ -303,23 +341,12 @@ class Handler(BaseHTTPRequestHandler):
                      "application/json")
             return
         if self.path == "/reboot":
-            # Like the update: only the page's own request (custom header), never a bare cross-site form post.
-            if not self.headers.get("X-Requested-With"):
-                self.send_response(403)
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-                return
             started, message = probes.start_reboot()
             self.send(json.dumps({"started": started, "message": message}), "application/json")
             return
         if self.path in ("/update/check", "/update/start"):
-            # Runs a git pull and the installer as root: only the page's own requests
-            # (custom header, which another website can't add to a cross-site form post).
-            if not self.headers.get("X-Requested-With"):
-                self.send_response(403)
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-                return
+            if not self.headers.get("X-Requested-With"):   # the check is harmless but still only for the page
+                return self._refuse(403, "Refused: this request did not come from the page")
             message = ""
             if self.path == "/update/check":
                 updater.check_in_background()
@@ -329,8 +356,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/numbers":
             try:
-                length = min(int(self.headers.get("Content-Length") or 0), 16384)
-                numbers.save_numbers(json.loads(self.rfile.read(length).decode("utf-8")))
+                numbers.save_numbers(json.loads(self._body(16384).decode("utf-8")))
             except (ValueError, IOError, OSError) as e:
                 self.send_response(400)
                 self.end_headers()
@@ -340,8 +366,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/buttonconfig":
             try:
-                length = min(int(self.headers.get("Content-Length") or 0), 4096)
-                data = json.loads(self.rfile.read(length).decode("utf-8"))
+                data = json.loads(self._body(4096).decode("utf-8"))
             except (ValueError, IOError, OSError) as e:
                 self.send_response(400)
                 self.end_headers()
@@ -429,11 +454,10 @@ class Handler(BaseHTTPRequestHandler):
             if os.path.exists(core.WIFI_ENABLED):
                 ssid = ""
                 try:
-                    length = min(int(self.headers.get("Content-Length") or 0), 4096)
-                    data = json.loads(self.rfile.read(length).decode("utf-8"))
-                    ssid = str(data.get("ssid") or "").strip()
-                    password = str(data.get("password") or "")
-                except (ValueError, IOError, OSError):
+                    data = json.loads(self._body(4096).decode("utf-8"))
+                    ssid = str(data.get("ssid") or "").strip()[:32]      # an SSID is at most 32 bytes
+                    password = str(data.get("password") or "")[:63]      # a WPA passphrase at most 63
+                except (ValueError, IOError, OSError, AttributeError):
                     pass
                 if ssid:
                     tmp = core.WIFI_CONNECT + ".tmp"

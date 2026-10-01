@@ -42,6 +42,8 @@ Options:
 - The status NeoPixel is on by default (1 LED on GPIO18). `sudo ./install.sh --leds=30` sets the starting count for a chain or strip of 30 (the count can also be changed later in Settings), and `--leds=0` turns the LEDs off and hides the LED settings; `--led-gpio=10`/`12`/`21` uses a different pin than the default GPIO18 (see [Status NeoPixels](#status-neopixels-optional)). The older `--led`, `--led=N` and `--no-led` still work.
 - `sudo ./install.sh --wifi` adds Wi-Fi setup: the temporary access point for joining a network without a keyboard (installs `hostapd` and `dnsmasq`), plus its Settings controls and the button hold that starts it (see [Wi-Fi setup button](#buttons-and-wi-fi-setup)). `--no-wifi` removes it again. To try the Wi-Fi flow without any Wi-Fi hardware, `--wifi-demo` runs Wi-Fi setup on dummy networks (password `demo` connects, anything else fails) without touching the Pi's network; `--no-wifi-demo` ends it. The two buttons themselves (GPIO17 and GPIO4 by default) are always installed.
 
+- `sudo ./install.sh --pin` asks for a PIN (`--pin=1234` gives it on the command line, which shows in the shell history); `--no-pin` removes it. See [Safety](#safety).
+
 Options can be combined, for example `sudo ./install.sh --leds=8 --no-https`.
 
 ### Update
@@ -52,6 +54,16 @@ The page can do it for you: **Settings > Updates** checks GitHub for a newer ver
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
 ```
 Your settings are kept: selected network, default network, Auto reset, the LED setup and its colours, and the HTTPS certificate. You don't need to repeat `--leds=N`, `--wifi` or the port options; the installer remembers them (`--leds=0` / `--no-wifi` switch them off, `--https-port=443` turns HTTPS back on after `--no-https`). If the page still looks old afterwards, reload it in the browser.
+
+### Safety
+
+The web page runs on the Pi as root, because it has to restart DreamPi, reboot the Pi and run the updater. There are no user accounts: **anybody who can reach the page on your network can use it**, so only put the Pi on a network you trust, and don't forward its ports from the internet. What the add-on does to limit the risk:
+
+- **PIN (optional).** `sudo ./install.sh --pin` sets a PIN that the page asks for (once per page load) before **Update now**, **Reboot** and **Wi-Fi connect**. It is stored only as a salted hash, can only be set or removed from the Pi itself (`--pin` / `--no-pin`, never from the page), and five wrong tries lock those three actions for a minute. Use the `https://` address when you use a PIN: over plain `http://` the PIN travels unencrypted. Forgot it? `sudo ./install.sh --no-pin`. Without a PIN, anybody on your network can update or reboot the Pi.
+- **Other websites can't use it.** Every change (all `POST`s) must come from the page itself: a request from another site (a form or script on a web page you have open in your browser) is refused, and so is a request that reaches the Pi under a name that isn't the Pi's (the trick used to attack devices on a home network from a web page). The page answers to IP addresses, `dreampi.local`-style names and the Pi's own host name; if your router gives it another domain name and the page says "Unknown host name", list that name in `/opt/dreampi-netswitch/allowed_hosts` (one per line). The page can't be shown inside another site's frame.
+- **Update now is limited to GitHub.** It only pulls from the git address the checkout had when the add-on was installed (it must be a GitHub address, and a changed one is refused), fetches from exactly that address, and only fast-forwards, so it can't pull in changes that don't continue your copy.
+- **The web service is fenced in** (systemd: no new privileges, read-only `/usr`, `/boot` and `/etc`, no kernel-module or cgroup changes) and the add-on's files in `/opt/dreampi-netswitch` are root-owned.
+- **Not covered:** someone who is already logged in on the Pi (or can run code on it) can do more than this add-on ever could, and the status files in `/tmp` are guessable names (the update's status file is not written through a planted link). The Wi-Fi setup access point is open by design while you set up Wi-Fi: it closes itself after 10 minutes if nobody picks a network, but don't start it where you don't want others to join.
 
 ### Uninstall
 

@@ -13,6 +13,7 @@ function lookDot(el,look){if(!look){el.className="dot";el.style.background="#333
  el.style.animation=f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none"}
 var favNet="dcnow";
 function render(d){
+ pinNeeded=!!d.pin;
  // Hang up only while in a call (or while a hang up is still running)
  $("hang-row").style.display=(d.dreampi.state.indexOf("call")==0||(d.hangup&&d.hangup.busy))?"":"none";
  if(d.hangup){var hb=$("hang-b");
@@ -75,9 +76,11 @@ function wifiSelect(n){wifiChosen=n;$("wifi-ssid").value=n.ssid;$("wifi-ssid").r
 $("wifi-manual").onclick=function(){wifiSelect({ssid:"",secured:true});$("wifi-ssid").readOnly=false;$("wifi-ssid").focus()};
 $("wifi-connect-b").onclick=function(){
  var ssid=$("wifi-ssid").value.trim();if(!ssid)return;
- $("wifi-connect-b").disabled=true;$("wifi-connect-b").textContent="Connecting...";
- var x=new XMLHttpRequest();x.open("POST","/wificonnect",true);x.setRequestHeader("Content-Type","application/json");
- x.onload=refresh;x.send(JSON.stringify({ssid:ssid,password:$("wifi-pass").value}))};
+ withPin(function(){
+  $("wifi-connect-b").disabled=true;$("wifi-connect-b").textContent="Connecting...";
+  xhrJson("POST","/wificonnect",function(r,st,body){
+   if(st==401||st==429){$("wifi-connect-b").disabled=false;$("wifi-connect-b").textContent="Connect";alert((body&&body.message)||"PIN refused")}
+   refresh()},{ssid:ssid,password:$("wifi-pass").value})})};
 var logSize=0,debugOn=false,logBusy=false,debugOpen=false;
 function toggleNet(el){el.classList.toggle("open");el.setAttribute("aria-expanded",el.classList.contains("open"))}
 $("net").onclick=function(e){if(e.target.closest&&e.target.closest(".hang"))return;toggleNet(this)};
@@ -124,9 +127,15 @@ function saveNumbers(){clearTimeout(numTimer);numTimer=setTimeout(function(){
 $("num-defaults").onclick=function(){if(!numCfg)return;numCfg.numbers=JSON.parse(JSON.stringify(numCfg.defaults));saveNumbers()};
 // Updates: GET /update (cached GitHub check), POST /update/check, POST /update/start (runs git pull + the installer on the Pi).
 var updTimer=null;
-function xhrJson(method,url,cb){var x=new XMLHttpRequest();x.open(method,url,true);
- if(method=="POST")x.setRequestHeader("X-Requested-With","netswitch");
- x.onload=function(){var r=null;try{r=JSON.parse(x.responseText)}catch(e){}cb(x.status==200?r:null)};x.onerror=function(){cb(null)};x.send()}
+// The PIN (when one is set with install.sh --pin) is asked for once per page load, before update / restart / Wi-Fi connect.
+var pinNeeded=false,pinValue="";
+function withPin(go){if(!pinNeeded||pinValue)return go();var p=prompt("Enter the PIN");if(p===null)return;pinValue=p;go()}
+function xhrJson(method,url,cb,body){var x=new XMLHttpRequest();x.open(method,url,true);
+ if(method=="POST"){x.setRequestHeader("X-Requested-With","netswitch");if(pinValue)x.setRequestHeader("X-Netswitch-Pin",pinValue);
+  if(body!==undefined)x.setRequestHeader("Content-Type","application/json")}
+ x.onload=function(){var r=null;try{r=JSON.parse(x.responseText)}catch(e){}
+  if(x.status==401||x.status==429)pinValue="";   // asked again next time
+  cb(x.status==200?r:null,x.status,r)};x.onerror=function(){cb(null,0,null)};x.send(body===undefined?undefined:JSON.stringify(body))}
 function loadUpdate(){xhrJson("GET","/update",function(r){if(r)renderUpdate(r);else if(updRunning)$("upd-text").textContent="Restarting the services..."})}
 var updRunning=false,updWatched=false;   // updWatched: this page started or saw the update, so it reloads once when it is done
 function renderUpdate(r){var a=r.addon,d=r.dreampi,msg;
@@ -158,22 +167,26 @@ function renderUpdate(r){var a=r.addon,d=r.dreampi,msg;
 $("upd-check").onclick=function(){$("upd-text").textContent="Checking...";xhrJson("POST","/update/check",function(r){if(r)renderUpdate(r.status);
  clearTimeout(updTimer);updTimer=setTimeout(loadUpdate,1500)})};
 $("upd-do").onclick=function(){if(!confirm("Update the add-on now? It is fetched from GitHub and installed; this page is unavailable for a few seconds."))return;
- updRunning=true;updWatched=true;$("upd-text").textContent="Starting the update...";
- xhrJson("POST","/update/start",function(r){if(r&&r.message&&r.message!="Update started")$("upd-text").textContent=r.message;
-  clearTimeout(updTimer);updTimer=setTimeout(loadUpdate,2000)})};
+ withPin(function(){
+  updRunning=true;updWatched=true;$("upd-text").textContent="Starting the update...";
+  xhrJson("POST","/update/start",function(r,st,body){
+   if(st==401||st==429){updRunning=false;updWatched=false;$("upd-text").textContent=(body&&body.message)||"PIN refused";return}
+   if(r&&r.message&&r.message!="Update started"){updRunning=false;updWatched=false;$("upd-text").textContent=r.message}
+   clearTimeout(updTimer);updTimer=setTimeout(loadUpdate,2000)})})};
 // Reboot the Pi: confirm, ask the server, then wait until the page answers again and reload it.
 $("reboot-b").onclick=function(){
  var inCall=(window.lastDreampiState||"").indexOf("call")==0;
  if(!confirm((inCall?"A call is in progress and will be cut. ":"")+"Reboot the Raspberry Pi now? It is back in about a minute."))return;
- var b=this,sub=$("reboot-sub");b.disabled=true;
- xhrJson("POST","/reboot",function(r){
-  if(!r||!r.started){b.disabled=false;sub.textContent=(r&&r.message)||"Could not reboot";return}
+ var b=this,sub=$("reboot-sub");
+ withPin(function(){b.disabled=true;
+ xhrJson("POST","/reboot",function(r,st,body){
+  if(!r||!r.started){b.disabled=false;sub.textContent=(r&&r.message)||(body&&body.message)||"Could not reboot";return}
   sub.textContent="Rebooting... this page comes back by itself.";
   var down=false,tries=0;
   (function poll(){tries++;
    var x=new XMLHttpRequest();x.open("GET","/ping?"+Date.now(),true);x.timeout=3000;
    x.onload=function(){if(down||tries>60)location.reload();else setTimeout(poll,2000)};
-   x.onerror=x.ontimeout=function(){down=true;setTimeout(poll,2000)};x.send()})()})};
+   x.onerror=x.ontimeout=function(){down=true;setTimeout(poll,2000)};x.send()})()})})};
 function loadAbout(){var x=new XMLHttpRequest();x.open("GET","/about",true);
  x.onload=function(){if(x.status!=200)return;$("about").innerHTML=JSON.parse(x.responseText).map(function(r){
   return '<tr><td class="n">'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>'}).join("")};x.send()}

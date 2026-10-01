@@ -204,7 +204,7 @@ class HttpNumbersTests(unittest.TestCase):
             self.assertEqual(r["numbers"], nums.default_numbers())
             self.assertEqual([a["key"] for a in r["actions"]], list(hook.NUMBER_ACTIONS))
             body = json.dumps({"call_dcnet": ["5550002", "*61#"]}).encode()
-            req = Request(base + "/numbers", data=body, method="POST", headers={"Content-Type": "application/json"})
+            req = Request(base + "/numbers", data=body, method="POST", headers={"Content-Type": "application/json", "X-Requested-With": "netswitch"})
             out = json.loads(urlopen(req, timeout=10).read().decode())
             self.assertEqual(out["numbers"]["call_dcnet"], ["5550002", "*61#"])
             self.assertEqual(nums.numbers()["call_dcnet"], ["5550002", "*61#"])

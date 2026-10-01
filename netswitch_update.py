@@ -204,21 +204,64 @@ def _ports():
         return 80, 443
 
 
-def update_script(src, branch, http_port, https_port):
+# Where the update may come from: GitHub over https (or ssh with the checkout owner's own key).
+ORIGIN_RE = re.compile(r"^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)[\w.-]+/[\w.-]+?(\.git)?/?$")
+
+
+def origin_url():
+    return _git(["config", "--get", "remote.origin.url"])
+
+
+def origin_problem():
+    """Why the checkout's git origin can't be trusted for an update, or None. The update runs the
+    checkout's install.sh as root, so it must come from GitHub and be the origin that was there
+    when the add-on was installed (anything that can edit the checkout's .git/config could
+    otherwise point it elsewhere). An install from before this check has no recorded origin; it
+    is accepted when it is a GitHub address and gets recorded by the update's own install."""
+    url = origin_url()
+    if not url or not ORIGIN_RE.match(url):
+        return "the checkout's git origin isn't a GitHub address"
+    recorded = (core.read_file(core.UPDATE_ORIGIN) or "").strip()
+    if recorded and recorded != url:
+        return "the checkout's git origin changed since the add-on was installed (run install.sh by hand to accept it)"
+    return None
+
+
+def update_script(src, branch, http_port, https_port, url=None):
     """The shell script that updates and re-installs. Built from validated
-    values only (it runs as root)."""
-    if not re.match(r"^[A-Za-z0-9._/-]+$", branch) or not os.path.isabs(src) or "'" in src or "\n" in src:
+    values only (it runs as root). With `url` (already checked by origin_problem) the fetch uses that
+    address and only https/ssh transports; otherwise the checkout's own 'origin'."""
+    if url is not None and not ORIGIN_RE.match(url):
+        raise ValueError("unsafe update address")
+    if (not re.match(r"^[A-Za-z0-9._/][A-Za-z0-9._/-]*$", branch) or ".." in branch or branch.endswith("/")
+            or not os.path.isabs(src) or not re.match(r"^[A-Za-z0-9._/ +@=-]+$", src)):
         raise ValueError("unsafe update settings")
     ports = ["%d" % int(http_port), "--https-port=%d" % int(https_port)]
     return (
-        "S=%s; B=%s; L=%s; ST=%s\n"
+        "S=%s; B=%s; L=%s; ST=%s; U=%s\n"
+        "rm -f \"$L\" \"$ST\"; set -C                      # never write through a link someone left in /tmp\n"
         "exec >\"$L\" 2>&1\n"
         "echo running > \"$ST\"\n"
         "echo \"Updating $S from origin/$B\"\n"
         "OWNER=$(stat -c %%U \"$S\")\n"
-        "if [ \"$(id -u)\" = 0 ] && [ \"$OWNER\" != root ]; then G=\"runuser -u $OWNER -- git\"; else G=git; fi\n"
-        "cd \"$S\" && $G fetch origin \"$B\" && $G merge --ff-only FETCH_HEAD && sh \"$S/install.sh\" %s && echo ok > \"$ST\" || echo failed > \"$ST\"\n"
-    ) % ("'%s'" % src, "'%s'" % branch, "'%s'" % core.UPDATE_LOG, "'%s'" % core.UPDATE_STATUS, " ".join(ports))
+        "P=; [ \"$U\" != origin ] && P='env GIT_ALLOW_PROTOCOL=https:ssh'\n"
+        "if [ \"$(id -u)\" = 0 ] && [ \"$OWNER\" != root ]; then G=\"runuser -u $OWNER -- $P git\"; else G=\"$P git\"; fi\n"
+        "cd \"$S\" && $G fetch \"$U\" \"$B\" && $G merge --ff-only FETCH_HEAD && sh \"$S/install.sh\" %s && echo ok >| \"$ST\" || echo failed >| \"$ST\"\n"
+    ) % ("'%s'" % src, "'%s'" % branch, "'%s'" % core.UPDATE_LOG, "'%s'" % core.UPDATE_STATUS,
+                                                          "'%s'" % (url or "origin"), " ".join(ports))
+
+
+def _write_status(text):
+    """Write the status file without following a link that someone left at its (predictable) /tmp path."""
+    try:
+        if os.path.islink(core.UPDATE_STATUS):
+            os.remove(core.UPDATE_STATUS)
+    except OSError:
+        pass
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(core.UPDATE_STATUS, flags, 0o644)
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
 
 
 def _spawn(cmd):
@@ -231,22 +274,34 @@ def _spawn(cmd):
         subprocess.Popen(["setsid"] + cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
+_start_lock = threading.Lock()
+
+
 def start_update():
-    """Begin the update; returns (started, message)."""
-    if update_state() == "running":
-        return False, "An update is already running"
-    repo, branch, src = source()
-    if not can_update():
-        return False, "This install can't update itself (no git checkout recorded): use the update guide"
-    http, https = _ports()
-    script = update_script(src, branch, http, https)
-    with open(core.UPDATE_STATUS, "w") as f:
-        f.write("running")
-    try:
-        _spawn(["sh", "-c", script])
-    except OSError as e:
-        with open(core.UPDATE_STATUS, "w") as f:
-            f.write("failed")
-        return False, "Could not start the update (%s)" % e
+    """Begin the update; returns (started, message). One at a time."""
+    with _start_lock:
+        if update_state() == "running":
+            return False, "An update is already running"
+        repo, branch, src = source()
+        if not can_update():
+            return False, "This install can't update itself (no git checkout recorded): use the update guide"
+        problem = origin_problem()
+        if problem:
+            core.debug_log("web page: update refused (%s)" % problem)
+            return False, "Update refused: %s" % problem
+        http, https = _ports()
+        try:
+            script = update_script(src, branch, http, https, origin_url())
+        except ValueError as e:
+            return False, "Update refused: %s" % e
+        try:
+            _write_status("running")
+            _spawn(["sh", "-c", script])
+        except OSError as e:
+            try:
+                _write_status("failed")
+            except OSError:
+                pass
+            return False, "Could not start the update (%s)" % e
     core.debug_log("web page: update started (%s, branch %s)" % (src, branch))
     return True, "Update started"

@@ -69,6 +69,7 @@ AP_SSID = core.WIFI_AP_SSID
 AP_IP = "192.168.4.1"
 AP_DHCP_FROM, AP_DHCP_TO = "192.168.4.10", "192.168.4.100"
 SCAN_WAIT = 4             # seconds to let a scan finish before reading results
+AP_TIMEOUT = 600          # the open setup access point closes itself after this many seconds without a choice
 CONNECT_TIMEOUT = 25      # seconds to wait for an IP address after a connect attempt
 RESULT_PAUSE = 5          # seconds the green/red result shows before moving on
 
@@ -321,6 +322,7 @@ def save_network(ssid, password):
     tmp = WPA_CONF + ".tmp"
     with open(tmp, "w") as f:
         f.write("".join(header).rstrip() + "\n\n" + "\n".join(b.strip() + "\n" for b in blocks))
+    os.chmod(tmp, 0o600)   # it holds the Wi-Fi passwords
     os.rename(tmp, WPA_CONF)
 
 
@@ -430,6 +432,10 @@ def _ap_page(networks):
     return (AP_PAGE_TMPL % {"style": AP_STYLE, "script": script}).encode("utf-8")
 
 
+def ap_expired(deadline):
+    return time.time() > deadline
+
+
 def run_ap_server(networks):
     """Serves the setup page on the access point until a network is chosen
     or setup is cancelled. Returns ("connect", ssid, password) or ("stop", None, None)."""
@@ -445,6 +451,8 @@ def run_ap_server(networks):
     page = _ap_page(networks)
 
     class Handler(BaseHTTPRequestHandler):
+        timeout = 10     # this server handles one connection at a time: a stalled client mustn't block it
+
         def _send(self, body, ctype="text/plain; charset=utf-8", status=200):
             if not isinstance(body, bytes):
                 body = body.encode("utf-8")
@@ -464,7 +472,7 @@ def run_ap_server(networks):
 
         def do_POST(self):
             try:
-                length = min(int(self.headers.get("Content-Length") or 0), 4096)
+                length = max(0, min(int(self.headers.get("Content-Length") or 0), 4096))
                 data = parse_qs(self.rfile.read(length).decode("utf-8", "replace"))
             except (ValueError, IOError):
                 data = {}
@@ -490,12 +498,16 @@ def run_ap_server(networks):
     t = threading.Thread(target=server.serve_forever)
     t.daemon = True
     t.start()
+    deadline = time.time() + AP_TIMEOUT
     try:
         while True:
             try:
                 return result.get(timeout=1)
             except queue.Empty:
                 if stop_requested():
+                    return ("stop", None, None)
+                if ap_expired(deadline):
+                    core.debug_log("wifi setup: nobody chose a network, the access point is closed")
                     return ("stop", None, None)
                 external = check_external_connect()
                 if external:
