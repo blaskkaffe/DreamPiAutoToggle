@@ -5,20 +5,24 @@
 #   sudo ./install.sh 8080         use another port for the web page
 #   sudo ./install.sh --https-port=8443   HTTPS on another port (default 443)
 #   sudo ./install.sh --no-https   plain HTTP only
-#   sudo ./install.sh --led        also show the status on a NeoPixel on GPIO18
-#   sudo ./install.sh --leds=30    the same with several NeoPixels / a strip (starting count: 30)
+#   sudo ./install.sh --led        also show the status on a NeoPixel on GPIO18 (1 LED, or the
+#                                  count already set)
+#   sudo ./install.sh --led=30     the same with several NeoPixels / a strip (starting count: 30)
 #   sudo ./install.sh --led-gpio=21   use GPIO10, 12, 18 (default) or 21 instead
 #   sudo ./install.sh --no-led     remove the NeoPixel service again
-#   sudo ./install.sh --wifi       two buttons: GPIO17/pin11 (toggles the network by default) and GPIO4/pin7
-#                                  (off by default) - pins, functions and which (if any) holds 3 s to set up
-#                                  Wi-Fi are all editable later from the page's Settings > GPIO
-#   sudo ./install.sh --no-wifi    remove the button/Wi-Fi setup service again
+#   sudo ./install.sh --wifi       add Wi-Fi setup (a temporary access point for joining a network
+#                                  without a keyboard; installs hostapd + dnsmasq): its page controls
+#                                  and the button hold that starts it
+#   sudo ./install.sh --no-wifi    remove Wi-Fi setup again
 #
-# Once --led or --wifi has been used, later updates keep it until --no-led /
-# --no-wifi. The LED count, output pin, wire order and colour calibration can
-# all be changed later from the page's Settings, without --leds=N/--led-gpio=N
-# or a reinstall - except switching to GPIO10, which needs SPI enabled first
-# (this installer does that for --led-gpio=10, but it needs a reboot).
+# The two GPIO buttons (GPIO17/pin11 toggles the network, GPIO4/pin7 is off by
+# default) are always installed; their pins and functions are editable from the
+# page's Settings > GPIO. Once --led or --wifi has been used, later updates keep
+# it until --no-led / --no-wifi. The LED count, output pin, wire order and white
+# balance can all be changed later from the page's Settings, without
+# --led=N/--led-gpio=N or a reinstall - except switching to GPIO10, which needs
+# SPI enabled first (this installer does that for --led-gpio=10, but it needs a
+# reboot).
 set -e
 DEST=/opt/dreampi-netswitch
 SRC="$(cd "$(dirname "$0")" && pwd)"
@@ -32,10 +36,10 @@ BUTTON1_GPIO_DEFAULT=17   # GPIO17 / physical pin 11; editable later from the pa
 BUTTON2_GPIO_DEFAULT=4    # GPIO4 / physical pin 7
 for arg in "$@"; do
     case "$arg" in
-        --led) LED=on; LED_COUNT=1 ;;
-        --leds=*) LED=on; LED_COUNT="${arg#--leds=}"
-                  case "$LED_COUNT" in ''|*[!0-9]*) echo "--leds needs a number, e.g. --leds=30"; exit 1 ;; esac
-                  if [ "$LED_COUNT" -lt 1 ] || [ "$LED_COUNT" -gt 300 ]; then echo "--leds must be 1 to 300"; exit 1; fi ;;
+        --led) LED=on ;;
+        --led=*) LED=on; LED_COUNT="${arg#--led=}"
+                  case "$LED_COUNT" in ''|*[!0-9]*) echo "--led needs a number, e.g. --led=30"; exit 1 ;; esac
+                  if [ "$LED_COUNT" -lt 1 ] || [ "$LED_COUNT" -gt 300 ]; then echo "--led must be 1 to 300"; exit 1; fi ;;
         --led-gpio=*) LED=on; LED_GPIO="${arg#--led-gpio=}"
                   case "$LED_GPIO" in 10|12|18|21) ;; *) echo "--led-gpio must be 10, 12, 18 or 21"; exit 1 ;; esac ;;
         --no-led) LED=off ;;
@@ -48,10 +52,10 @@ for arg in "$@"; do
     esac
 done
 
-if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--led|--leds=N|--led-gpio=N|--no-led] [--wifi|--no-wifi]"; exit 1; fi
+if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--led[=N]|--led-gpio=N|--no-led] [--wifi|--no-wifi]"; exit 1; fi
 
 mkdir -p "$DEST"
-cp "$SRC/netswitch_hook.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_wifi.py" \
+cp "$SRC/netswitch_hook.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" \
    "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/static"
 cp "$SRC/static/three.min.js" "$SRC/static/dc-background.js" "$SRC/static/LICENSES.txt" "$SRC"/static/*.png "$DEST/static/"
@@ -181,16 +185,42 @@ elif [ "$LED" = off ]; then
     echo "NeoPixel service removed."
 fi
 
-# ----------------------------------------------------------- buttons / Wi-Fi setup
-if [ "$WIFI" = keep ] && [ -f "$DEST/wifi_button_enabled" ]; then WIFI=on; fi
+# ------------------------------------------------------------------ buttons
+# Always installed: two GPIO buttons with a short-press function each (pins and
+# functions editable from the page). Wi-Fi setup is the optional part, below.
+[ -f "$DEST/button1_gpio" ] || echo "$BUTTON1_GPIO_DEFAULT" > "$DEST/button1_gpio"
+[ -f "$DEST/button2_gpio" ] || echo "$BUTTON2_GPIO_DEFAULT" > "$DEST/button2_gpio"
+echo "Buttons on GPIO$(cat "$DEST/button1_gpio") and GPIO$(cat "$DEST/button2_gpio") (pins and functions editable from the page's Settings > GPIO)"
+# Older versions had one service for both buttons and Wi-Fi setup, enabled only
+# by --wifi (marker wifi_button_enabled): carry that over.
+if [ -f "$DEST/wifi_button_enabled" ]; then mv "$DEST/wifi_button_enabled" "$DEST/wifi_enabled"; fi
+if [ -f /etc/systemd/system/dreampi-netswitch-wifi.service ]; then
+    systemctl disable --now dreampi-netswitch-wifi.service 2>/dev/null || true
+    rm -f /etc/systemd/system/dreampi-netswitch-wifi.service
+fi
+rm -f "$DEST/netswitch_wifi.py" "$DEST/wifi_button_gpio"
+cat > /etc/systemd/system/dreampi-netswitch-buttons.service <<EOF
+[Unit]
+Description=DreamPi Netswitch buttons (and Wi-Fi setup)
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=$(command -v python3) $DEST/netswitch_buttons.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# ---------------------------------------------------------------- Wi-Fi setup
+if [ "$WIFI" = keep ] && [ -f "$DEST/wifi_enabled" ]; then WIFI=on; fi
 if [ "$WIFI" = on ]; then
-    touch "$DEST/wifi_button_enabled"
-    [ -f "$DEST/button1_gpio" ] || echo "$BUTTON1_GPIO_DEFAULT" > "$DEST/button1_gpio"
-    [ -f "$DEST/button2_gpio" ] || echo "$BUTTON2_GPIO_DEFAULT" > "$DEST/button2_gpio"
-    echo "Buttons on GPIO$(cat "$DEST/button1_gpio") and GPIO$(cat "$DEST/button2_gpio") (pins, functions and Wi-Fi setup assignment editable from the page's Settings > GPIO)"
+    touch "$DEST/wifi_enabled"
     # The Wi-Fi setup access point needs hostapd and dnsmasq. Install them if
     # missing, and make sure their own systemd units stay off: this add-on
-    # starts and stops them itself (dreampi-netswitch-wifi.service), so a
+    # starts and stops them itself (dreampi-netswitch-buttons.service), so a
     # default dnsmasq listening on every interface would conflict with it.
     if ! command -v hostapd >/dev/null 2>&1 || ! command -v dnsmasq >/dev/null 2>&1; then
         if command -v apt-get >/dev/null 2>&1; then
@@ -203,26 +233,10 @@ if [ "$WIFI" = on ]; then
     fi
     systemctl disable --now hostapd.service 2>/dev/null || true
     systemctl disable --now dnsmasq.service 2>/dev/null || true
-    cat > /etc/systemd/system/dreampi-netswitch-wifi.service <<EOF
-[Unit]
-Description=DreamPi Netswitch Wi-Fi setup button
-After=network.target
-StartLimitIntervalSec=0
-
-[Service]
-ExecStart=$(command -v python3) $DEST/netswitch_wifi.py
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
+    echo "Wi-Fi setup enabled (choose which button holds to start it in Settings > GPIO)"
 elif [ "$WIFI" = off ]; then
-    systemctl disable --now dreampi-netswitch-wifi.service 2>/dev/null || true
-    rm -f /etc/systemd/system/dreampi-netswitch-wifi.service "$DEST/wifi_button_enabled" \
-          "$DEST/button1_gpio" "$DEST/button2_gpio" "$DEST/button1_function" "$DEST/button2_function" "$DEST/wifi_button" \
-          "$DEST/wifi_hostapd.conf" "$DEST/wifi_dnsmasq.conf"
-    echo "Button/Wi-Fi setup service removed."
+    rm -f "$DEST/wifi_enabled" "$DEST/wifi_button" "$DEST/wifi_hostapd.conf" "$DEST/wifi_dnsmasq.conf"
+    echo "Wi-Fi setup removed."
 fi
 
 systemctl daemon-reload
@@ -232,10 +246,8 @@ if [ -f "$DEST/led_enabled" ]; then
     systemctl enable dreampi-netswitch-led.service >/dev/null 2>&1
     systemctl restart dreampi-netswitch-led.service
 fi
-if [ -f "$DEST/wifi_button_enabled" ]; then
-    systemctl enable dreampi-netswitch-wifi.service >/dev/null 2>&1
-    systemctl restart dreampi-netswitch-wifi.service
-fi
+systemctl enable dreampi-netswitch-buttons.service >/dev/null 2>&1
+systemctl restart dreampi-netswitch-buttons.service
 systemctl restart dreampi.service 2>/dev/null || echo "Could not restart DreamPi, please reboot."
 
 echo

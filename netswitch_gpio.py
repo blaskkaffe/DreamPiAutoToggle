@@ -2,7 +2,7 @@
 # DreamPi Netswitch add-on - shared low-level GPIO register access.
 #
 # Used by netswitch_led.py (NeoPixel output, GPIO10/12/18/21) and
-# netswitch_wifi.py (the Wi-Fi setup button input). Registers are mapped straight from
+# netswitch_buttons.py (the Wi-Fi setup button input). Registers are mapped straight from
 # /dev/mem, 32-bit accesses only, so no driver or Python package is needed;
 # each caller opens its own mapping since these run in separate processes.
 # Python 3 only (both services run under python3).

@@ -48,7 +48,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import netswitch_web as web  # noqa: E402  (reuses the page's status logic)
-from netswitch_gpio import peripheral_base, Block  # noqa: E402  (shared with netswitch_wifi.py)
+from netswitch_gpio import peripheral_base, Block  # noqa: E402  (shared with netswitch_buttons.py)
 
 FPS = 50
 REFRESH = 0.25     # seconds between re-reading DreamPi's state and led.json

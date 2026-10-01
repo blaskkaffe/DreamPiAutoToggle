@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# DreamPi Netswitch add-on - buttons and Wi-Fi setup (optional, install.sh --wifi).
+# DreamPi Netswitch add-on - buttons (always) and Wi-Fi setup (optional, install.sh --wifi).
 #
-# Runs as root (service dreampi-netswitch-wifi). Watches up to two GPIO
-# button pins (see netswitch_gpio.py), each independently configured from
-# the page's Settings > GPIO with its own pin and short-press function (off,
-# toggle the selected network, or select DCNow!/DCNET outright); which
-# button (or both held together) also triggers Wi-Fi setup on a 3-second
-# hold is configurable the same way. Or, when the web page's "Wi-Fi setup"
-# button in Settings > Network is used (POST /wifitoggle, which just touches
+# Runs as root (service dreampi-netswitch-buttons, always installed). Watches
+# up to two GPIO button pins (see netswitch_gpio.py), each independently
+# configured from the page's Settings > GPIO with its own pin and short-press
+# function (off, toggle the selected network, or select DCNow!/DCNET outright).
+#
+# Wi-Fi setup is the optional part (install.sh --wifi, marker wifi_enabled;
+# without it none of the rest of this file runs): a 3-second hold of the
+# button(s) assigned to it in Settings > GPIO, or the page's "Wi-Fi setup"
+# button in Settings > Network (POST /wifitoggle, which just touches
 # wifi_start / wifi_stop under /opt/dreampi-netswitch - the same files this
-# service watches):
+# service watches), starts:
 #   1. Scans for Wi-Fi networks on the wireless interface and keeps the list
 #      in memory for the length of the setup session.
 #   2. Hosts an open access point named "DreamPi WiFi Config" (192.168.4.1)
@@ -666,8 +668,16 @@ def button_watcher(gpio1, gpio2, function1, function2, wifi_assignment, stop_eve
         time.sleep(BUTTON_POLL)
 
 
+def wifi_enabled():
+    """Wi-Fi setup was installed (install.sh --wifi); without it the buttons
+    only run their own short-press functions."""
+    return os.path.exists(web.WIFI_ENABLED)
+
+
 def _button_config():
-    return (web.button_gpio(1), web.button_gpio(2), web.button_function(1), web.button_function(2), web.wifi_button())
+    # "" = no button starts Wi-Fi setup (check_wifi_hold() matches none)
+    return (web.button_gpio(1), web.button_gpio(2), web.button_function(1), web.button_function(2),
+            web.wifi_button() if wifi_enabled() else "")
 
 
 def main():
@@ -677,7 +687,6 @@ def main():
     thread.daemon = True
     thread.start()
 
-    set_state("idle")
     while True:
         new_cfg = _button_config()
         if new_cfg != cfg:
@@ -691,6 +700,9 @@ def main():
             web.debug_log("button: config changed, button1=GPIO%d (%s), button2=GPIO%d (%s), wifi setup=%s"
                           % cfg)
 
+        if not wifi_enabled():
+            time.sleep(HEARTBEAT)
+            continue
         iface = wifi_iface()
         if start_requested():
             clear_flags()

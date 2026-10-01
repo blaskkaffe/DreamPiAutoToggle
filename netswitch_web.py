@@ -49,16 +49,16 @@ STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
 MODEM = "/tmp/dreampi-netswitch.modem"
 DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
-# Wi-Fi setup (netswitch_wifi.py, install.sh --wifi)
-WIFI_BUTTON_ENABLED = os.path.join(BASE_DIR, "wifi_button_enabled")  # written by install.sh
-WIFI_START = os.path.join(BASE_DIR, "wifi_start")   # touched to ask netswitch_wifi.py to start
+# Wi-Fi setup (netswitch_buttons.py, install.sh --wifi); the buttons themselves are always installed
+WIFI_ENABLED = os.path.join(BASE_DIR, "wifi_enabled")  # written by install.sh --wifi
+WIFI_START = os.path.join(BASE_DIR, "wifi_start")   # touched to ask netswitch_buttons.py to start
 WIFI_STOP = os.path.join(BASE_DIR, "wifi_stop")     # touched to ask it to stop / cancel
 WIFI_CONNECT = os.path.join(BASE_DIR, "wifi_connect")   # {"ssid":..., "password":...}, an alternative
                                                          # to the setup access point's own /connect -
                                                          # lets the regular page pick a network too,
                                                          # useful when it's reachable some other way
                                                          # (e.g. Ethernet) while Wi-Fi is being set up
-WIFI_STATE = "/tmp/dreampi-netswitch.wifi"          # written by netswitch_wifi.py
+WIFI_STATE = "/tmp/dreampi-netswitch.wifi"          # written by netswitch_buttons.py
 WIFI_STALE = 30       # ignore WIFI_STATE when older than this (the service is down)
 WIFI_AP_SSID = "DreamPi WiFi Config"
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 80
@@ -276,7 +276,7 @@ def network_state():
 
 
 def wifi_state():
-    """Latest Wi-Fi setup state written by netswitch_wifi.py: state (idle /
+    """Latest Wi-Fi setup state written by netswitch_buttons.py: state (idle /
     scanning / hosting / connecting / ok / failed), ssid, networks (scan
     results while hosting) and time. {"state": "idle"} when the service
     hasn't run yet, or hasn't updated the file in a while (it isn't
@@ -713,7 +713,7 @@ def checker():
 # dreampi_state(); the network ones from the checker (NET_STATE).
 LED_STATES = [
     # key, label, category, colour, effect, speed, enabled
-    # Wi-Fi setup (netswitch_wifi.py) always outranks everything else: while
+    # Wi-Fi setup (netswitch_buttons.py) always outranks everything else: while
     # it's in progress "no network"/"no internet" are usually also true, and
     # would otherwise hide it. default_led_config() switches wifi-setup's
     # default effect to "scanner" when a strip is installed (breathe on a
@@ -806,7 +806,7 @@ def led_hidden():
 
 
 # ------------------------------------------------------------------ buttons
-# Up to two physical GPIO buttons (netswitch_wifi.py, install.sh --wifi),
+# Up to two physical GPIO buttons (netswitch_buttons.py, always installed),
 # each independently wired to a pin and a short-press function; which one
 # (or both held together) triggers Wi-Fi setup on a 3-second hold is also
 # configurable. Unlike the LED output pins, a button needs no special
@@ -1030,7 +1030,7 @@ def active_messages(state=None, net_state=None, wifi=True):
     """Enabled LED messages that apply right now, lowest priority first (the
     LED service draws them in this order, so later ones end up on top).
     Each: key, category, color, effect, speed, brightness (effective), leds.
-    wifi=False skips netswitch_wifi.py's state (used for the DreamPi dot
+    wifi=False skips netswitch_buttons.py's state (used for the DreamPi dot
     preview, which only ever previews the DreamPi-state message)."""
     if state is None:
         state = dreampi_state()[0]
@@ -1133,7 +1133,7 @@ def api_state():
             "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
                    "line2": pi.get("line2"), "warn": pi.get("warn")},
             "wifi": {"state": wf_state, "ssid": wf.get("ssid"), "networks": wf.get("networks"),
-                     "installed": os.path.exists(WIFI_BUTTON_ENABLED)},
+                     "installed": os.path.exists(WIFI_ENABLED)},
             "hangup": {"busy": _hangup["busy"], "text": _hangup["text"]},
             "warnings": warnings, "now": int(time.time())}
 
@@ -1324,19 +1324,19 @@ millisecond timing. Turn recording on, then dial.</div>
   <input type="checkbox" class="cbox dcnow" id="bg-b" aria-label="Dreamcast background"></div>
 </div>
 
-<div id="gpio-section" style="display:none;position:relative">
+<div id="gpio-section" style="position:relative">
 <h2>GPIO <span class="saved" id="gpio-saved">Saved &#10003;</span></h2>
 <div class="card">
  <div class="srow" id="gpio-led-row" style="display:none"><span>LED<span class="sub">LEDs connected, output pin and wire order</span></span>
   <div style="display:flex;gap:8px"><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"><select class="ord" id="led-gpio" aria-label="LED output pin"></select><select class="ord" id="led-order" aria-label="Wire order"></select></div></div>
- <div class="srow" id="gpio-btn1-row" style="display:none"><span>Button 1<span class="sub">Function and pin</span></span>
+ <div class="srow" id="gpio-btn1-row"><span>Button 1<span class="sub">Function and pin</span></span>
   <div style="display:flex;gap:8px"><select class="ord" id="btn1-fn" aria-label="Button 1 function"></select><select class="ord" id="btn1-gpio" aria-label="Button 1 pin"></select></div></div>
- <div class="srow" id="gpio-btn2-row" style="display:none"><span>Button 2<span class="sub">Function and pin</span></span>
+ <div class="srow" id="gpio-btn2-row"><span>Button 2<span class="sub">Function and pin</span></span>
   <div style="display:flex;gap:8px"><select class="ord" id="btn2-fn" aria-label="Button 2 function"></select><select class="ord" id="btn2-gpio" aria-label="Button 2 pin"></select></div></div>
- <div class="srow" id="gpio-wifi-row" style="display:none"><span>Wi-Fi setup<span class="sub">Which button (or both) starts it</span></span>
+ <div class="srow" id="gpio-wifi-row" style="display:none"><span>Wi-Fi setup<span class="sub">Which button, or both, held 3 s starts it</span></span>
   <select class="ord" id="wifi-btn-sel" aria-label="Wi-Fi setup button"></select></div>
 </div>
-<div class="note">LED count, output pin and wire order (most WS2812 strips are GRB) take effect within a second; switching the LED output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot). Button pin and function changes take effect within a couple of seconds - pick two different pins for the two buttons. A button's own function (Off, Toggle network, Select DCNow!, Select DCNET) fires on a short press; "Wi-Fi setup" is which button, or both held together, starts Wi-Fi setup with a 3-second hold.</div>
+<div class="note">LED count, output pin and wire order (most WS2812 strips are GRB) take effect within a second; switching the LED output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot). Button pin and function changes take effect within a couple of seconds - pick two different pins for the two buttons. A button's own function (Off, Toggle network, Select DCNow!, Select DCNET) fires on a short press.</div>
 </div>
 
 <div id="led-section" style="display:none;position:relative">
@@ -1496,14 +1496,11 @@ function setDebugMenu(on){
 $("dbg-b").onchange=function(){setDebugMenu(this.checked)};
 var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledEffects=[],ledCount=1,ledGpio=18,ledNet="dcnow";
 var wbPreviewOn=false,wbHeartbeat=null;
-var ledInstalled=false,ledHiddenFlag=false,buttonsInstalled=false;
+var ledInstalled=false,ledHiddenFlag=false,wifiInstalled=false;
 function updateGpioSection(){
  var ledOn=ledInstalled&&!ledHiddenFlag;
  $("gpio-led-row").style.display=ledOn?"flex":"none";
- $("gpio-btn1-row").style.display=buttonsInstalled?"flex":"none";
- $("gpio-btn2-row").style.display=buttonsInstalled?"flex":"none";
- $("gpio-wifi-row").style.display=buttonsInstalled?"flex":"none";
- $("gpio-section").style.display=(ledOn||buttonsInstalled)?"block":"none"}
+ $("gpio-wifi-row").style.display=wifiInstalled?"flex":"none"}
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
   led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledEffects=r.effects;ledCount=r.count||1;ledGpio=r.gpio||18;
@@ -1627,7 +1624,7 @@ $("led-hide-b").onclick=function(){
 var btn=null,btnTimer=null;
 function loadButtons(){var x=new XMLHttpRequest();x.open("GET","/buttonconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
-  btn=r.config;buttonsInstalled=r.installed;
+  btn=r.config;wifiInstalled=r.wifi;
   if(!$("btn1-gpio").options.length){var gOpts=r.gpios.map(function(g){return '<option value="'+g+'">GPIO'+g+'</option>'}).join("");
    $("btn1-gpio").innerHTML=gOpts;$("btn2-gpio").innerHTML=gOpts}
   if(!$("btn1-fn").options.length){var fOpts=r.functions.map(function(f){return '<option value="'+f[0]+'">'+esc(f[1])+'</option>'}).join("");
@@ -1801,7 +1798,7 @@ class Handler(BaseHTTPRequestHandler):
                                              "wifi_button": wifi_button()},
                                   "gpios": BUTTON_GPIO_PINS, "functions": BUTTON_FUNCTIONS,
                                   "wifi_choices": WIFI_BUTTON_CHOICES,
-                                  "installed": os.path.exists(WIFI_BUTTON_ENABLED)}),
+                                  "wifi": os.path.exists(WIFI_ENABLED)}),
                      "application/json")
         elif self.path.split("?")[0] == "/dtmf":
             try:
@@ -1915,7 +1912,7 @@ class Handler(BaseHTTPRequestHandler):
                 os.remove(DTMF_LOG)
             debug_log("web page: log cleared")
         elif self.path == "/wifitoggle":
-            if os.path.exists(WIFI_BUTTON_ENABLED):
+            if os.path.exists(WIFI_ENABLED):
                 if wifi_state().get("state", "idle") == "idle":
                     open(WIFI_START, "w").close()
                     debug_log("web page: Wi-Fi setup started")
@@ -1926,7 +1923,7 @@ class Handler(BaseHTTPRequestHandler):
             # An alternative to the setup access point's own /connect: lets
             # this page pick a network too, reachable while it's up over
             # Ethernet (or anything else besides the Wi-Fi being reconfigured).
-            if os.path.exists(WIFI_BUTTON_ENABLED):
+            if os.path.exists(WIFI_ENABLED):
                 ssid = ""
                 try:
                     length = min(int(self.headers.get("Content-Length") or 0), 4096)

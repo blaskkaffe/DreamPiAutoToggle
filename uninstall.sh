@@ -4,7 +4,7 @@ DEST=/opt/dreampi-netswitch
 
 if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo $0"; exit 1; fi
 
-for SERVICE in dreampi-netswitch dreampi-netswitch-led dreampi-netswitch-wifi; do
+for SERVICE in dreampi-netswitch dreampi-netswitch-led dreampi-netswitch-buttons dreampi-netswitch-wifi; do
     systemctl disable --now "$SERVICE.service" 2>/dev/null
     rm -f "/etc/systemd/system/$SERVICE.service"
 done
