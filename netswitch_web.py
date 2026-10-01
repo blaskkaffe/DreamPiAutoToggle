@@ -25,6 +25,7 @@ except ImportError:
 
 import netswitch_core as core
 import netswitch_ledconfig as ledconfig
+import netswitch_numbers as numbers
 import netswitch_probes as probes
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -146,6 +147,12 @@ def _static(name):
     return _static_cache[name]
 
 
+def _numbers_reply():
+    return {"numbers": numbers.numbers(), "defaults": numbers.default_numbers(),
+            "actions": [{"key": a[0], "label": a[1], "sub": a[2]} for a in numbers.ACTIONS],
+            "min": numbers.MIN_LEN, "max": numbers.MAX_LEN, "per_action": numbers.MAX_PER_ACTION}
+
+
 class Handler(BaseHTTPRequestHandler):
     timeout = 20          # a client that stops talking can't hold a thread forever
 
@@ -229,6 +236,8 @@ class Handler(BaseHTTPRequestHandler):
                                   "gpio": ledconfig.led_gpio(), "gpios": ledconfig.GPIO_PINS,
                                   "installed": ledconfig.led_count() > 0, "hidden": ledconfig.led_hidden()}),
                      "application/json")
+        elif self.path == "/numbers":
+            self.send(json.dumps(_numbers_reply()), "application/json")
         elif self.path == "/buttonconfig":
             self.send(json.dumps({"config": {"button1_gpio": core.button_gpio(1), "button2_gpio": core.button_gpio(2),
                                              "button1_function": core.button_function(1),
@@ -272,6 +281,17 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self.send(json.dumps({"config": cfg, "count": ledconfig.led_count(), "gpio": ledconfig.led_gpio()}),
                      "application/json")
+            return
+        if self.path == "/numbers":
+            try:
+                length = min(int(self.headers.get("Content-Length") or 0), 16384)
+                numbers.save_numbers(json.loads(self.rfile.read(length).decode("utf-8")))
+            except (ValueError, IOError, OSError) as e:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(str(e).encode("utf-8"))
+                return
+            self.send(json.dumps(_numbers_reply()), "application/json")
             return
         if self.path == "/buttonconfig":
             try:

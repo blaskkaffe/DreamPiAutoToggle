@@ -9,9 +9,16 @@ It then wraps Netlink.check_number() with these rules:
   1111111  openMenu's number. Always DCNow! If the reset toggle is on,
            it also switches the selected network back to the default
            network (DCNow! unless the file default_dcnet exists).
-  5550001  Selects DCNow! and connects through DCNow!
-  5550002  Selects DCNET and connects through DCNET.
-  others   Go to whichever network is selected (website or 5550001/5550002).
+  numbers  Five lists of numbers set on the web page (numbers.json), matched
+           against the END of what was dialed (a short ending or a full
+           number; the longest match wins):
+             reset         selects the default network, hangs up (busy tone)
+             toggle_dcnow  selects DCNow!, hangs up
+             toggle_dcnet  selects DCNET, hangs up
+             call_dcnow    selects DCNow! and connects through DCNow!
+             call_dcnet    selects DCNET and connects through DCNET
+           Defaults: 1111111# / 5550001# / 5550002# / 5550001 / 5550002.
+  others   Go to whichever network is selected (website or the numbers above).
            Only calls DreamPi would send to its normal PPP are redirected;
            Netlink/XBAND codes and the built-in *69 prefix are untouched.
 
@@ -23,6 +30,7 @@ it also logs every modem event while DreamPi listens for digits to
 /tmp/dreampi-netswitch-dtmf.log, to diagnose misheard numbers.
 No DreamPi file is modified. Written for both Python 2.7 and 3.
 """
+import json
 import logging
 import math
 import os
@@ -43,9 +51,15 @@ MODEM = "/tmp/dreampi-netswitch.modem"
 MODEM_PORT = "/tmp/dreampi-netswitch.port"   # the serial device DreamPi opened, e.g. /dev/ttyUSB0
 NETLINK_DIR = "/home/pi/dreampi"
 
-NUM_OPENMENU = "1111111"
-NUM_DCNOW = "5550001"
-NUM_DCNET = "5550002"
+NUMBERS = os.path.join(BASE_DIR, "numbers.json")   # the five lists below, edited on the web page
+
+NUM_OPENMENU = "1111111"   # fixed: openMenu always dials this and it must stay on DCNow!
+# Action -> numbers. Order is the tie-break when two entries are equally long.
+# Keep in sync with netswitch_numbers.DEFAULTS (a test compares them).
+NUMBER_ACTIONS = ("reset", "toggle_dcnow", "toggle_dcnet", "call_dcnow", "call_dcnet")
+DEFAULT_NUMBERS = {"reset": ["1111111#"], "toggle_dcnow": ["5550001#"], "toggle_dcnet": ["5550002#"],
+                   "call_dcnow": ["5550001"], "call_dcnet": ["5550002"]}
+HANGUP_ACTIONS = ("reset", "toggle_dcnow", "toggle_dcnet")   # select, then hang up
 
 # __builtin__ first: on Python 2 the "future" package can provide a fake
 # "builtins" module, and patching that would do nothing.
@@ -226,14 +240,37 @@ def _select_dcnet(on):
         os.remove(FLAG)
 
 
-def _special(raw_string):
-    """Which special number was dialed, matched on the last seven digits.
-    DreamPi often hears an extra leading digit (e.g. 15550002), and ISP
-    settings may add a prefix or area code, so exact matching is unreliable."""
-    for number in (NUM_OPENMENU, NUM_DCNOW, NUM_DCNET):
-        if raw_string.endswith(number):
-            return number
-    return None
+def _load_numbers():
+    """The number lists from numbers.json; a missing, unreadable or partly
+    wrong file falls back to the defaults for what it doesn't provide."""
+    numbers = dict((k, list(v)) for k, v in DEFAULT_NUMBERS.items())
+    try:
+        with open(NUMBERS) as f:
+            data = json.load(f)
+        for key in NUMBER_ACTIONS:
+            if isinstance(data.get(key), list):
+                numbers[key] = [str(n) for n in data[key] if n]
+    except Exception:
+        pass
+    return numbers
+
+
+def _classify(raw_string, numbers):
+    """(action, number) for what was dialed, or (None, None). The dialed
+    string only has to END with a configured number: DreamPi often hears an
+    extra leading digit (e.g. 15550002) and ISP settings add prefixes or area
+    codes, so exact matching is unreliable. The longest match wins; openMenu's
+    fixed number is "openmenu" and wins ties."""
+    if not raw_string:
+        return None, None
+    best, best_len = (None, None), 0
+    candidates = [("openmenu", NUM_OPENMENU)]
+    for action in NUMBER_ACTIONS:
+        candidates += [(action, n) for n in numbers.get(action, [])]
+    for action, number in candidates:
+        if number and raw_string.endswith(number) and len(number) > best_len:
+            best, best_len = (action, number), len(number)
+    return best
 
 
 def _patch(module):
@@ -246,38 +283,35 @@ def _patch(module):
         return
 
     def check_number(self, raw_string):
-        # "Switch only": special number + #  ->  select, don't answer, busy tone
-        if raw_string and raw_string.endswith("#") and not raw_string.startswith("#"):
-            only = _special(raw_string.rstrip("#"))
-            if only:
-                try:
-                    if only == NUM_OPENMENU:
-                        dcnet = os.path.exists(DEFAULT_DCNET)
-                    else:
-                        dcnet = only == NUM_DCNET
-                    _select_dcnet(dcnet)
-                    net = "DCNET" if dcnet else "DCNow!"
-                    busy = _play_busy(getattr(self, "modem", None))
-                    _log(self, "%s dialed: %s selected, not answering%s"
-                         % (raw_string, net, ", busy tone sent" if busy else ""))
-                    _dtmf_log("add-on: number heard %r: switch only, %s selected" % (raw_string, net))
-                    _write_modem("Switched to %s by %s, call not answered" % (net, raw_string))
-                except Exception as e:
-                    _log(self, "could not switch network: %s" % e)
-                self.mode = "idle"
-                return {"client": "idle", "dial_string": raw_string}
-        special = _special(raw_string)
+        action, matched = _classify(raw_string, _load_numbers())
         if raw_string:
-            _dtmf_log("add-on: number heard %r (matches %s)" % (raw_string, special or "no special number"))
-        # Special numbers: remember the choice before DreamPi routes the call
+            _dtmf_log("add-on: number heard %r (%s)" % (raw_string, "matches %s %r" % (action, matched) if action else "no special number"))
+        # Hang-up numbers: select a network, don't answer, busy tone (like *70)
+        if action in HANGUP_ACTIONS:
+            try:
+                if action == "reset":
+                    dcnet = os.path.exists(DEFAULT_DCNET)
+                else:
+                    dcnet = action == "toggle_dcnet"
+                _select_dcnet(dcnet)
+                net = "DCNET" if dcnet else "DCNow!"
+                busy = _play_busy(getattr(self, "modem", None))
+                _log(self, "%s dialed (%s): %s selected, not answering%s"
+                     % (raw_string, action, net, ", busy tone sent" if busy else ""))
+                _write_modem("Switched to %s by %s, call not answered" % (net, raw_string))
+            except Exception as e:
+                _log(self, "could not switch network: %s" % e)
+            self.mode = "idle"
+            return {"client": "idle", "dial_string": raw_string}
+        # Call numbers: remember the choice before DreamPi routes the call
         try:
-            if special == NUM_DCNOW:
+            if action == "call_dcnow":
                 _select_dcnet(False)
                 _log(self, "%s dialed, DCNow! selected" % raw_string)
-            elif special == NUM_DCNET:
+            elif action == "call_dcnet":
                 _select_dcnet(True)
                 _log(self, "%s dialed, DCNET selected" % raw_string)
-            elif special == NUM_OPENMENU and os.path.exists(AUTORESET):
+            elif action == "openmenu" and os.path.exists(AUTORESET):
                 default_dcnet = os.path.exists(DEFAULT_DCNET)
                 if os.path.exists(FLAG) != default_dcnet:
                     _select_dcnet(default_dcnet)
@@ -290,7 +324,7 @@ def _patch(module):
 
         try:
             if isinstance(result, dict) and result.get("client") == "PPP" \
-                    and special not in (NUM_OPENMENU, NUM_DCNOW) and os.path.exists(FLAG):
+                    and action not in ("openmenu", "call_dcnow") and os.path.exists(FLAG):
                 if getattr(self, "dcnet", False):
                     self.mode = "dcnet"
                     self.dial_string = raw_string

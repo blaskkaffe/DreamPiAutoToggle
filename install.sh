@@ -54,7 +54,7 @@ done
 if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--leds=N|--led-gpio=N] [--wifi|--no-wifi]"; exit 1; fi
 
 mkdir -p "$DEST"
-cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_ledconfig.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_led_drivers.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" "$SRC/netswitch_wifi_setup.py" \
+cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_ledconfig.py" "$SRC/netswitch_numbers.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_led_drivers.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" "$SRC/netswitch_wifi_setup.py" \
    "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/static"
 cp "$SRC/page/index.html" "$SRC/page/page.css" "$SRC/page/page.js" "$DEST/page/"

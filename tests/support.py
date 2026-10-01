@@ -18,18 +18,23 @@ import netswitch_web as web  # noqa: E402
 __all__ = ['ROOT', 'core', 'ledconfig', 'probes', 'web', 'sandbox', 'cleanup']
 
 
+_ORIGINAL = {}   # module -> {name: original string value}, taken the first time a module is sandboxed
+ORIGINAL_BASE = core.BASE_DIR
+
+
 def sandbox(*modules):
-    modules = (core, probes, web) + tuple(m for m in modules if m not in (core, probes, web))
-    """Redirect every path constant of web (and the given modules, which
-    usually re-export or copy some) into a fresh temp dir. Returns the dir;
-    the caller removes it with shutil.rmtree."""
+    """Redirect every path constant of the add-on modules (and any extra
+    module given, e.g. the hook, which keeps its own copies) into a fresh
+    temp dir. Always maps from the original values, so repeated sandboxes
+    never see an earlier test's deleted directory. Returns the dir; the
+    caller removes it with cleanup()."""
     tmp = tempfile.mkdtemp(prefix="dpns-test-")
-    base = core.BASE_DIR
-    for mod in modules:
-        for name in dir(mod):
-            val = getattr(mod, name)
-            if not isinstance(val, str) or name.startswith("__") or name == "STATIC_DIR":
-                continue
+    base = ORIGINAL_BASE
+    for mod in (core, ledconfig, probes, web) + tuple(m for m in modules if m not in (core, ledconfig, probes, web)):
+        if mod not in _ORIGINAL:
+            _ORIGINAL[mod] = dict((n, getattr(mod, n)) for n in dir(mod)
+                                  if isinstance(getattr(mod, n), str) and not n.startswith("__") and n != "STATIC_DIR")
+        for name, val in _ORIGINAL[mod].items():
             if val.startswith(base + "/") or val == base:
                 setattr(mod, name, tmp + val[len(base):])
             elif val.startswith("/tmp/dreampi-netswitch"):

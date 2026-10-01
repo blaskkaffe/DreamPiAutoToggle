@@ -58,19 +58,18 @@ millisecond timing. Turn recording on, then dial.</div>
 </section>
 
 <section class="sec">
-<h2>Phone numbers</h2>
-<div class="card">
+<h2>Phone numbers <span class="saved" id="num-saved">Saved &#10003;</span></h2>
+<div class="card" id="num-card">
+<div id="num-list"></div>
 <table>
-<tr><td class="n">111-1111</td><td>Always directs to DCNow! for compatibility with openMenu and standard ISP configs.<br>
+<tr><td class="n">111-1111</td><td>Always directs to DCNow! for compatibility with openMenu and standard ISP configs (fixed).<br>
 <span class="sub">When &quot;Auto reset&quot; is enabled, dialing it also resets the network to the default network.<span id="reset-note"></span></span></td></tr>
-<tr><td class="n">555-0001</td><td>Selects DCNow! / DreamPi and connects to it<br>
-<span class="sub">Can be set in the Dreamcast ISP config to always connect to DCNow!</span></td></tr>
-<tr><td class="n">555-0002</td><td>Selects DCNET / FLYCAST and connects to it<br>
-<span class="sub">Can be set in the Dreamcast ISP config to always connect to DCNET.</span></td></tr>
 <tr><td class="n">Any other</td><td>Connects to the currently selected network.<br>
 <span class="sub">Set your Dreamcast ISP config to any 7-digit number to use this feature.</span></td></tr>
 </table>
 </div>
+<div class="note">A number can be a whole number or just its ending: it counts when what the Dreamcast dials <em>ends with</em> it, so prefixes from the ISP config don't matter and the longest match wins. Use digits, <code>*</code> and <code>#</code> (3 to 24 characters), for example <code>*61#</code>. Hang-up numbers select the network, then get a busy tone instead of an answer.</div>
+<div class="bar" style="margin-top:0"><button class="pill-s" id="num-defaults" type="button">Restore default numbers</button></div>
 </section>
 
 <section class="sec">

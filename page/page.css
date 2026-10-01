@@ -101,6 +101,15 @@
  #wifi-networks{padding:10px 0 14px}
  .wnet{display:block;width:100%;margin-bottom:6px;padding:9px 12px;text-align:left;border-radius:12px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
  .wnet .sig{float:right;opacity:.6;font-size:.85em}
+ .nrow{padding:12px 0;border-top:1px solid var(--line)} .nrow:first-child{border-top:0}
+ .nrow .sub{display:block;margin-top:2px}
+ .nchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+ .nchip{display:inline-flex;align-items:center;gap:2px;padding:3px 4px 3px 12px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);font-size:.88em}
+ .nchip button{background:none;color:#aaa;font-size:1.05em;line-height:1;padding:2px 8px}
+ .nchip button:hover{color:#fff}
+ .nempty{color:var(--muted);font-size:.85em;margin:8px 0}
+ .nadd{display:flex;gap:8px;align-items:center} .nadd input[type=text]{flex:1;margin:0;padding:7px 12px}
+ .nmsg{color:#f99;font-size:.82em;margin-top:6px;min-height:0}
  .range.wb{display:grid;grid-template-columns:5.6em minmax(0,1fr) 3.1em;gap:12px}   /* same slider length for R, G and B */
  .range.wb span:last-child{text-align:right}
  .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range > span:first-child{white-space:nowrap} .range input{flex:1;min-width:60px;accent-color:var(--dcnow)}

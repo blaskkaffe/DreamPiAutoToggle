@@ -69,19 +69,22 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 
 ## Phone numbers
 
-| Phone number | Result |
-|---|---|
-| `111-1111` | Always directs to DCNow! for compatibility with openMenu and standard ISP configs. When **Auto reset** is enabled, dialing it also resets the network to the **default network**. |
-| `555-0001` | Selects DCNow! / DreamPi and connects to it. Can be set in the Dreamcast ISP config to always connect to DCNow! |
-| `555-0002` | Selects DCNET / FLYCAST and connects to it. Can be set in the Dreamcast ISP config to always connect to DCNET. |
-| Any other number | Connects to the currently selected network. Set your Dreamcast ISP config to any 7-digit number to use this feature. |
-| `555-0001#` | Switch only: selects DCNow! / DreamPi without connecting. |
-| `555-0002#` | Switch only: selects DCNET / FLYCAST without connecting. |
-| `111-1111#` | Switch only: resets the selection to the **default network** without connecting. |
+Five actions, each with its own list of numbers that you edit in **Settings > Phone numbers** (add with the field and **Add**, remove with the ✕, **Restore default numbers** puts the list below back):
 
-A number ending in `#` is a switch-only call. DreamPi doesn't answer it: the add-on changes the selection and plays a busy tone for 4 seconds, so the Dreamcast gives up straight away instead of waiting for an answer. After that the normal dial tone comes back and the next call goes to the newly selected network. Use it to change networks from the Dreamcast without opening the web page.
+| Action | What it does | Default number |
+|---|---|---|
+| **Reset** | Selects the **default network** and hangs up | `111-1111#` |
+| **Toggle to DCNow!** | Selects DCNow! / DreamPi and hangs up | `555-0001#` |
+| **Toggle to DCNET** | Selects DCNET / FLYCAST and hangs up | `555-0002#` |
+| **Call DCNow!** | Selects DCNow! / DreamPi **and** connects to it | `555-0001` |
+| **Call DCNET** | Selects DCNET / FLYCAST **and** connects to it | `555-0002` |
 
-- The numbers are matched on their last seven digits, so a leading `1` (long-distance prefix), an area code or an outside-line digit doesn't matter. DreamPi often hears an extra leading `1`, for example `15550002`.
+Fixed, not editable: `111-1111` always directs to DCNow! for compatibility with openMenu and standard ISP configs (when **Auto reset** is enabled, dialing it also resets the network to the default network), and any other number connects to the currently selected network (set your Dreamcast ISP config to any 7-digit number to use this feature).
+
+**Hang-up actions** (Reset, Toggle): DreamPi doesn't answer. The add-on changes the selection and plays a busy tone for 4 seconds, so the Dreamcast gives up straight away instead of waiting for an answer. After that the normal dial tone comes back and the next call goes to the newly selected network. Use it to change networks from the Dreamcast without opening the web page.
+
+**What counts as a number:** digits, `*` and `#`, 3 to 24 characters, either a whole number or just an ending, for example `*61#` or `0002`. A number counts when what the Dreamcast dialed **ends with** it, so a leading `1` (long-distance prefix), an area code, an outside-line digit or other digits the ISP config puts in front don't matter (DreamPi often hears an extra leading `1`, for example `15550002`), and the longest matching number wins. A number can only belong to one action, and a short ending can't take over openMenu's `111-1111`. Take care with very short endings: anything the Dreamcast dials that ends with it will trigger the action.
+
 - `555-0001` and `555-0002` (the North American fictional-exchange prefix) replace the older `222-2222`/`333-3333`: a run of seven identical digits is the hardest pattern for a DTMF decoder to count correctly (no frequency change marks a digit boundary, only a timing gap), the same kind of issue the [Debug log](#debug-log) helps track down for misheard numbers. If you had `222-2222` or `333-3333` set in a Dreamcast ISP config, update it to the new numbers.
 - openMenu always dials `111-1111`, so it always gets DCNow! (DCNET wouldn't accept openMenu's login).
 - Netlink/XBAND dial codes and DreamPi's built-in `*69` prefix ("this call to DCNET") keep working as before.
@@ -109,7 +112,7 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 - **Debug log:** when ticked, the **Debug log** bar appears at the bottom of the main page. Off by default and remembered per browser.
 - **Wi-Fi setup:** only shown when Wi-Fi setup was installed with `--wifi` (see [Wi-Fi setup button](#buttons-and-wi-fi-setup)). Starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too - tap one, enter its password if it needs one, and connect - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
 
-**Phone numbers:** the table above, as a reminder.
+**Phone numbers:** the five lists above, editable here, plus the two fixed rows as a reminder.
 
 **Appearance**
 - **Dreamcast background:** an animated background in the style of the Dreamcast menu (see [Credits](#credits)). Off by default, and remembered per browser, so a phone can leave it off while a PC has it on. It pauses while the page is hidden. The Pi serves the files itself (about 600 KB, fetched once), so it works without internet; browsers without WebGL just show the blue gradient. The buttons are slightly see-through so the background shows through them.

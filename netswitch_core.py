@@ -13,6 +13,7 @@ FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 AUTORESET = os.path.join(BASE_DIR, "autoreset")
 DEFAULT_DCNET = os.path.join(BASE_DIR, "default_dcnet")
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
+NUMBERS = os.path.join(BASE_DIR, "numbers.json")     # phone numbers per action, edited on the page, read by the hook
 LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness, colours, wire order, white balance
 LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs, editable from the page
 LED_GPIO = os.path.join(BASE_DIR, "led_gpio")        # output pin (10, 12, 18 or 21), likewise
