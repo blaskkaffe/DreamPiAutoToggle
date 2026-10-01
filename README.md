@@ -71,11 +71,13 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 | `111-1111` | Always directs to DCNow! for compatibility with openMenu and standard ISP configs. When **Auto reset** is enabled, dialing it also resets the network to the **default network**. |
 | `222-2222` | Selects DCNow! / DreamPi and connects to it. Can be set in the Dreamcast ISP config to always connect to DCNow! |
 | `333-3333` | Selects DCNET / FLYCAST and connects to it. Can be set in the Dreamcast ISP config to always connect to DCNET. |
-| `222-2222#` / `333-3333#` | Selects the network but doesn't answer the call. openMenu's Switch buttons dial this way, so a press just records the selection instead of tying up DreamPi's modem answering a call that's about to be hung up anyway. |
+| `222-2222#` / `333-3333#` | Selects the network but doesn't answer the call. |
+| `*21#*21#*21#` / `*23#*23#*23#` | Selects DCNow!/DCNET and doesn't answer the call. openMenu's current Switch buttons dial these, so a press just records the selection instead of tying up DreamPi's modem answering a call that's about to be hung up anyway. |
 | Any other number | Connects to the currently selected network. Set your Dreamcast ISP config to any 7-digit number to use this feature. |
 
-- The numbers are matched on a run of six or more of their own digit at the end of what was heard (ignoring a trailing `#`), not an exact seven-digit tail: a leading `1` (long-distance prefix), an area code or an outside-line digit doesn't matter (DreamPi often hears an extra leading `1`, for example `13333333`), and since each number is just one digit repeated, losing a single repeat to a DTMF decode hiccup still leaves which number was meant unambiguous.
-- openMenu always dials `111-1111` for a full connect, and `222-2222#` / `333-3333#` for its quick Switch buttons.
+- `111-1111`, `222-2222` and `333-3333` are matched on a run of six or more of their own digit at the end of what was heard (ignoring a trailing `#`), not an exact seven-digit tail: a leading `1` (long-distance prefix), an area code or an outside-line digit doesn't matter (DreamPi often hears an extra leading `1`, for example `13333333`), and since each number is just one digit repeated, losing a single repeat to a DTMF decode hiccup still leaves which number was meant unambiguous.
+- `*21#*21#*21#`/`*23#*23#*23#` are matched the same way, tolerating one lost character anywhere in the 12-character code rather than one lost digit - the same reasoning, applied to a repeated four-character unit instead of a single repeated digit.
+- openMenu always dials `111-1111` for a full connect, and `*21#*21#*21#` / `*23#*23#*23#` for its quick Switch buttons (and for the "Auto DCNet"/"Auto DCNow!" boot settings, before the real connect).
 - Netlink/XBAND dial codes and DreamPi's built-in `*69` prefix ("this call to DCNET") keep working as before.
 
 ## Web page

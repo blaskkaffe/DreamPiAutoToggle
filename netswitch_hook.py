@@ -6,18 +6,21 @@ Loaded automatically by Python (through a .pth file) but does nothing unless
 the running program imports DreamPi's netlink.py from /home/pi/dreampi.
 It then wraps Netlink.check_number() with these rules:
 
-  1111111  openMenu's number. Always DCNow! If the reset toggle is on,
-           it also switches the selected network back to the default
-           network (DCNow! unless the file default_dcnet exists).
-  2222222  Selects DCNow! and connects through DCNow!
-  3333333  Selects DCNET and connects through DCNET.
-  2222222# Selects DCNow!, but doesn't answer the call - openMenu's Switch
-  3333333# buttons dial this way, so a press just records the selection and
-           lets DreamPi go back to listening instead of spending a minute
-           retrying an answer that has nowhere to go.
-  others   Go to whichever network is selected (website or 2222222/3333333).
-           Only calls DreamPi would send to its normal PPP are redirected;
-           Netlink/XBAND codes and the built-in *69 prefix are untouched.
+  1111111      openMenu's number. Always DCNow! If the reset toggle is on,
+               it also switches the selected network back to the default
+               network (DCNow! unless the file default_dcnet exists).
+  2222222      Selects DCNow! and connects through DCNow!
+  3333333      Selects DCNET and connects through DCNET.
+  2222222#     Selects DCNow!, but doesn't answer the call.
+  3333333#
+  *21#*21#*21# Selects DCNow! or DCNET and doesn't answer the call -
+  *23#*23#*23# openMenu's Switch buttons dial these, so a press just records
+               the selection and lets DreamPi go back to listening instead of
+               spending a minute retrying an answer that has nowhere to go.
+  others       Go to whichever network is selected (website or 2222222/
+               3333333). Only calls DreamPi would send to its normal PPP
+               are redirected; Netlink/XBAND codes and the built-in *69
+               prefix are untouched.
 
 The selection is the file dcnet_mode, the reset toggle is the file autoreset,
 the default network for the reset is the file default_dcnet (exists = DCNET).
@@ -47,6 +50,11 @@ NETLINK_DIR = "/home/pi/dreampi"
 NUM_OPENMENU = "1111111"
 NUM_DCNOW = "2222222"
 NUM_DCNET = "3333333"
+# openMenu's current Switch buttons dial these instead of NUM_DCNOW/NUM_DCNET
+# with a trailing '#' - still three repeats of one unit for the same DTMF
+# decode-loss tolerance reasoning (see _special()).
+DCNOW_SWITCH_CODE = "*21#*21#*21#"
+DCNET_SWITCH_CODE = "*23#*23#*23#"
 
 # __builtin__ first: on Python 2 the "future" package can provide a fake
 # "builtins" module, and patching that would do nothing.
@@ -173,18 +181,42 @@ def _select_dcnet(on):
         os.remove(FLAG)
 
 
+def _tail_matches_one_loss(raw_string, target):
+    """True if raw_string ends with target, or with target missing exactly
+    one character anywhere in it - the same single-lost-DTMF-tone tolerance
+    as the digit-repeat codes below, just applied to a multi-character
+    repeated unit instead of a single repeated digit."""
+    if raw_string.endswith(target):
+        return True
+    for i in range(len(target)):
+        if raw_string.endswith(target[:i] + target[i + 1:]):
+            return True
+    return False
+
+
 def _special(raw_string):
-    """Which special number was dialed, matched on a run of the number's own
-    digit at the end of what was heard (ignoring a trailing '#', see
-    check_number()), one shorter than the number itself, rather than an
-    exact tail match. DreamPi often hears an extra leading digit (e.g.
-    13333333), and ISP settings may add a prefix or area code, so exact
-    matching was already unreliable - and since each number is just one
-    digit repeated, losing a single repeat to a DTMF decode hiccup still
-    leaves which number was meant unambiguous. Confirmed on real hardware:
-    a capture of 3333333 with proper 2-second finalization (not a hang-up
-    cut short) still only reported six of the seven "3"s."""
-    string = raw_string[:-1] if raw_string.endswith("#") else raw_string
+    """Which special number was dialed, and whether this match means "just
+    switch, don't answer" (quick). *21#*21#*21#/*23#*23#*23# are openMenu's
+    current Switch buttons and always mean quick - there is no other reason
+    to dial them. 2222222/3333333 are matched on a run of the number's own
+    digit at the end of what was heard (ignoring a trailing '#'), one
+    shorter than the number itself, rather than an exact tail match: DreamPi
+    often hears an extra leading digit (e.g. 13333333), and ISP settings may
+    add a prefix or area code, so exact matching was already unreliable -
+    and since each number is just one digit repeated, losing a single repeat
+    to a DTMF decode hiccup still leaves which number was meant unambiguous
+    (confirmed on real hardware: a capture of 3333333 with proper 2-second
+    finalization, not a hang-up cut short, still only reported six of the
+    seven "3"s). Those two stay real, dialable ISP numbers per the README
+    unless dialed with a trailing '#', since openMenu itself no longer uses
+    them that way."""
+    if _tail_matches_one_loss(raw_string, DCNOW_SWITCH_CODE):
+        return NUM_DCNOW, True
+    if _tail_matches_one_loss(raw_string, DCNET_SWITCH_CODE):
+        return NUM_DCNET, True
+
+    quick = raw_string.endswith("#")
+    string = raw_string[:-1] if quick else raw_string
     for number in (NUM_OPENMENU, NUM_DCNOW, NUM_DCNET):
         digit = number[0]
         run = 0
@@ -193,8 +225,8 @@ def _special(raw_string):
                 break
             run += 1
         if run >= len(number) - 1:
-            return number
-    return None
+            return number, quick and number != NUM_OPENMENU
+    return None, False
 
 
 def _patch(module):
@@ -207,7 +239,7 @@ def _patch(module):
         return
 
     def check_number(self, raw_string):
-        special = _special(raw_string)
+        special, quick = _special(raw_string)
         if raw_string:
             _dtmf_log("add-on: number heard %r (matches %s)" % (raw_string, special or "no special number"))
         # Special numbers: remember the choice before DreamPi routes the call
@@ -227,7 +259,7 @@ def _patch(module):
         except Exception as e:
             _log(self, "could not update selection: %s" % e)
 
-        if raw_string.endswith("#") and special in (NUM_DCNOW, NUM_DCNET):
+        if quick:
             # openMenu's Switch buttons dial this way: the selection above is
             # already recorded, and there is nothing else to do. Returning
             # here instead of routing the call to PPP/DCNET the way a plain
