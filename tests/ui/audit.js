@@ -52,7 +52,8 @@ const AUDIT = () => {
     await page.waitForTimeout(1200);
     const check = async (label) => { const res = await page.evaluate(AUDIT); res.forEach(r => problems.push([r[0], label + ': ' + r[1]])); };
     await check('main closed');
-    await page.click('#net'); await page.waitForTimeout(2500); await check('main net open (with players)');
+    await page.click('#net'); await page.waitForTimeout(300); await check('main net open');
+    await page.click('#pl-toggle'); await page.waitForTimeout(2500); await check('main players open');
     await page.click('#show-debug'); await page.waitForTimeout(500); await check('main debug open');
     await page.screenshot({ path: `/tmp/dpns-audit-main-${w}.png`, fullPage: true });
     await page.click('#cog'); await page.waitForTimeout(1500); await check('settings');

@@ -198,7 +198,7 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn("60000", js)                       # polls at most once a minute
             self.assertIn("netswitch-players", js)           # show/hide setting, per browser
             self.assertIn('id="pl-b"', js)
-            self.assertIn("pl-list", js)
+            self.assertIn("pl-toggle", js)
             r = json.loads(urlopen(base + "/players", timeout=10).read().decode())
             self.assertTrue(r["configured"])
             self.assertIn("links", r)
