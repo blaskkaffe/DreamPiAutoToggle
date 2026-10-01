@@ -3,7 +3,6 @@ and the HTTP endpoint (no network: fetch is faked)."""
 import json
 import os
 import threading
-import time
 import unittest
 from urllib.request import urlopen
 

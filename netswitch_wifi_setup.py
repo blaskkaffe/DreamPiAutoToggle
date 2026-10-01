@@ -354,7 +354,7 @@ button{font:inherit;cursor:pointer;border:0;color:#fff}
 .card{background:var(--card);border-radius:var(--r);padding:6px 16px;margin-bottom:14px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 4px;border-top:1px solid var(--line);text-align:left;width:100%;background:none}
 .row:first-child{border-top:0} .row.sel{color:#fff}
-.ssid{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ssid{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sig{color:var(--muted);font-size:.82em;flex:none;margin-left:8px}
 .lock{flex:none;margin-right:6px;opacity:.7}
 .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r);font-size:1.05em;font-weight:600;
