@@ -100,7 +100,7 @@ A number ending in `#` is a switch-only call. DreamPi doesn't answer it: the add
 
 ### Settings (cogwheel)
 
-The cogwheel in the top right corner opens the settings. Changes are saved straight away; close them with the ✕ or Esc.
+The cogwheel in the top right corner opens the settings. Changes are saved straight away; close them with the ✕ or Esc. On a wide screen the sections flow into as many columns as fit (up to four), so there is less scrolling; a phone keeps the single column.
 
 **Network**
 

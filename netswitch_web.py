@@ -1192,6 +1192,14 @@ PAGE = u"""<!doctype html>
  #settings{display:none;position:fixed;top:0;right:0;bottom:0;left:0;background:#111;overflow:auto;z-index:10}
  #settings.open{display:block} body.settings-open{overflow:hidden}
  #settings .in{max-width:460px;margin:24px auto;padding:0 16px 40px}
+ /* Wide screens: the settings sections flow into as many ~420px columns as fit (phones keep the one column) */
+ #settings .cols{column-width:420px;column-gap:24px}
+ .sec{margin-bottom:22px;break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid}
+ .sec > h2:first-child{margin-top:0}
+ #settings .cols{padding-top:6px}
+ @media(min-width:920px){#settings .in{max-width:920px}}
+ @media(min-width:1340px){#settings .in{max-width:1340px}}
+ @media(min-width:1780px){#settings .in{max-width:1780px}}
  .srow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line);margin:0}
  .srow:first-child{border-top:0} .srow .sub{display:block;margin-top:2px}
  .switch{position:relative;flex:none;width:104px;height:40px;padding:0;border-radius:var(--r);font-size:.8em;font-weight:bold;
@@ -1242,7 +1250,7 @@ PAGE = u"""<!doctype html>
  .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range > span:first-child{white-space:nowrap} .range input{flex:1;min-width:60px;accent-color:var(--dcnow)}
  .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
  #log{background:#0a0a0a;border:var(--bw) solid var(--line);border-radius:12px;padding:8px;font-size:11px;line-height:1.45;
-      height:55vh;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:12px}
+      height:55vh;overflow:auto;white-space:pre;margin-top:12px}   /* one entry per row; long ones scroll sideways instead of wrapping */
  #log .dtmf{color:#6f6;font-weight:bold} #log .route{color:#8bf} #log .web{color:#e0b400}
  #log .modem{color:#aaa} #log .dim{color:#555} #log .err{color:#f66}
  #dcbg{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100lvh;z-index:-1;overflow:hidden;pointer-events:none;
@@ -1283,6 +1291,8 @@ millisecond timing. Turn recording on, then dial.</div>
 
 <div id="settings" role="dialog" aria-label="Settings"><div class="in">
 <header><h1>Settings</h1><button class="cog" id="close-settings" type="button" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.6 3.5 12 9.9l6.4-6.4 2.1 2.1-6.4 6.4 6.4 6.4-2.1 2.1-6.4-6.4-6.4 6.4-2.1-2.1 6.4-6.4-6.4-6.4z"/></svg></button></header>
+<div class="cols">
+<section class="sec">
 <h2>Network</h2>
 <div class="card">
  <form method="post" action="/default" class="srow"><span>Default network<span class="sub">Where Auto reset goes back to</span></span>
@@ -1303,7 +1313,9 @@ millisecond timing. Turn recording on, then dial.</div>
   </div>
  </div>
 </div>
+</section>
 
+<section class="sec">
 <h2>Phone numbers</h2>
 <div class="card">
 <table>
@@ -1317,14 +1329,17 @@ millisecond timing. Turn recording on, then dial.</div>
 <span class="sub">Set your Dreamcast ISP config to any 7-digit number to use this feature.</span></td></tr>
 </table>
 </div>
+</section>
 
+<section class="sec">
 <h2>Appearance</h2>
 <div class="card">
  <div class="srow"><span>Dreamcast background<span class="sub">Animated, saved in this browser only</span></span>
   <input type="checkbox" class="cbox dcnow" id="bg-b" aria-label="Dreamcast background"></div>
 </div>
+</section>
 
-<div id="gpio-section" style="position:relative">
+<div id="gpio-section" class="sec" style="position:relative">
 <h2>GPIO <span class="saved" id="gpio-saved">Saved &#10003;</span></h2>
 <div class="card">
  <div class="srow" id="gpio-led-row" style="display:none"><span>LED<span class="sub">LEDs connected, output pin and wire order</span></span>
@@ -1339,7 +1354,7 @@ millisecond timing. Turn recording on, then dial.</div>
 <div class="note">LED count, output pin and wire order (most WS2812 strips are GRB) take effect within a second; switching the LED output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot). Button pin and function changes take effect within a couple of seconds - pick two different pins for the two buttons. A button's own function (Off, Toggle network, Select DCNow!, Select DCNET) fires on a short press.</div>
 </div>
 
-<div id="led-section" style="display:none;position:relative">
+<div id="led-section" class="sec" style="display:none;position:relative">
 <h2>Status LED<span id="led-count-t"></span> <span class="saved" id="led-saved">Saved &#10003;</span></h2>
 <div class="card">
  <div class="range"><span>Red</span><input type="range" id="wb-r" min="0" max="100" step="1" style="accent-color:#f33"><span id="wb-r-v" style="width:3em;text-align:right"></span></div>
@@ -1370,9 +1385,12 @@ millisecond timing. Turn recording on, then dial.</div>
  <div class="range"><input type="range" id="lvl-r" min="0" max="1000" step="1"><span id="lvl-v" style="width:3em;text-align:right"></span></div>
  <div class="bar"><button class="pill-s" id="lvl-base" type="button">Use global</button><button class="pill-s" id="lvl-done" type="button">Done</button></div></div>
 </div>
+<section class="sec">
 <h2>About</h2>
 <div class="card"><table class="about" id="about"></table></div>
 <div class="note">The DreamPi script versions are the dates DreamPi's own auto-update compares.</div>
+</section>
+</div>
 </div></div>
 
 <script>
