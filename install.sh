@@ -14,6 +14,8 @@
 #                                  without a keyboard; installs hostapd + dnsmasq): its page controls
 #                                  and the button hold that starts it
 #   sudo ./install.sh --no-wifi    remove Wi-Fi setup again
+#   sudo ./install.sh --wifi-demo  try Wi-Fi setup on dummy networks (no hostapd, nothing is changed on the
+#                                  Pi's network; password "demo" connects); --no-wifi-demo ends it
 #
 # The two GPIO buttons (GPIO17/pin11 toggles the network, GPIO4/pin7 is off by
 # default) are always installed; their pins and functions are editable from the
@@ -31,6 +33,7 @@ HTTPS_PORT=443
 LED_COUNT=
 LED_GPIO=
 WIFI=keep
+WIFI_DEMO=keep
 BUTTON1_GPIO_DEFAULT=17   # GPIO17 / physical pin 11; editable later from the page's Settings > GPIO
 BUTTON2_GPIO_DEFAULT=4    # GPIO4 / physical pin 7
 for arg in "$@"; do
@@ -44,6 +47,8 @@ for arg in "$@"; do
         --no-led) LED_COUNT=0 ;;
         --wifi) WIFI=on ;;
         --no-wifi) WIFI=off ;;
+        --wifi-demo) WIFI_DEMO=on ;;
+        --no-wifi-demo) WIFI_DEMO=off ;;
         --https-port=*) HTTPS_PORT="${arg#--https-port=}" ;;
         --no-https) HTTPS_PORT=0 ;;
         [0-9]*) PORT="$arg" ;;
@@ -51,7 +56,7 @@ for arg in "$@"; do
     esac
 done
 
-if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--leds=N|--led-gpio=N] [--wifi|--no-wifi]"; exit 1; fi
+if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--leds=N|--led-gpio=N] [--wifi|--no-wifi|--wifi-demo|--no-wifi-demo]"; exit 1; fi
 
 mkdir -p "$DEST"
 cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_ledconfig.py" "$SRC/netswitch_numbers.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_led_drivers.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" "$SRC/netswitch_wifi_setup.py" \
@@ -233,6 +238,14 @@ if [ "$WIFI" = on ]; then
 elif [ "$WIFI" = off ]; then
     rm -f "$DEST/wifi_enabled" "$DEST/wifi_button" "$DEST/wifi_hostapd.conf" "$DEST/wifi_dnsmasq.conf"
     echo "Wi-Fi setup removed."
+fi
+
+if [ "$WIFI_DEMO" = on ]; then
+    touch "$DEST/wifi_enabled" "$DEST/wifi_demo"
+    echo "Wi-Fi setup DEMO on: dummy networks, password \"demo\" connects, nothing on the Pi's network is touched. End it with --no-wifi-demo."
+elif [ "$WIFI_DEMO" = off ]; then
+    rm -f "$DEST/wifi_demo"
+    echo "Wi-Fi setup demo off. (Add --no-wifi to remove the Wi-Fi setup button as well.)"
 fi
 
 systemctl daemon-reload

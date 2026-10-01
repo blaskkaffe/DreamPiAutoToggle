@@ -93,8 +93,30 @@ def output(cmd, timeout=10):
 
 # --------------------------------------------------------------- interface
 
+# Demo mode (install.sh --wifi-demo, marker wifi_demo): the whole setup cycle runs
+# on dummy networks, without touching hostapd, dnsmasq, wpa_supplicant or the
+# interface, so the page, the LED states and the flow can be tried on a Pi that
+# has no Wi-Fi. A connect succeeds for open networks and for the password "demo"
+# (anything else fails after a short wait, to show the failure state).
+DEMO_NETWORKS = [
+    {"ssid": "DreamCast-Home", "signal": -45, "secured": True},
+    {"ssid": "Neighbour 5G", "signal": -62, "secured": True},
+    {"ssid": "CoffeeShop Free", "signal": -70, "secured": False},
+    {"ssid": "A_Very_Long_Network_Name_To_See_How_The_List_Copes", "signal": -78, "secured": True},
+    {"ssid": "Old Router", "signal": -85, "secured": True},
+]
+DEMO_PASSWORD = "demo"
+DEMO_CONNECT_SECONDS = 3
+
+
+def demo():
+    return os.path.exists(core.WIFI_DEMO)
+
+
 def wifi_iface():
     """The first wireless interface, or None."""
+    if demo():
+        return "wlan0"
     try:
         for name in sorted(os.listdir("/sys/class/net")):
             if os.path.isdir("/sys/class/net/%s/wireless" % name):
@@ -172,6 +194,11 @@ def scan_networks(iface):
     """[{"ssid": ..., "signal": dBm or None, "secured": bool}, ...], best
     signal first, one entry per SSID. Empty (not None) on any failure - the
     setup page still offers a manual SSID/password field."""
+    if demo():
+        core.debug_log("wifi demo: scanning (dummy networks)")
+        if wait_or_stop(SCAN_WAIT):
+            return []
+        return [dict(n) for n in DEMO_NETWORKS]
     run(["wpa_cli", "-i", iface, "scan"])
     if wait_or_stop(SCAN_WAIT):
         return []
@@ -214,6 +241,9 @@ _procs = {}
 
 
 def start_ap(iface):
+    if demo():
+        core.debug_log("wifi demo: access point not started")
+        return
     run(["systemctl", "stop", "wpa_supplicant@%s.service" % iface])
     run(["systemctl", "stop", "wpa_supplicant.service"])
     run(["systemctl", "stop", "dhcpcd.service"])
@@ -230,6 +260,8 @@ def start_ap(iface):
 
 
 def stop_ap(iface):
+    if demo():
+        return
     for name in ("dnsmasq", "hostapd"):
         p = _procs.pop(name, None)
         if not p:
@@ -244,6 +276,8 @@ def stop_ap(iface):
 
 
 def restore_client(iface):
+    if demo():
+        return
     run(["ip", "link", "set", iface, "up"])
     run(["systemctl", "start", "dhcpcd.service"])
     run(["systemctl", "start", "wpa_supplicant@%s.service" % iface])
@@ -291,6 +325,11 @@ def save_network(ssid, password):
 
 
 def try_connect(iface, ssid, password):
+    if demo():
+        known = dict((n["ssid"], n) for n in DEMO_NETWORKS).get(ssid)
+        ok = (known is not None and not known["secured"]) or password == DEMO_PASSWORD
+        core.debug_log("wifi demo: connecting to %s %s" % (ssid, "(will succeed)" if ok else "(will fail)"))
+        return not wait_or_stop(DEMO_CONNECT_SECONDS) and ok
     restore_client(iface)
     save_network(ssid, password)
     run(["wpa_cli", "-i", iface, "reconfigure"])
@@ -395,6 +434,14 @@ def run_ap_server(networks):
     """Serves the setup page on the access point until a network is chosen
     or setup is cancelled. Returns ("connect", ssid, password) or ("stop", None, None)."""
     result = queue.Queue()
+    if demo():   # no access point: only the regular page's network list (wifi_connect) and the stop flag
+        while True:
+            if stop_requested():
+                return ("stop", None, None)
+            external = check_external_connect()
+            if external:
+                return ("connect", external[0], external[1])
+            time.sleep(1)
     page = _ap_page(networks)
 
     class Handler(BaseHTTPRequestHandler):

@@ -40,7 +40,7 @@ Options:
 - `sudo ./install.sh 8080` puts the HTTP page on another port, if port 80 is taken.
 - `sudo ./install.sh --https-port=8443` puts the HTTPS page on another port, and `--no-https` turns it off.
 - The status NeoPixel is on by default (1 LED on GPIO18). `sudo ./install.sh --leds=30` sets the starting count for a chain or strip of 30 (the count can also be changed later in Settings), and `--leds=0` turns the LEDs off and hides the LED settings; `--led-gpio=10`/`12`/`21` uses a different pin than the default GPIO18 (see [Status NeoPixels](#status-neopixels-optional)). The older `--led`, `--led=N` and `--no-led` still work.
-- `sudo ./install.sh --wifi` adds Wi-Fi setup: the temporary access point for joining a network without a keyboard (installs `hostapd` and `dnsmasq`), plus its Settings controls and the button hold that starts it (see [Wi-Fi setup button](#buttons-and-wi-fi-setup)). `--no-wifi` removes it again. The two buttons themselves (GPIO17 and GPIO4 by default) are always installed.
+- `sudo ./install.sh --wifi` adds Wi-Fi setup: the temporary access point for joining a network without a keyboard (installs `hostapd` and `dnsmasq`), plus its Settings controls and the button hold that starts it (see [Wi-Fi setup button](#buttons-and-wi-fi-setup)). `--no-wifi` removes it again. To try the Wi-Fi flow without any Wi-Fi hardware, `--wifi-demo` runs Wi-Fi setup on dummy networks (password `demo` connects, anything else fails) without touching the Pi's network; `--no-wifi-demo` ends it. The two buttons themselves (GPIO17 and GPIO4 by default) are always installed.
 
 Options can be combined, for example `sudo ./install.sh --leds=8 --no-https`.
 

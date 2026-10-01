@@ -24,6 +24,7 @@ MODEM = "/tmp/dreampi-netswitch.modem"
 DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
 # Wi-Fi setup (netswitch_buttons.py, install.sh --wifi); the buttons themselves are always installed
 WIFI_ENABLED = os.path.join(BASE_DIR, "wifi_enabled")  # written by install.sh --wifi
+WIFI_DEMO = os.path.join(BASE_DIR, "wifi_demo")        # exists = Wi-Fi setup runs on dummy networks (install.sh --wifi-demo)
 WIFI_START = os.path.join(BASE_DIR, "wifi_start")   # touched to ask netswitch_buttons.py to start
 WIFI_STOP = os.path.join(BASE_DIR, "wifi_stop")     # touched to ask it to stop / cancel
 WIFI_CONNECT = os.path.join(BASE_DIR, "wifi_connect")   # {"ssid":..., "password":...}, an alternative

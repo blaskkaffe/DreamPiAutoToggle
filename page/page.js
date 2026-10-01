@@ -39,7 +39,7 @@ function render(d){
  $("wifi-row").style.display=d.wifi.installed?"flex":"none";
  var wl=WIFI_LABELS[d.wifi.state]||WIFI_LABELS.idle;
  $("wifi-b").textContent=wl[0];
- $("wifi-sub").textContent=wl[1].replace("%s",d.wifi.ssid||"");
+ $("wifi-sub").textContent=((d.wifi.demo&&d.wifi.state=="hosting")?"Pick a network below":wl[1].replace("%s",d.wifi.ssid||""))+(d.wifi.demo?" - DEMO: dummy networks, password \u201cdemo\u201d connects":"");
  $("wifi-b").disabled=d.wifi.state=="ok";
  var showNets=d.wifi.state=="hosting"||d.wifi.state=="scanning";
  $("wifi-networks").style.display=showNets?"block":"none";

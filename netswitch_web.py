@@ -99,7 +99,7 @@ def api_state():
             "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
                    "line2": pi.get("line2"), "warn": pi.get("warn")},
             "wifi": {"state": wf_state, "ssid": wf.get("ssid"), "networks": wf.get("networks"),
-                     "installed": os.path.exists(core.WIFI_ENABLED)},
+                     "installed": os.path.exists(core.WIFI_ENABLED), "demo": os.path.exists(core.WIFI_DEMO)},
             "hangup": {"busy": probes._hangup["busy"], "text": probes._hangup["text"]},
             "warnings": warnings, "now": int(time.time())}
 
