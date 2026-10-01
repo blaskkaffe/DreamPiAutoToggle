@@ -10,11 +10,9 @@ import io
 import json
 import os
 import re
-import select
 import socket
 import sys
 import subprocess
-import termios
 import threading
 import time
 import traceback
@@ -538,14 +536,9 @@ def about():
     rows.append(("Raspberry Pi", (model or "unknown").replace("\x00", "")))
     rows.append(("System", osname or "unknown"))
     usb = _usb_info(modem_port())
-    info = load_modem_info()
-    compat, label = modem_compat(usb, " ".join(info.get(k, "") for k in ("ati", "model", "revision")))
+    compat, label = modem_compat(usb)
     if usb:
         text = label
-        if info.get("revision"):
-            text += ", firmware " + info["revision"]
-        elif info.get("error"):
-            text += " (could not query it: %s)" % info["error"]
         if compat is False:
             text += " — not known to work with DreamPi"
         elif compat is None:
@@ -557,16 +550,24 @@ def about():
 
 
 # ----------------------------------------------------- modem identification
-MODEM_PORT = "/tmp/dreampi-netswitch.port"              # written by the hook
-MODEM_INFO = os.path.join(BASE_DIR, "modem_info.json")  # cached USB id + AT probe result
+# Passive only: no AT commands, nothing is ever sent to the modem, and
+# DreamPi is never stopped. An earlier version also actively probed the
+# modem (ATI/AT+GM*) to show its firmware/revision, stopping and restarting
+# DreamPi.service around it; on at least one real modem that got DreamPi
+# stuck re-opening the serial port ("Opening modem on ..." never clearing)
+# instead of completing, so it was removed. If that's revisited, it needs
+# testing against real hardware first, not just the simulated port this
+# was developed against.
+MODEM_PORT = "/tmp/dreampi-netswitch.port"   # written by the hook
 
-# Modems the DreamPi community has reported working, matched (case-insensitive,
-# either direction) against the USB descriptor's manufacturer + product
-# strings. Most of these are the same board sold under different brands, all
-# built around a Conexant CX93010 hardmodem chip; MODEM_CHIPSET below catches
-# ones not listed here by name once an AT probe has been run. Source and more
-# reports: https://www.segacity.de/viewtopic.php?t=7649 (a softmodem, which
-# needs the host's own drivers to do part of the modem's job, is never a
+# Modems the DreamPi community has reported working, matched (case-
+# insensitive) against the USB descriptor's manufacturer + product strings
+# containing the known name (not the other way round - a short bad entry
+# like "conceptronic c56u" must not match the good "conceptronic c56u-v2"
+# as a prefix of it). Most share a Conexant CX93010 hardmodem chip, which
+# the USB descriptor alone won't show. Source and more reports:
+# https://www.segacity.de/viewtopic.php?t=7649 (a softmodem, which needs
+# the host's own drivers to do part of the modem's job, is never a
 # substitute: DreamPi needs the modem to handle the call by itself).
 KNOWN_MODEMS = (
     "usrobotics 5637", "usr5637",
@@ -579,12 +580,10 @@ KNOWN_MODEMS = (
     "v.top um02", "vtop um02",
 )
 # Reported NOT to work: same case as the good ones above, but an older/
-# different chip inside. Checked first isn't right here - see modem_compat().
+# different chip inside.
 UNKNOWN_MODEMS = (
     "conceptronic c56u",   # the original, without "-v2"/"se"
 )
-MODEM_CHIPSET = "conexant"
-MODEM_CHIPSET_MODEL = "93010"   # CX93010, the chip the known-good modems share
 
 
 def modem_port():
@@ -618,12 +617,6 @@ def _usb_info(port):
         return None
 
 
-def _usb_id(usb):
-    if not usb:
-        return None
-    return "%s:%s:%s" % (usb["vendor"], usb["product"], usb["serial"])
-
-
 def modem_plugged():
     """Whether the serial port DreamPi opened for the modem is present
     right now, or None while the port isn't known yet (DreamPi hasn't
@@ -634,7 +627,7 @@ def modem_plugged():
     return os.path.exists(port)
 
 
-def modem_compat(usb, at_text=None):
+def modem_compat(usb):
     """(compat, label). compat is True (known good), False (known not to
     work) or None (can't tell, or nothing plugged in). label is what to
     show for the modem's make/model."""
@@ -651,139 +644,7 @@ def modem_compat(usb, at_text=None):
             return True, label
         if any(bad in low for bad in UNKNOWN_MODEMS):
             return False, label
-    if at_text and MODEM_CHIPSET in at_text.lower() and MODEM_CHIPSET_MODEL in at_text:
-        return True, label + " (Conexant %s)" % MODEM_CHIPSET_MODEL
     return None, label
-
-
-_AT_BAUDS = dict((n, getattr(termios, "B%d" % n)) for n in (1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200))
-
-
-def _open_at(port, baud=57600):
-    """Open the modem's serial port directly (no pyserial dependency) in
-    raw 8N1 mode. Only call this while nothing else (i.e. DreamPi) has the
-    port open."""
-    fd = os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-    cflag = termios.CS8 | termios.CREAD | termios.CLOCAL
-    speed = _AT_BAUDS.get(baud, termios.B57600)
-    termios.tcsetattr(fd, termios.TCSANOW, [0, 0, cflag, 0, speed, speed, [b"\0"] * len(termios.tcgetattr(fd)[6])])
-    termios.tcflush(fd, termios.TCIOFLUSH)
-    return fd
-
-
-def _at_read(fd, timeout):
-    end, buf = time.time() + timeout, b""
-    while time.time() < end:
-        r, _, _ = select.select([fd], [], [], max(0, end - time.time()))
-        if not r:
-            break
-        try:
-            chunk = os.read(fd, 256)
-        except OSError:
-            break
-        if not chunk:
-            break
-        buf += chunk
-        if buf.endswith((b"OK\r\n", b"ERROR\r\n")):
-            break
-    return buf.decode("ascii", "replace")
-
-
-def _at_query(fd, cmd, timeout=1.5):
-    os.write(fd, (cmd + "\r").encode("ascii"))
-    lines = [ln.strip() for ln in _at_read(fd, timeout).splitlines()]
-    lines = [ln for ln in lines if ln and ln not in (cmd, "OK", "ERROR")]
-    return lines[0] if lines else ""
-
-
-def probe_modem(port):
-    """Send basic AT identification commands (chipset info, manufacturer,
-    model, firmware revision). Only safe while DreamPi isn't using the
-    port - run_modem_check() stops it first."""
-    fd = None
-    try:
-        fd = _open_at(port)
-        _at_query(fd, "AT", 1.0)    # wakes it up; a stray reply/garbage is ignored
-        return {"ati": _at_query(fd, "ATI"), "manufacturer": _at_query(fd, "AT+GMI"),
-                "model": _at_query(fd, "AT+GMM"), "revision": _at_query(fd, "AT+GMR")}
-    except (OSError, termios.error) as e:
-        return {"error": str(e)}
-    finally:
-        if fd is not None:
-            os.close(fd)
-
-
-def load_modem_info():
-    try:
-        with open(MODEM_INFO) as f:
-            return json.load(f)
-    except (IOError, OSError, ValueError):
-        return {}
-
-
-def _save_modem_info(data):
-    tmp = MODEM_INFO + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(data, f, indent=1, sort_keys=True)
-    os.rename(tmp, MODEM_INFO)
-
-
-_modem_check = {"busy": False, "text": ""}
-_modem_check_lock = threading.Lock()
-
-
-def run_modem_check(usb_id):
-    """Stop DreamPi, send AT identification commands, start it again. Runs
-    in its own thread; progress is shown on the page. usb_id is cached
-    (success or failure) so the same device isn't re-probed on its own -
-    only a plugged-in device change or the page's Check button does that."""
-    def say(text):
-        _modem_check["text"] = text
-        debug_log("web page: " + text)
-        sys.stderr.write("modem check: %s\n" % text)
-
-    try:
-        port = modem_port()
-        if not port:
-            say("modem port unknown, can't check yet")
-            return
-        say("stopping DreamPi to check the modem")
-        _run(["systemctl", "stop", "dreampi.service"])
-        time.sleep(1)
-        say("querying the modem")
-        info = probe_modem(port)
-        data = load_modem_info()
-        if "error" not in info:
-            data.pop("error", None)   # clear a stale error from an earlier failed check
-        data.update(info)
-        data["usb_id"], data["checked_at"] = usb_id, int(time.time())
-        _save_modem_info(data)
-        say("starting DreamPi again")
-        _run(["systemctl", "start", "dreampi.service"])
-        say("modem check failed: %s" % info["error"] if "error" in info else "modem check done")
-    finally:
-        time.sleep(3)
-        _modem_check["busy"] = False
-
-
-def start_modem_check(force=False):
-    """False if a check is already running, nothing is plugged in, or
-    (without force) this exact device was already checked."""
-    usb_id = _usb_id(_usb_info(modem_port()))
-    if not usb_id:
-        return False
-    if not force and load_modem_info().get("usb_id") == usb_id:
-        return False
-    if dreampi_state()[0].startswith("call"):   # never interrupt a call
-        return False
-    with _modem_check_lock:
-        if _modem_check["busy"]:
-            return False
-        _modem_check.update(busy=True, text="starting modem check...")
-    t = threading.Thread(target=run_modem_check, args=(usb_id,))
-    t.daemon = True
-    t.start()
-    return True
 
 
 def checker():
@@ -813,10 +674,6 @@ def checker():
                           "internet": None if internet["state"] == "checking" else internet["state"] == "ok",
                           "time": time.time()})
         trim_log()
-        try:
-            start_modem_check()   # no-ops unless a new (or never checked) USB modem showed up
-        except Exception:
-            pass
         time.sleep(LINK_EVERY)
 
 
@@ -1130,9 +987,7 @@ def api_state():
             else "the network works, but the internet can't be reached"
         warnings.append("No internet: %s. Dreamcast games can't get online right now." % why)
     plugged = modem_plugged()
-    cached_info = load_modem_info()
-    compat, label = modem_compat(_usb_info(modem_port()),
-                                 " ".join(cached_info.get(k, "") for k in ("ati", "model", "revision")))
+    compat, label = modem_compat(_usb_info(modem_port()))
     if plugged is False:
         warnings.append("Modem not detected: its USB serial port is gone. Check the cable/connection.")
     elif compat is False:
@@ -1146,9 +1001,7 @@ def api_state():
             # network problems show as warning boxes instead
             "dreampi": {"state": dstate, "text": dtext,
                         "look": (active_messages(dstate, {"network": True}) or [None])[-1]},
-            "modem": {"text": mtext, "since": msince, "plugged": plugged, "label": label, "compat": compat,
-                      "info": cached_info if cached_info.get("usb_id") else None,
-                      "check": {"busy": _modem_check["busy"], "text": _modem_check["text"]}},
+            "modem": {"text": mtext, "since": msince, "plugged": plugged, "label": label, "compat": compat},
             "internet": checks["internet"],
             "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
                    "line2": pi.get("line2"), "warn": pi.get("warn")},
@@ -1280,9 +1133,7 @@ PAGE = u"""<!doctype html>
 <div class="now rows" id="net" title="Show or hide details">
  <div class="nlabel">Selected network:</div><b id="net-name">...</b>
  <div class="row main"><span class="k">DreamPi</span><span class="v"><span class="dot" id="d-dot"></span><span id="d-text">...</span></span><span class="arrow">&#9656;</span></div>
- <div class="row more"><span class="k">Modem</span><span class="v"><span><span class="nw" id="m-text">...</span><span class="sub blk" id="m-since"></span></span>
-  <button class="pill-s" id="modem-check-b" type="button" style="flex:none;margin-left:8px;padding:4px 10px;font-size:.78em"
-   title="Identify the modem (briefly restarts DreamPi)">Check</button></span></div>
+ <div class="row more"><span class="k">Modem</span><span class="v"><span><span class="nw" id="m-text">...</span><span class="sub blk" id="m-since"></span></span></span></div>
  <div class="row more"><span class="k">Internet</span><span class="v"><span class="dot" id="i-dot"></span><span id="i-text">...</span></span></div>
  <div class="row more"><span class="k">Pi</span><span class="v"><span class="dot" id="p-dot"></span><span id="p-text">...</span></span></div>
  <div class="row more hang" id="hang-row" style="display:none"><form method="post" action="/hangup" id="hang-f"><button class="pill-s" id="hang-b" type="submit"
@@ -1403,10 +1254,6 @@ function render(d){
  $("warnings").innerHTML=d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("");
  lookDot($("d-dot"),d.dreampi.look); $("d-text").textContent=d.dreampi.text;
  $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now).replace(/[()]/g,"");
- var mcb=$("modem-check-b");
- if(d.modem.check&&d.modem.check.busy){mcb.disabled=true;
-  mcb.textContent=d.modem.check.text?d.modem.check.text.charAt(0).toUpperCase()+d.modem.check.text.slice(1):"Checking..."}
- else if(mcb.disabled){mcb.disabled=false;mcb.textContent="Check"}
  dot($("i-dot"),d.internet.state); $("i-text").textContent=d.internet.text;
  dot($("p-dot"),d.pi.state);
  $("p-text").innerHTML=d.pi.line1?'<span class="nw">'+esc(d.pi.line1)+'</span><span class="sub blk">'+esc(d.pi.line2)+
@@ -1423,11 +1270,7 @@ function render(d){
  debugOn=d.debug;
 }
 var logSize=0,debugOn=false,logBusy=false,debugOpen=false;
-$("net").onclick=function(e){if(e.target.closest&&(e.target.closest(".hang")||e.target.closest("#modem-check-b")))return;this.classList.toggle("open")};
-$("modem-check-b").onclick=function(){if(this.disabled)return;
- if(!confirm("Check the modem? This briefly stops and restarts DreamPi, so don't do it during a call."))return;
- this.disabled=true;this.textContent="Checking...";
- var x=new XMLHttpRequest();x.open("POST","/modemcheck",true);x.setRequestHeader("X-Requested-With","netswitch");x.onload=refresh;x.send()};
+$("net").onclick=function(e){if(e.target.closest&&e.target.closest(".hang"))return;this.classList.toggle("open")};
 // Hang up: tap once to arm, again within 4 s to confirm (a call in progress is easy to end by accident)
 var hangArm=0;
 $("hang-f").onsubmit=function(e){e.preventDefault();e.stopPropagation();var b=$("hang-b");
@@ -1848,9 +1691,6 @@ class Handler(BaseHTTPRequestHandler):
                           ("DCNET" if os.path.exists(FLAG) else "DCNow!"))
         elif self.path == "/hangup":
             start_hangup()
-        elif self.path == "/modemcheck":
-            debug_log("web page: modem check requested")
-            start_modem_check(force=True)
         elif self.path == "/clearlog":
             if os.path.exists(DTMF_LOG):
                 os.remove(DTMF_LOG)
