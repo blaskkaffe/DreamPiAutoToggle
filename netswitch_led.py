@@ -3,10 +3,10 @@
 # The pixel output drivers (PWM FIFO, PWM/PCM + DMA, SPI) are in
 # netswitch_led_drivers.py; this file decides what to show and when.
 #
-# What it shows comes from the page's settings (led.json, see netswitch_core):
+# What it shows comes from the page's settings (led.json, see netswitch_ledconfig):
 # per message (DreamPi status, network/internet errors, Ethernet/Wi-Fi) and
 # selected network: on/off, colour, effect, speed, brightness and LED section.
-# Errors outrank information; see netswitch_core.active_messages().
+# Errors outrank information; see netswitch_ledconfig.active_messages().
 # The number of LEDs is in /opt/dreampi-netswitch/led_count (install.sh).
 import colorsys
 import math
@@ -16,7 +16,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import netswitch_core as core  # noqa: E402  (settings and state shared with the web service)
+import netswitch_ledconfig as ledconfig  # noqa: E402  (led.json, messages: shared with the web service)
 import netswitch_led_drivers as drivers  # noqa: E402  (open_output(), wire orders)
 
 FPS = 50
@@ -107,17 +107,17 @@ _dither_err = {}   # (led index, channel) -> carried-over rounding error
 
 
 # ------------------------------------------------------------- calibration
-# A simple NeoPixel-style pipeline (see core.default_led_config(), which
+# A simple NeoPixel-style pipeline (see ledconfig.default_led_config(), which
 # stores it): requested colour -> gamma correction -> white-balance
-# multipliers -> max_brightness -> NeoPixel. Gamma (core.GAMMA, ~2.2)
+# multipliers -> max_brightness -> NeoPixel. Gamma (ledconfig.GAMMA, ~2.2)
 # compensates for duty-cycle brightness not matching perceived brightness
 # (dim values get dimmer, full-on is unchanged); white balance is a plain
 # per-channel multiplier (0..1, 1 = no correction) found once by eye with
-# the LED held at solid white (see core.wb_test_active()) and nudging down
+# the LED held at solid white (see ledconfig.wb_test_active()) and nudging down
 # whichever channel looks too strong; max_brightness is the familiar
 # global/per-message brightness level, applied last so it scales the
 # already-corrected colour rather than the raw request.
-def to_bytes(frame, brightness, white_balance=None, gamma=core.GAMMA, dither=True, start=0):
+def to_bytes(frame, brightness, white_balance=None, gamma=ledconfig.GAMMA, dither=True, start=0):
     """Floats 0..1 -> 0..255 through gamma -> white balance -> brightness.
     A channel that is on never rounds down to 0, so colours stay
     recognisable at low brightness. With dither, the rounding error is
@@ -159,7 +159,7 @@ def reset_dither():
     _dither_err.clear()
 
 
-def scaled(colour, brightness, white_balance=None, gamma=core.GAMMA):
+def scaled(colour, brightness, white_balance=None, gamma=ledconfig.GAMMA):
     """'#rrggbb' at a brightness, for a single solid pixel."""
     return to_bytes([hex_rgb(colour)], brightness, white_balance, gamma, dither=False)[0]
 
@@ -171,7 +171,7 @@ def _wb(cfg):
 
 
 # ---------------------------------------------------------------- composing
-def render(messages, now, count, clocks=None, white_balance=None, gamma=core.GAMMA):
+def render(messages, now, count, clocks=None, white_balance=None, gamma=ledconfig.GAMMA):
     """Draw the active messages (lowest priority first) into one frame.
     Each message covers all LEDs or its own section; later (more important)
     messages draw over earlier ones, and uncovered LEDs stay dark.
@@ -206,10 +206,10 @@ def render(messages, now, count, clocks=None, white_balance=None, gamma=core.GAM
 
 # ---------------------------------------------------------------- main loop
 def main():
-    count, gpio = core.led_count() or 1, core.led_gpio()
-    cfg = core.led_config()
+    count, gpio = ledconfig.led_count() or 1, ledconfig.led_gpio()
+    cfg = ledconfig.led_config()
     order = drivers.ORDERS.get(cfg.get("order"), drivers.DEFAULT_ORDER)
-    white_balance, gamma = _wb(cfg), cfg.get("gamma", core.GAMMA)
+    white_balance, gamma = _wb(cfg), cfg.get("gamma", ledconfig.GAMMA)
     try:
         out = drivers.open_output(count, gpio)
     except (IOError, OSError) as e:
@@ -237,12 +237,12 @@ def main():
         now = time.time()
         if now >= next_read:
             try:
-                wb_test = core.wb_test_active()
-                messages = core.active_messages()
-                cfg = core.led_config()
+                wb_test = ledconfig.wb_test_active()
+                messages = ledconfig.active_messages()
+                cfg = ledconfig.led_config()
                 order = drivers.ORDERS.get(cfg.get("order"), drivers.DEFAULT_ORDER)
-                white_balance, gamma = _wb(cfg), cfg.get("gamma", core.GAMMA)
-                new_count, new_gpio = core.led_count() or 1, core.led_gpio()
+                white_balance, gamma = _wb(cfg), cfg.get("gamma", ledconfig.GAMMA)
+                new_count, new_gpio = ledconfig.led_count() or 1, ledconfig.led_gpio()
                 if new_count != count or new_gpio != gpio:   # changed on the page: reopen the output
                     try:
                         new_out = drivers.open_output(new_count, new_gpio)
@@ -263,7 +263,7 @@ def main():
         # White-balance test open on the page: hold the strip at solid white,
         # run through the same gamma/white-balance/brightness pipeline as
         # everything else, so what's previewed is exactly what's being
-        # calibrated - see core.wb_test_active().
+        # calibrated - see ledconfig.wb_test_active().
         if wb_test:
             frame = to_bytes([(1.0, 1.0, 1.0)] * count, cfg.get("max_brightness", 0.08),
                              white_balance, gamma, dither=False)

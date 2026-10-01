@@ -261,7 +261,6 @@ def force_hangup():
         sys.stderr.write("hang up: %s\n" % text)
 
     try:
-        state = core.dreampi_state()[0]
         ended = []
         if _run(["pkill", "-TERM", "-x", "pppd"]) == 0:
             ended.append("pppd")

@@ -31,8 +31,8 @@
 #      re-hosts the access point) until the page or the button cancels it.
 # The current state is written to /tmp/dreampi-netswitch.wifi for the web
 # page (a warning banner and the Settings button) and the LED service
-# (netswitch_led.py, via netswitch_core.active_messages()) to read; see
-# LED_STATES's "wifi-setup" / "wifi-ok" / "wifi-failed" in netswitch_core.py.
+# (netswitch_led.py, via netswitch_ledconfig.active_messages()) to read; see
+# LED_STATES's "wifi-setup" / "wifi-ok" / "wifi-failed" in netswitch_ledconfig.py.
 #
 # This assumes the classic Raspberry Pi OS network stack DreamPi normally
 # runs on: wpa_supplicant + dhcpcd managing the wireless interface, and

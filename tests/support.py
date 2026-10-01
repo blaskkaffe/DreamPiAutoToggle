@@ -10,11 +10,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-_argv, sys.argv = sys.argv, sys.argv[:1]   # netswitch_web reads the ports from sys.argv at import
 import netswitch_core as core  # noqa: E402
+import netswitch_ledconfig as ledconfig  # noqa: E402
 import netswitch_probes as probes  # noqa: E402
 import netswitch_web as web  # noqa: E402
-sys.argv = _argv
+
+__all__ = ['ROOT', 'core', 'ledconfig', 'probes', 'web', 'sandbox', 'cleanup']
 
 
 def sandbox(*modules):

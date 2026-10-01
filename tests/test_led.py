@@ -1,7 +1,7 @@
 """LED colour pipeline, wire order encoding and message composing (no hardware)."""
 import unittest
 
-from support import core, sandbox, cleanup
+from support import ledconfig, sandbox, cleanup
 import netswitch_led as led
 import netswitch_led_drivers as drivers
 
@@ -96,21 +96,21 @@ class ActiveMessageTests(unittest.TestCase):
         cleanup(self.tmp)
 
     def test_errors_outrank_information(self):
-        msgs = core.active_messages("ok", {"network": False}, wifi=False)
+        msgs = ledconfig.active_messages("ok", {"network": False}, wifi=False)
         keys = [m["key"] for m in msgs]
         self.assertEqual(keys[-1], "no-network")        # last = drawn on top
         self.assertIn("ok", keys)
 
     def test_disabled_message_is_left_out(self):
-        cfg = core.led_config()
+        cfg = ledconfig.led_config()
         cfg["colours"]["dcnow"]["ok"]["enabled"] = False
-        core.save_led_config(cfg)
-        keys = [m["key"] for m in core.active_messages("ok", {"network": True}, wifi=False)]
+        ledconfig.save_led_config(cfg)
+        keys = [m["key"] for m in ledconfig.active_messages("ok", {"network": True}, wifi=False)]
         self.assertNotIn("ok", keys)
 
     def test_brightness_falls_back_to_max(self):
-        m = core.active_messages("ok", {"network": True}, wifi=False)[0]
-        self.assertEqual(m["brightness"], core.led_config()["max_brightness"])
+        m = ledconfig.active_messages("ok", {"network": True}, wifi=False)[0]
+        self.assertEqual(m["brightness"], ledconfig.led_config()["max_brightness"])
 
 
 if __name__ == "__main__":

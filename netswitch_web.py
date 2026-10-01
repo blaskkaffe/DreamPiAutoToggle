@@ -3,7 +3,7 @@
 # Shows DreamPi's and the modem's live status and internet access, plus an
 # optional debug timeline. It only creates/removes the files that
 # netswitch_hook.py reads. This module is the HTTP side (page, API, HTTPS,
-# watchdog); settings and state are in netswitch_core.py, measurements in
+# watchdog); settings and state are in netswitch_core.py and netswitch_ledconfig.py, measurements in
 # netswitch_probes.py. Works on Python 3 and 2.7.
 import gzip
 import io
@@ -24,6 +24,7 @@ except ImportError:
     from SocketServer import ThreadingMixIn
 
 import netswitch_core as core
+import netswitch_ledconfig as ledconfig
 import netswitch_probes as probes
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -91,7 +92,7 @@ def api_state():
             # the dot next to DreamPi previews that status's LED message only;
             # network problems show as warning boxes instead
             "dreampi": {"state": dstate, "text": dtext,
-                        "look": (core.active_messages(dstate, {"network": True}, wifi=False) or [None])[-1]},
+                        "look": (ledconfig.active_messages(dstate, {"network": True}, wifi=False) or [None])[-1]},
             "modem": {"text": mtext, "since": msince, "plugged": plugged, "label": label, "compat": compat},
             "internet": checks["internet"],
             "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
@@ -222,11 +223,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self.send(body, STATIC_FILES[name], cache=86400, fixed=True)
         elif self.path == "/ledconfig":
-            self.send(json.dumps({"config": core.led_config(), "defaults": core.default_led_config(),
-                                  "states": core.LED_STATES,
-                                  "effects": core.EFFECTS, "orders": core.LED_ORDERS, "count": core.led_count(),
-                                  "gpio": core.led_gpio(), "gpios": core.GPIO_PINS,
-                                  "installed": os.path.exists(core.LED_ENABLED), "hidden": core.led_hidden()}),
+            self.send(json.dumps({"config": ledconfig.led_config(), "defaults": ledconfig.default_led_config(),
+                                  "states": ledconfig.LED_STATES,
+                                  "effects": ledconfig.EFFECTS, "orders": ledconfig.LED_ORDERS, "count": ledconfig.led_count(),
+                                  "gpio": ledconfig.led_gpio(), "gpios": ledconfig.GPIO_PINS,
+                                  "installed": os.path.exists(core.LED_ENABLED), "hidden": ledconfig.led_hidden()}),
                      "application/json")
         elif self.path == "/buttonconfig":
             self.send(json.dumps({"config": {"button1_gpio": core.button_gpio(1), "button2_gpio": core.button_gpio(2),
@@ -259,17 +260,17 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 length = min(int(self.headers.get("Content-Length") or 0), 65536)
                 data = json.loads(self.rfile.read(length).decode("utf-8"))
-                cfg = core.save_led_config(data)
+                cfg = ledconfig.save_led_config(data)
                 if "count" in data:
-                    core.save_led_count(data["count"])
+                    ledconfig.save_led_count(data["count"])
                 if "gpio" in data:
-                    core.save_led_gpio(data["gpio"])
+                    ledconfig.save_led_gpio(data["gpio"])
             except (ValueError, IOError, OSError) as e:
                 self.send_response(400)
                 self.end_headers()
                 self.wfile.write(str(e).encode("utf-8"))
                 return
-            self.send(json.dumps({"config": cfg, "count": core.led_count(), "gpio": core.led_gpio()}),
+            self.send(json.dumps({"config": cfg, "count": ledconfig.led_count(), "gpio": ledconfig.led_gpio()}),
                      "application/json")
             return
         if self.path == "/buttonconfig":
@@ -308,9 +309,9 @@ class Handler(BaseHTTPRequestHandler):
                 open(core.LED_HIDDEN, "w").close()
                 core.debug_log("web page: LED settings hidden")
         if self.path == "/wbtest":
-            core.touch_wb_test()
+            ledconfig.touch_wb_test()
         elif self.path == "/wbtestdone":
-            core.clear_wb_test()
+            ledconfig.clear_wb_test()
         if self.path == "/dcnet":
             open(core.FLAG, "w").close()
             core.debug_log("web page: DCNET selected")

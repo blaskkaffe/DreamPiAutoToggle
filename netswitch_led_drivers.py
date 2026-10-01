@@ -39,7 +39,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from netswitch_core import GPIO_PINS, DEFAULT_GPIO  # noqa: E402  (allowed LED output pins: 10, 12, 18, 21; default 18)
+from netswitch_ledconfig import GPIO_PINS, DEFAULT_GPIO  # noqa: E402  (allowed LED output pins: 10, 12, 18, 21; default 18)
 from netswitch_gpio import peripheral_base, Block  # noqa: E402  (shared with netswitch_buttons.py)
 
 # ---------------------------------------------------------------- registers
