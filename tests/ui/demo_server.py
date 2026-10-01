@@ -51,7 +51,9 @@ if os.environ.get("FAKEPLAYERS"):
             "dcnet": {"online": True, "players": [
                 {"name": "Alice", "gameName": "Phantasy Star Online", "geoloc": {"country": "DE"}},
                 {"name": "Carol", "gameName": "Outtrigger", "geoloc": {"country": "FR"}}]}}
-    pl.fetch = lambda url: json.dumps(feed)      # the real default source (dc99.net) is used, only the download is faked
+    feed["kosnet"] = {"online": True, "players": [{"name": "Kay", "gameName": "KOS Game", "geoloc": {"country": "JP"}}]}
+    users = {"users": [{"username": "Dave", "country": "US", "current_game_display": "Quake III Arena", "online": True}]}
+    pl.fetch = lambda url: json.dumps(users if "dreamcast.online" in url else feed)      # the real default source (dc99.net) is used, only the download is faked
 print("state dir", tmp, flush=True)
 srv = web.Server(('127.0.0.1', int(os.environ.get('PORT', '8734'))), web.Handler)
 srv.serve_forever()

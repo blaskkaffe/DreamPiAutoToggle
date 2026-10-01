@@ -80,7 +80,7 @@ $("wifi-connect-b").onclick=function(){
  x.onload=refresh;x.send(JSON.stringify({ssid:ssid,password:$("wifi-pass").value}))};
 var logSize=0,debugOn=false,logBusy=false,debugOpen=false;
 function toggleNet(el){el.classList.toggle("open");el.setAttribute("aria-expanded",el.classList.contains("open"))}
-$("net").onclick=function(e){if(e.target.closest&&e.target.closest(".hang"))return;toggleNet(this)};
+$("net").onclick=function(e){if(e.target.closest&&e.target.closest(".hang,.keep"))return;toggleNet(this)};
 $("net").onkeydown=function(e){if((e.key=="Enter"||e.key==" ")&&e.target===this){e.preventDefault();toggleNet(this)}};
 // Hang up: tap once to arm, again within 4 s to confirm (a call in progress is easy to end by accident)
 var hangArm=0;

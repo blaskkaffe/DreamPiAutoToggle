@@ -17,12 +17,11 @@ import netswitch_core as core
 
 # [{"name": "DC99", "url": "http://.../players.json", "network": "DCNET"}, ...]
 # "network" is only the fallback label for entries that don't say which network they are on.
-# The default is the feed openMenu's player list already uses (the shapes below are
-# taken from that working code, which was checked against live responses): dc99.net's
-# combined status page lists DreamPi (DCNow!) and DCNET players together. dreamcast.online's
-# own feed ("http://dreamcast.online/now/api/users.json", DCNow! only) also works as an
-# extra entry in players_sources.json, but its players are already in dc99's list.
-DEFAULT_SOURCES = [{"name": "DC99", "url": "http://dc99.net/online/dcnet_status.php"}]
+# The defaults are the two feeds openMenu's player list uses: dc99.net's combined status page
+# (DCNow!, DCNET and any other network section such as KOSnet) and dreamcast.online's own
+# DCNow! feed. Players found in both are listed once.
+DEFAULT_SOURCES = [{"name": "DC99", "url": "https://dc99.net/online/dcnet_status.php"},
+                   {"name": "Dreamcast.online", "url": "https://dreamcast.online/now/api/users.json"}]
 CACHE_SECONDS = 60
 TIMEOUT = 8
 MAX_BYTES = 1000000
@@ -53,7 +52,7 @@ _cache = {"time": 0, "refreshing": False, "players": [], "sources": []}
 
 def fetch(url):
     """JSON text of a URL. Replaced by the tests."""
-    req = Request(url, headers={"User-Agent": "dreampi-netswitch", "Accept": "application/json"})
+    req = Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; dreampi-netswitch)", "Accept": "application/json, */*"})
     return urlopen(req, timeout=TIMEOUT).read(MAX_BYTES).decode("utf-8", "replace")
 
 
@@ -64,6 +63,8 @@ def network_label(text, default=""):
         return default
     if "dcnet" in low or "flycast" in low:
         return "DCNET"
+    if "kosnet" in low or low.startswith("kos"):
+        return "KOSnet"
     if "dcnow" in low or "dreampi" in low or "dreamcast now" in low:
         return "DCNow!"
     return t[:20]
@@ -108,26 +109,46 @@ def _user(item, network):
             "network": network, "country": _first(item, ("country",))[:3]}
 
 
-def parse_dc99(data):
-    """dc99.net/online/dcnet_status.php: {"dreampi": {"users": [{"username", "country",
-    "current_game_display", "current_game", "online", ...}]}, "dcnet": {"online": bool,
-    "players": [{"name", "gameName", "gameId", "geoloc": {"country"}}, ...], ...}}.
-    DreamPi users are DCNow!, DCNet players are DCNET. Sections may be missing."""
-    out = []
-    dreampi = data.get("dreampi")
-    for item in (dreampi.get("users") if isinstance(dreampi, dict) else None) or []:
-        p = _user(item, "DCNow!")
-        if p:
-            out.append(p)
-    dcnet = data.get("dcnet")
-    if isinstance(dcnet, dict) and dcnet.get("online") is not False:
-        for item in dcnet.get("players") or []:
-            if not isinstance(item, dict) or not _first(item, ("name",)):
-                continue
-            geo = item.get("geoloc")
-            out.append({"player": _first(item, ("name",))[:40], "game": _first(item, ("gameName",))[:60],
-                        "network": "DCNET", "country": (_first(geo, ("country",)) if isinstance(geo, dict) else "")[:3]})
-    return out
+def _section_entry(item, network):
+    """One entry of a network section's players/users list. An entry that has an
+    "online" field must have it true; players lists (dcnet.players) have none."""
+    if not isinstance(item, dict):
+        return None
+    if "online" in item and not _flag(item.get("online")):
+        return None
+    name = _first(item, ("username", "name", "player"))
+    if not name:
+        return None
+    geo = item.get("geoloc")
+    country = _first(item, ("country",)) or (_first(geo, ("country",)) if isinstance(geo, dict) else "")
+    return {"player": name[:40], "game": _first(item, ("current_game_display", "gameName", "current_game", "game", "title"))[:60],
+            "network": network, "country": country[:3]}
+
+
+def parse_sections(data):
+    """dc99.net/online/dcnet_status.php lists one section per network at the top level:
+    {"dreampi": {"users": [...]}, "dcnet": {"online": bool, "players": [...], "users": [...]}, ...}.
+    Every section that holds a list of players is read (so a new network such as KOSnet
+    shows up without a code change); the section name gives the network (dreampi/dcnow =
+    DCNow!, dcnet = DCNET, kosnet = KOSnet, anything else its own name). A section's
+    "players" list wins over its "users" list, as in openMenu's reader (dcnet.users is
+    everybody who ever played). Returns (players, info) where info says per section how
+    many entries it listed and how many are shown, for the page's diagnostics line."""
+    out, info = [], []
+    for key, section in data.items():
+        if not isinstance(section, dict):
+            continue
+        lst = section.get("players") if isinstance(section.get("players"), list) else section.get("users")
+        if not isinstance(lst, list):
+            continue
+        network = network_label(key, key)
+        shown = []
+        if section.get("online") is not False:
+            shown = [p for p in (_section_entry(i, network) for i in lst) if p]
+        out += shown
+        info.append({"section": key, "network": network, "listed": len(lst), "shown": len(shown),
+                     "offline": section.get("online") is False})
+    return out, info
 
 
 def parse_dcnow(data):
@@ -136,13 +157,22 @@ def parse_dcnow(data):
     return [p for p in (_user(i, "DCNow!") for i in data.get("users") or []) if p]
 
 
+def parse_players_info(data, default_network=""):
+    """(players, section info) - parse_players() plus what each section of a dc99-style feed contained."""
+    if isinstance(data, dict) and any(isinstance(v, dict) and (isinstance(v.get("players"), list) or isinstance(v.get("users"), list))
+                                      for v in data.values()):
+        return parse_sections(data)
+    return parse_players(data, default_network), []
+
+
 def parse_players(data, default_network=""):
     """Players from whatever shape a status endpoint uses. Understands a list of
     player objects, an object holding such a list under a common key, and games
     that each list their players. Unknown shapes give an empty list."""
     out = []
-    if isinstance(data, dict) and ("dreampi" in data or "dcnet" in data):
-        return parse_dc99(data)
+    if isinstance(data, dict) and any(isinstance(v, dict) and (isinstance(v.get("players"), list) or isinstance(v.get("users"), list))
+                                      for v in data.values()):
+        return parse_sections(data)[0]
     if isinstance(data, dict) and isinstance(data.get("users"), list) and any(
             isinstance(u, dict) and "username" in u for u in data["users"]):
         return parse_dcnow(data)
@@ -201,19 +231,30 @@ def refresh():
         for s in sources():
             name = str(s.get("name") or s["url"])[:30]
             try:
-                found = parse_players(json.loads(fetch(s["url"])), network_label(s.get("network")))
+                try:
+                    text = fetch(s["url"])
+                except Exception:
+                    if not s["url"].startswith("https://"):
+                        raise
+                    text = fetch("http://" + s["url"][len("https://"):])   # a Pi whose TLS can't reach it
+                found, info = parse_players_info(json.loads(text), network_label(s.get("network")))
                 for p in found:
                     p["source"] = name
                 players += found
-                report.append({"name": name, "ok": True, "count": len(found), "error": None})
+                report.append({"name": name, "ok": True, "count": len(found), "error": None, "sections": info})
             except Exception as e:
                 report.append({"name": name, "ok": False, "count": 0, "error": str(getattr(e, "reason", None) or e)[:80]})
-        seen, unique = set(), []
-        for p in players:                       # the same person can be in two sources
+        by_key, unique = {}, []
+        for p in players:                       # the same person can be in two sources: keep one, fill gaps
             key = (p["player"].lower(), p["network"])
-            if key not in seen:
-                seen.add(key)
+            if key not in by_key:
+                by_key[key] = p
                 unique.append(p)
+            else:
+                first = by_key[key]
+                for field in ("game", "country"):
+                    if not first.get(field) and p.get(field):
+                        first[field] = p[field]
         players = unique
         order = {"DCNow!": 0, "DCNET": 1}
         players.sort(key=lambda p: (order.get(p["network"], 2), p["network"], p["game"].lower(), p["player"].lower()))

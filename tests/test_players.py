@@ -74,6 +74,24 @@ class ShapeTests(unittest.TestCase):
         self.assertEqual(len(pl.parse_players({"dcnet": {"players": [{"name": "Bo", "gameName": "G"}]}})), 1)
         self.assertEqual(pl.parse_players({"dreampi": {}}), [])
 
+    def test_any_network_section_is_read_kosnet_included(self):
+        data = json.loads(json.dumps(DC99))
+        data["kosnet"] = {"online": True, "players": [{"name": "Kay", "gameName": "Some KOS Game", "geoloc": {"country": "JP"}}]}
+        got = pl.parse_players(data)
+        self.assertIn(("Kay", "Some KOS Game", "KOSnet", "JP"), [(p["player"], p["game"], p["network"], p["country"]) for p in got])
+        self.assertEqual(len(got), 4)
+
+    def test_section_info_says_what_each_section_listed(self):
+        players, info = pl.parse_players_info(DC99)
+        by = dict((i["section"], i) for i in info)
+        self.assertEqual((by["dreampi"]["listed"], by["dreampi"]["shown"]), (3, 2))      # one is offline
+        self.assertEqual((by["dcnet"]["listed"], by["dcnet"]["shown"]), (1, 1))
+        self.assertEqual(len(players), 3)
+
+    def test_users_without_an_online_field_count_as_online_in_a_section(self):
+        got = pl.parse_players({"dreampi": {"users": [{"username": "A", "current_game_display": "G"}]}})
+        self.assertEqual([(p["player"], p["network"]) for p in got], [("A", "DCNow!")])
+
     def test_dreamcast_online_feed(self):
         got = pl.parse_players({"users": [{"username": "Cy", "country": "GB", "current_game_display": "Toy Racer", "online": True},
                                           {"username": "Gone", "online": False}]})
@@ -94,8 +112,24 @@ class SourceTests(unittest.TestCase):
         with open(core.PLAYERS_SOURCES, "w") as f:
             json.dump(data, f)
 
-    def test_default_is_the_dc99_feed_openmenu_uses(self):
-        self.assertEqual([(s["name"], s["url"]) for s in pl.sources()], [("DC99", "http://dc99.net/online/dcnet_status.php")])
+    def test_defaults_are_the_two_feeds_openmenu_uses(self):
+        self.assertEqual([(s["name"], s["url"]) for s in pl.sources()],
+                         [("DC99", "https://dc99.net/online/dcnet_status.php"),
+                          ("Dreamcast.online", "https://dreamcast.online/now/api/users.json")])
+
+    def test_https_failure_falls_back_to_http(self):
+        self.write_sources([{"name": "DC99", "url": "https://dc99.test/p"}])
+        calls = []
+        def fetch(url):
+            calls.append(url)
+            if url.startswith("https://"):
+                raise IOError("tls")
+            return json.dumps(DC99)
+        pl.fetch = fetch
+        pl.refresh()
+        self.assertEqual(calls, ["https://dc99.test/p", "http://dc99.test/p"])
+        self.assertTrue(pl.status()["sources"][0]["ok"])
+        self.assertEqual(len(pl.status()["sources"][0]["sections"]), 2)
 
     def test_an_empty_file_switches_the_list_off(self):
         self.write_sources([])
@@ -134,6 +168,13 @@ class SourceTests(unittest.TestCase):
         pl.refresh()
         self.assertEqual(sorted(p["player"] for p in pl.status()["players"]), ["Ana", "Bo", "Idle Ida"])
 
+    def test_a_duplicate_fills_in_what_the_first_copy_lacks(self):
+        self.write_sources([{"name": "A", "url": "https://a.test/p"}, {"name": "B", "url": "https://b.test/p"}])
+        pl.fetch = lambda url: json.dumps({"users": [{"username": "Zed", "current_game_display": "" if "a.test" in url else "Sonic", "online": True}]})
+        pl.refresh()
+        players = pl.status()["players"]
+        self.assertEqual([(p["player"], p["game"]) for p in players], [("Zed", "Sonic")])
+
     def test_bad_json_is_reported_as_an_error(self):
         self.write_sources([{"name": "Bad", "url": "https://bad.test/p"}])
         pl.fetch = lambda url: "<html>not json</html>"
@@ -154,6 +195,10 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn('<script src="/players.js" defer></script>', html)
             js = urlopen(base + "/players.js", timeout=10).read().decode()
             self.assertIn("/players", js)
+            self.assertIn("60000", js)                       # polls at most once a minute
+            self.assertIn("netswitch-players", js)           # show/hide setting, per browser
+            self.assertIn('id="pl-b"', js)
+            self.assertIn("pl-list", js)
             r = json.loads(urlopen(base + "/players", timeout=10).read().decode())
             self.assertTrue(r["configured"])
             self.assertIn("links", r)
