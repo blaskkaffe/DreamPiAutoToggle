@@ -756,7 +756,7 @@ SPEEDS = ("slow", "fast")
 
 def led_count():
     """LEDs installed: 0 = no LED service, 1 = single LED, more = strip.
-    Set at install time (install.sh --leds=N) and editable from the page."""
+    Set at install time (install.sh --led=N) and editable from the page."""
     if not os.path.exists(LED_ENABLED):
         return 0
     try:
