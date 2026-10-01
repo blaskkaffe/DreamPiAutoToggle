@@ -11,18 +11,18 @@
  css.textContent=
   "#pl-box{margin:0 0 14px;padding:14px 24px 10px;border-radius:var(--r);text-align:center;background:#9e4f10;border:var(--bw) solid #c9793a;line-height:1.35;cursor:pointer;user-select:none}#pl-box.dcnet{background:#1c4f9e;border-color:#5a86cf}#pl-box.off{display:none}"+
   "#pl-box .nlabel{display:block;margin:0 0 6px;padding:0 0 2px;font-size:1.08em;font-weight:600;color:rgba(255,255,255,.8);text-align:center;letter-spacing:.01em}"+
-  "#pl-box .row{font-size:.62em;line-height:1.35;padding:9px 0;border-top:1px solid rgba(255,255,255,.18);text-align:left}#pl-box .row.main{justify-content:center;border-top:0;padding:8px 0 4px}#pl-box .row.main .k{display:none}#pl-box .row.main .v{width:100%;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;font-size:1.05em}#pl-box .row .k{color:rgba(255,255,255,.65);width:90px;flex:none}#pl-box .row .v{min-width:0;display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}#pl-box .more{display:none}#pl-box.open .more{display:flex}#pl-box .arrow{color:rgba(255,255,255,.7);font-size:.9em;transition:transform .15s;flex:none;margin-left:8px}#pl-box.open .arrow{transform:rotate(90deg)}"+
-  "#pl-box .pl-net{display:inline-block;white-space:nowrap;font-size:1.05em;font-weight:600;color:inherit}#pl-box .pl-net-dcnow{color:var(--dcnow-l)}#pl-box .pl-net-dcnet{color:var(--dcnet-l)}"+
+  "#pl-box .row{font-size:.62em;line-height:1.35;padding:9px 0;border-top:1px solid rgba(255,255,255,.18);text-align:left}#pl-box .row.main{justify-content:center;border-top:0;padding:8px 0 4px}#pl-box .row.main .k{display:none}#pl-box .row.main .v{width:100%;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;font-size:1.25em}#pl-box .row .k{color:rgba(255,255,255,.65);width:90px;flex:none}#pl-box .row .v{min-width:0;display:flex;align-items:baseline;flex-wrap:wrap;gap:8px}#pl-box .more{display:none}#pl-box:not(.open) #pl-games-row{display:flex}#pl-box.open .more{display:flex}#pl-box .arrow{color:rgba(255,255,255,.7);font-size:.9em;transition:transform .15s;flex:none;margin-left:8px}#pl-box.open .arrow{transform:rotate(90deg)}"+
+  "#pl-box .pl-net{display:inline-block;white-space:nowrap;font-size:1.25em;font-weight:700;color:inherit}#pl-box .pl-net-dcnow{color:var(--dcnow-l)}#pl-box .pl-net-dcnet{color:var(--dcnet-l)}"+
   "#pl-box #pl-games,#pl-box #pl-players,#pl-box #pl-msg,#pl-box #pl-links{display:block;white-space:normal;overflow-wrap:anywhere}#pl-box #pl-games{display:block;overflow:hidden;white-space:nowrap;width:100%;padding:2px 0}#pl-box .pl-games-track{display:inline-block;white-space:nowrap;padding-left:100%;animation:pl-scroll 16s linear infinite;will-change:transform}#pl-box #pl-links{display:flex;flex-wrap:wrap;gap:6px}#pl-box #pl-links a{text-decoration:none}#pl-box #pl-players{display:flex;flex-direction:column;gap:4px}#pl-box .pl-row{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1.4fr) auto;gap:8px;align-items:center;padding:5px 0;border-top:1px solid rgba(255,255,255,.12)}#pl-box .pl-row:first-child{border-top:0}#pl-box .pl-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}#pl-box .pl-game{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.82}#pl-box .pl-network{justify-self:end;white-space:nowrap;font-size:.78em;font-weight:700;letter-spacing:.04em;text-transform:uppercase}#pl-box .pl-network.dcnow{color:var(--dcnow-l)}#pl-box .pl-network.dcnet{color:var(--dcnet-l)}@keyframes pl-scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}";
  document.head.appendChild(css);
  var box=document.createElement("div");box.id="pl-box";box.className="now rows";box.title="Show or hide details";box.setAttribute("role","button");box.setAttribute("tabindex","0");box.setAttribute("aria-expanded","false");
  box.innerHTML='<div class="nlabel">Online players:</div>'+ 
   '<div class="row main" id="pl-toggle" aria-expanded="false">'+
    '<span class="k">Players</span><span class="v"><span class="pl-net pl-net-dcnow">DCNow!: <span id="pl-dcnow-count">0</span></span><span class="pl-net pl-net-dcnet">DCNET: <span id="pl-dcnet-count">0</span></span></span><span class="arrow">&#9656;</span></div>'+ 
-  '<div class="row more"><span class="k">Games</span><span class="v"><span id="pl-games">...</span></span></div>'+ 
-  '<div class="row more"><span class="k">Players</span><span class="v"><span id="pl-players">...</span></span></div>'+ 
-  '<div class="row more"><span class="k">Status</span><span class="v"><span id="pl-msg"></span></span></div>'+ 
-  '<div class="row more"><span class="k">Links</span><span class="v"><span id="pl-links"></span></span></div>';
+  '<div class="row more" id="pl-games-row"><span class="k">Games</span><span class="v"><span id="pl-games">...</span></span></div>'+ 
+  '<div class="row more" id="pl-players-row"><span class="k">Players</span><span class="v"><span id="pl-players">...</span></span></div>'+ 
+  '<div class="row more" id="pl-msg-row"><span class="k">Status</span><span class="v"><span id="pl-msg"></span></span></div>'+ 
+  '<div class="row more" id="pl-links-row"><span class="k">Links</span><span class="v"><span id="pl-links"></span></span></div>';
  anchor.parentNode.insertBefore(box,anchor);
  // setting: show or hide the box (this browser only), next to the debug log switch
  var srow=dbg&&dbg.closest?dbg.closest(".srow"):null;
@@ -48,11 +48,15 @@
    var seen={};
    var gameNames=[];
    players.forEach(function(p){
-    if(!p.game||seen[p.game])return;
-    seen[p.game]=true;gameNames.push(p.game);
+    if(!p.game)return;
+    if(!seen[p.game]){seen[p.game]=0}
+    seen[p.game]+=1;
+   });
+   Object.keys(seen).forEach(function(name){
+    gameNames.push({name:name,count:seen[name]});
    });
    if(gameNames.length){
-    var gamesText=gameNames.slice(0,12).join(" • ");
+    var gamesText=gameNames.slice(0,12).map(function(g){return g.name+(g.count>1?" ("+g.count+")":"");}).join(" • ");
     var scrollText=gamesText.length>36?gamesText+" • "+gamesText:"";
     games.innerHTML=scrollText?'<span class="pl-games-track">'+esc(scrollText)+'</span>':esc(gamesText);
    }else{
