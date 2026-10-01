@@ -28,6 +28,10 @@ import netswitch_ledconfig as ledconfig
 import netswitch_numbers as numbers
 import netswitch_probes as probes
 import netswitch_update as updater
+try:
+    import netswitch_players as players   # optional: delete it and page/players.js to drop the online-players list
+except ImportError:
+    players = None
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 STATIC_FILES = {   # only these are served from /static/
@@ -115,7 +119,10 @@ def build_page():
     def part(name):
         with io.open(os.path.join(PAGE_DIR, name), encoding="utf-8", newline="") as f:
             return f.read()
-    return part("index.html").replace("@@CSS@@", part("page.css")).replace("@@JS@@", part("page.js"))
+    modules = ""
+    if players is not None and os.path.exists(os.path.join(PAGE_DIR, "players.js")):
+        modules = '<script src="/players.js" defer></script>'
+    return part("index.html").replace("@@CSS@@", part("page.css")).replace("@@JS@@", part("page.js")).replace("@@MODULES@@", modules)
 
 
 PAGE = build_page()
@@ -241,6 +248,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send(json.dumps(_numbers_reply()), "application/json")
         elif self.path == "/update":
             self.send(json.dumps(updater.status()), "application/json")
+        elif self.path == "/players" and players is not None:
+            self.send(json.dumps(players.status()), "application/json")
+        elif self.path == "/players.js" and players is not None and os.path.exists(os.path.join(PAGE_DIR, "players.js")):
+            with open(os.path.join(PAGE_DIR, "players.js"), "rb") as f:
+                self.send(f.read(), "application/javascript; charset=utf-8")
         elif self.path == "/buttonconfig":
             self.send(json.dumps({"config": {"button1_gpio": core.button_gpio(1), "button2_gpio": core.button_gpio(2),
                                              "button1_function": core.button_function(1),

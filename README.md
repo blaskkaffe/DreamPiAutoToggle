@@ -101,6 +101,14 @@ Fixed, not editable: `111-1111` always directs to DCNow! for compatibility with 
   - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online`, and whether it's connected by Ethernet or Wi-Fi. A red warning box appears at the top of the page when the internet is down.
   - **Hang up** (at the bottom when the box is open, only while DreamPi is in a call): ends a call that got stuck and gets the modem ready again. Tap it twice to confirm. It ends the call the way DreamPi ends one itself, by stopping `pppd` for DCNow! or `dcnet.rpi` for DCNET, after which DreamPi hangs up the modem and starts the dial tone. If DreamPi isn't ready for calls within 30 seconds, or the call process is already gone, it restarts the DreamPi service.
 - The **DCNow! / DreamPi** and **DCNET / FLYCAST** buttons change the selected network.
+- **Online players** (optional module): a button that opens a list of who is online, with player, game and network, plus links to DC99, Dreamcast.online, the DCNET status page, Dreamcast Live and DreamPi on GitHub. The Pi fetches the list itself (at most once a minute, and only while the list is open) from the JSON addresses you put in `/opt/dreampi-netswitch/players_sources.json`:
+
+  ```
+  [{"name": "DC99", "url": "https://.../players.json", "network": "DCNET"},
+   {"name": "Dreamcast.online", "url": "https://.../online.json"}]
+  ```
+
+  `network` is only used for entries that don't say which network they are on. It understands a list of player objects, an object with a `players` list, or games that list their players (field names like `name`/`player`/`username`, `game`/`title`, `network`). Without sources the list says so and the links still work. To remove the feature, delete `netswitch_players.py` and `page/players.js` (the installer then removes the installed copies too).
 - **Debug log:** hidden unless switched on in the settings (see below).
 
 ### Settings (cogwheel)

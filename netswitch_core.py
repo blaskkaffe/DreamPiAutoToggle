@@ -18,6 +18,7 @@ ADDON_SRC = os.path.join(BASE_DIR, "src_dir")            # that checkout's folde
 INSTALL_PORTS = os.path.join(BASE_DIR, "install_ports")  # "<http port> <https port>", so an update keeps them
 UPDATE_STATUS = "/tmp/dreampi-netswitch.update"          # running / ok / failed, written by the update script
 UPDATE_LOG = "/tmp/dreampi-netswitch.update.log"
+PLAYERS_SOURCES = os.path.join(BASE_DIR, "players_sources.json")   # JSON addresses for the optional online-players list
 NUMBERS = os.path.join(BASE_DIR, "numbers.json")     # phone numbers per action, edited on the page, read by the hook
 LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness, colours, wire order, white balance
 LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs, editable from the page

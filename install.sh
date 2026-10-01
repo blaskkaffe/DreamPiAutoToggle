@@ -68,7 +68,11 @@ mkdir -p "$DEST"
 cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_ledconfig.py" "$SRC/netswitch_numbers.py" "$SRC/netswitch_update.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_led_drivers.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" "$SRC/netswitch_wifi_setup.py" \
    "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/static"
-cp "$SRC/page/index.html" "$SRC/page/page.css" "$SRC/page/page.js" "$DEST/page/"
+cp "$SRC"/page/*.html "$SRC"/page/*.css "$SRC"/page/*.js "$DEST/page/"
+# optional modules: copy when shipped, remove an old copy when they were dropped from the repo
+for f in netswitch_players.py page/players.js; do
+    if [ -f "$SRC/$f" ]; then cp "$SRC/$f" "$DEST/$f"; else rm -f "$DEST/$f"; fi
+done
 cp "$SRC/static/three.min.js" "$SRC/static/dc-background.js" "$SRC/static/LICENSES.txt" "$SRC"/static/*.png "$DEST/static/"
 chmod +x "$DEST/uninstall.sh"
 # Add-on version for the settings page: date and commit of this checkout

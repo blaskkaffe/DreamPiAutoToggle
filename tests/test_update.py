@@ -221,7 +221,8 @@ class RealScriptTests(unittest.TestCase):
         self.run_script()
         self.assertEqual(core.read_file(core.UPDATE_STATUS).strip(), "failed")
         self.assertFalse(os.path.exists(os.path.join(self.tmp, "installer.out")))
-        self.assertIn("Updating", open(core.UPDATE_LOG).read())
+        with open(core.UPDATE_LOG) as f:
+            self.assertIn("Updating", f.read())
 
 
 class HttpUpdateTests(unittest.TestCase):
