@@ -219,8 +219,20 @@ WIFI_BUTTON_FILE = os.path.join(BASE_DIR, "wifi_button")   # "1", "2" or "12": w
 BUTTON_GPIO_PINS = tuple(range(2, 28))   # BCM GPIO2-27 (0/1 are reserved for the ID EEPROM)
 BUTTON_DEFAULT_GPIO1 = 17
 BUTTON_DEFAULT_GPIO2 = 4
-BUTTON_FUNCTIONS = (("off", "Off"), ("toggle", "Toggle network"),
-                    ("dcnow", "Select DCNow!"), ("dcnet", "Select DCNET"))
+# What a button does. Push buttons act on a short press. A toggle switch is wired
+# between the pin and GND and acts on its position: closed (pin low) = "on",
+# open = "off"; the position is also applied once at start.
+# (name, label, group, needs Wi-Fi setup installed, description shown on the page)
+BUTTON_FUNCTIONS = (
+    ("off", "Off", "Push button", False, "Does nothing"),
+    ("toggle", "Toggle network", "Push button", False, "Push button: each press switches between DCNow! and DCNET"),
+    ("dcnow", "Select DCNow!", "Push button", False, "Push button: a press selects DCNow!"),
+    ("dcnet", "Select DCNET", "Push button", False, "Push button: a press selects DCNET"),
+    ("sw_dcnet", "On = DCNET", "Toggle switch", False, "Toggle switch to GND: on selects DCNET, off selects DCNow!"),
+    ("sw_dcnow", "On = DCNow!", "Toggle switch", False, "Toggle switch to GND: on selects DCNow!, off selects DCNET"),
+    ("sw_wifi", "On = Wi-Fi setup", "Toggle switch", True, "Toggle switch to GND: on starts Wi-Fi setup, off ends it (normal mode)"),
+    ("sw_wifi_off", "Off = Wi-Fi setup", "Toggle switch", True, "Toggle switch to GND: off starts Wi-Fi setup, on is normal mode"),
+)
 _BUTTON_FUNCTION_NAMES = tuple(f[0] for f in BUTTON_FUNCTIONS)
 BUTTON_DEFAULT_FUNCTION1 = "toggle"
 BUTTON_DEFAULT_FUNCTION2 = "off"

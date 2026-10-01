@@ -245,17 +245,27 @@ $("led-hide-b").onclick=function(){
  var x=new XMLHttpRequest();x.open("POST","/ledhide",true);x.setRequestHeader("X-Requested-With","netswitch");
  x.onload=function(){$("led-section").style.display="none";ledHiddenFlag=true;updateGpioSection()};x.send()};
 var btn=null,btnTimer=null;
+// Button functions come as [name, label, group, needs Wi-Fi setup, description]: push buttons and
+// toggle switches in two groups; the Wi-Fi switch functions only show once Wi-Fi setup is installed
+// (or while one is already selected).
+var btnFunctions=[];
+function fillFunctions(id,current){var groups={},order=[];
+ btnFunctions.forEach(function(f){if(f[3]&&!wifiInstalled&&f[0]!=current)return;
+  if(!groups[f[2]]){groups[f[2]]=[];order.push(f[2])}
+  groups[f[2]].push('<option value="'+f[0]+'">'+esc(f[1])+'</option>')});
+ $(id).innerHTML=order.map(function(g){return '<optgroup label="'+esc(g)+'">'+groups[g].join("")+'</optgroup>'}).join("")}
+function describeButtons(){[1,2].forEach(function(n){var name=btn["button"+n+"_function"],d="";
+ btnFunctions.forEach(function(f){if(f[0]==name)d=f[4]});$("btn"+n+"-sub").textContent=d})}
 function loadButtons(){var x=new XMLHttpRequest();x.open("GET","/buttonconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
   btn=r.config;wifiInstalled=r.wifi;
   if(!$("btn1-gpio").options.length){var gOpts=r.gpios.map(function(g){return '<option value="'+g+'">GPIO'+g+'</option>'}).join("");
    $("btn1-gpio").innerHTML=gOpts;$("btn2-gpio").innerHTML=gOpts}
-  if(!$("btn1-fn").options.length){var fOpts=r.functions.map(function(f){return '<option value="'+f[0]+'">'+esc(f[1])+'</option>'}).join("");
-   $("btn1-fn").innerHTML=fOpts;$("btn2-fn").innerHTML=fOpts}
+  btnFunctions=r.functions;fillFunctions("btn1-fn",btn.button1_function);fillFunctions("btn2-fn",btn.button2_function);
   if(!$("wifi-btn-sel").options.length)$("wifi-btn-sel").innerHTML=r.wifi_choices.map(function(c){
    return '<option value="'+c[0]+'">'+esc(c[1])+'</option>'}).join("");
   $("btn1-gpio").value=btn.button1_gpio;$("btn1-fn").value=btn.button1_function;
-  $("btn2-gpio").value=btn.button2_gpio;$("btn2-fn").value=btn.button2_function;
+  $("btn2-gpio").value=btn.button2_gpio;$("btn2-fn").value=btn.button2_function;describeButtons();
   $("wifi-btn-sel").value=btn.wifi_button;
   updateGpioSection()};x.send()}
 function saveButtons(){clearTimeout(btnTimer);btnTimer=setTimeout(function(){
@@ -263,9 +273,9 @@ function saveButtons(){clearTimeout(btnTimer);btnTimer=setTimeout(function(){
  x.onload=function(){if(x.status!=200)return;var el=$("gpio-saved");el.classList.add("show");
   setTimeout(function(){el.classList.remove("show")},1200);loadButtons()};x.send(JSON.stringify(btn))},250)}
 $("btn1-gpio").onchange=function(){btn.button1_gpio=parseInt(this.value,10);saveButtons()};
-$("btn1-fn").onchange=function(){btn.button1_function=this.value;saveButtons()};
+$("btn1-fn").onchange=function(){btn.button1_function=this.value;describeButtons();saveButtons()};
 $("btn2-gpio").onchange=function(){btn.button2_gpio=parseInt(this.value,10);saveButtons()};
-$("btn2-fn").onchange=function(){btn.button2_function=this.value;saveButtons()};
+$("btn2-fn").onchange=function(){btn.button2_function=this.value;describeButtons();saveButtons()};
 $("wifi-btn-sel").onchange=function(){btn.wifi_button=this.value;saveButtons()};
 $("show-debug").onclick=function(){debugOpen=!debugOpen;
  $("debug").style.display=debugOpen?"block":"none";

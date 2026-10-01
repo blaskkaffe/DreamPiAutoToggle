@@ -59,12 +59,50 @@ _BUTTON_FUNCTIONS = {"off": lambda: None, "toggle": toggle_network,
                      "dcnow": lambda: select_network("dcnow"), "dcnet": lambda: select_network("dcnet")}
 
 
+def _wifi_active():
+    return os.path.exists(core.WIFI_STATE) and core.wifi_state().get("state", "idle") != "idle"
+
+
 def _start_wifi_toggle():
-    if os.path.exists(core.WIFI_STATE) and core.wifi_state().get("state", "idle") != "idle":
+    if _wifi_active():
         open(core.WIFI_STOP, "w").close()
     else:
         open(core.WIFI_START, "w").close()
     core.debug_log("button: hold, Wi-Fi setup toggled")
+
+
+def _wifi_request(start):
+    """A toggle switch asks for Wi-Fi setup to run (start) or end. Only acts
+    when that changes something, so repeating the same position is harmless."""
+    if not wifi_enabled():
+        return
+    active = _wifi_active()
+    if start and not active:
+        open(core.WIFI_START, "w").close()
+        core.debug_log("button: switch, Wi-Fi setup started")
+    elif not start and active:
+        open(core.WIFI_STOP, "w").close()
+        core.debug_log("button: switch, Wi-Fi setup stopped")
+
+
+def _switch_network(on_net, closed):
+    select_network(on_net if closed else ("dcnow" if on_net == "dcnet" else "dcnet"))
+
+
+# Toggle switches: called with closed=True when the switch connects the pin to GND.
+_SWITCH_FUNCTIONS = {"sw_dcnet": lambda closed: _switch_network("dcnet", closed),
+                     "sw_dcnow": lambda closed: _switch_network("dcnow", closed),
+                     "sw_wifi": lambda closed: _wifi_request(closed),
+                     "sw_wifi_off": lambda closed: _wifi_request(not closed)}
+
+
+def effective_wifi_assignment(assignment, function1, function2):
+    """The Wi-Fi hold ("1", "2", "12") only works on push buttons: a button set
+    to a toggle switch function can't be 'held'. "" = nothing can start it."""
+    push1, push2 = function1 not in _SWITCH_FUNCTIONS, function2 not in _SWITCH_FUNCTIONS
+    if (assignment == "1" and push1) or (assignment == "2" and push2) or (assignment == "12" and push1 and push2):
+        return assignment
+    return ""
 
 
 def new_button_state(level=True):
@@ -157,35 +195,66 @@ def button_watcher(gpio1, gpio2, function1, function2, wifi_assignment, stop_eve
         for pin in pins:
             set_input_pullup(gpio_block, pin, base)
 
+    run_buttons(lambda pin: read_level(gpio_block, pin), apply_pullups,
+                gpio1, gpio2, function1, function2, wifi_assignment, stop_event)
+
+
+def run_buttons(read, apply_pullups, gpio1, gpio2, function1, function2, wifi_assignment, stop_event):
+    """The button loop proper, on top of read(pin) -> level and
+    apply_pullups(), so it can be driven by scripted levels in the tests."""
+    two_buttons = gpio2 != gpio1
+    pins = [gpio1] + ([gpio2] if two_buttons else [])
     apply_pullups()
     time.sleep(PULLUP_SETTLE)   # let the pull-up take effect before the first read
-    levels = [read_level(gpio_block, pin) for pin in pins]
+    levels = [read(pin) for pin in pins]
     core.debug_log("button: watching GPIO%s, idle level %s" % (
         "+".join(str(p) for p in pins), "/".join("high" if lv else "LOW" for lv in levels)))
 
     fn1 = _BUTTON_FUNCTIONS.get(function1, _BUTTON_FUNCTIONS["off"])
     fn2 = _BUTTON_FUNCTIONS.get(function2, _BUTTON_FUNCTIONS["off"])
+    sw1, sw2 = _SWITCH_FUNCTIONS.get(function1), _SWITCH_FUNCTIONS.get(function2)
+    if not two_buttons:
+        function2, sw2 = "off", None
+    wifi_assignment = effective_wifi_assignment(wifi_assignment, function1, function2)
     st1 = new_button_state(levels[0])
     st2 = new_button_state(levels[1] if two_buttons else True)
     last_pullup = time.time()
 
+    # A toggle switch's position decides the state, so apply it once at start.
+    for n, pin, sw, st in ((1, gpio1, sw1, st1), (2, gpio2, sw2, st2)):
+        if sw:
+            core.debug_log("button %d (GPIO%d): switch %s at start" % (n, pin, "closed" if not st[0] else "open"))
+            sw(not st[0])
+
     while not stop_event.is_set():
-        r1 = debounce_poll(read_level(gpio_block, gpio1), st1)
-        r2 = debounce_poll(read_level(gpio_block, gpio2), st2) if two_buttons else None
+        was1, was2 = st1[0], st2[0]
+        r1 = debounce_poll(read(gpio1), st1)
+        r2 = debounce_poll(read(gpio2), st2) if two_buttons else None
 
         if check_wifi_hold(st1, st2, two_buttons, wifi_assignment):
             _start_wifi_toggle()
 
-        if r1 == "released":
+        if sw1:
+            if st1[0] != was1:
+                core.debug_log("button 1 (GPIO%d): switch %s" % (gpio1, "closed" if not st1[0] else "open"))
+                sw1(not st1[0])
+        elif r1 == "released":
             core.debug_log("button 1 (GPIO%d): short press" % gpio1)
             fn1()
-        if two_buttons and r2 == "released":
-            core.debug_log("button 2 (GPIO%d): short press" % gpio2)
-            fn2()
-        # A pin that sits low with nothing pressing it (pull-up not in effect)
-        # never reports a release; re-apply the pull-up now and then so it heals.
+        if two_buttons:
+            if sw2:
+                if st2[0] != was2:
+                    core.debug_log("button 2 (GPIO%d): switch %s" % (gpio2, "closed" if not st2[0] else "open"))
+                    sw2(not st2[0])
+            elif r2 == "released":
+                core.debug_log("button 2 (GPIO%d): short press" % gpio2)
+                fn2()
+        # A push button that sits low with nothing pressing it (pull-up not in
+        # effect) never reports a release; re-apply the pull-up now and then
+        # so it heals. A closed toggle switch is legitimately low: skip those.
         now = time.time()
-        if now - last_pullup >= PULLUP_RETRY and (not st1[0] or (two_buttons and not st2[0])):
+        stuck = (not st1[0] and not sw1) or (two_buttons and not st2[0] and not sw2)
+        if stuck and now - last_pullup >= PULLUP_RETRY:
             apply_pullups()
             last_pullup = now
         time.sleep(BUTTON_POLL)

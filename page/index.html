@@ -86,14 +86,16 @@ millisecond timing. Turn recording on, then dial.</div>
 <div class="card">
  <div class="srow" id="gpio-led-row" style="display:none"><span>LED<span class="sub">LEDs connected, output pin and wire order</span></span>
   <div style="display:flex;gap:8px"><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"><select class="ord" id="led-gpio" aria-label="LED output pin"></select><select class="ord" id="led-order" aria-label="Wire order"></select></div></div>
- <div class="srow" id="gpio-btn1-row"><span>Button 1<span class="sub">Function and pin</span></span>
-  <div style="display:flex;gap:8px"><select class="ord" id="btn1-fn" aria-label="Button 1 function"></select><select class="ord" id="btn1-gpio" aria-label="Button 1 pin"></select></div></div>
- <div class="srow" id="gpio-btn2-row"><span>Button 2<span class="sub">Function and pin</span></span>
-  <div style="display:flex;gap:8px"><select class="ord" id="btn2-fn" aria-label="Button 2 function"></select><select class="ord" id="btn2-gpio" aria-label="Button 2 pin"></select></div></div>
- <div class="srow" id="gpio-wifi-row" style="display:none"><span>Wi-Fi setup<span class="sub">Which button, or both, held 3 s starts it</span></span>
+ <div class="srow" id="gpio-btn1-row" style="flex-wrap:wrap"><span>Button 1<span class="sub">Function and pin</span></span>
+  <div style="display:flex;gap:8px"><select class="ord" id="btn1-fn" aria-label="Button 1 function"></select><select class="ord" id="btn1-gpio" aria-label="Button 1 pin"></select></div>
+  <div class="sub" id="btn1-sub" style="flex-basis:100%;margin:-6px 0 2px"></div></div>
+ <div class="srow" id="gpio-btn2-row" style="flex-wrap:wrap"><span>Button 2<span class="sub">Function and pin</span></span>
+  <div style="display:flex;gap:8px"><select class="ord" id="btn2-fn" aria-label="Button 2 function"></select><select class="ord" id="btn2-gpio" aria-label="Button 2 pin"></select></div>
+  <div class="sub" id="btn2-sub" style="flex-basis:100%;margin:-6px 0 2px"></div></div>
+ <div class="srow" id="gpio-wifi-row" style="display:none"><span>Wi-Fi setup<span class="sub">Which push button, or both, held 3 s starts it</span></span>
   <select class="ord" id="wifi-btn-sel" aria-label="Wi-Fi setup button"></select></div>
 </div>
-<div class="note">LED count, output pin and wire order (most WS2812 strips are GRB) take effect within a second; switching the LED output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot). Button pin and function changes take effect within a couple of seconds - pick two different pins for the two buttons. A button's own function (Off, Toggle network, Select DCNow!, Select DCNET) fires on a short press.</div>
+<div class="note">LED count, output pin and wire order (most WS2812 strips are GRB) take effect within a second; switching the LED output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot). Button pin and function changes take effect within a couple of seconds - pick two different pins for the two buttons. A push button's function (Off, Toggle network, Select DCNow!, Select DCNET) fires on a short press; a toggle switch (wired between the pin and GND, on = closed) sets the network, or starts and ends Wi-Fi setup, by its position - also when the Pi starts.</div>
 </div>
 
 <div id="led-section" class="sec" style="display:none;position:relative">
