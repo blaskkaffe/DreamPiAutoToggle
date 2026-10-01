@@ -9,8 +9,10 @@
 #   sudo ./install.sh --leds=30    the same with several NeoPixels / a strip (starting count: 30)
 #   sudo ./install.sh --led-gpio=21   use GPIO10, 12, 18 (default) or 21 instead
 #   sudo ./install.sh --no-led     remove the NeoPixel service again
-#   sudo ./install.sh --wifi       Wi-Fi setup: tap the button on GPIO17 (pin 11) to switch networks, hold 3 s to set up Wi-Fi
-#   sudo ./install.sh --no-wifi    remove the Wi-Fi setup button/service again
+#   sudo ./install.sh --wifi       two buttons: GPIO17/pin11 (toggles the network by default) and GPIO4/pin7
+#                                  (off by default) - pins, functions and which (if any) holds 3 s to set up
+#                                  Wi-Fi are all editable later from the page's Settings > GPIO
+#   sudo ./install.sh --no-wifi    remove the button/Wi-Fi setup service again
 #
 # Once --led or --wifi has been used, later updates keep it until --no-led /
 # --no-wifi. The LED count, output pin, wire order and colour calibration can
@@ -26,7 +28,8 @@ LED=keep
 LED_COUNT=
 LED_GPIO=
 WIFI=keep
-WIFI_GPIO_DEFAULT=17   # GPIO17 / physical pin 11; edit $DEST/wifi_button_gpio for a different pin
+BUTTON1_GPIO_DEFAULT=17   # GPIO17 / physical pin 11; editable later from the page's Settings > GPIO
+BUTTON2_GPIO_DEFAULT=4    # GPIO4 / physical pin 7
 for arg in "$@"; do
     case "$arg" in
         --led) LED=on; LED_COUNT=1 ;;
@@ -178,12 +181,13 @@ elif [ "$LED" = off ]; then
     echo "NeoPixel service removed."
 fi
 
-# ----------------------------------------------------------- Wi-Fi setup button
+# ----------------------------------------------------------- buttons / Wi-Fi setup
 if [ "$WIFI" = keep ] && [ -f "$DEST/wifi_button_enabled" ]; then WIFI=on; fi
 if [ "$WIFI" = on ]; then
     touch "$DEST/wifi_button_enabled"
-    [ -f "$DEST/wifi_button_gpio" ] || echo "$WIFI_GPIO_DEFAULT" > "$DEST/wifi_button_gpio"
-    echo "Wi-Fi setup button on GPIO$(cat "$DEST/wifi_button_gpio")"
+    [ -f "$DEST/button1_gpio" ] || echo "$BUTTON1_GPIO_DEFAULT" > "$DEST/button1_gpio"
+    [ -f "$DEST/button2_gpio" ] || echo "$BUTTON2_GPIO_DEFAULT" > "$DEST/button2_gpio"
+    echo "Buttons on GPIO$(cat "$DEST/button1_gpio") and GPIO$(cat "$DEST/button2_gpio") (pins, functions and Wi-Fi setup assignment editable from the page's Settings > GPIO)"
     # The Wi-Fi setup access point needs hostapd and dnsmasq. Install them if
     # missing, and make sure their own systemd units stay off: this add-on
     # starts and stops them itself (dreampi-netswitch-wifi.service), so a
@@ -215,9 +219,10 @@ WantedBy=multi-user.target
 EOF
 elif [ "$WIFI" = off ]; then
     systemctl disable --now dreampi-netswitch-wifi.service 2>/dev/null || true
-    rm -f /etc/systemd/system/dreampi-netswitch-wifi.service "$DEST/wifi_button_enabled" "$DEST/wifi_button_gpio" \
+    rm -f /etc/systemd/system/dreampi-netswitch-wifi.service "$DEST/wifi_button_enabled" \
+          "$DEST/button1_gpio" "$DEST/button2_gpio" "$DEST/button1_function" "$DEST/button2_function" "$DEST/wifi_button" \
           "$DEST/wifi_hostapd.conf" "$DEST/wifi_dnsmasq.conf"
-    echo "Wi-Fi setup button service removed."
+    echo "Button/Wi-Fi setup service removed."
 fi
 
 systemctl daemon-reload

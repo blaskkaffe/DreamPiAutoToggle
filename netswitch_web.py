@@ -805,6 +805,87 @@ def led_hidden():
     return os.path.exists(LED_HIDDEN)
 
 
+# ------------------------------------------------------------------ buttons
+# Up to two physical GPIO buttons (netswitch_wifi.py, install.sh --wifi),
+# each independently wired to a pin and a short-press function; which one
+# (or both held together) triggers Wi-Fi setup on a 3-second hold is also
+# configurable. Unlike the LED output pins, a button needs no special
+# peripheral, so any header GPIO is allowed.
+BUTTON1_GPIO = os.path.join(BASE_DIR, "button1_gpio")
+BUTTON2_GPIO = os.path.join(BASE_DIR, "button2_gpio")
+BUTTON1_FUNCTION = os.path.join(BASE_DIR, "button1_function")
+BUTTON2_FUNCTION = os.path.join(BASE_DIR, "button2_function")
+WIFI_BUTTON_FILE = os.path.join(BASE_DIR, "wifi_button")   # "1", "2" or "12": which button(s) hold-to-start Wi-Fi setup
+
+BUTTON_GPIO_PINS = tuple(range(2, 28))   # BCM GPIO2-27 (0/1 are reserved for the ID EEPROM)
+BUTTON_DEFAULT_GPIO1 = 17
+BUTTON_DEFAULT_GPIO2 = 4
+BUTTON_FUNCTIONS = (("off", "Off"), ("toggle", "Toggle network"),
+                    ("dcnow", "Select DCNow!"), ("dcnet", "Select DCNET"))
+_BUTTON_FUNCTION_NAMES = tuple(f[0] for f in BUTTON_FUNCTIONS)
+BUTTON_DEFAULT_FUNCTION1 = "toggle"
+BUTTON_DEFAULT_FUNCTION2 = "off"
+WIFI_BUTTON_CHOICES = (("1", "Button 1"), ("2", "Button 2"), ("12", "Button 1 + 2"))
+_WIFI_BUTTON_NAMES = tuple(c[0] for c in WIFI_BUTTON_CHOICES)
+WIFI_BUTTON_DEFAULT = "1"
+
+
+def button_gpio(which):
+    """which: 1 or 2."""
+    path = BUTTON1_GPIO if which == 1 else BUTTON2_GPIO
+    default = BUTTON_DEFAULT_GPIO1 if which == 1 else BUTTON_DEFAULT_GPIO2
+    try:
+        n = int((read_file(path) or "").strip())
+        return n if n in BUTTON_GPIO_PINS else default
+    except ValueError:
+        return default
+
+
+def save_button_gpio(which, n):
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        return
+    if n not in BUTTON_GPIO_PINS:
+        return
+    path = BUTTON1_GPIO if which == 1 else BUTTON2_GPIO
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(str(n))
+    os.rename(tmp, path)
+
+
+def button_function(which):
+    path = BUTTON1_FUNCTION if which == 1 else BUTTON2_FUNCTION
+    default = BUTTON_DEFAULT_FUNCTION1 if which == 1 else BUTTON_DEFAULT_FUNCTION2
+    v = (read_file(path) or "").strip()
+    return v if v in _BUTTON_FUNCTION_NAMES else default
+
+
+def save_button_function(which, v):
+    if v not in _BUTTON_FUNCTION_NAMES:
+        return
+    path = BUTTON1_FUNCTION if which == 1 else BUTTON2_FUNCTION
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(v)
+    os.rename(tmp, path)
+
+
+def wifi_button():
+    v = (read_file(WIFI_BUTTON_FILE) or "").strip()
+    return v if v in _WIFI_BUTTON_NAMES else WIFI_BUTTON_DEFAULT
+
+
+def save_wifi_button(v):
+    if v not in _WIFI_BUTTON_NAMES:
+        return
+    tmp = WIFI_BUTTON_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(v)
+    os.rename(tmp, WIFI_BUTTON_FILE)
+
+
 NETWORKS = ("dcnow", "dcnet")
 _COLOUR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 try:
@@ -1261,14 +1342,28 @@ millisecond timing. Turn recording on, then dial.</div>
   <input type="checkbox" class="cbox dcnow" id="bg-b" aria-label="Dreamcast background"></div>
 </div>
 
+<div id="gpio-section" style="display:none;position:relative">
+<h2>GPIO <span class="saved" id="gpio-saved">Saved &#10003;</span></h2>
+<div class="card">
+ <div class="secrow" id="gpio-led-row" style="display:none"><span class="sub">LEDs connected</span><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"></div>
+ <div class="secrow" id="gpio-led-gpio-row" style="display:none"><span class="sub">LED output pin</span><select class="ord" id="led-gpio" aria-label="LED output pin"></select></div>
+</div>
+<div class="card" id="gpio-buttons-card" style="display:none">
+ <div class="secrow"><span class="sub">Button 1 pin</span><select class="ord" id="btn1-gpio" aria-label="Button 1 pin"></select></div>
+ <div class="secrow"><span class="sub">Button 1 function</span><select class="ord" id="btn1-fn" aria-label="Button 1 function"></select></div>
+ <div class="secrow"><span class="sub">Button 2 pin</span><select class="ord" id="btn2-gpio" aria-label="Button 2 pin"></select></div>
+ <div class="secrow"><span class="sub">Button 2 function</span><select class="ord" id="btn2-fn" aria-label="Button 2 function"></select></div>
+ <div class="secrow"><span class="sub">Wi-Fi setup button</span><select class="ord" id="wifi-btn-sel" aria-label="Wi-Fi setup button"></select></div>
+</div>
+<div class="note">LED count and output pin take effect within a second; switching the LED output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot). Button pin and function changes take effect within a couple of seconds - pick two different pins for the two buttons. A button's own function (Off, Toggle network, Select DCNow!, Select DCNET) fires on a short press; "Wi-Fi setup button" is which button, or both held together, starts Wi-Fi setup with a 3-second hold.</div>
+</div>
+
 <div id="led-section" style="display:none;position:relative">
 <h2>Status LED<span id="led-count-t"></span> <span class="saved" id="led-saved">Saved &#10003;</span></h2>
 <div class="card">
- <div class="secrow"><span class="sub">LEDs connected</span><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"></div>
- <div class="secrow"><span class="sub">Output pin</span><select class="ord" id="led-gpio" aria-label="Output pin"></select></div>
  <div class="secrow"><span class="sub">Wire order</span><select class="ord" id="led-order" aria-label="Wire order"></select></div>
 </div>
-<div class="note">LEDs connected, output pin and wire order (most WS2812 strips are GRB) take effect within a second. Switching the output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot); otherwise the LEDs just stay dark until it's switched back.</div>
+<div class="note">Wire order (most WS2812 strips are GRB) takes effect within a second. LED count and output pin are set in the GPIO section above.</div>
 <div class="card">
  <div class="calib-grid" id="calib-grid"></div>
 </div>
@@ -1398,7 +1493,7 @@ $("hang-f").onsubmit=function(e){e.preventDefault();e.stopPropagation();var b=$(
  var x=new XMLHttpRequest();x.open("POST","/hangup",true);x.setRequestHeader("X-Requested-With","netswitch");x.onload=refresh;x.send()};
 function showSettings(open){$("settings").classList.toggle("open",open);
  if(!open)closePops();
- document.body.classList.toggle("settings-open",open);if(open){loadLed();loadAbout()}}
+ document.body.classList.toggle("settings-open",open);if(open){loadLed();loadButtons();loadAbout()}}
 function loadAbout(){var x=new XMLHttpRequest();x.open("GET","/about",true);
  x.onload=function(){if(x.status!=200)return;$("about").innerHTML=JSON.parse(x.responseText).map(function(r){
   return '<tr><td class="n">'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>'}).join("")};x.send()}
@@ -1427,11 +1522,19 @@ function setDebugMenu(on){
 $("dbg-b").onchange=function(){setDebugMenu(this.checked)};
 var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledEffects=[],ledCount=1,ledGpio=18,ledNet="dcnow";
 var calibColumns=[],calibRows=[],calibSwatches={};
+var ledInstalled=false,ledHiddenFlag=false,buttonsInstalled=false;
+function updateGpioSection(){
+ var ledOn=ledInstalled&&!ledHiddenFlag;
+ $("gpio-led-row").style.display=ledOn?"flex":"none";
+ $("gpio-led-gpio-row").style.display=ledOn?"flex":"none";
+ $("gpio-buttons-card").style.display=buttonsInstalled?"block":"none";
+ $("gpio-section").style.display=(ledOn||buttonsInstalled)?"block":"none"}
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
   led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledEffects=r.effects;ledCount=r.count||1;ledGpio=r.gpio||18;
   calibColumns=r.calib_columns;calibRows=r.calib_rows;calibSwatches=r.calib_swatches;
   $("led-section").style.display=(r.installed&&!r.hidden)?"block":"none";   // install.sh --led, not hidden
+  ledInstalled=r.installed;ledHiddenFlag=r.hidden;updateGpioSection();
   $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";
   if(!$("led-order").options.length)$("led-order").innerHTML=r.orders.map(function(o){
    return '<option value="'+o+'">'+o+'</option>'}).join("");
@@ -1573,7 +1676,30 @@ $("led-order").onchange=function(){led.order=this.value;saveLed()};
 $("led-hide-b").onclick=function(){
  if(!confirm("Hide the Status LED settings? This can only be undone on the Pi itself, by deleting led_hidden in /opt/dreampi-netswitch."))return;
  var x=new XMLHttpRequest();x.open("POST","/ledhide",true);x.setRequestHeader("X-Requested-With","netswitch");
- x.onload=function(){$("led-section").style.display="none"};x.send()};
+ x.onload=function(){$("led-section").style.display="none";ledHiddenFlag=true;updateGpioSection()};x.send()};
+var btn=null,btnTimer=null;
+function loadButtons(){var x=new XMLHttpRequest();x.open("GET","/buttonconfig",true);
+ x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
+  btn=r.config;buttonsInstalled=r.installed;
+  if(!$("btn1-gpio").options.length){var gOpts=r.gpios.map(function(g){return '<option value="'+g+'">GPIO'+g+'</option>'}).join("");
+   $("btn1-gpio").innerHTML=gOpts;$("btn2-gpio").innerHTML=gOpts}
+  if(!$("btn1-fn").options.length){var fOpts=r.functions.map(function(f){return '<option value="'+f[0]+'">'+esc(f[1])+'</option>'}).join("");
+   $("btn1-fn").innerHTML=fOpts;$("btn2-fn").innerHTML=fOpts}
+  if(!$("wifi-btn-sel").options.length)$("wifi-btn-sel").innerHTML=r.wifi_choices.map(function(c){
+   return '<option value="'+c[0]+'">'+esc(c[1])+'</option>'}).join("");
+  $("btn1-gpio").value=btn.button1_gpio;$("btn1-fn").value=btn.button1_function;
+  $("btn2-gpio").value=btn.button2_gpio;$("btn2-fn").value=btn.button2_function;
+  $("wifi-btn-sel").value=btn.wifi_button;
+  updateGpioSection()};x.send()}
+function saveButtons(){clearTimeout(btnTimer);btnTimer=setTimeout(function(){
+ var x=new XMLHttpRequest();x.open("POST","/buttonconfig",true);x.setRequestHeader("Content-Type","application/json");
+ x.onload=function(){if(x.status!=200)return;var el=$("gpio-saved");el.classList.add("show");
+  setTimeout(function(){el.classList.remove("show")},1200);loadButtons()};x.send(JSON.stringify(btn))},250)}
+$("btn1-gpio").onchange=function(){btn.button1_gpio=parseInt(this.value,10);saveButtons()};
+$("btn1-fn").onchange=function(){btn.button1_function=this.value;saveButtons()};
+$("btn2-gpio").onchange=function(){btn.button2_gpio=parseInt(this.value,10);saveButtons()};
+$("btn2-fn").onchange=function(){btn.button2_function=this.value;saveButtons()};
+$("wifi-btn-sel").onchange=function(){btn.wifi_button=this.value;saveButtons()};
 $("show-debug").onclick=function(){debugOpen=!debugOpen;
  $("debug").style.display=debugOpen?"block":"none";
  this.classList.toggle("open",debugOpen);
@@ -1725,6 +1851,15 @@ class Handler(BaseHTTPRequestHandler):
                                   "calib_swatches": swatches,
                                   "installed": os.path.exists(LED_ENABLED), "hidden": led_hidden()}),
                      "application/json")
+        elif self.path == "/buttonconfig":
+            self.send(json.dumps({"config": {"button1_gpio": button_gpio(1), "button2_gpio": button_gpio(2),
+                                             "button1_function": button_function(1),
+                                             "button2_function": button_function(2),
+                                             "wifi_button": wifi_button()},
+                                  "gpios": BUTTON_GPIO_PINS, "functions": BUTTON_FUNCTIONS,
+                                  "wifi_choices": WIFI_BUTTON_CHOICES,
+                                  "installed": os.path.exists(WIFI_BUTTON_ENABLED)}),
+                     "application/json")
         elif self.path.split("?")[0] == "/dtmf":
             try:
                 with open(DTMF_LOG, "rb") as f:
@@ -1758,6 +1893,34 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(str(e).encode("utf-8"))
                 return
             self.send(json.dumps({"config": cfg, "count": led_count(), "gpio": led_gpio()}),
+                     "application/json")
+            return
+        if self.path == "/buttonconfig":
+            try:
+                length = min(int(self.headers.get("Content-Length") or 0), 4096)
+                data = json.loads(self.rfile.read(length).decode("utf-8"))
+            except (ValueError, IOError, OSError) as e:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(str(e).encode("utf-8"))
+                return
+            try:
+                g1, g2 = int(data["button1_gpio"]), int(data["button2_gpio"])
+            except (KeyError, TypeError, ValueError):
+                g1 = g2 = None
+            if g1 is not None and g2 is not None and g1 != g2:   # reject if they'd collide on one pin
+                save_button_gpio(1, g1)
+                save_button_gpio(2, g2)
+            if "button1_function" in data:
+                save_button_function(1, data["button1_function"])
+            if "button2_function" in data:
+                save_button_function(2, data["button2_function"])
+            if "wifi_button" in data:
+                save_wifi_button(data["wifi_button"])
+            self.send(json.dumps({"config": {"button1_gpio": button_gpio(1), "button2_gpio": button_gpio(2),
+                                             "button1_function": button_function(1),
+                                             "button2_function": button_function(2),
+                                             "wifi_button": wifi_button()}}),
                      "application/json")
             return
         if self.path == "/ledhide":

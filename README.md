@@ -15,7 +15,7 @@ What you get:
 - A debug log for tracking down calls that go wrong.
 - Modem plugged-in detection and its make/model, with a warning if it's not a modem known to work with DreamPi.
 
-**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `555-0002` works end to end. A single NeoPixel on GPIO18 works too. Several LEDs or a strip, the new LED colour calibration/wire order/dithering, the GPIO10/12/21 output pins, and the Wi-Fi setup button, haven't been tried on real hardware yet; feedback is welcome.
+**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `555-0002` works end to end. A single NeoPixel on GPIO18 works too. Several LEDs or a strip, the new LED colour calibration/wire order/dithering, the GPIO10/12/21 output pins, and the Wi-Fi setup button (including the newer second button, per-button function and combined-hold assignment), haven't been tried on real hardware yet; feedback is welcome.
 
 ## Install
 
@@ -40,7 +40,7 @@ Options:
 - `sudo ./install.sh 8080` puts the HTTP page on another port, if port 80 is taken.
 - `sudo ./install.sh --https-port=8443` puts the HTTPS page on another port, and `--no-https` turns it off.
 - `sudo ./install.sh --led` adds one status NeoPixel, and `--leds=30` a chain or strip of 30; `--led-gpio=10`/`12`/`21` uses a different pin than the default GPIO18 (see [Status NeoPixels](#status-neopixels-optional)). `--no-led` removes the LED service again.
-- `sudo ./install.sh --wifi` adds the Wi-Fi setup button, enabled by default on GPIO17 (physical pin 11) (see [Wi-Fi setup button](#wi-fi-setup-button-optional)). `--no-wifi` removes it again.
+- `sudo ./install.sh --wifi` adds two buttons, on GPIO17 (physical pin 11) and GPIO4 (physical pin 7) by default (see [Wi-Fi setup button](#wi-fi-setup-button-optional)). `--no-wifi` removes them again.
 
 Options can be combined, for example `sudo ./install.sh --leds=8 --no-https`.
 
@@ -114,11 +114,15 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 **Appearance**
 - **Dreamcast background:** an animated background in the style of the Dreamcast menu (see [Credits](#credits)). Off by default, and remembered per browser, so a phone can leave it off while a PC has it on. It pauses while the page is hidden. The Pi serves the files itself (about 600 KB, fetched once), so it works without internet; browsers without WebGL just show the blue gradient. The buttons are slightly see-through so the background shows through them.
 
-**About:** the add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model, the operating system, and - once a modem has been detected - its make/model, with a note if it isn't a known-working one.
+**GPIO** (shown when LEDs are installed and not hidden, buttons are installed, or both)
+
+- **LEDs connected** and **LED output pin:** moved here from Status LED below - see that section for what they do.
+- **Button 1 pin** / **Button 2 pin:** which GPIO pin each button is wired to (see [Wi-Fi setup button](#wi-fi-setup-button-optional) for the physical wiring and defaults, GPIO17 and GPIO4). Pick two different pins; a change takes effect within a couple of seconds, no reinstall needed.
+- **Button 1 function** / **Button 2 function:** what a short press on that button does - **Off**, **Toggle network** (switches between DCNow! and DCNET, the default for button 1), **Select DCNow!** or **Select DCNET** (the default for button 2 is **Off**).
+- **Wi-Fi setup button:** which button, or **Button 1 + 2** held together, starts Wi-Fi setup with a 3-second hold. A button's own short-press function above still works normally either way - only a press that's actually held long enough to start Wi-Fi setup skips it.
 
 **Status LED** (only shown when LEDs are installed with `--led` or `--leds=N`, and not hidden - see below; the title shows the number of LEDs for a strip)
 
-- **LEDs connected:** how many LEDs are wired up, 1 to 300. Takes effect within a second, no reinstall or `--leds=N` needed; this is just where the count starts out.
 - **Wire order:** the strip's wiring, `RGB`, `RBG`, `GRB` (most WS2812 strips), `GBR`, `BRG` or `BGR`. Wrong order shows the right brightness with the wrong colour (for example a red status looks green).
 - **Colour calibration:** a grid of reference swatches - red, orange, yellow, green, cyan, blue, purple, magenta and white, each in a light, medium and dark version. Tap one to open R, G and B sliders (0 to 255): the LED shows whatever the sliders are set to right away and keeps showing it for as long as the popup stays open, so slide them until the LED matches the swatch on screen as closely as you can, then tap **Done** (or tap outside the popup, or press Esc - the LED goes back to normal either way). A small dot marks a swatch once it's matched. **Reset** in the popup clears just that one swatch; every other colour the LEDs show - including in-between shades from effects like Rainbow, and however bright or dim an effect makes a colour - blends smoothly between whichever swatches are nearest, so calibrating even a handful of them (particularly white, at the brightness you actually use) already helps the rest. This fixes a wrong-looking colour, not just an overall wash-out, which a single brightness-per-channel adjustment couldn't do.
 - **Global brightness** of the LEDs, 0 to 100% (default 8%). The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
@@ -130,6 +134,8 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
   - **Level:** the brightness for that message. Grey means it uses the global brightness; tap it to give the message its own brightness with a slider, and tap **Use global** to go back.
 - **Reset LED settings to defaults** restores the defaults in [LED messages](#led-messages) and the 8% global brightness (not the LED count, wire order or calibration - those describe your wiring, not a look to reset).
 - **Hide these settings:** removes the whole Status LED section from Settings, for shipping a Pi with the LEDs already set up and keeping them from being changed by accident. There's a confirmation, because the only way back is deleting `led_hidden` in `/opt/dreampi-netswitch` on the Pi itself (or reinstalling).
+
+**About:** the add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model, the operating system, and - once a modem has been detected - its make/model, with a note if it isn't a known-working one.
 
 The status dot next to DreamPi on the main page previews that status's colour and effect. Network problems show as red warning boxes at the top of the page instead.
 
@@ -210,23 +216,23 @@ If the LEDs stay dark, `systemctl status dreampi-netswitch-led` shows why.
 
 ## Wi-Fi setup button (optional)
 
-A momentary push button on **GPIO17 (physical pin 11)** doubles as a quick network switch and a way to join a Wi-Fi network without a keyboard, monitor or SSH. Wire it between GPIO17 and a **GND** pin:
+Up to two momentary push buttons double as quick network switches and a way to join a Wi-Fi network without a keyboard, monitor or SSH: **button 1** on **GPIO17 (physical pin 11)**, function **Toggle network** by default, and **button 2** on **GPIO4 (physical pin 7)**, **Off** by default. Wire each between its GPIO pin and a **GND** pin. Pins, functions and which one (or both together) starts Wi-Fi setup are all editable later from Settings > GPIO (see [Settings](#settings-cogwheel)) - no reinstall needed.
 
-- **Tap it briefly** to switch the selected network between DCNow! and DCNET, the same as the web page's two buttons or dialing `555-0001`/`555-0002`.
-- **Hold it for 3 seconds** to start Wi-Fi setup. The Pi:
+- **A short press** on a button runs its own function: **Off** (nothing), **Toggle network** (switches between DCNow! and DCNET, the same as the web page's two buttons or dialing `555-0001`/`555-0002`), **Select DCNow!** or **Select DCNET** (selects that network outright, whatever was selected before).
+- **Holding the assigned button(s) for 3 seconds** starts Wi-Fi setup - by default that's button 1 alone, but Settings > GPIO can assign it to button 2 instead, or to both buttons held down together. Whichever button(s) that is, their own short-press function above still works normally on a short press; only a press that's actually held long enough to start Wi-Fi setup skips it. Once started, the Pi:
 
 1. Scans for Wi-Fi networks and hosts a temporary, unencrypted Wi-Fi network called **"DreamPi WiFi Config"**, styled like the main page.
 2. Connect a phone or PC to it and open `http://192.168.4.1` (most phones prompt for this automatically) - or, if the Pi's regular page is still reachable some other way (for example over Ethernet), open its Settings instead; the same network list appears there too (see [Settings](#settings-cogwheel)). Pick a network from the list (or enter one manually, for a hidden network), enter its password if it needs one, and tap **Connect**.
 3. The temporary network closes and the Pi tries to join the network you chose.
 4. If it gets online, the status LED (if installed) goes solid **green** for a few seconds and everything returns to normal; DreamPi keeps using this Wi-Fi network (and any others saved this way) after a reboot too. If it can't get online, the LED goes **red** for a few seconds and the Pi goes back to step 1, hosting "DreamPi WiFi Config" again so you can try another network or password.
 
-While it's scanning or hosting the setup network, a status LED shows a breathing blue light (a scanning animation instead, with a strip). Holding the button again, or the **Wi-Fi setup** control under Network in the settings, cancels it at any point and returns the Pi to its normal Wi-Fi connection.
+While it's scanning or hosting the setup network, a status LED shows a breathing blue light (a scanning animation instead, with a strip). Holding the assigned button(s) again, or the **Wi-Fi setup** control under Network in the settings, cancels it at any point and returns the Pi to its normal Wi-Fi connection.
 
-**Wiring:** no resistor needed; the Pi's internal pull-up is used, so the pin reads high normally and low while the button is held. GPIO17 was picked as the default because it has no other function on any Raspberry Pi model (earlier versions of this add-on defaulted to GPIO15, which doubles as the Pi's UART RX pin and could pick up noise from the serial console/Bluetooth if that's in use). If you'd rather use a different pin (GPIO4 also works well), edit `/opt/dreampi-netswitch/wifi_button_gpio` (a single GPIO number) after installing.
+**Wiring:** no resistor needed; the Pi's internal pull-up is used on each pin, so it reads high normally and low while that button is held. GPIO17 and GPIO4 were picked as the defaults because neither has any other function on any Raspberry Pi model (an earlier version of this add-on defaulted the single button to GPIO15, which doubles as the Pi's UART RX pin and could pick up noise from the serial console/Bluetooth if that's in use). A pin or function change from Settings > GPIO takes effect within a couple of seconds, with no service restart.
 
 **Install:** `sudo ./install.sh --wifi`. This installs `hostapd` and `dnsmasq` with `apt` if they aren't already present (needed to host the setup network) and starts the `dreampi-netswitch-wifi` service. Remove it again with `sudo ./install.sh --no-wifi`.
 
-**Not yet verified on real Wi-Fi hardware:** it assumes the classic Raspberry Pi OS network stack (`wpa_supplicant` + `dhcpcd`), and hosting the setup network takes the Wi-Fi interface away from its normal connection while it's up (Ethernet, if connected, keeps working throughout). If your Pi's networking is set up differently (for example NetworkManager), this feature likely won't work; everything else in this add-on is unaffected either way.
+**Not yet verified on real Wi-Fi hardware:** it assumes the classic Raspberry Pi OS network stack (`wpa_supplicant` + `dhcpcd`), and hosting the setup network takes the Wi-Fi interface away from its normal connection while it's up (Ethernet, if connected, keeps working throughout). If your Pi's networking is set up differently (for example NetworkManager), this feature likely won't work; everything else in this add-on is unaffected either way. A single button on GPIO17 was tried on real hardware in an earlier version of this add-on; the two-button, per-button-function and combined-hold generalisation described above has not been.
 
 ## Debug log
 
