@@ -44,12 +44,14 @@ if os.environ.get("FAKEUPDATE"):
 if os.environ.get("FAKEPLAYERS"):
     import json
     import netswitch_players as pl
-    json.dump([{"name": "DC99", "url": "https://dc99.test/p", "network": "DCNET"}, {"name": "Dreamcast.online", "url": "https://dco.test/p"}], open(core.PLAYERS_SOURCES, "w"))
-    def pfetch(url):
-        if "dc99" in url:
-            return json.dumps({"games": [{"name": "Phantasy Star Online", "players": ["Alice", "Bob_with_a_really_long_gamertag_here"]}, {"name": "Outtrigger", "players": ["Carol"]}]})
-        return json.dumps([{"name": "Dave", "game": "Quake III Arena", "network": "dcnow"}, {"name": "Eve", "game": "Daytona USA 2001", "network": "dcnow"}])
-    pl.fetch = pfetch
+    feed = {"dreampi": {"users": [
+                {"username": "Dave", "country": "US", "current_game_display": "Quake III Arena", "online": True},
+                {"username": "Eve_with_a_really_long_gamertag", "country": "SE", "current_game_display": "Daytona USA 2001", "online": True},
+                {"username": "Idle Ida", "country": "GB", "current_game_display": "", "online": True}]},
+            "dcnet": {"online": True, "players": [
+                {"name": "Alice", "gameName": "Phantasy Star Online", "geoloc": {"country": "DE"}},
+                {"name": "Carol", "gameName": "Outtrigger", "geoloc": {"country": "FR"}}]}}
+    pl.fetch = lambda url: json.dumps(feed)      # the real default source (dc99.net) is used, only the download is faked
 print("state dir", tmp, flush=True)
 srv = web.Server(('127.0.0.1', int(os.environ.get('PORT', '8734'))), web.Handler)
 srv.serve_forever()

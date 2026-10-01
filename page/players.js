@@ -39,7 +39,7 @@
   msg.style.display=msg.textContent?"block":"none";
   table.style.display=players.length?"table":"none";
   document.getElementById("pl-rows").innerHTML=players.map(function(p){
-   return '<tr><td>'+esc(p.player)+'</td><td>'+esc(p.game||"")+'</td><td class="pl-net '+netClass(p.network)+'">'+esc(p.network||"")+'</td></tr>'}).join("")}
+   return '<tr><td>'+esc(p.player)+'</td><td>'+esc(p.game||"(Idle)")+'</td><td class="pl-net '+netClass(p.network)+'">'+esc(p.network||"")+'</td></tr>'}).join("")}
  function load(){var x=new XMLHttpRequest(),again=15000;x.open("GET","/players",true);
   function next(){clearTimeout(timer);if(open)timer=setTimeout(load,again)}
   x.onload=function(){if(x.status==200){try{var r=JSON.parse(x.responseText);render(r);if(r.configured&&(!r.time||r.refreshing))again=2000}catch(e){}}next()};

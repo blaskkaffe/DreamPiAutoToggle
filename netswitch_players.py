@@ -15,9 +15,14 @@ except ImportError:   # Python 2.7
 
 import netswitch_core as core
 
-# [{"name": "DC99", "url": "https://.../players.json", "network": "DCNET"}, ...]
+# [{"name": "DC99", "url": "http://.../players.json", "network": "DCNET"}, ...]
 # "network" is only the fallback label for entries that don't say which network they are on.
-DEFAULT_SOURCES = []
+# The default is the feed openMenu's player list already uses (the shapes below are
+# taken from that working code, which was checked against live responses): dc99.net's
+# combined status page lists DreamPi (DCNow!) and DCNET players together. dreamcast.online's
+# own feed ("http://dreamcast.online/now/api/users.json", DCNow! only) also works as an
+# extra entry in players_sources.json, but its players are already in dc99's list.
+DEFAULT_SOURCES = [{"name": "DC99", "url": "http://dc99.net/online/dcnet_status.php"}]
 CACHE_SECONDS = 60
 TIMEOUT = 8
 MAX_BYTES = 1000000
@@ -88,11 +93,59 @@ def _player(item, game="", network=""):
             "network": network_label(_first(item, _NET_KEYS), network)}
 
 
+def _flag(value):
+    return value is True or str(value).lower() in ("true", "1", "yes")
+
+
+def _user(item, network):
+    """One entry of dc99's dreampi.users / dreamcast.online's users, or None when offline."""
+    if not isinstance(item, dict) or not _flag(item.get("online")):
+        return None
+    name = _first(item, ("username", "name"))
+    if not name:
+        return None
+    return {"player": name[:40], "game": _first(item, ("current_game_display", "current_game"))[:60],
+            "network": network, "country": _first(item, ("country",))[:3]}
+
+
+def parse_dc99(data):
+    """dc99.net/online/dcnet_status.php: {"dreampi": {"users": [{"username", "country",
+    "current_game_display", "current_game", "online", ...}]}, "dcnet": {"online": bool,
+    "players": [{"name", "gameName", "gameId", "geoloc": {"country"}}, ...], ...}}.
+    DreamPi users are DCNow!, DCNet players are DCNET. Sections may be missing."""
+    out = []
+    dreampi = data.get("dreampi")
+    for item in (dreampi.get("users") if isinstance(dreampi, dict) else None) or []:
+        p = _user(item, "DCNow!")
+        if p:
+            out.append(p)
+    dcnet = data.get("dcnet")
+    if isinstance(dcnet, dict) and dcnet.get("online") is not False:
+        for item in dcnet.get("players") or []:
+            if not isinstance(item, dict) or not _first(item, ("name",)):
+                continue
+            geo = item.get("geoloc")
+            out.append({"player": _first(item, ("name",))[:40], "game": _first(item, ("gameName",))[:60],
+                        "network": "DCNET", "country": (_first(geo, ("country",)) if isinstance(geo, dict) else "")[:3]})
+    return out
+
+
+def parse_dcnow(data):
+    """dreamcast.online/now/api/users.json: {"users": [{"username", "country",
+    "current_game_display", "online", ...}]} (DCNow! players)."""
+    return [p for p in (_user(i, "DCNow!") for i in data.get("users") or []) if p]
+
+
 def parse_players(data, default_network=""):
     """Players from whatever shape a status endpoint uses. Understands a list of
     player objects, an object holding such a list under a common key, and games
     that each list their players. Unknown shapes give an empty list."""
     out = []
+    if isinstance(data, dict) and ("dreampi" in data or "dcnet" in data):
+        return parse_dc99(data)
+    if isinstance(data, dict) and isinstance(data.get("users"), list) and any(
+            isinstance(u, dict) and "username" in u for u in data["users"]):
+        return parse_dcnow(data)
     if isinstance(data, dict):
         games = data.get("games")
         if isinstance(games, list) and games and all(isinstance(g, dict) for g in games):
@@ -155,6 +208,13 @@ def refresh():
                 report.append({"name": name, "ok": True, "count": len(found), "error": None})
             except Exception as e:
                 report.append({"name": name, "ok": False, "count": 0, "error": str(getattr(e, "reason", None) or e)[:80]})
+        seen, unique = set(), []
+        for p in players:                       # the same person can be in two sources
+            key = (p["player"].lower(), p["network"])
+            if key not in seen:
+                seen.add(key)
+                unique.append(p)
+        players = unique
         order = {"DCNow!": 0, "DCNET": 1}
         players.sort(key=lambda p: (order.get(p["network"], 2), p["network"], p["game"].lower(), p["player"].lower()))
     finally:

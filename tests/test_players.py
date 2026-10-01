@@ -48,6 +48,38 @@ class ParseTests(unittest.TestCase):
         self.assertTrue(len(p["player"]) <= 40 and len(p["game"]) <= 60)
 
 
+DC99 = {"generated": 1790000000,
+        "dreampi": {"users": [
+            {"username": "Ana", "country": "SE", "current_game_display": "Phantasy Star Online", "current_game": "PSO", "online": True, "history": [{"x": 1}]},
+            {"username": "Offline Olle", "country": "NO", "current_game_display": "Quake III", "online": False},
+            {"username": "Idle Ida", "country": "US", "current_game_display": "", "online": True}]},
+        "dcnet": {"online": True, "error": None, "games": [{"id": "x"}], "users": [],
+                  "players": [{"name": "Bo", "gameId": "G1", "gameName": "Outtrigger", "geoloc": {"country": "DE", "lat": 1}}]}}
+
+
+class ShapeTests(unittest.TestCase):
+    """The shapes openMenu's working player list reads (checked there against live responses)."""
+    def test_dc99_combined_feed(self):
+        got = pl.parse_players(DC99)
+        self.assertEqual([(p["player"], p["game"], p["network"], p["country"]) for p in got],
+                         [("Ana", "Phantasy Star Online", "DCNow!", "SE"), ("Idle Ida", "", "DCNow!", "US"),
+                          ("Bo", "Outtrigger", "DCNET", "DE")])
+
+    def test_dcnet_offline_adds_nobody_but_dreampi_still_counts(self):
+        data = json.loads(json.dumps(DC99))
+        data["dcnet"]["online"] = False
+        self.assertEqual([p["network"] for p in pl.parse_players(data)], ["DCNow!", "DCNow!"])
+
+    def test_missing_sections_are_fine(self):
+        self.assertEqual(len(pl.parse_players({"dcnet": {"players": [{"name": "Bo", "gameName": "G"}]}})), 1)
+        self.assertEqual(pl.parse_players({"dreampi": {}}), [])
+
+    def test_dreamcast_online_feed(self):
+        got = pl.parse_players({"users": [{"username": "Cy", "country": "GB", "current_game_display": "Toy Racer", "online": True},
+                                          {"username": "Gone", "online": False}]})
+        self.assertEqual([(p["player"], p["game"], p["network"]) for p in got], [("Cy", "Toy Racer", "DCNow!")])
+
+
 class SourceTests(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox()
@@ -62,7 +94,11 @@ class SourceTests(unittest.TestCase):
         with open(core.PLAYERS_SOURCES, "w") as f:
             json.dump(data, f)
 
-    def test_not_configured_by_default(self):
+    def test_default_is_the_dc99_feed_openmenu_uses(self):
+        self.assertEqual([(s["name"], s["url"]) for s in pl.sources()], [("DC99", "http://dc99.net/online/dcnet_status.php")])
+
+    def test_an_empty_file_switches_the_list_off(self):
+        self.write_sources([])
         self.assertEqual(pl.sources(), [])
         self.assertFalse(pl.status()["configured"])
 
@@ -91,6 +127,13 @@ class SourceTests(unittest.TestCase):
         self.assertTrue(st["configured"])
         self.assertTrue(any(l[0] == "DC99" for l in st["links"]))
 
+    def test_two_sources_do_not_list_a_player_twice(self):
+        self.write_sources([{"name": "DC99", "url": "https://a.test/p"}, {"name": "DCO", "url": "https://b.test/p"}])
+        pl.fetch = lambda url: json.dumps(DC99) if "a.test" in url else json.dumps(
+            {"users": [{"username": "ana", "current_game_display": "x", "online": True}]})
+        pl.refresh()
+        self.assertEqual(sorted(p["player"] for p in pl.status()["players"]), ["Ana", "Bo", "Idle Ida"])
+
     def test_bad_json_is_reported_as_an_error(self):
         self.write_sources([{"name": "Bad", "url": "https://bad.test/p"}])
         pl.fetch = lambda url: "<html>not json</html>"
@@ -104,15 +147,18 @@ class IntegrationTests(unittest.TestCase):
         srv = web.Server(("127.0.0.1", 0), web.Handler)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
         base = "http://127.0.0.1:%d" % srv.server_address[1]
+        saved_fetch, pl.fetch = pl.fetch, lambda url: json.dumps(DC99)
+        pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": []})
         try:
             html = urlopen(base + "/", timeout=10).read().decode()
             self.assertIn('<script src="/players.js" defer></script>', html)
             js = urlopen(base + "/players.js", timeout=10).read().decode()
             self.assertIn("/players", js)
             r = json.loads(urlopen(base + "/players", timeout=10).read().decode())
-            self.assertFalse(r["configured"])
+            self.assertTrue(r["configured"])
             self.assertIn("links", r)
         finally:
+            pl.fetch = saved_fetch
             srv.shutdown()
             srv.server_close()
             cleanup(tmp)
