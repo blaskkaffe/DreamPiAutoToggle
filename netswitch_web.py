@@ -1223,7 +1223,7 @@ PAGE = u"""<!doctype html>
  .secrow input[type=number],.srow input[type=number]{width:54px;padding:5px 6px;border-radius:8px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.85em}
  select.ord{padding:5px 6px;border-radius:8px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.85em}
  .lvl.on.dcnow{background:var(--dcnow);border-color:var(--dcnow);color:#fff} .lvl.on.dcnet{background:var(--dcnet);border-color:var(--dcnet);color:#fff}
- #wb-preview.on{background:#fff;border-color:#bbb;color:#111}
+ #wb-preview{min-width:10.5em;text-align:center} #wb-preview.on{background:#fff;border-color:#bbb;color:#111}
  .in{position:relative}
  .pop{display:none;position:absolute;z-index:20;width:290px;padding:12px 16px;border-radius:var(--r);background:#262626;box-shadow:0 6px 24px rgba(0,0,0,.6)}
  .pop.open{display:block} .pop .t{font-size:.85em;color:#ccc;margin-bottom:8px}
@@ -1345,7 +1345,7 @@ millisecond timing. Turn recording on, then dial.</div>
  <div class="range"><span>Red</span><input type="range" id="wb-r" min="0" max="100" step="1" style="accent-color:#f33"><span id="wb-r-v" style="width:3em;text-align:right"></span></div>
  <div class="range"><span>Green</span><input type="range" id="wb-g" min="0" max="100" step="1" style="accent-color:#3f3"><span id="wb-g-v" style="width:3em;text-align:right"></span></div>
  <div class="range"><span>Blue</span><input type="range" id="wb-b" min="0" max="100" step="1" style="accent-color:#39f"><span id="wb-b-v" style="width:3em;text-align:right"></span></div>
- <div class="bar"><button class="pill-s" id="wb-preview" type="button">Preview on LED</button><button class="pill-s" id="wb-reset" type="button">Reset to neutral</button></div>
+ <div class="bar" style="justify-content:center;margin:12px 0 10px"><button class="pill-s" id="wb-preview" type="button">Preview on LED</button><button class="pill-s" id="wb-reset" type="button">Reset to neutral</button></div>
 </div>
 <div class="note">White balance: tap <strong>Preview on LED</strong> to show solid white, then turn down whichever of R, G or B looks too strong until it looks neutral - leave the others at 100%. Tap Preview again when done. This corrects every colour the LEDs show, not just white, and takes about 30 seconds.</div>
 <div class="card">
