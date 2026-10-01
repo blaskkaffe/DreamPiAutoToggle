@@ -128,11 +128,11 @@ function xhrJson(method,url,cb){var x=new XMLHttpRequest();x.open(method,url,tru
  if(method=="POST")x.setRequestHeader("X-Requested-With","netswitch");
  x.onload=function(){var r=null;try{r=JSON.parse(x.responseText)}catch(e){}cb(x.status==200?r:null)};x.onerror=function(){cb(null)};x.send()}
 function loadUpdate(){xhrJson("GET","/update",function(r){if(r)renderUpdate(r);else if(updRunning)$("upd-text").textContent="Restarting the services..."})}
-var updRunning=false;
+var updRunning=false,updWatched=false;   // updWatched: this page started or saw the update, so it reloads once when it is done
 function renderUpdate(r){var a=r.addon,d=r.dreampi,msg;
- updRunning=r.state=="running";
+ updRunning=r.state=="running";if(updRunning)updWatched=true;
  if(r.state=="running")msg="Updating... the page is unavailable for a few seconds while the services restart.";
- else if(r.state=="ok")msg="Updated. Reloading...";
+ else if(r.state=="ok")msg=updWatched?"Updated. Reloading...":"The add-on was updated a few minutes ago.";
  else if(r.state=="failed")msg="The update failed. Details below; the guide shows how to update by hand.";
  else if(r.checking)msg="Checking...";
  else if(!r.time)msg="Not checked yet";
@@ -152,13 +152,13 @@ function renderUpdate(r){var a=r.addon,d=r.dreampi,msg;
  $("upd-check").disabled=!!r.checking||updRunning;
  var lg=$("upd-log");lg.style.display=(r.log&&r.log.length&&r.state!="idle")?"block":"none";lg.textContent=(r.log||[]).join("\n");
  $("upd-cd").textContent="cd "+(r.src||"DreamPiAutoToggle");
- if(r.state=="ok"){setTimeout(function(){location.reload()},3000)}
+ if(r.state=="ok"&&updWatched){updWatched=false;setTimeout(function(){location.reload()},3000)}
  clearTimeout(updTimer);
  if(r.state=="running"||r.checking)updTimer=setTimeout(loadUpdate,2000)}
 $("upd-check").onclick=function(){$("upd-text").textContent="Checking...";xhrJson("POST","/update/check",function(r){if(r)renderUpdate(r.status);
  clearTimeout(updTimer);updTimer=setTimeout(loadUpdate,1500)})};
 $("upd-do").onclick=function(){if(!confirm("Update the add-on now? It is fetched from GitHub and installed; this page is unavailable for a few seconds."))return;
- updRunning=true;$("upd-text").textContent="Starting the update...";
+ updRunning=true;updWatched=true;$("upd-text").textContent="Starting the update...";
  xhrJson("POST","/update/start",function(r){if(r&&r.message&&r.message!="Update started")$("upd-text").textContent=r.message;
   clearTimeout(updTimer);updTimer=setTimeout(loadUpdate,2000)})};
 // Reboot the Pi: confirm, ask the server, then wait until the page answers again and reload it.

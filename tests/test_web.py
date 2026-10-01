@@ -210,6 +210,31 @@ class PageTests(unittest.TestCase):
         cls.css = "\n".join(re.findall(r"<style[^>]*>(.*?)</style>", cls.html, re.S))
         cls.srv_base = base
 
+    def test_html_tags_are_balanced(self):
+        """A stray '</span</span>' in a hand edit once left a span open; catch any mismatch."""
+        from html.parser import HTMLParser
+        void = {"br", "input", "meta", "link", "img", "hr"}
+        problems, stack = [], []
+
+        class P(HTMLParser):
+            def handle_starttag(self, tag, attrs):
+                if tag not in void:
+                    stack.append((tag, self.getpos()[0]))
+
+            def handle_endtag(self, tag):
+                if stack and stack[-1][0] == tag:
+                    stack.pop()
+                else:
+                    problems.append("</%s> at line %d, open: %s" % (tag, self.getpos()[0], stack[-1:]))
+
+        P().feed(self.html)
+        self.assertEqual(problems, [])
+        self.assertEqual(stack, [])
+
+    def test_finished_update_reloads_only_the_page_that_watched_it(self):
+        """An 'ok' update state lasts 10 minutes; reloading on every sight of it closed Settings."""
+        self.assertIn('r.state=="ok"&&updWatched', self.js)
+
     @classmethod
     def tearDownClass(cls):
         cls.srv.shutdown()
