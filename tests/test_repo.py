@@ -51,6 +51,25 @@ class LayeringTests(unittest.TestCase):
         self.assertEqual(subprocess.call(["python3", "-c", code]), 0)
 
 
+class DocsTests(unittest.TestCase):
+    def test_markdown_links_resolve(self):
+        import re
+        files = [os.path.join(ROOT, "CLAUDE.md"), os.path.join(ROOT, "README.md")] + glob.glob(os.path.join(ROOT, "docs", "*.md"))
+        for path in files:
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            heads = set(re.sub(r"[^a-z0-9 -]", "", h.lower()).strip().replace(" ", "-") for h in re.findall(r"^#+\s+(.*)$", text, re.M))
+            for target in re.findall(r"\]\(([^)\s]+)\)", text):
+                if target.startswith(("http://", "https://", "mailto:")):
+                    continue
+                if target.startswith("#"):
+                    self.assertIn(target[1:], heads, "%s: broken anchor %s" % (os.path.basename(path), target))
+                else:
+                    rel = target.split("#")[0]
+                    self.assertTrue(os.path.exists(os.path.join(os.path.dirname(path), rel)),
+                                    "%s: missing %s" % (os.path.basename(path), target))
+
+
 class CompileTests(unittest.TestCase):
     def test_python_files_compile(self):
         for path in glob.glob(os.path.join(ROOT, "*.py")) + glob.glob(os.path.join(ROOT, "tests", "*.py")):

@@ -1,0 +1,40 @@
+# The hook, call routing and the debug log
+
+Read before touching `netswitch_hook.py`, the phone-number rules or the debug timeline. Back to [CLAUDE.md](../CLAUDE.md).
+
+## How the hook loads
+
+- The `.pth` file imports `netswitch_hook`. It only acts when `/proc/self/cmdline` contains `dreampi` (`sys.argv` doesn't exist yet during `.pth` processing on Python 2). It then temporarily wraps `__import__`, using `__builtin__` before `builtins` because python-future can provide a fake `builtins` on Python 2. When a module named `netlink` is imported from `/home/pi/dreampi`, it wraps `Netlink.check_number()` and restores the original `__import__`.
+- State lives in files: `/opt/dreampi-netswitch/dcnet_mode` (exists means DCNet is selected), `/opt/dreampi-netswitch/autoreset` (reset toggle) and `/opt/dreampi-netswitch/default_dcnet` (exists means auto reset returns to DCNet instead of DC Now; page: `POST /default`). The hook writes `/tmp/dreampi-netswitch.active` (`active pid=N` or an error). The hook also writes `/tmp/dreampi-netswitch.state` (`starting`, `ready`, `call <network>` or `unknown`, plus a unix time): `starting` when netlink is imported, `call ...` from `check_number()`, and `ready` after `__main__.Modem.start_dial_tone()` (the moment DreamPi logs `<LISTENING>`) or `Netlink.reset_serial()`. The web page checks that pid under `/proc`, and also reads `netlink_config.ini` and `/boot/noautoupdates.txt` to warn when DCNet is off.
+- Modem status: the hook adds a `logging.Handler` to DreamPi's `dreampi` logger and maps DreamPi's own messages (`<LISTENING>`, `Heard:`, `CONNECT 33600`, `Call answered`, `Connected`, `Detected modem hang up`, ...) to a short text in `/tmp/dreampi-netswitch.modem` (`<unix time> <text>`). Table `_MODEM_EVENTS`; keep it in sync if upstream log texts change. The same table's `Opening serial interface to (\S+)` row also writes the raw port (e.g. `/dev/ttyUSB0`) to `/tmp/dreampi-netswitch.port`, which is how the web service finds the modem without guessing or parsing `netlink_config.ini`.
+
+## Debug log
+
+If `/opt/dreampi-netswitch/debug_dtmf` exists, the hook writes one timeline to `/tmp/dreampi-netswitch-dtmf.log` (`HH:MM:SS.mmm  +Nms  text`):
+- modem bytes read while `modem._sending_tone` is true, decoded by `_serial_feed()`: `<DLE><digit>` -> `modem: DTMF x`, other `<DLE>` codes via `_DLE_CODES` (V.253), text lines -> `modem says: ...`. The hook replaces `read` on the pyserial object again after every `start_dial_tone()`, since DreamPi opens a new serial object after each call;
+- every message on DreamPi's `dreampi` logger (`dreampi: ...`), via the same handler as the modem status;
+- the number `check_number()` received (`add-on: number heard ...`) and routing lines.
+The web service trims the log to its newest 500 KB whenever it passes 1 MB (`trim_log()` in the checker loop; safe because the hook opens the file per line). `GET /dtmf` serves the newest 256 KB (`?all` for everything). Responses over 2 KB are gzip-compressed when the browser accepts it. The web page appends its own actions (`web page: ...`), serves new text incrementally at `GET /log?from=<byte offset>` (JSON; `reset` when the file was cleared), shows it live in a panel polled every 0.7 s, and has `POST /debug` (toggle) and `POST /clearlog`. The page's status poll runs every 1 s.
+
+Open question being investigated: on hardware DreamPi heard openMenu's `1111111` as `11111111`, `1111` and `1`. Known contributors: (1) `digit_parser()` in netlink.py reads the digit right after `<DLE>` on a non-blocking port (`timeout=0`); if the byte hasn't arrived yet the digit is dropped and parsing restarts at the next `<DLE>` (reproduced in simulation). (2) openMenu's KallistiOS `modem_dial()` dials immediately after opening the line, without waiting for dial tone, using the modem chip's default DTMF timing. The debug log on real hardware decides which it is. Do not paper over it in the routing rules; the user wants the cause fixed.
+
+## Upstream facts the hook depends on (netlink.py, dpi2 branch)
+
+- `check_number(self, raw_string)` returns `{'client': mode, 'dial_string': ...}`. `dreampi.py` answers with its own pppd only when `client == 'PPP'`. Any other non-idle mode is handled by `Netlink.poll()` -> `mode_handler()`.
+- Mode `"dcnet"` makes `mode_handler()` call `dcnet_connect()`, which answers and runs `dcnet.rpi`. This is the same route the built-in `*69` prefix uses: it stores `self.dial_modifier` in memory, valid for 10 seconds.
+- `self.dcnet` is True only when `netlink_config.ini` has `[DCNet] enabled = yes` and `dcnet.rpi` exists.
+- The serial-port path (`serial_poll`) also calls `check_number()` and handles `"dcnet"`.
+- openMenu 1.7.0 always dials `1111111` with login `openMenu`/`openMenu` (see `dcnow_net.h` in DerekPascarella/openMenu-Virtual-Folder-Bundle). DCNet expects the password `password`, so `1111111` must stay on DC Now.
+- If upstream renames `check_number`, the hook writes an error to the status file and does nothing, and DreamPi keeps working.
+
+## Routing rules (see README table)
+
+Special numbers are matched with `endswith()` on the dialed string: on real hardware DreamPi hears an extra leading `1` (e.g. `13333333` with the old DCNet number, `11111111`), and ISP prefixes add digits too. Only calls the original `check_number` returns as `PPP` are redirected. Numbers ending in `1111111` or `5550001` (select DC Now) always stay PPP. `5550002` (select DCNet), or any number while `dcnet_mode` exists, becomes `dcnet` if `self.dcnet` is true. With `autoreset`, `1111111` first sets the selection to the default network (`default_dcnet`); the openMenu call itself still stays PPP.
+
+Switch only: a dialed string ending in `#` (not starting with `#`) whose part before the `#` matches a special number only changes the selection (`5550001#` DC Now, `5550002#` DCNet, `1111111#` the default network) and returns `{'client': 'idle'}` (sets `self.mode = 'idle'`), so DreamPi doesn't answer, like `*70`. `_play_busy()` swaps `modem._dial_tone_wav` for a generated busy tone (480+620 Hz, 0.5 s on/off, 8-bit unsigned 8 kHz) for `BUSY_SECONDS` (4 s), then a timer restores the real dial tone (kept in `modem._netswitch_dial`, so quick repeats don't save the busy tone as the dial tone). Only done while `modem._sending_tone` is true. Whether the Dreamcast reacts to the busy tone is not yet verified on hardware.
+
+`5550001`/`5550002` (555-0001/555-0002, the North American fictional-exchange prefix) replaced the original `2222222`/`3333333`: a run of seven identical digits is the hardest case for a DTMF decoder to count correctly (no frequency change marks a digit boundary, only a timing gap) - the same category of problem as the openMenu `1111111` mishearing above, but for numbers we actually control. `1111111` itself can't change (hardcoded in openMenu).
+
+## Testing the routing without a Pi
+
+Download the current `netlink.py`, place it at `/home/pi/dreampi/netlink.py`, stub the `serial`, `stun` and `sh` modules, load the `.pth` with `site.addsitedir()`, create the object with `Netlink.__new__(Netlink)`, set `logger`, `servers`, `dcnet`, `dial_modifier` and `mode`, then call `check_number()` for each rule. Also check that `netlink.py`'s hash is unchanged afterwards.
