@@ -221,10 +221,15 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path.startswith("/log"):
             m = re.search(r"from=(-?\d+)", self.path)
             self.send(json.dumps(core.read_log(int(m.group(1)) if m else 0)), "application/json")
+        elif self.path.split("?")[0] == "/tag":
+            # For openMenu over the PPP link: a tiny HTTP/1.0 answer, no markup, no caching.
+            code = core.tag()
+            text = dict(core.TAGS).get(code, "") if "text" in self.path else code
+            self.send(text + "\n", "text/plain; charset=utf-8")
         elif self.path == "/status":
             d = api_state()
-            self.send("network=%s\ndefault=%s\nautoreset=%s\ndreampi=%s\nmodem=%s\ninternet=%s\npi=%s\n" % (
-                d["network"], d["default"], "on" if d["autoreset"] else "off", d["dreampi"]["text"],
+            self.send("network=%s\ntag=%s\ndefault=%s\nautoreset=%s\ndreampi=%s\nmodem=%s\ninternet=%s\npi=%s\n" % (
+                d["network"], core.tag(), d["default"], "on" if d["autoreset"] else "off", d["dreampi"]["text"],
                 d["modem"]["text"], d["internet"]["text"], d["pi"]["text"]), "text/plain; charset=utf-8")
         elif self.path == "/about":
             self.send(json.dumps(probes.about()), "application/json")
@@ -296,6 +301,16 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self.send(json.dumps({"config": cfg, "count": ledconfig.led_count(), "gpio": ledconfig.led_gpio()}),
                      "application/json")
+            return
+        if self.path == "/reboot":
+            # Like the update: only the page's own request (custom header), never a bare cross-site form post.
+            if not self.headers.get("X-Requested-With"):
+                self.send_response(403)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            started, message = probes.start_reboot()
+            self.send(json.dumps({"started": started, "message": message}), "application/json")
             return
         if self.path in ("/update/check", "/update/start"):
             # Runs a git pull and the installer as root: only the page's own requests

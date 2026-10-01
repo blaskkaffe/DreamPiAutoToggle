@@ -148,6 +148,12 @@ millisecond timing. Turn recording on, then dial.</div>
  <ol><li>Open a terminal on the Pi (SSH).</li><li><code id="upd-cd">cd DreamPiAutoToggle</code></li><li><code>git pull</code></li><li><code>sudo ./install.sh</code> (add the same options you used before, such as <code>--wifi</code> or <code>--leds=30</code>)</li></ol>
  <p><b>DreamPi itself</b> updates its own scripts when the Pi starts and has internet. Restart the Pi (<code>sudo reboot</code>) to get a newer version. If <code>/boot/noautoupdates.txt</code> exists, DreamPi does not update itself: remove that file first.</p>
 </details>
+<section class="sec">
+<div class="card">
+ <div class="srow"><span>Reboot DreamPi<span class="sub" id="reboot-sub">Restarts the Raspberry Pi; it is back in about a minute. A call in progress is cut.</span></span>
+  <button class="pill-s danger" id="reboot-b" type="button">Reboot</button></div>
+</div>
+</section>
 </section>
 </div>
 </div></div>

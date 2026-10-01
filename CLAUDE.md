@@ -25,12 +25,13 @@ User-facing text (web page, README, log lines) spells the networks **DCNow!** an
 | Web page (`page/`), API, HTTPS, hang up, Pi health, modem identification | `docs/web.md` |
 | LED messages, `led.json`, colour calibration, white-balance test, NeoPixel drivers | `docs/led.md` |
 | GPIO settings box, buttons (debounce/hold), Wi-Fi setup | `docs/buttons-wifi.md` |
+| `GET /tag`: telling openMenu which network runs | `docs/openmenu.md` |
 | What is / is not verified on real hardware | `docs/hardware-status.md` |
 
 ## Testing without a Pi
 `sh tests/run.sh` runs the off-hardware tests (`tests/`: buttons debounce/hold, Wi-Fi setup helpers, LED pipeline and render, web config + HTTP round trips on a random port with all paths redirected into a temp dir, page JS syntax and id references, hook Python 2 syntax guard, layering, shell syntax). `tests/support.py` has `sandbox()` for redirecting paths. The routing test that needs the real `netlink.py` is described in `docs/hook.md` and is not in the suite. To look at the page run `python3 tests/ui/demo_server.py` (the real web service on a sandbox; env switches `WIFIDEMO=1 FAKEUPDATE=1 FAKEPLAYERS=1 LEDS=n PORT=n`, see its docstring) and screenshot it with Playwright (Chromium is pre-installed; scripts need `NODE_PATH=/opt/node22/lib/node_modules`). `sh tests/ui/run.sh` is an optional UI audit at four screen widths (overflow, clipped text, tap targets, unlabelled controls, duplicate ids, stretched pills, JS errors, failed requests); run it after changing `page/`. When editing `page/page.css` add rules with an exact-string anchor, never by 'first occurrence of a selector' (that once split a rule in half).
 
 ## Ideas for later
-- Let openMenu read `/status` over plain HTTP to show the selected network.
+- openMenu side of `GET /tag` (the Pi side exists, see `docs/openmenu.md`).
 - Show DCNet player counts on the page, for example by relaying DC99 / dcnet.flyca.st data.
 - Make the special numbers configurable in a small config file.

@@ -20,7 +20,7 @@ function render(d){
    hb.textContent=d.hangup.text?d.hangup.text.charAt(0).toUpperCase()+d.hangup.text.slice(1):"Hanging up..."}
   else if(hb.disabled){hb.disabled=false;hb.textContent="Hang up"}}
  $("warnings").innerHTML=d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("");
- lookDot($("d-dot"),d.dreampi.look); $("d-text").textContent=d.dreampi.text;
+ window.lastDreampiState=d.dreampi.state; lookDot($("d-dot"),d.dreampi.look); $("d-text").textContent=d.dreampi.text;
  $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now).replace(/[()]/g,"");
  dot($("i-dot"),d.internet.state); $("i-text").textContent=d.internet.text;
  dot($("p-dot"),d.pi.state);
@@ -161,6 +161,19 @@ $("upd-do").onclick=function(){if(!confirm("Update the add-on now? It is fetched
  updRunning=true;$("upd-text").textContent="Starting the update...";
  xhrJson("POST","/update/start",function(r){if(r&&r.message&&r.message!="Update started")$("upd-text").textContent=r.message;
   clearTimeout(updTimer);updTimer=setTimeout(loadUpdate,2000)})};
+// Reboot the Pi: confirm, ask the server, then wait until the page answers again and reload it.
+$("reboot-b").onclick=function(){
+ var inCall=(window.lastDreampiState||"").indexOf("call")==0;
+ if(!confirm((inCall?"A call is in progress and will be cut. ":"")+"Reboot the Raspberry Pi now? It is back in about a minute."))return;
+ var b=this,sub=$("reboot-sub");b.disabled=true;
+ xhrJson("POST","/reboot",function(r){
+  if(!r||!r.started){b.disabled=false;sub.textContent=(r&&r.message)||"Could not reboot";return}
+  sub.textContent="Rebooting... this page comes back by itself.";
+  var down=false,tries=0;
+  (function poll(){tries++;
+   var x=new XMLHttpRequest();x.open("GET","/ping?"+Date.now(),true);x.timeout=3000;
+   x.onload=function(){if(down||tries>60)location.reload();else setTimeout(poll,2000)};
+   x.onerror=x.ontimeout=function(){down=true;setTimeout(poll,2000)};x.send()})()})};
 function loadAbout(){var x=new XMLHttpRequest();x.open("GET","/about",true);
  x.onload=function(){if(x.status!=200)return;$("about").innerHTML=JSON.parse(x.responseText).map(function(r){
   return '<tr><td class="n">'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>'}).join("")};x.send()}

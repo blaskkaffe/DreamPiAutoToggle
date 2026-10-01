@@ -85,6 +85,22 @@ def dcnet_problem():
     return None
 
 
+# The short tag served at GET /tag for openMenu (docs/openmenu.md): which network this
+# DreamPi is running. openMenu keeps its own list of what each code means; the texts
+# here are only a suggestion and what /tag?text returns.
+TAGS = (("DCNET", "Running DCNet!"), ("DCNOW", "Running DCNow!"),
+        ("DCNET_OFF", "DCNet is selected but not available"), ("INACTIVE", ""))
+
+
+def tag():
+    """One of the codes in TAGS for the current state of this DreamPi."""
+    if hook_problem():
+        return "INACTIVE"          # DreamPi isn't running the add-on: nothing is being switched
+    if os.path.exists(FLAG):
+        return "DCNET_OFF" if dcnet_problem() else "DCNET"
+    return "DCNOW"
+
+
 def dreampi_state():
     """(state, text) for what DreamPi is doing right now."""
     if hook_problem() == "DreamPi is not running":

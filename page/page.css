@@ -39,6 +39,7 @@
  .pill:active{filter:brightness(1.1)}
  .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
  .srow .pill-s,.nadd .pill-s{white-space:nowrap}
+ .pill-s.danger{background:rgba(160,30,30,.85);border-color:rgba(230,110,110,.85)}
  input[type=range]{min-height:28px}
  :focus-visible{outline:3px solid #8bf;outline-offset:2px}
  .wide{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 20px;border-radius:var(--r);background:var(--card);border:var(--bw) solid #3a3a3a;color:#eee;font-size:1em;text-align:left}
