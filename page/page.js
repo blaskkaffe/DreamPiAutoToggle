@@ -79,7 +79,9 @@ $("wifi-connect-b").onclick=function(){
  var x=new XMLHttpRequest();x.open("POST","/wificonnect",true);x.setRequestHeader("Content-Type","application/json");
  x.onload=refresh;x.send(JSON.stringify({ssid:ssid,password:$("wifi-pass").value}))};
 var logSize=0,debugOn=false,logBusy=false,debugOpen=false;
-$("net").onclick=function(e){if(e.target.closest&&e.target.closest(".hang"))return;this.classList.toggle("open")};
+function toggleNet(el){el.classList.toggle("open");el.setAttribute("aria-expanded",el.classList.contains("open"))}
+$("net").onclick=function(e){if(e.target.closest&&e.target.closest(".hang"))return;toggleNet(this)};
+$("net").onkeydown=function(e){if((e.key=="Enter"||e.key==" ")&&e.target===this){e.preventDefault();toggleNet(this)}};
 // Hang up: tap once to arm, again within 4 s to confirm (a call in progress is easy to end by accident)
 var hangArm=0;
 $("hang-f").onsubmit=function(e){e.preventDefault();e.stopPropagation();var b=$("hang-b");

@@ -38,6 +38,9 @@
  .dcnow-b{background:rgba(232,118,28,.82);border:var(--bw) solid rgba(246,178,122,.82)} .dcnet-b{background:rgba(28,111,232,.82);border:var(--bw) solid rgba(128,177,246,.82)}
  .pill:active{filter:brightness(1.1)}
  .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
+ .srow .pill-s,.nadd .pill-s{white-space:nowrap}
+ input[type=range]{min-height:28px}
+ :focus-visible{outline:3px solid #8bf;outline-offset:2px}
  .wide{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 20px;border-radius:var(--r);background:var(--card);border:var(--bw) solid #3a3a3a;color:#eee;font-size:1em;text-align:left}
  .wide .arrow{margin-left:8px} .wide.open .arrow{transform:rotate(90deg)}
  .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 0}
@@ -100,14 +103,14 @@
  input[type=password],input[type=text]{width:100%;padding:10px 12px;margin:0 0 10px;border-radius:12px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.9em}
  #wifi-networks{padding:10px 0 14px}
  .wnet{display:block;width:100%;margin-bottom:6px;padding:9px 12px;text-align:left;border-radius:12px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
- .wnet .sig{float:right;opacity:.6;font-size:.85em}
- details.guide{margin:6px 4px 14px;color:var(--muted);font-size:.85em} details.guide summary{cursor:pointer;padding:6px 0}
+ .wnet .sig{float:right;opacity:.6;font-size:.85em;margin-left:8px} .wnet{overflow-wrap:anywhere}
+ details.guide{margin:6px 4px 14px;color:var(--muted);font-size:.85em} details.guide summary{cursor:pointer;padding:10px 0}
  details.guide code{background:#222;border-radius:6px;padding:1px 6px;color:#ddd} details.guide ol{margin:6px 0;padding-left:20px} details.guide li{margin:4px 0}
  .nrow{padding:12px 0;border-top:1px solid var(--line)} .nrow:first-child{border-top:0}
  .nrow .sub{display:block;margin-top:2px}
  .nchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
  .nchip{display:inline-flex;align-items:center;gap:2px;padding:3px 4px 3px 12px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);font-size:.88em}
- .nchip button{background:none;color:#aaa;font-size:1.05em;line-height:1;padding:2px 8px}
+ .nchip button{background:none;color:#aaa;font-size:1.05em;line-height:1;min-width:36px;min-height:32px;padding:0;margin:-6px 0}
  .nchip button:hover{color:#fff}
  .nempty{color:var(--muted);font-size:.85em;margin:8px 0}
  .nadd{display:flex;gap:8px;align-items:center} .nadd input[type=text]{flex:1;margin:0;padding:7px 12px}
