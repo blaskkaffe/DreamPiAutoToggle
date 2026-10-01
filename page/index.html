@@ -1,0 +1,139 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DreamPi</title>
+<link rel="icon" type="image/png" id="fav" href="/static/favicon-dcnow.png">
+<link rel="apple-touch-icon" id="touch" href="/static/touch-dcnow.png">
+<style>@@CSS@@</style></head><body>
+<div id="dcbg"></div>
+<header><h1>DreamPi</h1><button class="cog" id="cog" type="button" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M10.3 1.5h3.4l.5 2.6a8.3 8.3 0 0 1 2.1.9l2.2-1.5 2.4 2.4-1.5 2.2c.4.7.7 1.4.9 2.1l2.6.5v3.4l-2.6.5a8.3 8.3 0 0 1-.9 2.1l1.5 2.2-2.4 2.4-2.2-1.5c-.7.4-1.4.7-2.1.9l-.5 2.6h-3.4l-.5-2.6a8.3 8.3 0 0 1-2.1-.9l-2.2 1.5-2.4-2.4 1.5-2.2a8.3 8.3 0 0 1-.9-2.1l-2.6-.5v-3.4l2.6-.5c.2-.7.5-1.4.9-2.1L3.4 5.9l2.4-2.4L8 5c.7-.4 1.4-.7 2.1-.9zM12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6z"/></svg></button></header>
+<div id="warnings"></div>
+<div class="now rows" id="net" title="Show or hide details">
+ <div class="nlabel">Selected network:</div><b id="net-name">...</b>
+ <div class="row main"><span class="k">DreamPi</span><span class="v"><span class="dot" id="d-dot"></span><span id="d-text">...</span></span><span class="arrow">&#9656;</span></div>
+ <div class="row more"><span class="k">Modem</span><span class="v"><span><span class="nw" id="m-text">...</span><span class="sub blk" id="m-since"></span></span></span></div>
+ <div class="row more"><span class="k">Internet</span><span class="v"><span class="dot" id="i-dot"></span><span id="i-text">...</span></span></div>
+ <div class="row more"><span class="k">Pi</span><span class="v"><span class="dot" id="p-dot"></span><span id="p-text">...</span></span></div>
+ <div class="row more hang" id="hang-row" style="display:none"><form method="post" action="/hangup" id="hang-f"><button class="pill-s" id="hang-b" type="submit"
+  title="Ends the current call and gets the modem ready again">Hang up</button></form></div>
+</div>
+<form method="post" action="/dcnow"><button class="pill dcnow-b">DCNow! / DreamPi</button></form>
+<form method="post" action="/dcnet"><button class="pill dcnet-b">DCNET / FLYCAST</button></form>
+<div class="bar" id="debug-bar" style="display:none"><button class="wide" id="show-debug" type="button"><span>Debug log</span><span class="arrow">&#9656;</span></button></div>
+<div id="debug" style="display:none">
+<div class="note">Records every modem event, DreamPi message and routing decision with
+millisecond timing. Turn recording on, then dial.</div>
+<div class="bar" style="margin-top:6px"><form method="post" action="/debug"><button class="pill-s" id="debug-b">Recording</button></form>
+<span id="log-tools" style="display:none"><form method="post" action="/clearlog" style="display:inline"><button class="pill-s">Clear</button></form>
+<a class="pill-s" href="/dtmf" target="_blank" style="text-decoration:none">Newest 256 KB</a>
+<a class="pill-s" href="/dtmf?all" target="_blank" style="text-decoration:none">Full log</a>
+<label class="sub" style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:4px"><input type="checkbox" class="cbox dcnow" id="follow" checked>Follow</label></span></div>
+<pre id="log" style="display:none"></pre>
+</div>
+
+<div id="settings" role="dialog" aria-label="Settings"><div class="in">
+<header><h1>Settings</h1><button class="cog" id="close-settings" type="button" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.6 3.5 12 9.9l6.4-6.4 2.1 2.1-6.4 6.4 6.4 6.4-2.1 2.1-6.4-6.4-6.4 6.4-2.1-2.1 6.4-6.4-6.4-6.4z"/></svg></button></header>
+<div class="cols">
+<section class="sec">
+<h2>Network</h2>
+<div class="card">
+ <form method="post" action="/default" class="srow"><span>Default network<span class="sub">Where Auto reset goes back to</span></span>
+  <button class="switch" id="default-b" type="submit"><span class="lbl" id="default-l">DCNow!</span><span class="knob"></span></button></form>
+ <form method="post" action="/autoreset" class="srow"><span>Auto reset<span class="sub">Dialing 111-1111 returns to the default network</span></span>
+  <button class="cbox" id="reset-b" type="submit" aria-label="Auto reset"></button></form>
+ <div class="srow"><span>Debug log<span class="sub">Show the debug log on the main page (this browser only)</span></span>
+  <input type="checkbox" class="cbox dcnow" id="dbg-b" aria-label="Show debug log"></div>
+ <div class="srow" id="wifi-row" style="display:none"><span>Wi-Fi setup<span class="sub" id="wifi-sub">Search for a Wi-Fi network to connect the Pi to</span></span>
+  <button class="pill-s" id="wifi-b" type="button">Search</button></div>
+ <div id="wifi-networks" style="display:none">
+  <div id="wifi-list"></div>
+  <button type="button" class="pill-s" id="wifi-manual" style="margin-bottom:10px">Enter a network name manually</button>
+  <div id="wifi-form" style="display:none">
+   <input type="text" id="wifi-ssid" placeholder="Network name" readonly>
+   <input type="password" id="wifi-pass" placeholder="Password" style="display:none">
+   <button type="button" class="pill-s" id="wifi-connect-b" disabled>Connect</button>
+  </div>
+ </div>
+</div>
+</section>
+
+<section class="sec">
+<h2>Phone numbers</h2>
+<div class="card">
+<table>
+<tr><td class="n">111-1111</td><td>Always directs to DCNow! for compatibility with openMenu and standard ISP configs.<br>
+<span class="sub">When &quot;Auto reset&quot; is enabled, dialing it also resets the network to the default network.<span id="reset-note"></span></span></td></tr>
+<tr><td class="n">555-0001</td><td>Selects DCNow! / DreamPi and connects to it<br>
+<span class="sub">Can be set in the Dreamcast ISP config to always connect to DCNow!</span></td></tr>
+<tr><td class="n">555-0002</td><td>Selects DCNET / FLYCAST and connects to it<br>
+<span class="sub">Can be set in the Dreamcast ISP config to always connect to DCNET.</span></td></tr>
+<tr><td class="n">Any other</td><td>Connects to the currently selected network.<br>
+<span class="sub">Set your Dreamcast ISP config to any 7-digit number to use this feature.</span></td></tr>
+</table>
+</div>
+</section>
+
+<section class="sec">
+<h2>Appearance</h2>
+<div class="card">
+ <div class="srow"><span>Dreamcast background<span class="sub">Animated, saved in this browser only</span></span>
+  <input type="checkbox" class="cbox dcnow" id="bg-b" aria-label="Dreamcast background"></div>
+</div>
+</section>
+
+<div id="gpio-section" class="sec" style="position:relative">
+<h2>GPIO <span class="saved" id="gpio-saved">Saved &#10003;</span></h2>
+<div class="card">
+ <div class="srow" id="gpio-led-row" style="display:none"><span>LED<span class="sub">LEDs connected, output pin and wire order</span></span>
+  <div style="display:flex;gap:8px"><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"><select class="ord" id="led-gpio" aria-label="LED output pin"></select><select class="ord" id="led-order" aria-label="Wire order"></select></div></div>
+ <div class="srow" id="gpio-btn1-row"><span>Button 1<span class="sub">Function and pin</span></span>
+  <div style="display:flex;gap:8px"><select class="ord" id="btn1-fn" aria-label="Button 1 function"></select><select class="ord" id="btn1-gpio" aria-label="Button 1 pin"></select></div></div>
+ <div class="srow" id="gpio-btn2-row"><span>Button 2<span class="sub">Function and pin</span></span>
+  <div style="display:flex;gap:8px"><select class="ord" id="btn2-fn" aria-label="Button 2 function"></select><select class="ord" id="btn2-gpio" aria-label="Button 2 pin"></select></div></div>
+ <div class="srow" id="gpio-wifi-row" style="display:none"><span>Wi-Fi setup<span class="sub">Which button, or both, held 3 s starts it</span></span>
+  <select class="ord" id="wifi-btn-sel" aria-label="Wi-Fi setup button"></select></div>
+</div>
+<div class="note">LED count, output pin and wire order (most WS2812 strips are GRB) take effect within a second; switching the LED output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot). Button pin and function changes take effect within a couple of seconds - pick two different pins for the two buttons. A button's own function (Off, Toggle network, Select DCNow!, Select DCNET) fires on a short press.</div>
+</div>
+
+<div id="led-section" class="sec" style="display:none;position:relative">
+<h2>Status LED<span id="led-count-t"></span> <span class="saved" id="led-saved">Saved &#10003;</span></h2>
+<div class="card">
+ <div class="range wb"><span>Red</span><input type="range" id="wb-r" min="0" max="255" step="1" style="accent-color:#f33"><span id="wb-r-v"></span></div>
+ <div class="range wb"><span>Green</span><input type="range" id="wb-g" min="0" max="255" step="1" style="accent-color:#3f3"><span id="wb-g-v"></span></div>
+ <div class="range wb"><span>Blue</span><input type="range" id="wb-b" min="0" max="255" step="1" style="accent-color:#39f"><span id="wb-b-v"></span></div>
+ <div class="bar" style="justify-content:center;margin:12px 0 10px"><button class="pill-s" id="wb-preview" type="button">Preview on LED</button><button class="pill-s" id="wb-reset" type="button">Reset to neutral</button></div>
+</div>
+<div class="note">White balance: tap <strong>Preview on LED</strong> to show solid white, then turn down whichever of R, G or B looks too strong until it looks neutral - leave the others at 100%. Tap Preview again when done. This corrects every colour the LEDs show, not just white, and takes about 30 seconds.</div>
+<div class="card">
+ <div class="range"><span>Maximum brightness</span><input type="range" id="led-bright" min="0" max="1000" step="1"><span id="led-bright-v" style="width:3em;text-align:right"></span></div>
+ <div class="tabs"><button class="pill-s" type="button" id="tab-dcnow">DCNow! selected</button><button class="pill-s" type="button" id="tab-dcnet">DCNET selected</button></div>
+ <table class="ledtab"><thead><tr><th>Message</th><th>colour</th><th>effect</th><th>level</th></tr></thead><tbody id="led-rows"></tbody></table>
+</div>
+<div class="bar" style="margin-top:0"><button class="pill-s" id="led-reset" type="button">Reset LED settings to defaults</button></div>
+<div class="note">The tabs choose which selected network the table is for. Tick a message to use it; the LED is off when no ticked message applies. Errors always have higher priority than information. Effect: tap to pick solid, blink, breathe, RGB or (with a strip) an animation, its speed, and with a strip which LEDs it uses (later messages in the list draw underneath earlier ones). Level: its own brightness; grey means the maximum brightness above. The status dot on the main page previews the most important message.</div>
+<div class="card">
+ <div class="srow"><span>Hide these settings<span class="sub">Removes this Status LED section from Settings; only reversible by deleting led_hidden in /opt/dreampi-netswitch</span></span>
+  <button class="pill-s" id="led-hide-b" type="button">Hide</button></div>
+</div>
+<div id="fx-pop" class="pop"><div class="t" id="fx-t"></div>
+ <div class="opts" id="fx-opts"></div>
+ <div class="opts" id="fx-speed" style="align-items:center"><span class="sub" style="margin-right:4px">Speed</span><button class="pill-s" type="button" data-speed="slow">Slow</button><button class="pill-s" type="button" data-speed="fast">Fast</button></div>
+ <div class="secrow" id="fx-sec"><span class="sub">LEDs</span>
+  <button class="pill-s" type="button" id="sec-all">All</button>
+  <input type="number" id="sec-a" min="1" max="300" aria-label="First LED"><span class="sub">to</span><input type="number" id="sec-b" min="1" max="300" aria-label="Last LED"></div>
+ <div class="bar" style="justify-content:flex-end"><button class="pill-s" id="fx-done" type="button">Done</button></div></div>
+<div id="lvl-pop" class="pop"><div class="t" id="lvl-t"></div>
+ <div class="range"><input type="range" id="lvl-r" min="0" max="1000" step="1"><span id="lvl-v" style="width:3em;text-align:right"></span></div>
+ <div class="bar"><button class="pill-s" id="lvl-base" type="button">Use global</button><button class="pill-s" id="lvl-done" type="button">Done</button></div></div>
+</div>
+<section class="sec">
+<h2>About</h2>
+<div class="card"><table class="about" id="about"></table></div>
+<div class="note">The DreamPi script versions are the dates DreamPi's own auto-update compares.</div>
+</section>
+</div>
+</div></div>
+
+<script>@@JS@@</script>
+</body></html>

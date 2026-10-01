@@ -57,7 +57,8 @@ if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--
 mkdir -p "$DEST"
 cp "$SRC/netswitch_hook.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" \
    "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
-mkdir -p "$DEST/static"
+mkdir -p "$DEST/page" "$DEST/static"
+cp "$SRC/page/index.html" "$SRC/page/page.css" "$SRC/page/page.js" "$DEST/page/"
 cp "$SRC/static/three.min.js" "$SRC/static/dc-background.js" "$SRC/static/LICENSES.txt" "$SRC"/static/*.png "$DEST/static/"
 chmod +x "$DEST/uninstall.sh"
 # Add-on version for the settings page: date and commit of this checkout
