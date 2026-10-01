@@ -2,7 +2,7 @@
 state list, driven with scripted levels and a fake clock (no GPIO)."""
 import unittest
 
-from support import web, sandbox, cleanup
+from support import core, sandbox, cleanup
 import netswitch_buttons as b
 
 
@@ -76,16 +76,16 @@ class ButtonTests(unittest.TestCase):
 
     def test_toggle_and_select(self):
         import os
-        self.assertFalse(os.path.exists(web.FLAG))
+        self.assertFalse(os.path.exists(core.FLAG))
         b.toggle_network()
-        self.assertTrue(os.path.exists(web.FLAG))
+        self.assertTrue(os.path.exists(core.FLAG))
         b.toggle_network()
-        self.assertFalse(os.path.exists(web.FLAG))
+        self.assertFalse(os.path.exists(core.FLAG))
         b.select_network("dcnet")
         b.select_network("dcnet")                     # idempotent
-        self.assertTrue(os.path.exists(web.FLAG))
+        self.assertTrue(os.path.exists(core.FLAG))
         b.select_network("dcnow")
-        self.assertFalse(os.path.exists(web.FLAG))
+        self.assertFalse(os.path.exists(core.FLAG))
 
     def test_pull_constants_differ_per_register(self):
         import netswitch_gpio as g

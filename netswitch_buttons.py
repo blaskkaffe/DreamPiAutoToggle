@@ -27,8 +27,8 @@
 #      re-hosts the access point) until the page or the button cancels it.
 # The current state is written to /tmp/dreampi-netswitch.wifi for the web
 # page (a warning banner and the Settings button) and the LED service
-# (netswitch_led.py, via netswitch_web.active_messages()) to read; see
-# LED_STATES's "wifi-setup" / "wifi-ok" / "wifi-failed" in netswitch_web.py.
+# (netswitch_led.py, via netswitch_core.active_messages()) to read; see
+# LED_STATES's "wifi-setup" / "wifi-ok" / "wifi-failed" in netswitch_core.py.
 #
 # This assumes the classic Raspberry Pi OS network stack DreamPi normally
 # runs on: wpa_supplicant + dhcpcd managing the wireless interface, and
@@ -54,15 +54,16 @@ except ImportError:   # not expected (this service only ever runs under python3)
 from urllib.parse import parse_qs
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import netswitch_web as web  # noqa: E402  (paths, check_internet(), debug_log())
+import netswitch_core as core  # noqa: E402  (paths, settings, debug_log())
+import netswitch_probes as probes  # noqa: E402  (check_internet())
 from netswitch_gpio import peripheral_base, Block, GPIO_OFFSET, set_input_pullup, read_level  # noqa: E402
 
-BASE_DIR = web.BASE_DIR
+BASE_DIR = core.BASE_DIR
 HOSTAPD_CONF = os.path.join(BASE_DIR, "wifi_hostapd.conf")
 DNSMASQ_CONF = os.path.join(BASE_DIR, "wifi_dnsmasq.conf")
 WPA_CONF = "/etc/wpa_supplicant/wpa_supplicant.conf"
 
-AP_SSID = web.WIFI_AP_SSID
+AP_SSID = core.WIFI_AP_SSID
 AP_IP = "192.168.4.1"
 AP_DHCP_FROM, AP_DHCP_TO = "192.168.4.10", "192.168.4.100"
 
@@ -118,25 +119,25 @@ def set_state(state, ssid=None, networks=None):
     data = {"state": state, "ssid": ssid, "time": time.time()}
     if networks is not None:
         data["networks"] = networks
-    tmp = web.WIFI_STATE + ".tmp"
+    tmp = core.WIFI_STATE + ".tmp"
     try:
         with open(tmp, "w") as f:
             json.dump(data, f)
-        os.rename(tmp, web.WIFI_STATE)
+        os.rename(tmp, core.WIFI_STATE)
     except (IOError, OSError):
         pass
 
 
 def stop_requested():
-    return os.path.exists(web.WIFI_STOP)
+    return os.path.exists(core.WIFI_STOP)
 
 
 def start_requested():
-    return os.path.exists(web.WIFI_START)
+    return os.path.exists(core.WIFI_START)
 
 
 def clear_flags():
-    for path in (web.WIFI_START, web.WIFI_STOP, web.WIFI_CONNECT):
+    for path in (core.WIFI_START, core.WIFI_STOP, core.WIFI_CONNECT):
         try:
             os.remove(path)
         except OSError:
@@ -149,9 +150,9 @@ def check_external_connect():
     the regular page is reachable some other way (e.g. Ethernet) while
     Wi-Fi is being set up. Returns (ssid, password) or None."""
     try:
-        with open(web.WIFI_CONNECT) as f:
+        with open(core.WIFI_CONNECT) as f:
             data = json.load(f)
-        os.remove(web.WIFI_CONNECT)
+        os.remove(core.WIFI_CONNECT)
     except (IOError, OSError, ValueError):
         return None
     ssid = str(data.get("ssid") or "").strip()
@@ -302,7 +303,7 @@ def try_connect(iface, ssid, password):
         if stop_requested():
             return False
         if has_ip(iface):
-            return web.check_internet()["state"] in ("ok", "warn")
+            return probes.check_internet()["state"] in ("ok", "warn")
         time.sleep(1)
     return False
 
@@ -505,23 +506,23 @@ def _setup_cycle(iface):
         try:
             start_ap(iface)
         except Exception:
-            web.debug_log("wifi setup: could not start the access point")
+            core.debug_log("wifi setup: could not start the access point")
             break
         action, ssid, password = run_ap_server(networks)
         stop_ap(iface)
         if action != "connect":
             break
         set_state("connecting", ssid=ssid)
-        web.debug_log("wifi setup: trying to connect to %s" % ssid)
+        core.debug_log("wifi setup: trying to connect to %s" % ssid)
         ok = try_connect(iface, ssid, password)
         if stop_requested():
             break
         if ok:
-            web.debug_log("wifi setup: connected to %s" % ssid)
+            core.debug_log("wifi setup: connected to %s" % ssid)
             set_state("ok", ssid=ssid)
             wait_or_stop(RESULT_PAUSE)
             break
-        web.debug_log("wifi setup: could not connect to %s, trying again" % ssid)
+        core.debug_log("wifi setup: could not connect to %s, trying again" % ssid)
         set_state("failed", ssid=ssid)
         if wait_or_stop(RESULT_PAUSE):
             break
@@ -533,26 +534,26 @@ def _setup_cycle(iface):
 def toggle_network():
     """Short press: switch the selected network, the same flag file the web
     page's DCNow!/DCNET buttons and the special phone numbers use."""
-    if os.path.exists(web.FLAG):
-        os.remove(web.FLAG)
+    if os.path.exists(core.FLAG):
+        os.remove(core.FLAG)
         net = "DCNow!"
     else:
-        open(web.FLAG, "w").close()
+        open(core.FLAG, "w").close()
         net = "DCNET"
-    web.debug_log("button: short press, %s selected" % net)
+    core.debug_log("button: short press, %s selected" % net)
 
 
 def select_network(net):
     """Short press: select DCNow! or DCNET outright, unlike toggle_network()
     not relative to the current selection. Idempotent (does nothing, and
     logs nothing, if that network is already selected)."""
-    exists = os.path.exists(web.FLAG)
+    exists = os.path.exists(core.FLAG)
     if net == "dcnet" and not exists:
-        open(web.FLAG, "w").close()
-        web.debug_log("button: short press, DCNET selected")
+        open(core.FLAG, "w").close()
+        core.debug_log("button: short press, DCNET selected")
     elif net == "dcnow" and exists:
-        os.remove(web.FLAG)
-        web.debug_log("button: short press, DCNow! selected")
+        os.remove(core.FLAG)
+        core.debug_log("button: short press, DCNow! selected")
 
 
 _BUTTON_FUNCTIONS = {"off": lambda: None, "toggle": toggle_network,
@@ -560,11 +561,11 @@ _BUTTON_FUNCTIONS = {"off": lambda: None, "toggle": toggle_network,
 
 
 def _start_wifi_toggle():
-    if os.path.exists(web.WIFI_STATE) and web.wifi_state().get("state", "idle") != "idle":
-        open(web.WIFI_STOP, "w").close()
+    if os.path.exists(core.WIFI_STATE) and core.wifi_state().get("state", "idle") != "idle":
+        open(core.WIFI_STOP, "w").close()
     else:
-        open(web.WIFI_START, "w").close()
-    web.debug_log("button: hold, Wi-Fi setup toggled")
+        open(core.WIFI_START, "w").close()
+    core.debug_log("button: hold, Wi-Fi setup toggled")
 
 
 def new_button_state():
@@ -671,13 +672,13 @@ def button_watcher(gpio1, gpio2, function1, function2, wifi_assignment, stop_eve
 def wifi_enabled():
     """Wi-Fi setup was installed (install.sh --wifi); without it the buttons
     only run their own short-press functions."""
-    return os.path.exists(web.WIFI_ENABLED)
+    return os.path.exists(core.WIFI_ENABLED)
 
 
 def _button_config():
     # "" = no button starts Wi-Fi setup (check_wifi_hold() matches none)
-    return (web.button_gpio(1), web.button_gpio(2), web.button_function(1), web.button_function(2),
-            web.wifi_button() if wifi_enabled() else "")
+    return (core.button_gpio(1), core.button_gpio(2), core.button_function(1), core.button_function(2),
+            core.wifi_button() if wifi_enabled() else "")
 
 
 def main():
@@ -697,7 +698,7 @@ def main():
             thread = threading.Thread(target=button_watcher, args=cfg + (stop_event,))
             thread.daemon = True
             thread.start()
-            web.debug_log("button: config changed, button1=GPIO%d (%s), button2=GPIO%d (%s), wifi setup=%s"
+            core.debug_log("button: config changed, button1=GPIO%d (%s), button2=GPIO%d (%s), wifi setup=%s"
                           % cfg)
 
         if not wifi_enabled():
@@ -707,7 +708,7 @@ def main():
         if start_requested():
             clear_flags()
             if not iface:
-                web.debug_log("wifi setup: no Wi-Fi adapter found")
+                core.debug_log("wifi setup: no Wi-Fi adapter found")
                 set_state("failed", ssid="no Wi-Fi adapter found")
                 wait_or_stop(RESULT_PAUSE)
                 set_state("idle")
@@ -715,7 +716,7 @@ def main():
                 try:
                     setup_cycle(iface)
                 except Exception:
-                    web.debug_log("wifi setup: unexpected error, stopping")
+                    core.debug_log("wifi setup: unexpected error, stopping")
                     sys.stderr.write("wifi setup failed:\n")
                     import traceback
                     traceback.print_exc()

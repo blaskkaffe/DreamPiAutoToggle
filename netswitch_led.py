@@ -29,10 +29,10 @@
 #   (DmaStrip; PcmStrip is the same idea against the PCM peripheral).
 # When the data runs out the pin stays low, which latches the colours.
 #
-# What it shows comes from the page's settings (led.json, see netswitch_web):
+# What it shows comes from the page's settings (led.json, see netswitch_core):
 # per message (DreamPi status, network/internet errors, Ethernet/Wi-Fi) and
 # selected network: on/off, colour, effect, speed, brightness and LED section.
-# Errors outrank information; see netswitch_web.active_messages().
+# Errors outrank information; see netswitch_core.active_messages().
 # The number of LEDs is in /opt/dreampi-netswitch/led_count (install.sh).
 import array
 import colorsys
@@ -47,7 +47,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import netswitch_web as web  # noqa: E402  (reuses the page's status logic)
+import netswitch_core as core  # noqa: E402  (settings and state shared with the web service)
 from netswitch_gpio import peripheral_base, Block  # noqa: E402  (shared with netswitch_buttons.py)
 
 FPS = 50
@@ -477,17 +477,17 @@ _dither_err = {}   # (led index, channel) -> carried-over rounding error
 
 
 # ------------------------------------------------------------- calibration
-# A simple NeoPixel-style pipeline (see web.default_led_config(), which
+# A simple NeoPixel-style pipeline (see core.default_led_config(), which
 # stores it): requested colour -> gamma correction -> white-balance
-# multipliers -> max_brightness -> NeoPixel. Gamma (web.GAMMA, ~2.2)
+# multipliers -> max_brightness -> NeoPixel. Gamma (core.GAMMA, ~2.2)
 # compensates for duty-cycle brightness not matching perceived brightness
 # (dim values get dimmer, full-on is unchanged); white balance is a plain
 # per-channel multiplier (0..1, 1 = no correction) found once by eye with
-# the LED held at solid white (see web.wb_test_active()) and nudging down
+# the LED held at solid white (see core.wb_test_active()) and nudging down
 # whichever channel looks too strong; max_brightness is the familiar
 # global/per-message brightness level, applied last so it scales the
 # already-corrected colour rather than the raw request.
-def to_bytes(frame, brightness, white_balance=None, gamma=web.GAMMA, dither=True, start=0):
+def to_bytes(frame, brightness, white_balance=None, gamma=core.GAMMA, dither=True, start=0):
     """Floats 0..1 -> 0..255 through gamma -> white balance -> brightness.
     A channel that is on never rounds down to 0, so colours stay
     recognisable at low brightness. With dither, the rounding error is
@@ -529,7 +529,7 @@ def reset_dither():
     _dither_err.clear()
 
 
-def scaled(colour, brightness, white_balance=None, gamma=web.GAMMA):
+def scaled(colour, brightness, white_balance=None, gamma=core.GAMMA):
     """'#rrggbb' at a brightness, for a single solid pixel."""
     return to_bytes([hex_rgb(colour)], brightness, white_balance, gamma, dither=False)[0]
 
@@ -541,7 +541,7 @@ def _wb(cfg):
 
 
 # ---------------------------------------------------------------- composing
-def render(messages, now, count, clocks=None, white_balance=None, gamma=web.GAMMA):
+def render(messages, now, count, clocks=None, white_balance=None, gamma=core.GAMMA):
     """Draw the active messages (lowest priority first) into one frame.
     Each message covers all LEDs or its own section; later (more important)
     messages draw over earlier ones, and uncovered LEDs stay dark.
@@ -576,10 +576,10 @@ def render(messages, now, count, clocks=None, white_balance=None, gamma=web.GAMM
 
 # ---------------------------------------------------------------- main loop
 def main():
-    count, gpio = web.led_count() or 1, web.led_gpio()
-    cfg = web.led_config()
+    count, gpio = core.led_count() or 1, core.led_gpio()
+    cfg = core.led_config()
     order = ORDERS.get(cfg.get("order"), DEFAULT_ORDER)
-    white_balance, gamma = _wb(cfg), cfg.get("gamma", web.GAMMA)
+    white_balance, gamma = _wb(cfg), cfg.get("gamma", core.GAMMA)
     try:
         out = open_output(count, gpio)
     except (IOError, OSError) as e:
@@ -607,12 +607,12 @@ def main():
         now = time.time()
         if now >= next_read:
             try:
-                wb_test = web.wb_test_active()
-                messages = web.active_messages()
-                cfg = web.led_config()
+                wb_test = core.wb_test_active()
+                messages = core.active_messages()
+                cfg = core.led_config()
                 order = ORDERS.get(cfg.get("order"), DEFAULT_ORDER)
-                white_balance, gamma = _wb(cfg), cfg.get("gamma", web.GAMMA)
-                new_count, new_gpio = web.led_count() or 1, web.led_gpio()
+                white_balance, gamma = _wb(cfg), cfg.get("gamma", core.GAMMA)
+                new_count, new_gpio = core.led_count() or 1, core.led_gpio()
                 if new_count != count or new_gpio != gpio:   # changed on the page: reopen the output
                     try:
                         new_out = open_output(new_count, new_gpio)
@@ -633,7 +633,7 @@ def main():
         # White-balance test open on the page: hold the strip at solid white,
         # run through the same gamma/white-balance/brightness pipeline as
         # everything else, so what's previewed is exactly what's being
-        # calibrated - see web.wb_test_active().
+        # calibrated - see core.wb_test_active().
         if wb_test:
             frame = to_bytes([(1.0, 1.0, 1.0)] * count, cfg.get("max_brightness", 0.08),
                              white_balance, gamma, dither=False)

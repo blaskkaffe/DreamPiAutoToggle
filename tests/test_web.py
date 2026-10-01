@@ -14,7 +14,7 @@ try:
 except ImportError:   # pragma: no cover
     raise
 
-from support import web, sandbox, cleanup, ROOT
+from support import web, core, sandbox, cleanup
 
 
 class ConfigTests(unittest.TestCase):
@@ -25,70 +25,70 @@ class ConfigTests(unittest.TestCase):
         cleanup(self.tmp)
 
     def test_led_defaults_are_valid(self):
-        cfg = web.led_config()
+        cfg = core.led_config()
         self.assertEqual(cfg["white_balance"], {"r": 1.0, "g": 1.0, "b": 1.0})
-        self.assertEqual(cfg["gamma"], web.GAMMA)
-        self.assertIn(cfg["order"], web.LED_ORDERS)
+        self.assertEqual(cfg["gamma"], core.GAMMA)
+        self.assertIn(cfg["order"], core.LED_ORDERS)
         self.assertEqual(set(cfg["colours"]), {"dcnow", "dcnet"})
         for net in cfg["colours"].values():
-            self.assertEqual(sorted(net), sorted(st[0] for st in web.LED_STATES))
+            self.assertEqual(sorted(net), sorted(st[0] for st in core.LED_STATES))
 
     def test_led_round_trip_and_clamping(self):
-        cfg = web.led_config()
+        cfg = core.led_config()
         cfg["white_balance"] = {"r": 2.0, "g": -1, "b": 0.5}
         cfg["max_brightness"] = 0.3
         cfg["order"] = "RGB"
-        web.save_led_config(cfg)
-        got = web.led_config()
+        core.save_led_config(cfg)
+        got = core.led_config()
         self.assertEqual(got["white_balance"], {"r": 1.0, "g": 0.0, "b": 0.5})
         self.assertEqual(got["max_brightness"], 0.3)
         self.assertEqual(got["order"], "RGB")
 
     def test_bad_led_values_fall_back(self):
-        got = web.clean_led_config({"order": "XYZ", "max_brightness": "lots", "gamma": 99,
+        got = core.clean_led_config({"order": "XYZ", "max_brightness": "lots", "gamma": 99,
                                     "colours": {"dcnow": {"ok": {"color": "red", "effect": "disco"}}}})
-        d = web.default_led_config()
+        d = core.default_led_config()
         self.assertEqual(got["order"], d["order"])
         self.assertEqual(got["colours"]["dcnow"]["ok"]["color"], d["colours"]["dcnow"]["ok"]["color"])
         self.assertEqual(got["colours"]["dcnow"]["ok"]["effect"], d["colours"]["dcnow"]["ok"]["effect"])
         self.assertTrue(0.5 <= got["gamma"] <= 4.0)
 
     def test_led_count_and_gpio(self):
-        self.assertEqual(web.led_gpio(), 18)
-        web.save_led_gpio(12)
-        self.assertEqual(web.led_gpio(), 12)
-        web.save_led_gpio(7)               # not an LED pin: ignored
-        self.assertEqual(web.led_gpio(), 12)
-        self.assertEqual(web.led_count(), 0)           # 0 = LED service not installed
-        open(web.LED_ENABLED, "w").close()
-        self.assertEqual(web.led_count(), 1)
-        web.save_led_count(30)
-        self.assertEqual(web.led_count(), 30)
-        web.save_led_count(9999)                       # clamped to the 1-300 range
-        self.assertEqual(web.led_count(), 300)
-        web.save_led_count("many")                     # ignored
-        self.assertEqual(web.led_count(), 300)
+        self.assertEqual(core.led_gpio(), 18)
+        core.save_led_gpio(12)
+        self.assertEqual(core.led_gpio(), 12)
+        core.save_led_gpio(7)               # not an LED pin: ignored
+        self.assertEqual(core.led_gpio(), 12)
+        self.assertEqual(core.led_count(), 0)           # 0 = LED service not installed
+        open(core.LED_ENABLED, "w").close()
+        self.assertEqual(core.led_count(), 1)
+        core.save_led_count(30)
+        self.assertEqual(core.led_count(), 30)
+        core.save_led_count(9999)                       # clamped to the 1-300 range
+        self.assertEqual(core.led_count(), 300)
+        core.save_led_count("many")                     # ignored
+        self.assertEqual(core.led_count(), 300)
 
     def test_button_config_defaults_and_validation(self):
-        self.assertEqual((web.button_gpio(1), web.button_gpio(2)), (17, 4))
-        self.assertEqual((web.button_function(1), web.button_function(2)), ("toggle", "off"))
-        self.assertEqual(web.wifi_button(), "1")
-        web.save_button_gpio(1, 22)
-        web.save_button_function(2, "dcnet")
-        web.save_wifi_button("12")
-        web.save_button_gpio(2, 99)          # out of range: ignored
-        web.save_button_function(1, "explode")
-        web.save_wifi_button("3")
-        self.assertEqual((web.button_gpio(1), web.button_gpio(2)), (22, 4))
-        self.assertEqual((web.button_function(1), web.button_function(2)), ("toggle", "dcnet"))
-        self.assertEqual(web.wifi_button(), "12")
+        self.assertEqual((core.button_gpio(1), core.button_gpio(2)), (17, 4))
+        self.assertEqual((core.button_function(1), core.button_function(2)), ("toggle", "off"))
+        self.assertEqual(core.wifi_button(), "1")
+        core.save_button_gpio(1, 22)
+        core.save_button_function(2, "dcnet")
+        core.save_wifi_button("12")
+        core.save_button_gpio(2, 99)          # out of range: ignored
+        core.save_button_function(1, "explode")
+        core.save_wifi_button("3")
+        self.assertEqual((core.button_gpio(1), core.button_gpio(2)), (22, 4))
+        self.assertEqual((core.button_function(1), core.button_function(2)), ("toggle", "dcnet"))
+        self.assertEqual(core.wifi_button(), "12")
 
     def test_white_balance_test_flag(self):
-        self.assertFalse(web.wb_test_active())
-        web.touch_wb_test()
-        self.assertTrue(web.wb_test_active())
-        web.clear_wb_test()
-        self.assertFalse(web.wb_test_active())
+        self.assertFalse(core.wb_test_active())
+        core.touch_wb_test()
+        self.assertTrue(core.wb_test_active())
+        core.clear_wb_test()
+        self.assertFalse(core.wb_test_active())
 
 
 class HttpTests(unittest.TestCase):
@@ -144,7 +144,7 @@ class HttpTests(unittest.TestCase):
         self.post("/default")
 
     def test_ledconfig_round_trip(self):
-        open(web.LED_ENABLED, "w").close()
+        open(core.LED_ENABLED, "w").close()
         r = json.loads(self.get("/ledconfig")[2].decode())
         for key in ("config", "defaults", "states", "effects", "orders", "count", "gpio", "gpios", "installed", "hidden"):
             self.assertIn(key, r)
@@ -168,9 +168,9 @@ class HttpTests(unittest.TestCase):
 
     def test_wbtest_flag(self):
         self.post("/wbtest")
-        self.assertTrue(web.wb_test_active())
+        self.assertTrue(core.wb_test_active())
         self.post("/wbtestdone")
-        self.assertFalse(web.wb_test_active())
+        self.assertFalse(core.wb_test_active())
 
     def test_static_whitelist(self):
         self.assertEqual(self.get("/static/favicon-dcnow.png")[0], 200)
