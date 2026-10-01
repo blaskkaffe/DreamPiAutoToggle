@@ -1345,8 +1345,8 @@ millisecond timing. Turn recording on, then dial.</div>
 <div id="gpio-section" style="display:none;position:relative">
 <h2>GPIO <span class="saved" id="gpio-saved">Saved &#10003;</span></h2>
 <div class="card">
- <div class="srow" id="gpio-led-row" style="display:none"><span>LED<span class="sub">LEDs connected and output pin</span></span>
-  <div style="display:flex;gap:8px"><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"><select class="ord" id="led-gpio" aria-label="LED output pin"></select></div></div>
+ <div class="srow" id="gpio-led-row" style="display:none"><span>LED<span class="sub">LEDs connected, output pin and wire order</span></span>
+  <div style="display:flex;gap:8px"><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"><select class="ord" id="led-gpio" aria-label="LED output pin"></select><select class="ord" id="led-order" aria-label="Wire order"></select></div></div>
  <div class="srow" id="gpio-btn1-row" style="display:none"><span>Button 1<span class="sub">Function and pin</span></span>
   <div style="display:flex;gap:8px"><select class="ord" id="btn1-fn" aria-label="Button 1 function"></select><select class="ord" id="btn1-gpio" aria-label="Button 1 pin"></select></div></div>
  <div class="srow" id="gpio-btn2-row" style="display:none"><span>Button 2<span class="sub">Function and pin</span></span>
@@ -1354,15 +1354,11 @@ millisecond timing. Turn recording on, then dial.</div>
  <div class="srow" id="gpio-wifi-row" style="display:none"><span>Wi-Fi setup<span class="sub">Which button (or both) starts it</span></span>
   <select class="ord" id="wifi-btn-sel" aria-label="Wi-Fi setup button"></select></div>
 </div>
-<div class="note">LED count and output pin take effect within a second; switching the LED output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot). Button pin and function changes take effect within a couple of seconds - pick two different pins for the two buttons. A button's own function (Off, Toggle network, Select DCNow!, Select DCNET) fires on a short press; "Wi-Fi setup" is which button, or both held together, starts Wi-Fi setup with a 3-second hold.</div>
+<div class="note">LED count, output pin and wire order (most WS2812 strips are GRB) take effect within a second; switching the LED output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot). Button pin and function changes take effect within a couple of seconds - pick two different pins for the two buttons. A button's own function (Off, Toggle network, Select DCNow!, Select DCNET) fires on a short press; "Wi-Fi setup" is which button, or both held together, starts Wi-Fi setup with a 3-second hold.</div>
 </div>
 
 <div id="led-section" style="display:none;position:relative">
 <h2>Status LED<span id="led-count-t"></span> <span class="saved" id="led-saved">Saved &#10003;</span></h2>
-<div class="card">
- <div class="secrow"><span class="sub">Wire order</span><select class="ord" id="led-order" aria-label="Wire order"></select></div>
-</div>
-<div class="note">Wire order (most WS2812 strips are GRB) takes effect within a second. LED count and output pin are set in the GPIO section above.</div>
 <div class="card">
  <div class="calib-grid" id="calib-grid"></div>
 </div>
