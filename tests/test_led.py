@@ -3,6 +3,7 @@ import unittest
 
 from support import core, sandbox, cleanup
 import netswitch_led as led
+import netswitch_led_drivers as drivers
 
 
 class PipelineTests(unittest.TestCase):
@@ -43,17 +44,17 @@ class PipelineTests(unittest.TestCase):
 
 class EncodingTests(unittest.TestCase):
     def test_wire_orders(self):
-        for name, order in led.ORDERS.items():
-            data = led.encode_bytes([(1, 2, 3)], order)
-            expect = b"".join(led._TABLE[(1, 2, 3)[i]] for i in order)
+        for name, order in drivers.ORDERS.items():
+            data = drivers.encode_bytes([(1, 2, 3)], order)
+            expect = b"".join(drivers._TABLE[(1, 2, 3)[i]] for i in order)
             self.assertEqual(data[:9], expect, name)
 
     def test_default_is_grb(self):
-        self.assertEqual(led.DEFAULT_ORDER, led.ORDERS["GRB"])
+        self.assertEqual(drivers.DEFAULT_ORDER, drivers.ORDERS["GRB"])
 
     def test_bit_symbols(self):
-        self.assertEqual(led._symbols(0), bytes([0b10010010, 0b01001001, 0b00100100]))
-        self.assertEqual(led._symbols(255), bytes([0b11011011, 0b01101101, 0b10110110]))
+        self.assertEqual(drivers._symbols(0), bytes([0b10010010, 0b01001001, 0b00100100]))
+        self.assertEqual(drivers._symbols(255), bytes([0b11011011, 0b01101101, 0b10110110]))
 
 
 class RenderTests(unittest.TestCase):

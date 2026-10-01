@@ -42,7 +42,7 @@ class HookCompatTests(unittest.TestCase):
 class LayeringTests(unittest.TestCase):
     """The small services must not drag the web server in."""
     def test_led_and_buttons_do_not_import_the_web_module(self):
-        for mod in ("netswitch_led", "netswitch_buttons", "netswitch_core", "netswitch_probes"):
+        for mod in ("netswitch_led", "netswitch_led_drivers", "netswitch_buttons", "netswitch_wifi_setup", "netswitch_core", "netswitch_probes"):
             code = "import sys; sys.path.insert(0, %r); import %s; sys.exit(1 if 'netswitch_web' in sys.modules else 0)" % (ROOT, mod)
             self.assertEqual(subprocess.call(["python3", "-c", code]), 0, mod)
 
