@@ -1,3 +1,2 @@
 {"title": "Wi-Fi setup", "order": 40, "default": false, "web": "netswitch_wifi_web",
- "description": "Join a Wi-Fi network without a keyboard, from Settings or by holding a button.",
- "note": "Needs hostapd and dnsmasq: run sudo ./install.sh --wifi once."}
+ "description": "Join and change Wi-Fi networks."}

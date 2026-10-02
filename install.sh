@@ -14,7 +14,7 @@
 #   in modules/ (see "Optional parts" in the README): a folder that is not there is not installed (and one that was
 #   installed before is removed), and the LED / Wi-Fi options below do nothing without their module.
 #   sudo ./install.sh --wifi       add Wi-Fi setup (a temporary access point for joining a network
-#                                  without a keyboard; installs hostapd + dnsmasq): its page controls
+#                                  without a keyboard; hostapd + dnsmasq are installed with every install): its page controls
 #                                  and the button hold that starts it
 #   sudo ./install.sh --no-wifi    remove Wi-Fi setup again
 #   sudo ./install.sh --wifi-demo  try Wi-Fi setup on dummy networks (no hostapd, nothing is changed on the

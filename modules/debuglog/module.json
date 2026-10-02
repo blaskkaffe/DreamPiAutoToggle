@@ -1,2 +1,2 @@
 {"title": "Debug log", "order": 60, "default": false, "web": "netswitch_debuglog",
- "description": "Timeline of modem events and call routing with millisecond timing, on the main page."}
+ "description": "Enable the modem debug log on the main page."}

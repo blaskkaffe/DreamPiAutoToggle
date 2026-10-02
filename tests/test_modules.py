@@ -129,7 +129,6 @@ class WithEverything(Base):
         self.assertEqual([m["name"] for m in got], ["numbers", "players", "wifi", "led", "debuglog", "background"])   # menu order
         self.assertTrue(all(m["enabled"] for m in got))
         self.assertTrue(all(m["title"] and m["description"] for m in got))
-        self.assertTrue(any(m["note"] for m in got if m["name"] == "wifi"))
 
 
 class WithNothing(Base):
