@@ -49,4 +49,7 @@ hook("buttons",function(r){
  if(!$("wifi-btn-sel").options.length)$("wifi-btn-sel").innerHTML=r.wifi_choices.map(function(c){
   return '<option value="'+c[0]+'">'+esc(c[1])+'</option>'}).join("");
  $("wifi-btn-sel").value=btn.wifi_button});
-$("wifi-btn-sel").onchange=function(){btn.wifi_button=this.value;saveButtons()};
+function describeWifiButton(){var v=$("wifi-btn-sel").value;
+ $("wifi-btn-sub").textContent="Hold button "+(v=="12"?"1 + 2":v)+" for 3 s to start Wi-Fi setup"}
+hook("buttons",describeWifiButton);
+$("wifi-btn-sel").onchange=function(){btn.wifi_button=this.value;describeWifiButton();saveButtons()};

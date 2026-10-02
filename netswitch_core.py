@@ -320,14 +320,14 @@ BUTTON_DEFAULT_GPIO2 = 4
 # open = "off"; the position is also applied once at start.
 # (name, label, group, needs Wi-Fi setup installed, description shown on the page)
 BUTTON_FUNCTIONS = (
-    ("off", "Off", "Push button", False, "Does nothing"),
-    ("toggle", "Toggle network", "Push button", False, "Push button: each press switches between DCNow! and DCNET"),
-    ("dcnow", "Select DCNow!", "Push button", False, "Push button: a press selects DCNow!"),
-    ("dcnet", "Select DCNET", "Push button", False, "Push button: a press selects DCNET"),
-    ("sw_dcnet", "On = DCNET", "Toggle switch", False, "Toggle switch to GND: on selects DCNET, off selects DCNow!"),
-    ("sw_dcnow", "On = DCNow!", "Toggle switch", False, "Toggle switch to GND: on selects DCNow!, off selects DCNET"),
-    ("sw_wifi", "On = Wi-Fi setup", "Toggle switch", True, "Toggle switch to GND: on starts Wi-Fi setup, off ends it (normal mode)"),
-    ("sw_wifi_off", "Off = Wi-Fi setup", "Toggle switch", True, "Toggle switch to GND: off starts Wi-Fi setup, on is normal mode"),
+    ("off", "Off", "Push button", False, "Not mapped to a function"),
+    ("toggle", "Toggle network", "Push button", False, "Push button to switch DCNow! and DCNET"),
+    ("dcnow", "Select DCNow!", "Push button", False, "Push button to select DCNow!"),
+    ("dcnet", "Select DCNET", "Push button", False, "Push button to select DCNET"),
+    ("sw_dcnet", "On = DCNET", "Toggle switch", False, "Toggle switch closed: DCNET, open: DCNow!"),
+    ("sw_dcnow", "On = DCNow!", "Toggle switch", False, "Toggle switch closed: DCNow!, open: DCNET"),
+    ("sw_wifi", "On = Wi-Fi setup", "Toggle switch", True, "Toggle switch closed: Wi-Fi setup, open: Normal mode"),
+    ("sw_wifi_off", "Off = Wi-Fi setup", "Toggle switch", True, "Toggle switch open: Wi-Fi setup, closed: Normal mode"),
 )
 _BUTTON_FUNCTION_NAMES = tuple(f[0] for f in BUTTON_FUNCTIONS)
 BUTTON_DEFAULT_FUNCTION1 = "toggle"

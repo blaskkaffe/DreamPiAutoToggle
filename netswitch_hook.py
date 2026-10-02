@@ -14,7 +14,7 @@ It then wraps Netlink.check_number() with these rules:
              toggle_dcnet  selects DCNET, hangs up
              call_dcnow    selects DCNow! and connects through DCNow!
              call_dcnet    selects DCNET and connects through DCNET
-           Defaults: 5550001# / 5550002# / 11111, 111111 and 1111111 / none.
+           Defaults: none / none / 11111, 111111 and 1111111 / none.
   others   Go to whichever network is selected (website or the numbers above).
            Only calls DreamPi would send to its normal PPP are redirected;
            Netlink/XBAND codes and the built-in *69 prefix are untouched.
@@ -55,7 +55,7 @@ NUM_OPENMENU = "1111111"   # fixed: openMenu always dials this and it must stay 
 # Action -> numbers. Order is the tie-break when two entries are equally long.
 # Keep in sync with modules/numbers/netswitch_numbers.py ACTIONS (a test compares them).
 NUMBER_ACTIONS = ("toggle_dcnow", "toggle_dcnet", "call_dcnow", "call_dcnet")
-DEFAULT_NUMBERS = {"toggle_dcnow": ["5550001#"], "toggle_dcnet": ["5550002#"],
+DEFAULT_NUMBERS = {"toggle_dcnow": [], "toggle_dcnet": [],
                    "call_dcnow": ["11111", "111111", "1111111"], "call_dcnet": []}
 HANGUP_ACTIONS = ("toggle_dcnow", "toggle_dcnet")   # select, then hang up
 

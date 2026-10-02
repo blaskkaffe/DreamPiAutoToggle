@@ -55,6 +55,10 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(nums.numbers(), saved)
         self.assertEqual(hook._load_numbers()["toggle_dcnow"], ["*61#", "5550009"])
 
+    def test_length_limits(self):
+        self.assertEqual(nums.clean_number("1" * 12), "1" * 12)
+        self.assertIsNone(nums.clean_number("1" * 13))         # the page says 3 - 12 digits
+
     def test_limit_per_action(self):
         saved = nums.save_numbers({"call_dcnow": ["%07d" % i for i in range(30)]})
         self.assertEqual(len(saved["call_dcnow"]), nums.MAX_PER_ACTION)
@@ -89,8 +93,8 @@ class ClassifyTests(unittest.TestCase):
         for n in ("11111", "111111", "1111111"):
             self.assertEqual(self.c(n), "call_dcnow", n)
         self.assertIsNone(self.c("5550001"))
-        self.assertEqual(self.c("5550001#"), "toggle_dcnow")
-        self.assertEqual(self.c("5550002#"), "toggle_dcnet")
+        self.assertEqual((self.D["toggle_dcnow"], self.D["toggle_dcnet"]), ([], []))      # no toggle numbers by default
+        self.assertIsNone(self.c("5550001#"))
         self.assertIsNone(self.c("1111111#"))                       # the old Reset number is no longer special
         self.assertIsNone(self.c("5551234"))
         self.assertIsNone(self.c(""))
@@ -99,7 +103,8 @@ class ClassifyTests(unittest.TestCase):
         n = dict(self.D, call_dcnet=["5550002"])
         self.assertEqual(self.c("15550002", n), "call_dcnet")       # DreamPi hears an extra leading 1
         self.assertEqual(self.c("11111111"), "call_dcnow")          # a longer run still ends with 1111111
-        self.assertEqual(self.c("0412345550001#"), "toggle_dcnow")  # ISP prefix
+        n = dict(self.D, toggle_dcnow=["5550001#"])
+        self.assertEqual(self.c("0412345550001#", n), "toggle_dcnow")   # ISP prefix
 
     def test_short_ending_and_star_numbers(self):
         n = dict(self.D, call_dcnet=["0002"], toggle_dcnow=["*61#"])
@@ -173,6 +178,7 @@ class WrapperTests(unittest.TestCase):
         self.assertEqual((r["client"], self.selected()), ("PPP", "dcnow"))
 
     def test_toggle_numbers_select_and_hang_up_without_calling_netlink(self):
+        nums.save_numbers({"toggle_dcnow": ["5550001#"], "toggle_dcnet": ["5550002#"]})
         r = self.dial("5550002#")
         self.assertEqual((r["client"], self.selected(), self.nl.mode), ("idle", "dcnet", "idle"))
         r = self.dial("5550001#")

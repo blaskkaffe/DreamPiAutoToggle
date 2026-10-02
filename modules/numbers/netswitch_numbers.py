@@ -11,12 +11,12 @@ import netswitch_core as core
 # against the END of each number, longest match first, so an entry can be a
 # short ending or a whole number, with digits, * and # (e.g. "*61#").
 ACTIONS = (
-    ("toggle_dcnow", "Toggle DCNow!", "Selects DCNow! and hangs up", ["5550001#"]),
-    ("toggle_dcnet", "Toggle DCNET", "Selects DCNET and hangs up", ["5550002#"]),
-    ("call_dcnow", "Call DCNow!", "Selects DCNow! and connects to it", ["11111", "111111", "1111111"]),
-    ("call_dcnet", "Call DCNET", "Selects DCNET and connects to it", []),
+    ("toggle_dcnow", "Toggle DCNow!", "Selects DCNow! and hangs up", []),
+    ("toggle_dcnet", "Toggle DCNET", "Selects DCNET and hangs up", []),
+    ("call_dcnow", "Call DCNow!", "Selects DCNow! and connects", ["11111", "111111", "1111111"]),
+    ("call_dcnet", "Call DCNET", "Selects DCNET and connects", []),
 )
-MIN_LEN, MAX_LEN, MAX_PER_ACTION = 3, 24, 10
+MIN_LEN, MAX_LEN, MAX_PER_ACTION = 3, 12, 10
 _JUNK = re.compile(r"[^0-9*#]")
 
 
