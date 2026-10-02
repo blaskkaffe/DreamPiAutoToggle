@@ -13,7 +13,7 @@ Read before adding, removing or restructuring a feature. Back to [CLAUDE.md](../
 | `numbers` | `modules/numbers/` | the editable phone numbers: Settings > Special phone numbers, `GET`/`POST /numbers`, `numbers.json` (the hook only reads it while the module is on, else it uses its built-in defaults) | on |
 | `players` | `modules/players/` | the Online players box on the main page and `GET /players` | on |
 | `wifi` | `modules/wifi/` | Wi-Fi setup: the Wi-Fi rows in Settings, `POST /wifitoggle` and `/wificonnect`, its own service `dreampi-netswitch-wifi` (`netswitch_wifi_service.py` + `netswitch_wifi_setup.py`) | **off** |
-| `led` | `modules/led/` | the status LEDs: the service (`netswitch_led.py`, `netswitch_led_drivers.py`), `netswitch_ledconfig.py`, the NeoPixel calibration and Status LED settings **including the LED count / GPIO pin / wire order row**, `GET`/`POST /ledconfig` | on |
+| `led` | `modules/led/` | the status LEDs: the service (`netswitch_led.py`, `netswitch_led_drivers.py`), `netswitch_ledconfig.py`, the Status LED settings (with the calibration pop-up) **including the LED count / GPIO pin / wire order row**, `GET`/`POST /ledconfig` | on |
 | `background` | `modules/background/` | the animated Dreamcast background: `GET /background/*.js` (its own script files), the `#dcbg` layer and the translucent box styling | **off** |
 | `debuglog` | `modules/debuglog/` | the Debug log bar and live log on the main page, `GET /log`, `/dtmf`, `POST /debug`, `/clearlog`, and the part that runs inside DreamPi (`netswitch_hookdebug.py`) | **off** |
 
@@ -54,7 +54,7 @@ POSTs pass the same security gate as every other POST (Origin / `X-Requested-Wit
 | `about_top` | extra rows at the top of the About card (the Wi-Fi setup row) |
 | `sections_a` | whole Settings sections before the GPIO card (Special phone numbers) |
 | `buttons_rows` | extra rows in the buttons' GPIO card (the Wi-Fi hold button) |
-| `sections_b` | whole Settings sections after the GPIO card (NeoPixel calibration, Status LED) |
+| `sections_b` | whole Settings sections after the GPIO card (Status LED, with the calibration pop-up) |
 
 Client-side hooks (`page/page.js`): a module's `page.js` calls `hook(name, fn)`, the page calls `fire(name, arg)`: `api` (d, every second), `settingsOpen`, `settingsClose`, `escape` (return `true` if handled), `buttons` (the button settings were loaded), `posted` (after a form post). Settings opening, closing and refreshing never mention a module by name.
 

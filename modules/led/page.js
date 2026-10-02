@@ -58,7 +58,13 @@ function placePop(pop,el){var box=pop.parentNode.getBoundingClientRect(),r=el.ge
  pop.style.top=(r.bottom-box.top+6)+"px"}
 var lvlCur=null,fxCur=null;
 function closePops(){$("lvl-pop").classList.remove("open");$("fx-pop").classList.remove("open");
- lvlCur=fxCur=null}
+ if(calOpen)closeCal();lvlCur=fxCur=null}
+// the calibration pop-up (white balance sliders, preview and the maximum brightness), opened from the Status LED card
+var calOpen=false;
+function closeCal(){calOpen=false;$("cal-pop").classList.remove("open");if(wbPreviewOn)setWbPreview(false)}   // the test hold ends with the pop-up
+$("cal-open").onclick=function(e){e.stopPropagation();if(calOpen){closePops();return}
+ closePops();calOpen=true;showWb();placePop($("cal-pop"),this)};
+$("cal-done").onclick=closePops;
 var secMode="all";   // what the LEDs buttons of the open effect popup show: all | one | range
 function openFx(el){closePops();var st=el.dataset.state,c=msgOf(st);fxCur=st;
  $("fx-t").textContent=el.dataset.label;
@@ -105,8 +111,8 @@ $("lvl-r").oninput=function(){if(!lvlCur)return;var b=Math.round(sliderToBright(
  msgOf(lvlCur).brightness=b;$("lvl-v").textContent=pct(b);showLvl(lvlCur);saveLed()};
 $("lvl-base").onclick=function(){if(!lvlCur)return;msgOf(lvlCur).brightness=null;showLvl(lvlCur);saveLed();closePops()};
 $("lvl-done").onclick=closePops;
-$("lvl-pop").onclick=$("fx-pop").onclick=function(e){e.stopPropagation()};
-$("settings").addEventListener("click",function(){if(lvlCur||fxCur)closePops()});
+$("lvl-pop").onclick=$("fx-pop").onclick=$("cal-pop").onclick=function(e){e.stopPropagation()};
+$("settings").addEventListener("click",function(){if(lvlCur||fxCur||calOpen)closePops()});
 ["r","g","b"].forEach(function(c){$("wb-"+c).oninput=function(){
  led.white_balance[c]=Math.round(this.value)/255;$("wb-"+c+"-v").textContent=Math.round(this.value);saveLed()}});
 function setWbPreview(on){wbPreviewOn=on;$("wb-preview").classList.toggle("on",on);
@@ -144,4 +150,4 @@ $("led-hide-b").onclick=function(){
 // hooks of the base page
 hook("settingsOpen",loadLed);                                                // Settings opened
 hook("settingsClose",function(){closePops();if(wbPreviewOn)setWbPreview(false)});   // Settings closed
-hook("escape",function(){if(lvlCur||fxCur){closePops();return true}});       // Escape closes an open pop-up first
+hook("escape",function(){if(lvlCur||fxCur||calOpen){closePops();return true}});       // Escape closes an open pop-up first
