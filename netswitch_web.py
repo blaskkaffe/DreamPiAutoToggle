@@ -270,7 +270,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send(body, STATIC_FILES[name], cache=86400, fixed=True)
         elif self.path == "/ledconfig":
             self.send(json.dumps({"config": ledconfig.led_config(), "defaults": ledconfig.default_led_config(),
-                                  "states": ledconfig.LED_STATES,
+                                  "states": ledconfig.LED_STATES, "groups": ledconfig.GROUPS,
                                   "effects": ledconfig.EFFECTS, "orders": ledconfig.LED_ORDERS, "count": ledconfig.led_count(),
                                   "gpio": ledconfig.led_gpio(), "gpios": ledconfig.GPIO_PINS,
                                   "installed": ledconfig.led_count() > 0, "hidden": ledconfig.led_hidden()}),

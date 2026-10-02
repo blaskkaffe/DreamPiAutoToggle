@@ -157,14 +157,14 @@ class ActiveMessageTests(unittest.TestCase):
         msgs = ledconfig.active_messages("ok", {"network": False}, wifi=False)
         keys = [m["key"] for m in msgs]
         self.assertEqual(keys[-1], "no-network")        # last = drawn on top
-        self.assertIn("ok", keys)
+        self.assertIn("ready-dcnow", keys)
 
     def test_disabled_message_is_left_out(self):
         cfg = ledconfig.led_config()
-        cfg["colours"]["dcnow"]["ok"]["enabled"] = False
+        cfg["messages"]["ready-dcnow"]["enabled"] = False
         ledconfig.save_led_config(cfg)
         keys = [m["key"] for m in ledconfig.active_messages("ok", {"network": True}, wifi=False)]
-        self.assertNotIn("ok", keys)
+        self.assertNotIn("ready-dcnow", keys)
 
     def test_brightness_falls_back_to_max(self):
         m = ledconfig.active_messages("ok", {"network": True}, wifi=False)[0]

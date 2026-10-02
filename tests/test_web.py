@@ -29,9 +29,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(cfg["white_balance"], {"r": 1.0, "g": 1.0, "b": 1.0})
         self.assertEqual(cfg["gamma"], ledconfig.GAMMA)
         self.assertIn(cfg["order"], ledconfig.LED_ORDERS)
-        self.assertEqual(set(cfg["colours"]), {"dcnow", "dcnet"})
-        for net in cfg["colours"].values():
-            self.assertEqual(sorted(net), sorted(st[0] for st in ledconfig.LED_STATES))
+        self.assertNotIn("colours", cfg)              # one entry per message, not per selected network
+        self.assertEqual(sorted(cfg["messages"]), sorted(st[0] for st in ledconfig.LED_STATES))
 
     def test_led_round_trip_and_clamping(self):
         cfg = ledconfig.led_config()
@@ -46,11 +45,11 @@ class ConfigTests(unittest.TestCase):
 
     def test_bad_led_values_fall_back(self):
         got = ledconfig.clean_led_config({"order": "XYZ", "max_brightness": "lots", "gamma": 99,
-                                    "colours": {"dcnow": {"ok": {"color": "red", "effect": "disco"}}}})
+                                    "messages": {"ready-dcnow": {"color": "red", "effect": "disco"}}})
         d = ledconfig.default_led_config()
         self.assertEqual(got["order"], d["order"])
-        self.assertEqual(got["colours"]["dcnow"]["ok"]["color"], d["colours"]["dcnow"]["ok"]["color"])
-        self.assertEqual(got["colours"]["dcnow"]["ok"]["effect"], d["colours"]["dcnow"]["ok"]["effect"])
+        self.assertEqual(got["messages"]["ready-dcnow"]["color"], d["messages"]["ready-dcnow"]["color"])
+        self.assertEqual(got["messages"]["ready-dcnow"]["effect"], d["messages"]["ready-dcnow"]["effect"])
         self.assertTrue(0.5 <= got["gamma"] <= 4.0)
 
     def test_led_count_and_gpio(self):

@@ -4,9 +4,10 @@
 # netswitch_led_drivers.py; this file decides what to show and when.
 #
 # What it shows comes from the page's settings (led.json, see netswitch_ledconfig):
-# per message (DreamPi status, network/internet errors, Ethernet/Wi-Fi) and
-# selected network: on/off, colour, effect, speed, brightness and LED section.
-# Errors outrank information; see netswitch_ledconfig.active_messages().
+# per message (system, network and call messages, see LED_STATES): on/off, colour, effect,
+# speed, brightness and LED section. Several messages can show at once on different LEDs;
+# errors outrank information and "State unknown" is only a fallback, see
+# netswitch_ledconfig.active_messages().
 # The number of LEDs is in /opt/dreampi-netswitch/led_count (install.sh).
 import colorsys
 import math
@@ -38,6 +39,30 @@ PERIODS = {
 }
 
 
+# Ping: a quick double pulse, then a longer pause - "pop pop ------- pop pop -------".
+# Seconds per speed: first pulse, gap, second pulse, pause. A pulse rises quickly (PING_RISE of
+# its length) and fades a little slower; the gap and the pause are dark.
+PING = {"slow": (0.14, 0.12, 0.14, 1.10), "fast": (0.10, 0.08, 0.10, 0.70)}
+PING_RISE = 0.3
+
+
+def _pulse(x):
+    """0..1 brightness across one pulse, x = 0..1 through it."""
+    return x / PING_RISE if x < PING_RISE else (1.0 - x) / (1.0 - PING_RISE)
+
+
+def ping_level(t, speed="slow"):
+    """Brightness factor 0..1 of the ping effect t seconds after it started."""
+    first, gap, second, pause = PING["fast" if speed == "fast" else "slow"]
+    t %= first + gap + second + pause
+    if t < first:
+        return _pulse(t / first)
+    t -= first + gap
+    if 0 <= t < second:
+        return _pulse(t / second)
+    return 0.0
+
+
 def hex_rgb(colour):
     return tuple(int(colour[i:i + 2], 16) / 255.0 for i in (1, 3, 5))
 
@@ -61,6 +86,8 @@ def effect_frame(effect, speed, colour, t, n):
     fast = speed == "fast"
     if effect == "solid":
         return [c] * n
+    if effect == "ping":
+        return [_mul(c, ping_level(t, speed))] * n     # every LED of the message pulses together
     period = PERIODS.get(effect, (1.0, 0.4))[1 if fast else 0]
     phase = (t / period) % 1.0
     if effect == "rgb":

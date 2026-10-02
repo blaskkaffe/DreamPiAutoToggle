@@ -5,7 +5,7 @@ function ago(t,now){if(!t)return"";var s=Math.max(0,now-t);
  if(s<60)return"("+s+"s ago)";if(s<3600)return"("+Math.floor(s/60)+" min ago)";return"("+Math.floor(s/3600)+" h ago)"}
 function dot(el,state){el.className="dot "+(state||"")}
 // Status dot preview of the LED effect: [keyframes, slow s, fast s, timing]
-var DOT_FX={blink:["blink",1,.4,"steps(1)"],breathe:["breathe",4,1.6,"ease-in-out"],rgb:["rgbc",20,10,"linear"],
+var DOT_FX={blink:["blink",1,.4,"steps(1)"],ping:["ping",1.5,.98,"linear"],breathe:["breathe",4,1.6,"ease-in-out"],rgb:["rgbc",20,10,"linear"],
  rainbow:["rgbc",20,10,"linear"],scanner:["breathe",3,1.2,"ease-in-out"],comet:["breathe",3,1.2,"ease-in-out"],
  chase:["blink",.6,.24,"steps(1)"],twinkle:["breathe",3,1.2,"ease-in-out"]};
 function lookDot(el,look){if(!look){el.className="dot";el.style.background="#333";el.style.animation="none";return}
@@ -224,7 +224,7 @@ function setDebugMenu(on){
  $("dbg-b").checked=on;$("debug-bar").style.display=on?"flex":"none";
  if(!on){debugOpen=false;$("debug").style.display="none";$("show-debug").classList.remove("open")}}
 $("dbg-b").onchange=function(){setDebugMenu(this.checked)};
-var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledEffects=[],ledCount=1,ledGpio=18,ledNet="dcnow";
+var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledGroups=[],ledEffects=[],ledCount=1,ledGpio=18;
 var wbPreviewOn=false,wbHeartbeat=null;
 var ledInstalled=false,ledHiddenFlag=false,wifiInstalled=false;
 function updateGpioSection(){
@@ -233,7 +233,7 @@ function updateGpioSection(){
  $("gpio-wifi-row").style.display=wifiInstalled?"flex":"none"}
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
-  led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledEffects=r.effects;ledCount=r.count||1;ledGpio=r.gpio||18;
+  led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledGroups=r.groups;ledEffects=r.effects;ledCount=r.count||1;ledGpio=r.gpio||18;
   $("led-section").style.display=(r.installed&&!r.hidden)?"block":"none";   // install.sh --led, not hidden
   ledInstalled=r.installed;ledHiddenFlag=r.hidden;updateGpioSection();
   $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";
@@ -243,37 +243,43 @@ function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
    return '<option value="'+g+'">GPIO'+g+'</option>'}).join("");
   $("led-count-i").value=ledCount;$("led-gpio").value=ledGpio;$("led-order").value=led.order;
   buildLed()};x.send()}
+// Every message is one row of led.messages[key]: on/off, colour, effect + speed, level, LEDs.
+function msgOf(st){return led.messages[st]}
+function shortLabel(l){return l.split(" \u2014 ")[0]}   // the group heading already says DCNow! / DCNET / Netlink
 function buildLed(){
- ["dcnow","dcnet"].forEach(function(n){$("tab-"+n).className="pill-s "+n+(n==ledNet?" sel":"")});
- var grp="";
- $("led-rows").innerHTML=ledStates.map(function(s){var st=s[0],h="";
-  if(s[2]!=grp){grp=s[2];h='<tr class="grp"><td colspan="4">'+(grp=="error"?"Errors":grp=="wifi"?"Wi-Fi setup":"Information")+'</td></tr>'}
-  return h+'<tr id="r-'+st+'"><td class="name"><input type="checkbox" class="cbox '+ledNet+'" id="e-'+st+'" title="Show this message" aria-label="Show '+esc(s[1])+'"><span class="lbl-t">'+esc(s[1])+'</span></td>'+
-  '<td class="c"><input type="color" id="c-'+st+'" data-state="'+st+'" aria-label="Colour"></td>'+
-  '<td class="c"><button type="button" class="chip fx" id="f-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'"></button></td>'+
-  '<td class="c"><button type="button" class="chip lvl" id="l-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'"></button></td></tr>'}).join("");
+ var html="";
+ ledGroups.forEach(function(g){
+  var items=ledStates.filter(function(s){return s[2]==g[0]});if(!items.length)return;
+  var net=g[0].indexOf("call-")==0&&ledDefaults.messages[g[0]]?ledDefaults.messages[g[0]].color:"";
+  html+='<tr class="grp"><td colspan="4">'+(net?'<span class="gdot" style="background:'+net+'"></span>':"")+esc(g[1])+'</td></tr>';
+  items.forEach(function(s){var st=s[0];
+   html+='<tr id="r-'+st+'"><td class="name"><input type="checkbox" class="cbox neutral" id="e-'+st+'" title="Show this message" aria-label="Show '+esc(s[1])+'"><span class="lbl-t">'+esc(shortLabel(s[1]))+
+   (s[7]===false?'<small class="nd">not detected yet</small>':"")+'</span></td>'+
+   '<td class="c"><input type="color" id="c-'+st+'" data-state="'+st+'" aria-label="Colour: '+esc(s[1])+'"></td>'+
+   '<td class="c"><button type="button" class="chip fx" id="f-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'" aria-label="Effect: '+esc(s[1])+'"></button></td>'+
+   '<td class="c"><button type="button" class="chip lvl" id="l-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'" aria-label="Level: '+esc(s[1])+'"></button></td></tr>'})});
+ $("led-rows").innerHTML=html;
  ledStates.forEach(function(s){var st=s[0];
-  $("c-"+st).addEventListener("input",function(){led.colours[ledNet][st].color=this.value;saveLed()});
-  $("e-"+st).onchange=function(){led.colours[ledNet][st].enabled=this.checked;showRow(st);saveLed()};
+  $("c-"+st).addEventListener("input",function(){msgOf(st).color=this.value;showFx(st);saveLed()});
+  $("e-"+st).onchange=function(){msgOf(st).enabled=this.checked;showRow(st);saveLed()};
   $("f-"+st).onclick=function(e){e.stopPropagation();openFx(this)};
   $("l-"+st).onclick=function(e){e.stopPropagation();openLvl(this)}});
  showLed()}
-["dcnow","dcnet"].forEach(function(n){$("tab-"+n).onclick=function(){ledNet=n;closePops();buildLed()}});
-function netName(n){return n=="dcnet"?"DCNET":"DCNow!"}
 function effectName(e){for(var i=0;i<ledEffects.length;i++)if(ledEffects[i][0]==e)return ledEffects[i][1];return e}
 function showLed(){$("led-bright").value=brightToSlider(led.max_brightness);$("led-bright-v").textContent=pct(led.max_brightness);
  $("led-order").value=led.order;
  showWb();
- ledStates.forEach(function(s){var st=s[0],c=led.colours[ledNet][st];
+ ledStates.forEach(function(s){var st=s[0],c=msgOf(st);
   $("c-"+st).value=c.color;$("e-"+st).checked=c.enabled!==false;showRow(st);showFx(st);showLvl(st)})}
 function showWb(){["r","g","b"].forEach(function(c){var v=Math.round(led.white_balance[c]*255);
  $("wb-"+c).value=v;$("wb-"+c+"-v").textContent=v})}
-function showRow(st){$("r-"+st).className=led.colours[ledNet][st].enabled===false?"dis":""}
-function showFx(st){var el=$("f-"+st);if(!el)return;var c=led.colours[ledNet][st];
- var sub=[];if(c.effect!="solid")sub.push(c.speed);if(ledCount>1&&c.leds)sub.push(c.leds[0]==c.leds[1]?"LED "+c.leds[0]:c.leds[0]+"-"+c.leds[1]);
- el.innerHTML=esc(effectName(c.effect))+(sub.length?"<small>"+sub.join(" · ")+"</small>":"")}
-function showLvl(st){var el=$("l-"+st);if(!el)return;var b=led.colours[ledNet][st].brightness,own=b!==null&&b!==undefined;
- el.className="chip lvl "+ledNet+(own?" on":"");el.textContent=pct(own?b:led.max_brightness)}
+function showRow(st){$("r-"+st).className=msgOf(st).enabled===false?"dis":""}
+function ledsText(L){return L[0]==L[1]?"LED "+L[0]:"LEDs "+L[0]+"-"+L[1]}
+function showFx(st){var el=$("f-"+st);if(!el)return;var c=msgOf(st);
+ var sub=[];if(c.effect!="solid")sub.push(c.speed);if(ledCount>1&&c.leds)sub.push(ledsText(c.leds));
+ el.innerHTML=esc(effectName(c.effect))+(sub.length?"<small>"+sub.join(" \u00b7 ")+"</small>":"")}
+function showLvl(st){var el=$("l-"+st);if(!el)return;var b=msgOf(st).brightness,own=b!==null&&b!==undefined;
+ el.className="chip lvl"+(own?" on":"");el.textContent=pct(own?b:led.max_brightness)}
 function placePop(pop,el){var box=pop.parentNode.getBoundingClientRect(),r=el.getBoundingClientRect();
  pop.classList.add("open");
  pop.style.left=Math.min(Math.max(r.right-box.left-pop.offsetWidth,0),box.width-pop.offsetWidth)+"px";
@@ -281,40 +287,51 @@ function placePop(pop,el){var box=pop.parentNode.getBoundingClientRect(),r=el.ge
 var lvlCur=null,fxCur=null;
 function closePops(){$("lvl-pop").classList.remove("open");$("fx-pop").classList.remove("open");
  lvlCur=fxCur=null}
-function openFx(el){closePops();var st=el.dataset.state,c=led.colours[ledNet][st];fxCur=st;
- $("fx-t").textContent=el.dataset.label+", "+netName(ledNet)+" selected";
+var secMode="all";   // what the LEDs buttons of the open effect popup show: all | one | range
+function openFx(el){closePops();var st=el.dataset.state,c=msgOf(st);fxCur=st;
+ $("fx-t").textContent=el.dataset.label;
  $("fx-opts").innerHTML=ledEffects.filter(function(e){return !e[2]||ledCount>1||e[0]==c.effect}).map(function(e){
   return '<button type="button" class="pill-s" data-fx="'+e[0]+'">'+esc(e[1])+'</button>'}).join("");
  Array.prototype.forEach.call($("fx-opts").querySelectorAll("button"),function(b){b.onclick=function(){c.effect=b.dataset.fx;fxMark();saveLed()}});
- $("fx-sec").style.display=ledCount>1?"flex":"none";
+ $("fx-sec").style.display=$("fx-sec-in").style.display=ledCount>1?"flex":"none";
  $("sec-a").max=$("sec-b").max=ledCount;
+ secMode=!c.leds?"all":c.leds[0]==c.leds[1]?"one":"range";
  fxMark();placePop($("fx-pop"),el)}
-function fxMark(){if(!fxCur)return;var c=led.colours[ledNet][fxCur],fixed=c.effect=="solid";
- Array.prototype.forEach.call($("fx-opts").querySelectorAll("button"),function(b){b.className="pill-s "+ledNet+(b.dataset.fx==c.effect?" sel":"")});
+function fxMark(){if(!fxCur)return;var c=msgOf(fxCur),fixed=c.effect=="solid";
+ Array.prototype.forEach.call($("fx-opts").querySelectorAll("button"),function(b){b.className="pill-s"+(b.dataset.fx==c.effect?" sel":"")});
  Array.prototype.forEach.call($("fx-speed").querySelectorAll("button"),function(b){b.disabled=fixed;
-  b.className="pill-s "+ledNet+(!fixed&&b.dataset.speed==c.speed?" sel":"")});
- var L=c.leds;$("sec-all").className="pill-s "+ledNet+(L?"":" sel");
+  b.className="pill-s"+(!fixed&&b.dataset.speed==c.speed?" sel":"")});
+ var L=c.leds;
+ $("sec-all").className="pill-s"+(secMode=="all"?" sel":"");$("sec-one").className="pill-s"+(secMode=="one"?" sel":"");$("sec-range").className="pill-s"+(secMode=="range"?" sel":"");
+ $("fx-sec-in").style.display=(ledCount>1&&secMode!="all")?"flex":"none";
+ $("sec-b").style.display=$("sec-to").style.display=secMode=="range"?"":"none";
+ $("sec-a").setAttribute("aria-label",secMode=="range"?"First LED":"LED");
  $("sec-a").value=L?L[0]:"";$("sec-b").value=L?L[1]:"";$("sec-a").placeholder="1";$("sec-b").placeholder=ledCount;
  showFx(fxCur)}
-$("sec-all").onclick=function(){if(!fxCur)return;led.colours[ledNet][fxCur].leds=null;fxMark();saveLed()};
+function setLeds(first,last){if(!fxCur)return;
+ first=Math.max(1,Math.min(ledCount,first));last=Math.max(first,Math.min(ledCount,last));
+ msgOf(fxCur).leds=[first,last];fxMark();saveLed()}
+$("sec-all").onclick=function(){if(!fxCur)return;secMode="all";msgOf(fxCur).leds=null;fxMark();saveLed()};
+$("sec-one").onclick=function(){if(!fxCur)return;var L=msgOf(fxCur).leds;secMode="one";setLeds(L?L[0]:1,L?L[0]:1)};
+$("sec-range").onclick=function(){if(!fxCur)return;var L=msgOf(fxCur).leds;secMode="range";
+ var a=L?L[0]:1,b=L&&L[1]>L[0]?L[1]:Math.min(ledCount,a+1);setLeds(a,b)};
 function secInput(){if(!fxCur)return;var a=parseInt($("sec-a").value,10),b=parseInt($("sec-b").value,10);
  if(isNaN(a)&&isNaN(b))return;if(isNaN(a))a=1;if(isNaN(b))b=ledCount;
- a=Math.max(1,Math.min(ledCount,a));b=Math.max(1,Math.min(ledCount,b));
- led.colours[ledNet][fxCur].leds=[Math.min(a,b),Math.max(a,b)];
- $("sec-all").className="pill-s "+ledNet;showFx(fxCur);saveLed()}
+ if(secMode=="one")b=a;
+ setLeds(Math.min(a,b),Math.max(a,b))}
 $("sec-a").onchange=$("sec-b").onchange=secInput;
 Array.prototype.forEach.call($("fx-speed").querySelectorAll("button"),function(b){b.onclick=function(){
- if(!fxCur)return;led.colours[ledNet][fxCur].speed=b.dataset.speed;fxMark();saveLed()}});
+ if(!fxCur)return;msgOf(fxCur).speed=b.dataset.speed;fxMark();saveLed()}});
 $("fx-done").onclick=closePops;
-function openLvl(el){closePops();var st=el.dataset.state,c=led.colours[ledNet][st];
+function openLvl(el){closePops();var st=el.dataset.state,c=msgOf(st);
  if(c.brightness===null||c.brightness===undefined){c.brightness=led.max_brightness;showLvl(st);saveLed()}
  lvlCur=st;
- $("lvl-t").textContent=el.dataset.label+", "+netName(ledNet)+" selected";
- $("lvl-r").style.accentColor=ledNet=="dcnet"?"#1c6fe8":"#e8761c";$("lvl-r").value=brightToSlider(c.brightness);$("lvl-v").textContent=pct(c.brightness);
+ $("lvl-t").textContent=el.dataset.label;
+ $("lvl-r").style.accentColor=c.color;$("lvl-r").value=brightToSlider(c.brightness);$("lvl-v").textContent=pct(c.brightness);
  placePop($("lvl-pop"),el)}
 $("lvl-r").oninput=function(){if(!lvlCur)return;var b=Math.round(sliderToBright(this.value)*1000)/1000;
- led.colours[ledNet][lvlCur].brightness=b;$("lvl-v").textContent=pct(b);showLvl(lvlCur);saveLed()};
-$("lvl-base").onclick=function(){if(!lvlCur)return;led.colours[ledNet][lvlCur].brightness=null;showLvl(lvlCur);saveLed();closePops()};
+ msgOf(lvlCur).brightness=b;$("lvl-v").textContent=pct(b);showLvl(lvlCur);saveLed()};
+$("lvl-base").onclick=function(){if(!lvlCur)return;msgOf(lvlCur).brightness=null;showLvl(lvlCur);saveLed();closePops()};
 $("lvl-done").onclick=closePops;
 $("lvl-pop").onclick=$("fx-pop").onclick=function(e){e.stopPropagation()};
 $("settings").addEventListener("click",function(){if(lvlCur||fxCur)closePops()});

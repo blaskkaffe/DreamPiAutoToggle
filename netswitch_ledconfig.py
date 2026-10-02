@@ -11,42 +11,78 @@ import netswitch_core as core
 
 # -------------------------------------------------------------------- page
 
-# DreamPi states (as returned by dreampi_state) in the order the settings show them
-# LED messages, highest priority first, with category and default look.
-# Errors always have higher priority than information. The DreamPi ones come from
-# dreampi_state(); the network ones from the checker (NET_STATE).
-LED_STATES = [
-    # key, label, category, colour, effect, speed, enabled
-    # Wi-Fi setup (netswitch_buttons.py) always outranks everything else: while
-    # it's in progress "no network"/"no internet" are usually also true, and
-    # would otherwise hide it. default_led_config() switches wifi-setup's
-    # default effect to "scanner" when a strip is installed (breathe on a
-    # single LED, see the user request); connecting keeps the same look.
-    ("wifi-setup", "Wi-Fi setup: choose a network", "wifi", "#0046ff", "breathe", "slow", True),
-    ("wifi-ok", "Wi-Fi setup: connected", "wifi", "#00ff00", "solid", "slow", True),
-    ("wifi-failed", "Wi-Fi setup: couldn't connect", "wifi", "#ff0000", "blink", "slow", True),
-    ("no-network", "No network", "error", "#ff0000", "solid", "slow", True),
-    ("no-internet", "No internet", "error", "#ff7a00", "blink", "slow", True),
-    ("pi", "Power or heat problem", "error", "#ff00aa", "breathe", "slow", True),
-    ("off", "DreamPi not running", "error", "#ff0000", "blink", "slow", True),
-    ("unknown", "State unknown", "error", "#3c3c3c", "solid", "slow", True),
-    ("busy", "Starting up", "info", "#ffaa00", "blink", "slow", True),
-    ("call-dcnow", "In a call on DCNow!", "info", "#ff5000", "solid", "slow", True),
-    ("call-dcnet", "In a call on DCNET", "info", "#0046ff", "solid", "slow", True),
-    ("call", "In another call (Netlink)", "info", "#aa00ff", "solid", "slow", True),
-    ("ok", "Ready for calls", "info", "#00ff00", "solid", "slow", True),
-    ("ethernet", "Ethernet connected", "info", "#ffffff", "solid", "slow", False),
-    ("wifi", "Wi-Fi connected", "info", "#00c8ff", "solid", "slow", False),
+# LED messages. Every message is independent: on/off, colour, effect, speed, brightness and
+# which LEDs. Many share the same default look on purpose; they are separate so each can be
+# customised or sent to its own LED. Colour meaning: ORANGE = DCNow!, BLUE = DCNET, PURPLE =
+# Netlink, RED = something is wrong, so a failed call is red, not the network's own colour.
+GROUPS = [   # key, heading (the order the settings page lists them)
+    ("system", "System"),
+    ("network", "Network"),
+    ("call-dcnow", u"Call \u2014 DCNow!"),
+    ("call-dcnet", u"Call \u2014 DCNET"),
+    ("call-netlink", u"Call \u2014 Netlink"),
+    ("wifi", "Wi-Fi setup"),
 ]
-PRIORITY = dict((s[0], len(LED_STATES) - i) for i, s in enumerate(LED_STATES))   # higher = more important
-CATEGORY = dict((s[0], s[2]) for s in LED_STATES)
-_DEFAULT_COLOURS = dict((s[0], s[3:7]) for s in LED_STATES)
-# LED effects. The first four work on a single LED; the rest need a strip.
+ORANGE, BLUE, PURPLE = "#ff8c00", "#0046ff", "#aa00ff"
+RED, AMBER, GREEN, CYAN = "#ff0000", "#ffd000", "#00ff00", "#00c8ff"
+LED_STATES = [
+    # key, label, group, colour, effect, speed, enabled by default, detected
+    # "detected" False = the page can set it up, but nothing tells the add-on yet when it
+    # happens (DreamPi's state file has no "connecting"/"failed", Netlink isn't selectable
+    # and nothing marks a network switch), so the message never shows. Not faked.
+    ("busy", "Starting up", "system", AMBER, "breathe", "slow", True, True),
+    ("off", "DreamPi not running", "system", RED, "blink", "slow", True, True),
+    ("pi", "Power or heat problem", "system", RED, "blink", "fast", True, True),
+    ("unknown", "State unknown", "system", "#3c3c3c", "solid", "slow", True, True),
+    ("no-network", "No network", "network", RED, "solid", "slow", True, True),
+    ("no-internet", "No internet", "network", AMBER, "blink", "slow", True, True),
+    ("ethernet", "Ethernet connected", "network", GREEN, "solid", "slow", False, True),
+    ("wifi", "Wi-Fi connected", "network", CYAN, "solid", "slow", False, True),
+    ("net-switch", "Network switching", "network", "#ffffff", "ping", "slow", False, False),
+    ("ready-dcnow", u"Ready for calls \u2014 DCNow!", "call-dcnow", ORANGE, "breathe", "slow", True, True),
+    ("connecting-dcnow", u"Connecting \u2014 DCNow!", "call-dcnow", ORANGE, "blink", "slow", True, False),
+    ("call-dcnow", u"In a call \u2014 DCNow!", "call-dcnow", ORANGE, "solid", "slow", True, True),
+    ("failed-dcnow", u"Call failed \u2014 DCNow!", "call-dcnow", RED, "blink", "fast", True, False),
+    ("ready-dcnet", u"Ready for calls \u2014 DCNET", "call-dcnet", BLUE, "breathe", "slow", True, True),
+    ("connecting-dcnet", u"Connecting \u2014 DCNET", "call-dcnet", BLUE, "blink", "slow", True, False),
+    ("call-dcnet", u"In a call \u2014 DCNET", "call-dcnet", BLUE, "solid", "slow", True, True),
+    ("failed-dcnet", u"Call failed \u2014 DCNET", "call-dcnet", RED, "blink", "fast", True, False),
+    ("ready-netlink", u"Ready for calls \u2014 Netlink", "call-netlink", PURPLE, "breathe", "slow", False, False),
+    ("connecting-netlink", u"Connecting \u2014 Netlink", "call-netlink", PURPLE, "blink", "slow", False, False),
+    ("call-netlink", u"In a call \u2014 Netlink", "call-netlink", PURPLE, "solid", "slow", False, True),
+    ("failed-netlink", u"Call failed \u2014 Netlink", "call-netlink", RED, "blink", "fast", False, False),
+    # Wi-Fi setup (netswitch_buttons.py) outranks everything else: while it's in progress "no
+    # network"/"no internet" are usually also true and would otherwise hide it.
+    # default_led_config() switches wifi-setup to "scanner" when a strip is installed.
+    ("wifi-setup", "Wi-Fi setup: choose a network", "wifi", CYAN, "breathe", "slow", True, True),
+    ("wifi-ok", "Wi-Fi setup: connected", "wifi", GREEN, "solid", "slow", True, True),
+    ("wifi-failed", "Wi-Fi setup: couldn't connect", "wifi", RED, "blink", "slow", True, True),
+]
+# What wins when several messages apply at once, most important first: Wi-Fi setup, then
+# errors, then what is happening, then plain information; "State unknown" is the last resort
+# (see active_messages(): it is dropped whenever anything else applies).
+PRIORITY_ORDER = [
+    "wifi-setup", "wifi-ok", "wifi-failed",
+    "no-network", "no-internet", "pi", "off",
+    "failed-dcnow", "failed-dcnet", "failed-netlink",
+    "net-switch", "busy",
+    "call-dcnow", "call-dcnet", "call-netlink",
+    "connecting-dcnow", "connecting-dcnet", "connecting-netlink",
+    "ready-dcnow", "ready-dcnet", "ready-netlink",
+    "ethernet", "wifi",
+    "unknown",
+]
+PRIORITY = dict((k, len(PRIORITY_ORDER) - i) for i, k in enumerate(PRIORITY_ORDER))   # higher = more important
+GROUP = dict((s[0], s[2]) for s in LED_STATES)
+_DEFAULT_LOOKS = dict((s[0], s[3:7]) for s in LED_STATES)
+# LED effects. All but "ping" and the last five work on a single LED; the rest need a strip.
 # "rgb" ignores the colour and cycles through all colours (20 s slow, 10 s fast).
+# "ping" is a double pulse and a longer pause (see netswitch_led.PING).
 EFFECTS = [
     ("solid", "Solid", False),
     ("blink", "Blink", False),
     ("breathe", "Breathe", False),
+    ("ping", "Ping", False),
     ("rgb", "RGB", False),
     ("rainbow", "Rainbow", True),
     ("scanner", "Scanner", True),
@@ -108,7 +144,6 @@ def led_hidden():
     return os.path.exists(core.LED_HIDDEN)
 
 
-NETWORKS = ("dcnow", "dcnet")
 _COLOUR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 try:
     _TEXT = basestring  # noqa: F821  (Python 2: json gives unicode)
@@ -132,17 +167,79 @@ LED_ORDERS = ("RGB", "RBG", "GRB", "GBR", "BRG", "BGR")   # wire order of the WS
 GAMMA = 2.2
 
 
+def _default_message(st):
+    c, e, sp, on = _DEFAULT_LOOKS[st]
+    return {"color": c, "effect": e, "speed": sp, "brightness": None, "enabled": on, "leds": None}
+
+
 def default_led_config():
     cfg = {"max_brightness": 0.08, "order": "GRB", "gamma": GAMMA,
            "white_balance": {"r": 1.0, "g": 1.0, "b": 1.0},
-           "colours": dict((net, dict((st, {"color": c, "effect": e, "speed": sp, "brightness": None,
-                                            "enabled": on, "leds": None})
-                                      for st, (c, e, sp, on) in _DEFAULT_COLOURS.items()))
-                           for net in NETWORKS)}
+           "messages": dict((s[0], _default_message(s[0])) for s in LED_STATES)}
     if led_count() > 1:   # a strip: scanning animation instead of a breathing single LED
-        for net in NETWORKS:
-            cfg["colours"][net]["wifi-setup"]["effect"] = "scanner"
+        cfg["messages"]["wifi-setup"]["effect"] = "scanner"
     return cfg
+
+
+def _apply_entry(target, entry):
+    """Copy the valid fields of one message's saved settings onto target (a default)."""
+    if isinstance(entry.get("color"), _TEXT) and _COLOUR_RE.match(entry["color"]):
+        target["color"] = str(entry["color"].lower())
+    if entry.get("blink") is True and "effect" not in entry:   # an older led.json
+        target["effect"] = "blink"
+    elif entry.get("blink") is False and "effect" not in entry:
+        target["effect"] = "solid"
+    if entry.get("effect") in EFFECT_NAMES:
+        target["effect"] = str(entry["effect"])
+    if entry.get("speed") in SPEEDS:
+        target["speed"] = str(entry["speed"])
+    if isinstance(entry.get("enabled"), bool):
+        target["enabled"] = entry["enabled"]
+    leds = entry.get("leds")   # None = all LEDs, else [first, last], 1-based (one LED = [n, n])
+    if isinstance(leds, list) and len(leds) == 2 and \
+            all(isinstance(x, int) and not isinstance(x, bool) and 1 <= x <= 300 for x in leds):
+        target["leds"] = [min(leds), max(leds)]
+    level = entry.get("brightness")   # None = use the global brightness
+    if isinstance(level, (int, float)) and not isinstance(level, bool):
+        target["brightness"] = min(1.0, max(0.0, float(level)))
+
+
+# Before the messages were independent, led.json kept one table per *selected* network:
+# {"colours": {"dcnow": {<old state>: {...}}, "dcnet": {...}}}. Those tables are still read
+# (never written): an old entry carries over when the user had changed it from its old default;
+# one still at its old default simply gets the new default look.
+_LEGACY_DEFAULTS = {   # old state -> (colour, effect, speed, enabled)
+    "wifi-setup": ("#0046ff", "breathe", "slow", True), "wifi-ok": ("#00ff00", "solid", "slow", True),
+    "wifi-failed": ("#ff0000", "blink", "slow", True), "no-network": ("#ff0000", "solid", "slow", True),
+    "no-internet": ("#ff7a00", "blink", "slow", True), "pi": ("#ff00aa", "breathe", "slow", True),
+    "off": ("#ff0000", "blink", "slow", True), "unknown": ("#3c3c3c", "solid", "slow", True),
+    "busy": ("#ffaa00", "blink", "slow", True), "call-dcnow": ("#ff5000", "solid", "slow", True),
+    "call-dcnet": ("#0046ff", "solid", "slow", True), "call": ("#aa00ff", "solid", "slow", True),
+    "ok": ("#00ff00", "solid", "slow", True), "ethernet": ("#ffffff", "solid", "slow", False),
+    "wifi": ("#00c8ff", "solid", "slow", False),
+}
+_LEGACY_MAP = {   # new message -> (old state, the old tables to look in, in order)
+    "ready-dcnow": ("ok", ("dcnow",)), "ready-dcnet": ("ok", ("dcnet",)),
+    "call-netlink": ("call", ("dcnow", "dcnet")),
+}
+
+
+def _legacy_entry(colours, key):
+    old, nets = _LEGACY_MAP.get(key, (key, ("dcnow", "dcnet")))
+    base = _LEGACY_DEFAULTS.get(old)
+    if base is None:
+        return None
+    for net in nets:
+        entry = (colours.get(net) or {}).get(old) if isinstance(colours.get(net), dict) else None
+        if not isinstance(entry, dict):
+            continue
+        got = {"color": base[0], "effect": base[1], "speed": base[2], "enabled": base[3], "leds": None, "brightness": None}
+        _apply_entry(got, entry)
+        effect_same = got["effect"] == base[1] or (old == "wifi-setup" and got["effect"] == "scanner")
+        if (got["color"], got["speed"], got["enabled"]) != (base[0], base[2], base[3]) or not effect_same \
+                or got["leds"] is not None or got["brightness"] is not None:
+            return got
+    return None
 
 
 def clean_led_config(data):
@@ -167,35 +264,16 @@ def clean_led_config(data):
                 cfg["white_balance"][ch] = min(1.0, max(0.0, float(wb[ch])))
             except (TypeError, ValueError, KeyError):
                 pass
-    colours = data.get("colours")
-    if isinstance(colours, dict):
-        for net in NETWORKS:
-            per_net = colours.get(net)
-            if not isinstance(per_net, dict):
-                continue
-            for st in _DEFAULT_COLOURS:
-                entry = per_net.get(st)
-                if not isinstance(entry, dict):
-                    continue
-                if isinstance(entry.get("color"), _TEXT) and _COLOUR_RE.match(entry["color"]):
-                    cfg["colours"][net][st]["color"] = entry["color"].lower()
-                if entry.get("blink") is True and "effect" not in entry:   # older led.json
-                    cfg["colours"][net][st]["effect"] = "blink"
-                elif entry.get("blink") is False and "effect" not in entry:
-                    cfg["colours"][net][st]["effect"] = "solid"
-                if entry.get("effect") in EFFECT_NAMES:
-                    cfg["colours"][net][st]["effect"] = str(entry["effect"])
-                if entry.get("speed") in SPEEDS:
-                    cfg["colours"][net][st]["speed"] = str(entry["speed"])
-                if isinstance(entry.get("enabled"), bool):
-                    cfg["colours"][net][st]["enabled"] = entry["enabled"]
-                leds = entry.get("leds")   # None = all LEDs, else [first, last], 1-based
-                if isinstance(leds, list) and len(leds) == 2 and \
-                        all(isinstance(x, int) and not isinstance(x, bool) and 1 <= x <= 300 for x in leds):
-                    cfg["colours"][net][st]["leds"] = [min(leds), max(leds)]
-                level = entry.get("brightness")   # None = use the global brightness
-                if isinstance(level, (int, float)) and not isinstance(level, bool):
-                    cfg["colours"][net][st]["brightness"] = min(1.0, max(0.0, float(level)))
+    messages = data.get("messages")
+    if isinstance(messages, dict):
+        for st in _DEFAULT_LOOKS:
+            if isinstance(messages.get(st), dict):
+                _apply_entry(cfg["messages"][st], messages[st])
+    elif isinstance(data.get("colours"), dict):
+        for st in _DEFAULT_LOOKS:
+            carried = _legacy_entry(data["colours"], st)
+            if carried:
+                cfg["messages"][st].update(carried)
     return cfg
 
 
@@ -245,17 +323,30 @@ def clear_wb_test():
         pass
 
 
+def message_for_state(state, dcnet):
+    """The LED message for a dreampi_state() value (None if there is none). "Ready" and
+    "In a call" depend on the network: ready follows the selected one; DreamPi's own other
+    calls (Netlink, XBAND) are the Netlink message."""
+    if state == "ok":
+        return "ready-dcnet" if dcnet else "ready-dcnow"
+    if state == "call":
+        return "call-netlink"
+    return state if state in _DEFAULT_LOOKS else None
+
+
 def active_messages(state=None, net_state=None, wifi=True):
     """Enabled LED messages that apply right now, lowest priority first (the
     LED service draws them in this order, so later ones end up on top).
-    Each: key, category, color, effect, speed, brightness (effective), leds.
+    Each: key, group, color, effect, speed, brightness (effective), leds.
+    A disabled message gives nothing. "State unknown" is only a fallback: it is
+    left out as soon as any other enabled message applies.
     wifi=False skips netswitch_buttons.py's state (used for the DreamPi dot
     preview, which only ever previews the DreamPi-state message)."""
     if state is None:
         state = core.dreampi_state()[0]
     if net_state is None:
         net_state = core.network_state()
-    active = [state]
+    active = [message_for_state(state, os.path.exists(core.FLAG))]
     if net_state:
         if not net_state.get("network"):
             active.append("no-network")
@@ -276,17 +367,19 @@ def active_messages(state=None, net_state=None, wifi=True):
         elif ws == "failed":
             active.append("wifi-failed")
     cfg = led_config()
-    looks = cfg["colours"]["dcnet" if os.path.exists(core.FLAG) else "dcnow"]
+    looks = cfg["messages"]
     out = []
-    for key in sorted(set(active), key=lambda k: PRIORITY.get(k, 0)):
+    for key in sorted(set(k for k in active if k), key=lambda k: PRIORITY.get(k, 0)):
         if key not in looks or not looks[key].get("enabled", True):
             continue
         look = dict(looks[key])
         look["key"] = key
-        look["category"] = CATEGORY.get(key, "info")
+        look["group"] = GROUP.get(key, "system")
         if look.get("brightness") is None:
             look["brightness"] = cfg["max_brightness"]
         out.append(look)
+    if len(out) > 1:
+        out = [m for m in out if m["key"] != "unknown"]   # a fallback, never on top of or beside anything else
     return out
 
 
