@@ -109,10 +109,10 @@ Four actions, each with its own list of numbers that you edit in **Settings > Sp
 
 | Action | What it does | Default number |
 |---|---|---|
-| **Toggle DCNow!** | Selects DCNow! / DreamPi and hangs up | none (add one to use it) |
-| **Toggle DCNET** | Selects DCNET / FLYCAST and hangs up | none (add one to use it) |
-| **Call DCNow!** | Selects DCNow! / DreamPi **and** connects | `11111`, `111111`, `1111111` |
-| **Call DCNET** | Selects DCNET / FLYCAST **and** connects | none (add one to use it) |
+| **Toggle DCNow!** | Select DCNow! / DreamPi and hang up | none (add one to use it) |
+| **Toggle DCNET** | Select DCNET / FLYCAST and hang up | none (add one to use it) |
+| **Call DCNow!** | Select DCNow! / DreamPi **and** connect | `11111`, `111111`, `1111111` |
+| **Call DCNET** | Select DCNET / FLYCAST **and** connect | none (add one to use it) |
 
 Any other number connects to the currently selected network. `111-1111` is also in the default **Call DCNow!** list, so dialing it (openMenu does) selects DCNow! again, which is how you get back to DCNow! by phone. If you remove it from the list, it still always directs to DCNow! for compatibility with openMenu and standard ISP configs, but the selected network is not changed. The shorter `11111` and `111111` are there because a repeated digit is easy for the modem to mishear. If you already had numbers saved, they are kept; **Restore default numbers** brings these back.
 
