@@ -2,7 +2,7 @@
 service on a sandbox (all paths in a temp dir). Switches via environment:
 LEDS=n (default 3), WIFI=1, WIFIDEMO=1 (dummy Wi-Fi networks + the setup loop),
 FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log), FAKEPLAYERS=1 (made-up
-players), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
+players), NOLED=1 (the page without the LED module), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
 import sys, os, threading, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from support import web, core, probes, sandbox
@@ -49,6 +49,11 @@ if os.environ.get("FAKEUPDATE"):
             "Updating 3baa024..21d1ad8\nFast-forward\n page/players.js | 84 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
             " 4 files changed, 64 insertions(+), 37 deletions(-)\n\x1b[31mERROR\x1b[0m: could not write /etc/systemd/system/dreampi-netswitch.service (Read-only file system)\n"
             "A_very_long_unbroken_path_/opt/dreampi-netswitch/page/players_and_more_and_more_and_more_and_more.js\nfailed\n")
+if os.environ.get("NOLED"):      # the page as it is without the LED module's files
+    import shutil
+    pages = os.path.join(tmp, "page"); shutil.copytree(web.PAGE_DIR, pages)
+    for f in ("led.html", "led.js", "led.css"): os.remove(os.path.join(pages, f))
+    web.PAGE_DIR = pages; web.refresh_modules(force=True)
 if os.environ.get("PIN"):
     import netswitch_security
     netswitch_security.set_pin(os.environ["PIN"])

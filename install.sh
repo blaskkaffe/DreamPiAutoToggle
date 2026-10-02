@@ -10,6 +10,8 @@
 #                                  hides the LED settings on the page
 #   sudo ./install.sh --led-gpio=21   use GPIO10, 12, 18 (default) or 21 instead
 #   (--led, --led=N and --no-led still work: same as the default, --leds=N and --leds=0)
+#   The LED part is an optional module (see "Optional parts" in the README): without its files in this
+#   folder no LED service is installed and the LED options do nothing.
 #   sudo ./install.sh --wifi       add Wi-Fi setup (a temporary access point for joining a network
 #                                  without a keyboard; installs hostapd + dnsmasq): its page controls
 #                                  and the button hold that starts it
@@ -75,13 +77,21 @@ if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
-cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_ledconfig.py" "$SRC/netswitch_numbers.py" "$SRC/netswitch_update.py" "$SRC/netswitch_security.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_led.py" "$SRC/netswitch_led_drivers.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" "$SRC/netswitch_wifi_setup.py" \
+cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_numbers.py" "$SRC/netswitch_update.py" "$SRC/netswitch_security.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" "$SRC/netswitch_wifi_setup.py" \
    "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/static"
 cp "$SRC"/page/*.html "$SRC"/page/*.css "$SRC"/page/*.js "$DEST/page/"
 # optional modules: copy when shipped, remove an old copy when they were dropped from the repo
 for f in netswitch_players.py page/players.js; do
     if [ -f "$SRC/$f" ]; then cp "$SRC/$f" "$DEST/$f"; else rm -f "$DEST/$f"; fi
+done
+# The LED module (status LEDs, their settings on the page, and the service that drives them) is optional too, but
+# only as a whole: with all of these files in the repo it is installed, with any missing it is removed again.
+LED_FILES="netswitch_ledconfig.py netswitch_led.py netswitch_led_drivers.py page/led.html page/led.js page/led.css"
+LED_MODULE=yes
+for f in $LED_FILES; do [ -f "$SRC/$f" ] || LED_MODULE=no; done
+for f in $LED_FILES; do
+    if [ "$LED_MODULE" = yes ]; then cp "$SRC/$f" "$DEST/$f"; else rm -f "$DEST/$f"; fi
 done
 cp "$SRC/static/three.min.js" "$SRC/static/dc-background.js" "$SRC/static/LICENSES.txt" "$SRC"/static/*.png "$DEST/static/"
 chmod +x "$DEST/uninstall.sh"
@@ -186,10 +196,20 @@ WantedBy=multi-user.target
 EOF
 
 # ---------------------------------------------------------------- NeoPixel
-# Always installed: the status LED service runs by default with 1 LED on GPIO18.
+# Installed with the LED module (see LED_MODULE above): the status LED service runs by default with 1 LED on GPIO18.
 # The count (0 = none: the service idles and the page hides the LED settings),
 # output pin, wire order and colours are editable from the page afterwards.
+# Without the module: no service, no settings on the page, and the settings files stay for when it comes back.
 rm -f "$DEST/led_enabled"   # old marker, no longer used
+if [ "$LED_MODULE" = no ]; then
+    echo "LED module not in this folder: no status LEDs, no LED settings on the page."
+    systemctl disable --now dreampi-netswitch-led.service >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/dreampi-netswitch-led.service
+    if [ -f "$DEST/spi_added" ]; then     # SPI was only switched on for the LEDs
+        sed -i '/^dtparam=spi=on  # added by dreampi-netswitch$/d' "$(cat "$DEST/spi_added")"
+        rm -f "$DEST/spi_added"
+    fi
+else
 if [ -n "$LED_COUNT" ]; then echo "$LED_COUNT" > "$DEST/led_count"; fi
 [ -f "$DEST/led_count" ] || echo 1 > "$DEST/led_count"
 if [ -n "$LED_GPIO" ]; then echo "$LED_GPIO" > "$DEST/led_gpio"; fi
@@ -225,6 +245,10 @@ cat > /etc/systemd/system/dreampi-netswitch-led.service <<EOF
 Description=DreamPi Netswitch status NeoPixel
 After=network.target
 StartLimitIntervalSec=0
+# the LED module's files: if they are deleted from $DEST the service is skipped quietly instead of failing in a loop
+ConditionPathExists=$DEST/netswitch_led.py
+ConditionPathExists=$DEST/netswitch_led_drivers.py
+ConditionPathExists=$DEST/netswitch_ledconfig.py
 
 [Service]
 ExecStart=$(command -v python3) $DEST/netswitch_led.py
@@ -236,6 +260,7 @@ Nice=10
 [Install]
 WantedBy=multi-user.target
 EOF
+fi
 
 # ------------------------------------------------------------------ buttons
 # Always installed: two GPIO buttons with a short-press function each (pins and
@@ -302,8 +327,10 @@ fi
 systemctl daemon-reload
 systemctl enable dreampi-netswitch.service >/dev/null 2>&1
 systemctl restart dreampi-netswitch.service
-systemctl enable dreampi-netswitch-led.service >/dev/null 2>&1
-systemctl restart dreampi-netswitch-led.service
+if [ "$LED_MODULE" = yes ]; then
+    systemctl enable dreampi-netswitch-led.service >/dev/null 2>&1
+    systemctl restart dreampi-netswitch-led.service
+fi
 systemctl enable dreampi-netswitch-buttons.service >/dev/null 2>&1
 systemctl restart dreampi-netswitch-buttons.service
 systemctl restart dreampi.service 2>/dev/null || echo "Could not restart DreamPi, please reboot."

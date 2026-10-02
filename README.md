@@ -65,6 +65,20 @@ The web page runs on the Pi as root, because it has to restart DreamPi, reboot t
 - **The web service is fenced in** (systemd: no new privileges, read-only `/usr`, `/boot` and `/etc`, no kernel-module or cgroup changes) and the add-on's files in `/opt/dreampi-netswitch` are root-owned.
 - **Not covered:** someone who is already logged in on the Pi (or can run code on it) can do more than this add-on ever could, and the status files in `/tmp` are guessable names (the update's status file is not written through a planted link). The Wi-Fi setup access point is open by design while you set up Wi-Fi: it closes itself after 10 minutes if nobody picks a network, but don't start it where you don't want others to join.
 
+### Optional parts
+
+Two parts of the add-on are modules you can leave out. Each is a set of files, and either all of them are there or the feature is simply absent; nothing else notices.
+
+| Module | Files | Without it |
+|---|---|---|
+| **Online players** | `netswitch_players.py`, `page/players.js` | no players box |
+| **Status LEDs** | `netswitch_led.py`, `netswitch_led_drivers.py`, `netswitch_ledconfig.py`, `page/led.html`, `page/led.js`, `page/led.css` | no LED service, no NeoPixel calibration / Status LED settings, no LED row under GPIO (the buttons' GPIO settings stay), and the DreamPi dot on the main page still shows a plain colour for the state |
+
+- **Leave one out:** delete its files from the folder you installed from and run `sudo ./install.sh`. The installer removes the installed copies (and, for the LEDs, the `dreampi-netswitch-led` service); your LED settings (`led.json`, the LED count and pin) are kept. A module with a file missing counts as absent, so a half-deleted module can't break anything.
+- **Add one back:** put all of its files in the folder and run `sudo ./install.sh` again. The settings pane appears with the files, and your old LED settings are back as they were.
+- **Without running the installer:** the page follows the files in `/opt/dreampi-netswitch` while it runs, so after copying or deleting a module's files, reload the page and its settings appear or disappear. The LED service itself is only started or stopped by the installer; if its files are deleted from `/opt/dreampi-netswitch`, systemd just skips it instead of failing.
+- `--leds=N`, `--led-gpio=N` and `--no-led` do nothing without the LED module.
+
 ### Uninstall
 
 ```

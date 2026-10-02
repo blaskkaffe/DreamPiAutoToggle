@@ -1,0 +1,37 @@
+<!--part:LED-->
+<div id="led-section" class="sec" style="display:none;position:relative">
+<h2>NeoPixel calibration <span class="saved led-saved">Saved &#10003;</span></h2>
+<div class="card">
+ <div class="range wb"><span>Red</span><input type="range" id="wb-r" aria-label="Red" min="0" max="255" step="1" style="accent-color:#f33"><span id="wb-r-v"></span></div>
+ <div class="range wb"><span>Green</span><input type="range" id="wb-g" aria-label="Green" min="0" max="255" step="1" style="accent-color:#3f3"><span id="wb-g-v"></span></div>
+ <div class="range wb"><span>Blue</span><input type="range" id="wb-b" aria-label="Blue" min="0" max="255" step="1" style="accent-color:#39f"><span id="wb-b-v"></span></div>
+ <div class="bar" style="justify-content:center;margin:12px 0 10px"><button class="pill-s" id="wb-preview" type="button">Preview on LED</button><button class="pill-s" id="wb-reset" type="button">Reset to neutral</button></div>
+ <div class="range wb" style="border-top:1px solid var(--line)"><span>Brightness</span><input type="range" id="led-bright" aria-label="Maximum brightness" min="0" max="1000" step="1"><span id="led-bright-v"></span></div>
+</div>
+<div class="note">White balance: tap <strong>Preview on LED</strong> to show solid white, then turn down whichever of R, G or B looks too strong until it looks neutral - leave the others at 255. Tap Preview again when done. This corrects every colour the LEDs show, not just white, and takes about 30 seconds. Brightness is the maximum for the whole strip, applied after the correction (logarithmic: the left half is the low range that suits an indicator LED).</div>
+<h2>Status LED<span id="led-count-t"></span> <span class="saved led-saved">Saved &#10003;</span></h2>
+<div class="card">
+ <table class="ledtab"><thead><tr><th>Message</th><th>Colour</th><th>Effect</th><th>Level</th></tr></thead><tbody id="led-rows"></tbody></table>
+</div>
+<div class="bar" style="margin-top:0"><button class="pill-s" id="led-reset" type="button">Reset LED settings to defaults</button></div>
+<div class="note">Every message is set up on its own: tick it to use it, pick its colour, effect and level, and (with a strip) which LEDs it uses. Many start out alike on purpose; they are separate so you can change one or send it to its own LED. Orange is DCNow!, blue is DCNET, purple is Netlink, and red means something is wrong. Errors always win over information, and <em>State unknown</em> only shows when nothing else applies. Messages marked <em>not detected yet</em> can be set up, but DreamPi doesn't tell this add-on when they happen, so they don't show. Effect: Solid, Blink, Breathe, Ping (two quick pulses, then a pause), RGB, or with a strip an animation, plus its speed. Level: its own brightness; grey means the maximum brightness above. The status dot on the main page previews the DreamPi message that is showing.</div>
+<div class="card">
+ <div class="srow"><span>Hide these settings<span class="sub">Removes the NeoPixel calibration and Status LED sections, and the LED row under GPIO, from Settings; only reversible by deleting led_hidden in /opt/dreampi-netswitch</span></span>
+  <button class="pill-s" id="led-hide-b" type="button">Hide</button></div>
+</div>
+<div id="fx-pop" class="pop"><div class="t" id="fx-t"></div>
+ <div class="opts" id="fx-opts"></div>
+ <div class="opts" id="fx-speed" style="align-items:center"><span class="sub" style="margin-right:4px">Speed</span><button class="pill-s" type="button" data-speed="slow">Slow</button><button class="pill-s" type="button" data-speed="fast">Fast</button></div>
+ <div class="secrow" id="fx-sec"><span class="sub">LEDs</span>
+  <button class="pill-s" type="button" id="sec-all">All</button><button class="pill-s" type="button" id="sec-one">One LED</button><button class="pill-s" type="button" id="sec-range">Range</button></div>
+ <div class="secrow" id="fx-sec-in"><input type="number" id="sec-a" min="1" max="300" aria-label="First LED"><span class="sub" id="sec-to">to</span><input type="number" id="sec-b" min="1" max="300" aria-label="Last LED"></div>
+ <div class="bar" style="justify-content:flex-end"><button class="pill-s" id="fx-done" type="button">Done</button></div></div>
+<div id="lvl-pop" class="pop"><div class="t" id="lvl-t"></div>
+ <div class="range"><input type="range" id="lvl-r" aria-label="Level brightness" min="0" max="1000" step="1"><span id="lvl-v" style="width:3em;text-align:right"></span></div>
+ <div class="bar"><button class="pill-s" id="lvl-base" type="button">Use global</button><button class="pill-s" id="lvl-done" type="button">Done</button></div></div>
+</div>
+<!--part:LED_GPIO_ROW-->
+ <div class="srow" id="gpio-led-row" style="display:none"><span>LED<span class="sub">LEDs, pin and rgb order</span></span>
+  <div style="display:flex;gap:8px"><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"><select class="ord" id="led-gpio" aria-label="LED output pin"></select><select class="ord" id="led-order" aria-label="Wire order"></select></div></div>
+<!--part:LED_GPIO_NOTE-->
+ <div class="note">Switching the LED output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot).</div>

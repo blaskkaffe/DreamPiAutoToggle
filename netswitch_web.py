@@ -24,15 +24,47 @@ except ImportError:
     from SocketServer import ThreadingMixIn
 
 import netswitch_core as core
-import netswitch_ledconfig as ledconfig
 import netswitch_numbers as numbers
 import netswitch_probes as probes
 import netswitch_security as security
 import netswitch_update as updater
-try:
-    import netswitch_players as players   # optional: delete it and page/players.js to drop the online-players list
-except ImportError:
-    players = None
+import importlib
+
+# Optional modules. Each is a set of files; with every file present the feature is part of the page, with any of
+# them missing it is simply not there (nothing else notices). The page follows the files while the service runs:
+# refresh_modules() looks at them whenever the page is requested, so adding or deleting them takes effect on the
+# next reload (the LED *service* is started or stopped by install.sh, see docs/led.md).
+#   players: the online-players list              (netswitch_players.py + page/players.js)
+#   led:     the status LEDs and their settings   (netswitch_ledconfig.py, netswitch_led.py, netswitch_led_drivers.py
+#                                                  + page/led.html, led.js, led.css)
+_HERE = os.path.dirname(os.path.abspath(__file__))
+OPTIONAL_MODULES = {
+    "players": {"python": ["netswitch_players.py"], "page": ["players.js"], "import": "netswitch_players"},
+    "led": {"python": ["netswitch_ledconfig.py", "netswitch_led.py", "netswitch_led_drivers.py"],
+            "page": ["led.html", "led.js", "led.css"], "import": "netswitch_ledconfig"},
+}
+LED_PATHS = ("/ledconfig", "/ledhide", "/wbtest", "/wbtestdone")   # answered only while the LED module is present
+
+
+def module_present(name):
+    spec = OPTIONAL_MODULES[name]
+    return (all(os.path.exists(os.path.join(_HERE, f)) for f in spec["python"])
+            and all(os.path.exists(os.path.join(PAGE_DIR, f)) for f in spec["page"]))
+
+
+def _load_optional(name):
+    """The module's Python file when all its files are there and it imports, else None."""
+    if not module_present(name):
+        return None
+    try:
+        return importlib.import_module(OPTIONAL_MODULES[name]["import"])
+    except Exception as e:      # a broken module must not take the page down with it
+        sys.stderr.write("optional module %s not loaded: %s\n" % (name, e))
+        return None
+
+
+players = None      # filled in by refresh_modules() below
+ledconfig = None
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 STATIC_FILES = {   # only these are served from /static/
@@ -48,6 +80,18 @@ PORT = 80
 HTTPS_PORT = 443   # 0 = no HTTPS; both can be given on the command line: netswitch_web.py [port] [https port]
 CERT = os.path.join(core.BASE_DIR, "https.crt")   # self-signed, made by install.sh
 KEY = os.path.join(core.BASE_DIR, "https.key")
+
+
+def _dot_look(dstate):
+    """What the DreamPi dot previews: the LED message that is showing (LED module present), else a plain
+    look for the state so the dot still says something."""
+    if ledconfig is not None:
+        return (ledconfig.active_messages(dstate, {"network": True}, wifi=False) or [None])[-1]
+    dcnet = os.path.exists(core.FLAG)
+    plain = {"ok": ("#1c6fe8" if dcnet else "#ff8c00", "breathe"), "busy": ("#ffd000", "breathe"), "off": ("#ff0000", "blink"),
+             "call-dcnow": ("#ff8c00", "solid"), "call-dcnet": ("#0046ff", "solid"), "call": ("#aa00ff", "solid"),
+             "unknown": ("#3c3c3c", "solid")}.get(dstate)
+    return {"color": plain[0], "effect": plain[1], "speed": "slow"} if plain else None
 
 
 def api_state():
@@ -99,7 +143,7 @@ def api_state():
             # the dot next to DreamPi previews that status's LED message only;
             # network problems show as warning boxes instead
             "dreampi": {"state": dstate, "text": dtext,
-                        "look": (ledconfig.active_messages(dstate, {"network": True}, wifi=False) or [None])[-1]},
+                        "look": _dot_look(dstate)},
             "modem": {"text": mtext, "since": msince, "plugged": plugged, "label": label, "compat": compat},
             "internet": checks["internet"],
             "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
@@ -117,17 +161,27 @@ PAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "page")
 def build_page():
     """The page is one document: page/index.html with page/page.css and
     page/page.js put in where it says @@CSS@@ and @@JS@@ (one request, kept in
-    memory by PAGE_BYTES). Edit those three files, not this module."""
+    memory by PAGE_BYTES). Edit those three files, not this module. The optional
+    modules add themselves: players.js as a script of its own, the LED module's
+    markup / styles / script at @@LED@@, @@LED_GPIO_ROW@@, @@LED_GPIO_NOTE@@, the end of
+    the CSS and the end of the script. Without a module those markers are just empty."""
     def part(name):
         with io.open(os.path.join(PAGE_DIR, name), encoding="utf-8", newline="") as f:
             return f.read()
     modules = ""
     if players is not None and os.path.exists(os.path.join(PAGE_DIR, "players.js")):
         modules = '<script src="/players.js" defer></script>'
-    return part("index.html").replace("@@CSS@@", part("page.css")).replace("@@JS@@", part("page.js")).replace("@@MODULES@@", modules)
-
-
-PAGE = build_page()
+    css, js = part("page.css"), part("page.js")
+    led_parts = {"LED": "", "LED_GPIO_ROW": "", "LED_GPIO_NOTE": ""}
+    if ledconfig is not None and all(os.path.exists(os.path.join(PAGE_DIR, f)) for f in OPTIONAL_MODULES["led"]["page"]):
+        for name, text in re.findall(r"<!--part:(\w+)-->\n(.*?)(?=<!--part:|\Z)", part("led.html"), re.S):
+            led_parts[name] = text
+        css += "\n" + part("led.css")
+        js += "\n" + part("led.js")
+    html = part("index.html").replace("@@CSS@@", css).replace("@@JS@@", js).replace("@@MODULES@@", modules)
+    for name, text in led_parts.items():
+        html = html.replace("@@%s@@" % name, text)
+    return html
 
 
 _gz_cache = {}   # (id, len) of an unchanging body -> gzipped bytes
@@ -140,8 +194,47 @@ def _gzip(body):
     return buf.getvalue()
 
 
-PAGE_BYTES = PAGE.encode("utf-8")
 _static_cache = {}
+_watched = ["index.html", "page.css", "page.js", "players.js", "led.html", "led.js", "led.css"]
+_page_state = {"sig": None}
+_page_lock = threading.Lock()
+PAGE = PAGE_BYTES = None
+
+
+def _signature():
+    files = [os.path.join(PAGE_DIR, f) for f in _watched]
+    for spec in OPTIONAL_MODULES.values():
+        files += [os.path.join(_HERE, f) for f in spec["python"]]
+    sig = []
+    for path in files:
+        try:
+            sig.append(os.path.getmtime(path))
+        except OSError:
+            sig.append(None)
+    return (PAGE_DIR, tuple(sig))
+
+
+def refresh_modules(force=False):
+    """Follow the files: when a page or module file was added, removed or changed since the page was built,
+    load or drop the optional modules and build the page again. Cheap (a few stat calls) and only done
+    when the page itself or one of the module endpoints is asked for."""
+    global players, ledconfig, PAGE, PAGE_BYTES
+    sig = _signature()
+    if sig == _page_state["sig"] and not force:
+        return
+    with _page_lock:
+        sig = _signature()
+        if sig == _page_state["sig"] and not force:
+            return
+        players = _load_optional("players")
+        ledconfig = _load_optional("led")
+        PAGE = build_page()
+        PAGE_BYTES = PAGE.encode("utf-8")
+        _gz_cache.clear()
+        _page_state["sig"] = sig
+
+
+refresh_modules(force=True)
 
 
 def _static(name):
@@ -237,6 +330,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.rfile.read(length) if length else b""
 
     def _get(self):
+        if self.path in ("/", "/ledconfig", "/players", "/players.js") or self.path.startswith("/?"):
+            refresh_modules()
         if self.path == "/ping":
             self.send("ok\n", "text/plain")
         elif self.path == "/api":
@@ -268,7 +363,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             self.send(body, STATIC_FILES[name], cache=86400, fixed=True)
-        elif self.path == "/ledconfig":
+        elif self.path == "/ledconfig" and ledconfig is None:
+            self._refuse(404, "The LED module is not installed")
+        elif self.path == "/ledconfig" and ledconfig is not None:
             self.send(json.dumps({"config": ledconfig.led_config(), "defaults": ledconfig.default_led_config(),
                                   "states": ledconfig.LED_STATES, "groups": ledconfig.GROUPS,
                                   "effects": ledconfig.EFFECTS, "orders": ledconfig.LED_ORDERS, "count": ledconfig.led_count(),
@@ -312,6 +409,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _post(self):
         path = self.path.split("?")[0]
+        if path in LED_PATHS:
+            refresh_modules()
+        if path in LED_PATHS and ledconfig is None:
+            return self._refuse(404, "The LED module is not installed")
         # Everything here changes something, and some of it runs as root: only the page itself may ask
         # (not another site's form or script), and the actions that reboot, update or change Wi-Fi
         # also need the PIN when one is set.
