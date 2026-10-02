@@ -16,7 +16,7 @@ What you get:
 - Update and reboot buttons on the page, and an optional PIN for them.
 - Modem plugged-in detection and its make/model, with a warning if it's not a modem known to work with DreamPi.
 
-**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET by dialing a number (`555-0002` in that test; it is no longer a default) works end to end. A single NeoPixel on GPIO18 works too. Several LEDs or a strip, the new LED colour calibration/wire order/dithering, the GPIO10/12/21 output pins, and the Wi-Fi setup button (including the newer second button, per-button function and combined-hold assignment), haven't been tried on real hardware yet; feedback is welcome.
+**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET by dialing a number (`555-0002` in that test; it is no longer a default) works end to end. The Toggle numbers (switch only, with the busy tone) haven't been tried on hardware yet. A single NeoPixel on GPIO18 works too. Several LEDs or a strip, the new LED colour calibration/wire order/dithering, the GPIO10/12/21 output pins, and the Wi-Fi setup button (including the newer second button, per-button function and combined-hold assignment), haven't been tried on real hardware yet; feedback is welcome.
 
 ## Install
 
@@ -116,7 +116,7 @@ Four actions, each with its own list of numbers that you edit in **Settings > Sp
 
 Any other number connects to the currently selected network. `111-1111` is also in the default **Call DCNow!** list, so dialing it (openMenu does) selects DCNow! again, which is how you get back to DCNow! by phone. If you remove it from the list, it still always directs to DCNow! for compatibility with openMenu and standard ISP configs, but the selected network is not changed. The shorter `11111` and `111111` are there because a repeated digit is easy for the modem to mishear. If you already had numbers saved, they are kept; **Restore default numbers** brings these back.
 
-**Hang-up actions** (Toggle): DreamPi doesn't answer. The add-on changes the selection and plays a busy tone for 4 seconds, so the Dreamcast gives up straight away instead of waiting for an answer. After that the normal dial tone comes back and the next call goes to the newly selected network. Use it to change networks from the Dreamcast without opening the web page.
+**Hang-up actions** (Toggle): DreamPi doesn't answer. The add-on changes the selection and plays a busy tone for 4 seconds, which is meant to make the Dreamcast give up straight away instead of waiting for an answer (not yet confirmed on real hardware). After that the normal dial tone comes back and the next call goes to the newly selected network. Use it to change networks from the Dreamcast without opening the web page.
 
 **What counts as a number:** digits, `*` and `#`, 3 to 12 characters, either a whole number or just an ending, for example `*61#` or `0002`. A number counts when what the Dreamcast dialed **ends with** it, so a leading `1` (long-distance prefix), an area code, an outside-line digit or other digits the ISP config puts in front don't matter (DreamPi often hears an extra leading `1`, for example `15550002`), and the longest matching number wins. A number can only belong to one action, and a short ending can't take over openMenu's `111-1111`. Take care with very short endings: anything the Dreamcast dials that ends with it will trigger the action.
 
