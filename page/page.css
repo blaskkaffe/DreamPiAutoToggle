@@ -74,9 +74,6 @@
              background:#1a1a1a url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23ccc' stroke-width='1.6'/></svg>") no-repeat right 9px center}   /* one height on every device: phones draw native selects at their own size */
  .in{position:relative}
  input[type=password],input[type=text]{width:100%;padding:10px 12px;margin:0 0 10px;border-radius:12px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.9em}
- #wifi-networks{padding:10px 0 14px}
- .wnet{display:block;width:100%;margin-bottom:6px;padding:9px 12px;text-align:left;border-radius:12px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
- .wnet .sig{float:right;opacity:.6;font-size:.85em;margin-left:8px} .wnet{overflow-wrap:anywhere}
  /* update log: a small console that scrolls inside the card, so long lines never push the rows around */
  .updlog{margin:2px 0 12px;padding:8px 10px;background:#0b0b0b;border:1px solid var(--line);border-radius:12px;font:.72em/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#bbb;max-height:11.5em;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
  .updlog div{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;padding:1px 0 1px 12px;text-indent:-12px}

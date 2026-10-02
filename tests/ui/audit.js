@@ -59,7 +59,7 @@ const AUDIT = () => {
     await page.click('#cog'); await page.waitForTimeout(1500); await check('settings');
     // wifi flow states
     await page.click('#wifi-b'); await page.waitForTimeout(4500); await check('settings wifi list');
-    await page.click('.wnet:nth-child(4)'); await page.waitForTimeout(300); await check('settings wifi chosen long ssid');
+    await page.click('#wifi-list .srow:nth-child(4) button'); await page.waitForTimeout(300); await check('settings wifi pop-up, long ssid');
     await page.screenshot({ path: `/tmp/dpns-audit-settings-${w}.png`, fullPage: true });
     await page.click('#wifi-b'); await page.waitForTimeout(1500);
     // popups

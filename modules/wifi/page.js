@@ -1,4 +1,4 @@
-// Wi-Fi setup module, page side: the Wi-Fi rows in Settings > Network and the "which button holds to start it" row under
+// Wi-Fi setup module, page side: the Wi-Fi rows at the top of Settings > System and the "which button holds to start it" row under
 // the buttons. Setup itself runs in the module's own service (dreampi-netswitch-wifi); this talks to it through POST /wifitoggle and /wificonnect.
 var WIFI_LABELS={
  idle:["Search","Search for a Wi-Fi network to connect the Pi to"],
@@ -10,29 +10,50 @@ var WIFI_LABELS={
 $("wifi-b").onclick=function(){
  var x=new XMLHttpRequest();x.open("POST","/wifitoggle",true);x.setRequestHeader("X-Requested-With","netswitch");
  x.onload=refresh;x.send()};
-// Wi-Fi network list, shown in Settings too while scanning/hosting (not just on the
-// temporary "DreamPi WiFi Config" page) - useful when this page is still reachable,
-// for example over Ethernet, while the Pi's Wi-Fi is being (re)configured.
-var wifiListKey=null,wifiChosen=null;
-function wifiBars(sig){if(sig==null)return"";var n=sig>=-55?4:sig>=-65?3:sig>=-75?2:1;return " "+"█".repeat(n)+"░".repeat(4-n)}
+// Wi-Fi network list, shown in Settings too while scanning/hosting (not just on the temporary "DreamPi WiFi Config" page) -
+// useful when this page is still reachable, for example over Ethernet, while the Pi's Wi-Fi is being (re)configured.
+// One row per network (name, how strong, secured or open) with a Connect button that opens a pop-up for the password,
+// the same way the phone numbers' Add button opens its pop-up. "Other network" is for a hidden one.
+var wifiListKey=null,wifiOpenFor=null;
+function wifiStrength(sig){return sig==null?"":sig>=-55?"Strong":sig>=-65?"Good":sig>=-75?"Fair":"Weak"}
 function renderWifiList(nets){
- $("wifi-list").innerHTML=nets.map(function(n,i){
-  return '<button type="button" class="wnet" data-i="'+i+'">'+(n.secured?"🔒 ":"")+esc(n.ssid)+
-   '<span class="sig">'+esc(wifiBars(n.signal))+'</span></button>'}).join("")||
-  '<div class="sub" style="margin:4px 0 10px">No networks found. Enter one manually.</div>';
- Array.prototype.forEach.call($("wifi-list").querySelectorAll(".wnet"),function(b){
-  b.onclick=function(){wifiSelect(nets[+b.dataset.i])}})}
-function wifiSelect(n){wifiChosen=n;$("wifi-ssid").value=n.ssid;$("wifi-ssid").readOnly=true;
- $("wifi-pass").style.display=n.secured?"block":"none";$("wifi-pass").value="";
- $("wifi-connect-b").disabled=false;$("wifi-connect-b").textContent="Connect";$("wifi-form").style.display="block"}
-$("wifi-manual").onclick=function(){wifiSelect({ssid:"",secured:true});$("wifi-ssid").readOnly=false;$("wifi-ssid").focus()};
-$("wifi-connect-b").onclick=function(){
- var ssid=$("wifi-ssid").value.trim();if(!ssid)return;
+ var rows=nets.map(function(n,i){
+  var info=[n.secured?"Secured":"Open",wifiStrength(n.signal)].filter(Boolean).join(" \u00b7 ");
+  return '<div class="srow"><span>'+esc(n.ssid)+'<span class="sub">'+esc(info)+'</span></span>'+
+   '<button type="button" class="pill-s" data-i="'+i+'" aria-label="Connect to '+esc(n.ssid)+'">Connect</button></div>'}).join("");
+ $("wifi-list").innerHTML=rows+
+  (nets.length?'':'<div class="srow none"><span class="sub">No networks found</span></div>')+
+  '<div class="srow"><span>Other network<span class="sub">For a hidden network: enter its name</span></span>'+
+  '<button type="button" class="pill-s" data-i="-1">Enter</button></div>';
+ Array.prototype.forEach.call($("wifi-list").querySelectorAll("button[data-i]"),function(b){
+  b.onclick=function(e){e.stopPropagation();wifiOpen(+b.dataset.i<0?{ssid:"",secured:true,other:true}:nets[+b.dataset.i],b)}})}
+function wifiOpen(n,btn){
+ if(wifiOpenFor===btn){wifiClose();return}
+ wifiOpenFor=btn;
+ $("wifi-pop-t").textContent=n.other?"Connect to another network":"Connect to "+n.ssid;
+ $("wifi-ssid").value=n.ssid;$("wifi-ssid").style.display=n.other?"block":"none";
+ $("wifi-pass").value="";$("wifi-pass").style.display=n.secured?"block":"none";$("wifi-msg").textContent="";
+ var pop=$("wifi-pop"),box=$("wifi-box").getBoundingClientRect(),r=btn.getBoundingClientRect();
+ pop.classList.add("open");
+ pop.style.left=Math.max(0,Math.min(r.right-box.left-pop.offsetWidth,box.width-pop.offsetWidth))+"px";
+ pop.style.top=(r.bottom-box.top+6)+"px";
+ (n.other?$("wifi-ssid"):n.secured?$("wifi-pass"):$("wifi-connect-b")).focus()}
+function wifiClose(){wifiOpenFor=null;$("wifi-pop").classList.remove("open")}
+function wifiConnect(){
+ var ssid=$("wifi-ssid").value.trim();
+ if(!ssid){$("wifi-msg").textContent="Enter the network name";return}
  withPin(function(){
   $("wifi-connect-b").disabled=true;$("wifi-connect-b").textContent="Connecting...";
   xhrJson("POST","/wificonnect",function(r,st,body){
-   if(st==401||st==429){$("wifi-connect-b").disabled=false;$("wifi-connect-b").textContent="Connect";alert((body&&body.message)||"PIN refused")}
-   refresh()},{ssid:ssid,password:$("wifi-pass").value})})};
+   $("wifi-connect-b").disabled=false;$("wifi-connect-b").textContent="Connect";
+   if(st==401||st==429){$("wifi-msg").textContent=(body&&body.message)||"PIN refused";return}
+   wifiClose();refresh()},{ssid:ssid,password:$("wifi-pass").value})})}
+$("wifi-connect-b").onclick=wifiConnect;
+$("wifi-pass").onkeydown=$("wifi-ssid").onkeydown=function(e){if(e.key=="Enter"){e.preventDefault();wifiConnect()}};
+$("wifi-pop").onclick=function(e){e.stopPropagation()};
+document.addEventListener("click",function(){if(wifiOpenFor)wifiClose()});
+hook("escape",function(){if(wifiOpenFor){wifiClose();return true}});
+hook("settingsClose",wifiClose);
 hook("api",function(d){
  if(!d.wifi)return;
  var wl=WIFI_LABELS[d.wifi.state]||WIFI_LABELS.idle;
@@ -43,7 +64,7 @@ hook("api",function(d){
  $("wifi-networks").style.display=showNets?"block":"none";
  if(showNets&&d.wifi.networks){var key=JSON.stringify(d.wifi.networks);
   if(key!=wifiListKey){wifiListKey=key;renderWifiList(d.wifi.networks)}}
- else if(!showNets){wifiListKey=null;wifiChosen=null;$("wifi-form").style.display="none";$("wifi-list").innerHTML=""}});
+ else if(!showNets){wifiListKey=null;wifiClose();$("wifi-list").innerHTML=""}});
 // the button row: which button, or both, held for 3 s starts Wi-Fi setup (saved with the other button settings)
 hook("buttons",function(r){
  if(!$("wifi-btn-sel").options.length)$("wifi-btn-sel").innerHTML=r.wifi_choices.map(function(c){
