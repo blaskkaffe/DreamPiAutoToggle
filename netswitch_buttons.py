@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# DreamPi Netswitch add-on - the GPIO buttons (base) and, while the Wi-Fi setup module
-# is installed and switched on, the trigger for Wi-Fi setup (modules/wifi/netswitch_wifi_setup.py).
+# DreamPi Netswitch add-on - the GPIO buttons (base). While the Wi-Fi setup module is switched on, a hold only
+# touches wifi_start / wifi_stop; the module's own service (modules/wifi/netswitch_wifi_service.py) does the setup.
 #
 # Runs as root (service dreampi-netswitch-buttons). Watches up to two GPIO
 # button pins (see netswitch_gpio.py), each independently configured from the
@@ -19,24 +19,6 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import netswitch_core as core  # noqa: E402  (paths, settings, debug_log())
 from netswitch_gpio import peripheral_base, Block, GPIO_OFFSET, set_input_pullup, read_level  # noqa: E402
-
-_wifi = [None]
-
-
-def get_wifi():
-    """The Wi-Fi setup module's code (modules/wifi/netswitch_wifi_setup.py), or None while that module isn't
-    installed. Looked for again each time, so installing the module needs no restart of this service."""
-    if _wifi[0] is None and core.module_manifest("wifi") is not None:
-        folder = os.path.join(core.MODULES_DIR, "wifi")
-        if folder not in sys.path:
-            sys.path.insert(0, folder)
-        try:
-            import netswitch_wifi_setup
-            _wifi[0] = netswitch_wifi_setup
-        except Exception as e:
-            sys.stderr.write("Wi-Fi setup module not loaded: %s\n" % e)
-    return _wifi[0]
-
 
 HOLD_SECONDS = 3.0        # button hold before Wi-Fi setup starts/stops
 SHORT_PRESS_MIN = 0.03    # ignore a debounced press shorter than this
@@ -280,7 +262,7 @@ def run_buttons(read, apply_pullups, gpio1, gpio2, function1, function2, wifi_as
 def wifi_enabled():
     """The Wi-Fi setup module is installed and switched on; without it the buttons
     only run their own short-press functions."""
-    return core.wifi_enabled() and get_wifi() is not None
+    return core.wifi_enabled()
 
 
 def _button_config():
@@ -289,16 +271,13 @@ def _button_config():
             core.wifi_button() if wifi_enabled() else "")
 
 
-def _graceful_exit(*args):
-    wifi = get_wifi()
-    if wifi is not None:
-        wifi.graceful_exit(*args)    # a stop mid-setup must not strand the Wi-Fi interface
+def _exit(*_):
     sys.exit(0)
 
 
 def main():
-    signal.signal(signal.SIGTERM, _graceful_exit)
-    signal.signal(signal.SIGINT, _graceful_exit)
+    signal.signal(signal.SIGTERM, _exit)
+    signal.signal(signal.SIGINT, _exit)
     cfg = _button_config()
     stop_event = threading.Event()
     thread = threading.Thread(target=button_watcher, args=cfg + (stop_event,))
@@ -318,35 +297,6 @@ def main():
             core.debug_log("button: config changed, button1=GPIO%d (%s), button2=GPIO%d (%s), wifi setup=%s"
                           % cfg)
 
-        if not wifi_enabled():
-            time.sleep(HEARTBEAT)
-            continue
-        wifi = get_wifi()
-        iface = wifi.wifi_iface()
-        if wifi.start_requested():
-            wifi.clear_flags()
-            if not iface:
-                core.debug_log("wifi setup: no Wi-Fi adapter found")
-                wifi.set_state("failed", ssid="no Wi-Fi adapter found")
-                wifi.wait_or_stop(wifi.RESULT_PAUSE)
-                wifi.set_state("idle")
-            else:
-                try:
-                    wifi.setup_cycle(iface)
-                except Exception:
-                    core.debug_log("wifi setup: unexpected error, stopping")
-                    sys.stderr.write("wifi setup failed:\n")
-                    import traceback
-                    traceback.print_exc()
-                    try:
-                        wifi.restore_client(iface)
-                    except Exception:
-                        pass
-                    wifi.set_state("idle")
-                    wifi.clear_flags()
-        else:
-            wifi.clear_flags()
-            wifi.set_state("idle")
         time.sleep(HEARTBEAT)
 
 

@@ -1,5 +1,5 @@
 // Wi-Fi setup module, page side: the Wi-Fi rows in Settings > Network and the "which button holds to start it" row under
-// the buttons. Setup itself runs in the buttons service; this talks to it through POST /wifitoggle and /wificonnect.
+// the buttons. Setup itself runs in the module's own service (dreampi-netswitch-wifi); this talks to it through POST /wifitoggle and /wificonnect.
 var WIFI_LABELS={
  idle:["Search","Search for a Wi-Fi network to connect the Pi to"],
  scanning:["Stop","Scanning for Wi-Fi networks..."],

@@ -1,5 +1,5 @@
 # DreamPi Netswitch add-on - Wi-Fi setup module, web side. The setup itself (scanning, the temporary access
-# point, connecting) runs in the buttons service (netswitch_buttons.py + netswitch_wifi_setup.py in this folder);
+# point, connecting) runs in the module's own service (netswitch_wifi_service.py + netswitch_wifi_setup.py in this folder);
 # this file is how the page starts and stops it and tells it which network to join:
 #   POST /wifitoggle   start Wi-Fi setup, or stop it while it runs (touches wifi_start / wifi_stop)
 #   POST /wificonnect  join a network chosen on this page (an alternative to the access point's own page)

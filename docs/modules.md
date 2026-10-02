@@ -12,7 +12,7 @@ Read before adding, removing or restructuring a feature. Back to [CLAUDE.md](../
 |---|---|---|---|
 | `numbers` | `modules/numbers/` | the editable phone numbers: Settings > Phone numbers, `GET`/`POST /numbers`, `numbers.json` (the hook only reads it while the module is on, else it uses its built-in defaults) | on |
 | `players` | `modules/players/` | the Online players box on the main page and `GET /players` | on |
-| `wifi` | `modules/wifi/` | Wi-Fi setup: the Wi-Fi rows in Settings, `POST /wifitoggle` and `/wificonnect`, the setup code the buttons service runs (`netswitch_wifi_setup.py`) | **off** |
+| `wifi` | `modules/wifi/` | Wi-Fi setup: the Wi-Fi rows in Settings, `POST /wifitoggle` and `/wificonnect`, its own service `dreampi-netswitch-wifi` (`netswitch_wifi_service.py` + `netswitch_wifi_setup.py`) | **off** |
 | `led` | `modules/led/` | the status LEDs: the service (`netswitch_led.py`, `netswitch_led_drivers.py`), `netswitch_ledconfig.py`, the NeoPixel calibration and Status LED settings **including the LED count / GPIO pin / wire order row**, `GET`/`POST /ledconfig` | on |
 | `debuglog` | `modules/debuglog/` | the Debug log bar and live log on the main page, `GET /log`, `/dtmf`, `POST /debug`, `/clearlog`, and the part that runs inside DreamPi (`netswitch_hookdebug.py`) | on |
 
@@ -32,7 +32,7 @@ modules/<name>/
   remove.sh        optional, sourced when the folder is gone from the repo, and by uninstall.sh
 ```
 
-Python files in a module folder import the base by name (`import netswitch_core as core`): the loader, and the module's own services, put the base folder and the module folder on `sys.path`. The base never imports module code, with two guarded exceptions: the buttons service loads `netswitch_wifi_setup` and the hook loads `netswitch_hookdebug` (both only while their module is installed and on). `tests/test_modules.py` enforces this.
+Python files in a module folder import the base by name (`import netswitch_core as core`): the loader, and the module's own services, put the base folder and the module folder on `sys.path`. The base never imports module code, with one guarded exception: the hook loads `netswitch_hookdebug` (only while the debug log module is installed and on). `tests/test_modules.py` enforces this.
 
 ### Web entry
 
@@ -66,7 +66,7 @@ Client-side hooks (`page/page.js`): a module's `page.js` calls `hook(name, fn)`,
 ## Services and the installer
 
 - The **LED service** (`dreampi-netswitch-led`, `modules/led/netswitch_led.py`) drives `ledconfig.led_count()` LEDs while the module is on and **0 (closed, dark) while it is off** (`wanted_count()`), so the Modules menu needs no systemctl. Its unit has `ConditionPathExists=` for the three files, so deleting the folder from `/opt/dreampi-netswitch` makes systemd skip it quietly.
-- The **buttons service** is base; it loads the Wi-Fi setup code from `modules/wifi` when that module is installed (`get_wifi()`, tried again every heartbeat) and runs it only while the module is on.
+- The **buttons service** is base and loads no module code. While the Wi-Fi module is on, a hold only touches `wifi_start` / `wifi_stop` (the same files the page's button touches). The **Wi-Fi service** (`dreampi-netswitch-wifi`, written by the module's `install.sh`, removed by its `remove.sh`) idles until a start request, runs `setup_cycle()`, and treats switching the module off mid-setup as a stop. Its unit has `ConditionPathExists` for the module's files.
 - `install.sh` `sync_modules`: copies every `modules/*/` that has a `module.json` to `$DEST/modules/` (replacing the old copy as a whole); a folder that was installed before but is gone from the repo gets its `remove.sh` run and is deleted. Then every installed module's `install.sh` is sourced (the LED one writes its unit and handles SPI for GPIO10; the Wi-Fi one handles `--wifi` / `--no-wifi` / `--wifi-demo` and installs hostapd + dnsmasq) and the services they add (`NS_SERVICES`) are enabled and restarted. `--wifi` turns the Wi-Fi module on (`ns_module_enable`), an old `wifi_enabled` marker is converted. `uninstall.sh` sources every `remove.sh` first.
 - To **remove a module for good**: delete its folder in the folder you installed from and run `sudo ./install.sh` (its service and files go; its settings files like `led.json`, `led_count`, `numbers.json` stay for when it comes back). To **add one**: put the folder in and run the installer. To only hide it: switch it off in Settings > Modules.
 

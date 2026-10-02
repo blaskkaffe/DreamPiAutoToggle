@@ -13,7 +13,7 @@ if os.environ.get("WIFI"): core.save_module_enabled("wifi", True)
 if os.environ.get("WIFIDEMO"):
     core.save_module_enabled("wifi", True); open(core.WIFI_DEMO, "w").close()
     wifi.SCAN_WAIT = 3
-    def loop():     # the Wi-Fi half of netswitch_buttons.main(), without the GPIO part
+    def loop():     # what netswitch_wifi_service.py does
         while True:
             if wifi.start_requested():
                 wifi.clear_flags()

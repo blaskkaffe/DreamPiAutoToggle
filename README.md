@@ -291,7 +291,7 @@ While it's scanning or hosting the setup network, a status LED shows a breathing
 
 **Wiring:** no resistor needed; the Pi's internal pull-up is used on each pin, so it reads high normally and low while that button is held. GPIO17 and GPIO4 were picked as the defaults because neither has any other function on any Raspberry Pi model (an earlier version of this add-on defaulted the single button to GPIO15, which doubles as the Pi's UART RX pin and could pick up noise from the serial console/Bluetooth if that's in use). A pin or function change from Settings > GPIO takes effect within a couple of seconds, with no service restart. A toggle switch is wired the same way, between the pin and GND (any simple on/off switch; closed = on).
 
-**Install:** the buttons come with every install and run as the `dreampi-netswitch-buttons` service. `sudo ./install.sh --wifi` additionally enables Wi-Fi setup and installs `hostapd` and `dnsmasq` with `apt` if they aren't already present (needed to host the setup network); remove just that again with `sudo ./install.sh --no-wifi`.
+**Install:** the buttons come with every install and run as the `dreampi-netswitch-buttons` service. `sudo ./install.sh --wifi` additionally enables the Wi-Fi setup module (its own `dreampi-netswitch-wifi` service, layered on top of the buttons) and installs `hostapd` and `dnsmasq` with `apt` if they aren't already present (needed to host the setup network); remove just that again with `sudo ./install.sh --no-wifi`.
 
 **Not yet verified on real Wi-Fi hardware:** it assumes the classic Raspberry Pi OS network stack (`wpa_supplicant` + `dhcpcd`), and hosting the setup network takes the Wi-Fi interface away from its normal connection while it's up (Ethernet, if connected, keeps working throughout). If your Pi's networking is set up differently (for example NetworkManager), this feature likely won't work; everything else in this add-on is unaffected either way. A single button on GPIO17 was tried on real hardware in an earlier version of this add-on; the two-button, per-button-function and combined-hold generalisation described above has not been.
 
@@ -317,7 +317,7 @@ The debug log is for tracking down calls that go wrong, such as misheard numbers
   - Try the Pi's IP address instead of `dreampi.local`. Looking up `.local` names can take a few seconds on some phones and PCs, or fail now and then.
   - Wi-Fi power saving is a common cause of a Pi dropping off the network. The page service switches it off for every Wi-Fi adapter each time it starts; the setting resets on reboot, and the service switches it off again.
   - `journalctl -u dreampi-netswitch -n 50` shows whether the page service restarted or logged an error. It restarts itself within seconds if it ever stops answering.
-- `journalctl -u dreampi-netswitch-buttons -n 50` shows what the buttons and Wi-Fi setup are doing (scanning, hosting, connecting) and any error.
+- `journalctl -u dreampi-netswitch-buttons -n 50` shows what the buttons are doing; `journalctl -u dreampi-netswitch-wifi -n 50` shows Wi-Fi setup (scanning, hosting, connecting) and any error.
 - `sudo grep netswitch /var/log/messages` shows lines like `netswitch: routing 5551234 to DCNET`.
 - `cat /tmp/dreampi-netswitch.active` should say `active pid=<DreamPi's process id>`.
 

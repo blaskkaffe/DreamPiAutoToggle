@@ -109,7 +109,7 @@ def save_module_enabled(name, on):
 
 
 def wifi_enabled():
-    """Wi-Fi setup module installed and on (the buttons service and the Wi-Fi button functions ask)."""
+    """Wi-Fi setup module installed and on (the buttons and the Wi-Fi service ask)."""
     return module_enabled("wifi")
 
 

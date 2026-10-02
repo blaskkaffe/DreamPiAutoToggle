@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # DreamPi Netswitch add-on - Wi-Fi setup (optional, install.sh --wifi).
-# Library for netswitch_buttons.py (service dreampi-netswitch-buttons): the
-# button thread there, or the page's Settings > Network > Wi-Fi setup button
-# (POST /wifitoggle), touches wifi_start / wifi_stop and this module's
-# setup_cycle() does the rest. The original design notes follow.
+# Library for netswitch_wifi_service.py (service dreampi-netswitch-wifi): the
+# button thread in netswitch_buttons.py (base), or the page's Settings > Network > Wi-Fi setup button
+# (POST /wifitoggle), touches wifi_start / wifi_stop and the service calls this module's
+# setup_cycle(), which does the rest. The original design notes follow.
 #
-# Runs as root (service dreampi-netswitch-buttons, always installed). Watches
-# up to two GPIO button pins (see netswitch_gpio.py), each independently
-# configured from the page's Settings > GPIO with its own pin and short-press
-# function (off, toggle the selected network, or select DCNow!/DCNET outright).
-#
-# Wi-Fi setup is the optional part (install.sh --wifi, marker wifi_enabled;
-# without it none of the rest of this file runs): a 3-second hold of the
+# Wi-Fi setup is the optional part (install.sh --wifi, or the Modules menu): a 3-second hold of the
 # button(s) assigned to it in Settings > GPIO, or the page's "Wi-Fi setup"
 # button in Settings > Network (POST /wifitoggle, which just touches
 # wifi_start / wifi_stop under /opt/dreampi-netswitch - the same files this

@@ -218,21 +218,22 @@ EOF
 
 # ------------------------------------------------------------------ buttons
 # Always installed: two GPIO buttons with a short-press function each (pins and
-# functions editable from the page). Wi-Fi setup is the optional part, below.
+# functions editable from the page). Wi-Fi setup is not part of it: that is the Wi-Fi module's own service.
 [ -f "$DEST/button1_gpio" ] || echo "$BUTTON1_GPIO_DEFAULT" > "$DEST/button1_gpio"
 [ -f "$DEST/button2_gpio" ] || echo "$BUTTON2_GPIO_DEFAULT" > "$DEST/button2_gpio"
 echo "Buttons on GPIO$(cat "$DEST/button1_gpio") and GPIO$(cat "$DEST/button2_gpio") (pins and functions editable from the page's Settings > GPIO)"
 # Older versions had one service for both buttons and Wi-Fi setup, enabled only
 # by --wifi (marker wifi_button_enabled): carry that over (modules/wifi/install.sh turns it into the module's switch).
 if [ -f "$DEST/wifi_button_enabled" ]; then mv "$DEST/wifi_button_enabled" "$DEST/wifi_enabled"; fi
-if [ -f /etc/systemd/system/dreampi-netswitch-wifi.service ]; then
+# (and a service of that name from then, running netswitch_wifi.py, is replaced by the Wi-Fi module's own service, or removed if the module is absent)
+if [ -f /etc/systemd/system/dreampi-netswitch-wifi.service ] && [ ! -d "$DEST/modules/wifi" ]; then
     systemctl disable --now dreampi-netswitch-wifi.service 2>/dev/null || true
     rm -f /etc/systemd/system/dreampi-netswitch-wifi.service
 fi
 rm -f "$DEST/netswitch_wifi.py" "$DEST/wifi_button_gpio"
 cat > /etc/systemd/system/dreampi-netswitch-buttons.service <<EOF
 [Unit]
-Description=DreamPi Netswitch buttons (and Wi-Fi setup)
+Description=DreamPi Netswitch buttons
 After=network.target
 StartLimitIntervalSec=0
 

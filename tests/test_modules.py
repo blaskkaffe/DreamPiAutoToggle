@@ -311,6 +311,30 @@ class Services(unittest.TestCase):
         core.save_module_enabled("wifi", False)
         self.assertFalse(buttons.wifi_enabled())
 
+    def test_buttons_service_loads_no_module_code(self):
+        """Wi-Fi is layered on top: a button hold only touches wifi_start / wifi_stop; the module has its own service."""
+        code = ("import sys; sys.path[:0] = %r; import netswitch_buttons; "
+                "sys.exit(1 if 'netswitch_wifi_setup' in sys.modules else 0)" % [ROOT])
+        self.assertEqual(subprocess.call(["python3", "-c", code]), 0)
+
+    def test_wifi_service_idles_while_module_is_off_and_runs_a_requested_setup(self):
+        import netswitch_wifi_service as svc
+        import netswitch_wifi_setup as wifi
+        calls = []
+        old = (wifi.wifi_iface, wifi.setup_cycle)
+        wifi.wifi_iface = lambda: "wlan0"
+        wifi.setup_cycle = lambda iface: calls.append(iface)
+        try:
+            core.save_module_enabled("wifi", True)
+            open(core.WIFI_START, "w").close()
+            svc.run_once()
+            self.assertEqual(calls, ["wlan0"])
+            self.assertFalse(os.path.exists(core.WIFI_START))       # the request was consumed
+            svc.run_once()                                          # nothing asked: nothing runs
+            self.assertEqual(calls, ["wlan0"])
+        finally:
+            wifi.wifi_iface, wifi.setup_cycle = old
+
 
 class InstallerTests(unittest.TestCase):
     """The module handling of install.sh (sync_modules), run on temp folders; and the module scripts parse."""
@@ -407,10 +431,8 @@ class Layering(unittest.TestCase):
                 for line in f:
                     m = re.match(r"\s*(?:import|from)\s+(\w+)", line)
                     if m and m.group(1) in module_files:
-                        # two places load a module's code on purpose, guarded: the buttons service (Wi-Fi setup) and
-                        # the hook inside DreamPi (the debug log's part)
-                        self.assertIn((name, m.group(1)), [("netswitch_buttons.py", "netswitch_wifi_setup"),
-                                                            ("netswitch_hook.py", "netswitch_hookdebug")], (name, line))
+                        # one place loads a module's code on purpose, guarded: the hook inside DreamPi (the debug log's part)
+                        self.assertIn((name, m.group(1)), [("netswitch_hook.py", "netswitch_hookdebug")], (name, line))
 
     def test_modules_only_use_the_base_and_themselves(self):
         base = set(f[:-3] for f in os.listdir(ROOT) if f.endswith(".py"))
