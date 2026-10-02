@@ -6,6 +6,8 @@ Switch a DreamPi between **DCNow!** (the normal DreamPi / Dreamcast Live network
 
 It changes no DreamPi files, so DreamPi's auto-updates keep working and uninstalling leaves DreamPi exactly as it was.
 
+<p align="center"><img src="docs/images/main-page.jpg" alt="The main page on a phone, with the Dreamcast background module on: selected network, the two network buttons and the online players box" width="320"></p>
+
 What you get:
 - A live status page at `http://dreampi.local` (also over HTTPS) with buttons to pick the network.
 - Special phone numbers that switch the network straight from the Dreamcast.
