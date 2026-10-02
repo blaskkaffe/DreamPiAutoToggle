@@ -13,7 +13,7 @@ What you get:
 - An optional animated Dreamcast-style background for the page.
 - A debug log for tracking down calls that go wrong.
 
-**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET with `555-0002` works end to end. A single NeoPixel on GPIO18 works too. Several LEDs or a strip haven't been tried on real hardware yet; feedback is welcome.
+**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET by dialing works end to end (tested with the earlier DCNET number, which uses the same code path as `555-0002`). The switch-only `#` numbers and the busy tone haven't been tried on hardware yet. A single NeoPixel on GPIO18 works too. Several LEDs or a strip haven't been tried on real hardware yet; feedback is welcome.
 
 ## Install
 
@@ -76,9 +76,9 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 | `555-0002#` | Switch only: selects DCNET / FLYCAST without connecting. |
 | `111-1111#` | Switch only: resets the selection to the **default network** without connecting. |
 
-A number ending in `#` is a switch-only call. DreamPi doesn't answer it: the add-on changes the selection and plays a busy tone for 4 seconds, so the Dreamcast gives up straight away instead of waiting for an answer. After that the normal dial tone comes back and the next call goes to the newly selected network. Use it to change networks from the Dreamcast without opening the web page.
+A number ending in `#` is a switch-only call. DreamPi doesn't answer it: the add-on changes the selection and plays a busy tone for 4 seconds, which is meant to make the Dreamcast give up instead of waiting for an answer (not yet confirmed on real hardware). After that the normal dial tone comes back and the next call goes to the newly selected network. Use it to change networks from the Dreamcast without opening the web page.
 
-- The numbers are matched on their last seven digits, so a leading `1` (long-distance prefix), an area code or an outside-line digit doesn't matter. DreamPi often hears an extra leading `1`, for example `15550002`.
+- The numbers are matched on how the dialed string ends (the last seven digits), so a leading `1` (long-distance prefix), an area code or an outside-line digit doesn't matter. DreamPi often hears an extra leading `1`, for example `15550002`.
 - openMenu always dials `111-1111`, so it always gets DCNow! (DCNET wouldn't accept openMenu's login).
 - Netlink/XBAND dial codes and DreamPi's built-in `*69` prefix ("this call to DCNET") keep working as before.
 
