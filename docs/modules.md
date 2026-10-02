@@ -10,7 +10,7 @@ Read before adding, removing or restructuring a feature. Back to [CLAUDE.md](../
 
 | Module | Folder | What it is | Default |
 |---|---|---|---|
-| `numbers` | `modules/numbers/` | the editable phone numbers: Settings > Phone numbers, `GET`/`POST /numbers`, `numbers.json` (the hook only reads it while the module is on, else it uses its built-in defaults) | on |
+| `numbers` | `modules/numbers/` | the editable phone numbers: Settings > Special phone numbers, `GET`/`POST /numbers`, `numbers.json` (the hook only reads it while the module is on, else it uses its built-in defaults) | on |
 | `players` | `modules/players/` | the Online players box on the main page and `GET /players` | on |
 | `wifi` | `modules/wifi/` | Wi-Fi setup: the Wi-Fi rows in Settings, `POST /wifitoggle` and `/wificonnect`, its own service `dreampi-netswitch-wifi` (`netswitch_wifi_service.py` + `netswitch_wifi_setup.py`) | **off** |
 | `led` | `modules/led/` | the status LEDs: the service (`netswitch_led.py`, `netswitch_led_drivers.py`), `netswitch_ledconfig.py`, the NeoPixel calibration and Status LED settings **including the LED count / GPIO pin / wire order row**, `GET`/`POST /ledconfig` | on |

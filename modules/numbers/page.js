@@ -1,4 +1,4 @@
-// Phone numbers module, page side: Settings > Phone numbers. Four lists (one per action) kept in numbers.json by the
+// Phone numbers module, page side: Settings > Special phone numbers. Four lists (one per action) kept in numbers.json by the
 // module; the hook matches what was dialed against their endings. Each block has an Add button that opens a pop-up.
 var numCfg=null,numTimer=null;
 function loadNumbers(){var x=new XMLHttpRequest();x.open("GET","/numbers",true);

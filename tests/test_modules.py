@@ -149,7 +149,7 @@ class WithNothing(Base):
             self.assertIn(ident, html)
         for n in NAMES:
             self.assertNotIn(MARKER[n], html, n)
-        for word in ("led-section", "Status LED", "NeoPixel", "num-card", "Phone numbers", "debug-bar", "wifi-row", "pl-box",
+        for word in ("led-section", "Status LED", "NeoPixel", "num-card", "Special phone numbers", "debug-bar", "wifi-row", "pl-box",
                      "ledOpen", "@@"):
             self.assertNotIn(word, html, word)
         self.check_js(html)

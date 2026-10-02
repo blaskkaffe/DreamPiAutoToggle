@@ -1,2 +1,2 @@
-{"title": "Phone numbers", "order": 20, "default": true, "web": "netswitch_numbers",
+{"title": "Special phone numbers", "order": 20, "default": true, "web": "netswitch_numbers",
  "description": "Edit the numbers the Dreamcast can dial to switch network or call through DCNow! / DCNET. Without it the built-in defaults are used."}

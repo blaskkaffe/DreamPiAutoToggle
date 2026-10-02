@@ -71,7 +71,7 @@ The add-on is a small **base** plus **modules**. The base is the web page with t
 
 | Module | Folder | Adds | On by default |
 |---|---|---|---|
-| **Phone numbers** | `modules/numbers/` | Settings > Phone numbers, to edit the numbers the Dreamcast dials. Without it the built-in default numbers are used | yes |
+| **Special phone numbers** | `modules/numbers/` | Settings > Special phone numbers, to edit the numbers the Dreamcast dials. Without it the built-in default numbers are used | yes |
 | **Online players** | `modules/players/` | the Online players box on the main page | yes |
 | **Wi-Fi setup** | `modules/wifi/` | joining a Wi-Fi network without a keyboard (a temporary access point), and the Wi-Fi rows in Settings | no |
 | **Status LEDs** | `modules/led/` | the NeoPixel service, the NeoPixel calibration and Status LED settings, and the LED count / GPIO pin / wire order | yes |
@@ -101,7 +101,7 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 
 ## Phone numbers
 
-Four actions, each with its own list of numbers that you edit in **Settings > Phone numbers** (each block has an **Add** button that opens a small box for the number, remove a number with its ✕, **Restore default numbers** at the bottom puts the list below back):
+Four actions, each with its own list of numbers that you edit in **Settings > Special phone numbers** (each block has an **Add** button that opens a small box for the number, remove a number with its ✕, **Restore default numbers** at the bottom puts the list below back):
 
 | Action | What it does | Default number |
 |---|---|---|
@@ -152,7 +152,7 @@ The selected network is DCNow! after every reboot (there is no default-network s
 
 **About** starts with **Wi-Fi setup** (Wi-Fi setup module): Starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too - tap one, enter its password if it needs one, and connect - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
 
-**Phone numbers** (Phone numbers module): the four lists above, editable here, with a short instruction at the bottom.
+**Special phone numbers** (Special phone numbers module): the four lists above, editable here, with a short instruction at the bottom.
 
 **Modules:** every installed module with a switch (see [Modules](#modules)).
 
