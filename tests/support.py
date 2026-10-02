@@ -10,6 +10,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+# every module's folder is importable by name, as the web service and the services do it
+_MODULES = os.path.join(ROOT, "modules")
+for _name in sorted(os.listdir(_MODULES)):
+    if os.path.isdir(os.path.join(_MODULES, _name)) and os.path.join(_MODULES, _name) not in sys.path:
+        sys.path.insert(0, os.path.join(_MODULES, _name))
+
 import netswitch_core as core  # noqa: E402
 import netswitch_ledconfig as ledconfig  # noqa: E402
 import netswitch_probes as probes  # noqa: E402

@@ -123,8 +123,10 @@ class HttpTests(unittest.TestCase):
 
     def test_api_shape(self):
         d = json.loads(self.get("/api")[2].decode())
-        for key in ("network", "default", "autoreset", "dreampi", "modem", "internet", "pi", "wifi", "warnings", "now"):
+        for key in ("network", "default", "autoreset", "dreampi", "modem", "internet", "pi", "hangup", "pin", "warnings", "now"):
             self.assertIn(key, d)
+        self.assertIn("debug", d)               # added by the debug log module (on by default)
+        self.assertNotIn("wifi", d)             # the Wi-Fi setup module is off by default
         self.assertIn(d["network"], ("dcnow", "dcnet"))
 
     def test_select_network(self):

@@ -16,7 +16,10 @@ import signal
 import sys
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _HERE)                                            # this module's other files
+sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (netswitch_core ...)
+import netswitch_core as core  # noqa: E402  (module on/off)
 import netswitch_ledconfig as ledconfig  # noqa: E402  (led.json, messages: shared with the web service)
 import netswitch_led_drivers as drivers  # noqa: E402  (open_output(), wire orders)
 
@@ -282,8 +285,14 @@ def switch_output(out, count, gpio, new_count, new_gpio):
     return new_out, new_count, new_gpio, True
 
 
+def wanted_count():
+    """How many LEDs to drive: the configured count while the LED module is switched on in the Modules menu, else 0
+    (the output is closed and dark, and the service just waits for it to be switched on)."""
+    return ledconfig.led_count() if core.module_enabled("led") else 0
+
+
 def main():
-    count, gpio = ledconfig.led_count(), ledconfig.led_gpio()
+    count, gpio = wanted_count(), ledconfig.led_gpio()
     cfg = ledconfig.led_config()
     order = drivers.ORDERS.get(cfg.get("order"), drivers.DEFAULT_ORDER)
     white_balance, gamma = _wb(cfg), cfg.get("gamma", ledconfig.GAMMA)
@@ -322,7 +331,7 @@ def main():
                 cfg = ledconfig.led_config()
                 order = drivers.ORDERS.get(cfg.get("order"), drivers.DEFAULT_ORDER)
                 white_balance, gamma = _wb(cfg), cfg.get("gamma", ledconfig.GAMMA)
-                out, count, gpio, switched = switch_output(out, count, gpio, ledconfig.led_count(), ledconfig.led_gpio())
+                out, count, gpio, switched = switch_output(out, count, gpio, wanted_count(), ledconfig.led_gpio())
                 if switched:
                     clocks = {}
                     last_frame = None

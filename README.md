@@ -53,7 +53,7 @@ The page can do it for you: **Settings > About** (the last rows of the About car
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
 ```
-Your settings are kept: selected network, default network, Auto reset, the LED setup and its colours, and the HTTPS certificate. You don't need to repeat `--leds=N`, `--wifi` or the port options; the installer remembers them (`--leds=0` / `--no-wifi` switch them off, `--https-port=443` turns HTTPS back on after `--no-https`). If the page still looks old afterwards, reload it in the browser.
+Your settings are kept: selected network, default network, Auto reset, which modules are on, the LED setup and its colours, and the HTTPS certificate. An install from before the modules were folders is converted by the update: its old flat files are removed and the modules are installed from `modules/` (an old Wi-Fi setup install stays on). You don't need to repeat `--leds=N`, `--wifi` or the port options; the installer remembers them (`--leds=0` / `--no-wifi` switch them off, `--https-port=443` turns HTTPS back on after `--no-https`). If the page still looks old afterwards, reload it in the browser.
 
 ### Safety
 
@@ -65,19 +65,23 @@ The web page runs on the Pi as root, because it has to restart DreamPi, reboot t
 - **The web service is fenced in** (systemd: no new privileges, read-only `/usr`, `/boot` and `/etc`, no kernel-module or cgroup changes) and the add-on's files in `/opt/dreampi-netswitch` are root-owned.
 - **Not covered:** someone who is already logged in on the Pi (or can run code on it) can do more than this add-on ever could, and the status files in `/tmp` are guessable names (the update's status file is not written through a planted link). The Wi-Fi setup access point is open by design while you set up Wi-Fi: it closes itself after 10 minutes if nobody picks a network, but don't start it where you don't want others to join.
 
-### Optional parts
+### Modules
 
-Two parts of the add-on are modules you can leave out. Each is a set of files, and either all of them are there or the feature is simply absent; nothing else notices.
+The add-on is a small **base** plus **modules**. The base is the web page with the Selected-network box, the two network buttons, Settings > Network (default network, Auto reset), Appearance, the buttons' GPIO settings, Modules, About (with updates) and Reboot, and the hook inside DreamPi that does the routing. Everything else is a module, a folder in `modules/`:
 
-| Module | Files | Without it |
-|---|---|---|
-| **Online players** | `netswitch_players.py`, `page/players.js` | no players box |
-| **Status LEDs** | `netswitch_led.py`, `netswitch_led_drivers.py`, `netswitch_ledconfig.py`, `page/led.html`, `page/led.js`, `page/led.css` | no LED service, no NeoPixel calibration / Status LED settings, no LED row under GPIO (the buttons' GPIO settings stay), and the DreamPi dot on the main page still shows a plain colour for the state |
+| Module | Folder | Adds | On by default |
+|---|---|---|---|
+| **Phone numbers** | `modules/numbers/` | Settings > Phone numbers, to edit the numbers the Dreamcast dials. Without it the built-in default numbers are used | yes |
+| **Online players** | `modules/players/` | the Online players box on the main page | yes |
+| **Wi-Fi setup** | `modules/wifi/` | joining a Wi-Fi network without a keyboard (a temporary access point), and the Wi-Fi rows in Settings | no |
+| **Status LEDs** | `modules/led/` | the NeoPixel service, the NeoPixel calibration and Status LED settings, and the LED count / GPIO pin / wire order | yes |
+| **Debug log** | `modules/debuglog/` | the Debug log bar and live log on the main page, and its recording inside DreamPi | yes |
 
-- **Leave one out:** delete its files from the folder you installed from and run `sudo ./install.sh`. The installer removes the installed copies (and, for the LEDs, the `dreampi-netswitch-led` service); your LED settings (`led.json`, the LED count and pin) are kept. A module with a file missing counts as absent, so a half-deleted module can't break anything.
-- **Add one back:** put all of its files in the folder and run `sudo ./install.sh` again. The settings pane appears with the files, and your old LED settings are back as they were.
-- **Without running the installer:** the page follows the files in `/opt/dreampi-netswitch` while it runs, so after copying or deleting a module's files, reload the page and its settings appear or disappear. The LED service itself is only started or stopped by the installer; if its files are deleted from `/opt/dreampi-netswitch`, systemd just skips it instead of failing.
-- `--leds=N`, `--led-gpio=N` and `--no-led` do nothing without the LED module.
+- **Switch one on or off:** Settings > **Modules**. It takes effect at once: the page reloads without the module's parts, and its endpoints and background work stop (the LED service goes dark while Status LEDs is off). Nothing is deleted, so switching it on again brings your settings back.
+- **Remove one for good:** delete its folder in the folder you installed from and run `sudo ./install.sh`. The installer removes the installed copy (and, for the LEDs, the `dreampi-netswitch-led` service and the SPI setting it added); settings files such as `led.json`, the LED count and pin, and `numbers.json` stay for when it comes back.
+- **Add one:** put its folder in `modules/` and run `sudo ./install.sh`. A module you wrote or got from someone only needs a `module.json` and its files: see `docs/modules.md`.
+- **Without running the installer:** the page follows the folders in `/opt/dreampi-netswitch/modules` while it runs, so copying or deleting a module folder and reloading the page is enough for the page and its endpoints. The LED service is only installed or removed by the installer; if its files are deleted from `/opt/dreampi-netswitch`, systemd just skips it instead of failing.
+- `--leds=N`, `--led-gpio=N` and `--no-led` do nothing without the LED module, and `--wifi`, `--no-wifi` and `--wifi-demo` do nothing without the Wi-Fi module. `--wifi` installs hostapd and dnsmasq and switches the Wi-Fi module on; the module's switch in Settings > Modules does the same without installing packages.
 
 ### Uninstall
 
@@ -149,10 +153,12 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 
 - **Default network:** a switch, orange for DCNow! or blue for DCNET, that sets which network Auto reset goes back to. DCNow! unless changed.
 - **Auto reset:** when ticked, dialing `111-1111` resets the selected network to the default network. Off by default.
-- **Debug log:** when ticked, the **Debug log** bar appears at the bottom of the main page. Off by default and remembered per browser.
-- **Wi-Fi setup:** only shown when Wi-Fi setup was installed with `--wifi` (see [Wi-Fi setup button](#buttons-and-wi-fi-setup)). Starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too - tap one, enter its password if it needs one, and connect - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
+- **Debug log** (Debug log module): when ticked, the **Debug log** bar appears at the bottom of the main page. Off by default and remembered per browser.
+- **Wi-Fi setup** (Wi-Fi setup module): only shown while that module is on (see [Wi-Fi setup button](#buttons-and-wi-fi-setup)). Starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too - tap one, enter its password if it needs one, and connect - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
 
-**Phone numbers:** the five lists above, editable here, plus the two fixed rows as a reminder.
+**Phone numbers** (Phone numbers module): the five lists above, editable here, plus the two fixed rows as a reminder.
+
+**Modules:** every installed module with a switch (see [Modules](#modules)).
 
 **Appearance**
 - **Dreamcast background:** an animated background in the style of the Dreamcast menu (see [Credits](#credits)). Off by default, and remembered per browser, so a phone can leave it off while a PC has it on. It pauses while the page is hidden. The Pi serves the files itself (about 600 KB, fetched once), so it works without internet; browsers without WebGL just show the blue gradient. The buttons are slightly see-through so the background shows through them.

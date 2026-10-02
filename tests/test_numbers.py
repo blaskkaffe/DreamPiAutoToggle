@@ -13,9 +13,18 @@ import netswitch_hook as hook
 builtins.__import__ = hook._original_import     # importing the hook may arm its import hook; undo that here
 
 
+def enable_numbers_module():
+    """The hook only reads numbers.json while the phone numbers module is installed (and not switched off)."""
+    folder = os.path.join(hook.MODULES_DIR, "numbers")
+    os.makedirs(folder)
+    with open(os.path.join(folder, "module.json"), "w") as f:
+        f.write("{}")
+
+
 class SettingsTests(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox(hook)
+        enable_numbers_module()
 
     def tearDown(self):
         cleanup(self.tmp)
@@ -49,6 +58,17 @@ class SettingsTests(unittest.TestCase):
     def test_limit_per_action(self):
         saved = nums.save_numbers({"reset": ["%07d" % i for i in range(30)]})
         self.assertEqual(len(saved["reset"]), nums.MAX_PER_ACTION)
+
+    def test_without_the_module_the_hook_uses_the_defaults(self):
+        nums.save_numbers({"reset": ["*61#"]})
+        self.assertEqual(hook._load_numbers()["reset"], ["*61#"])
+        with open(hook.MODULES_STATE, "w") as f:                       # switched off in the Modules menu
+            json.dump({"numbers": False}, f)
+        self.assertEqual(hook._load_numbers(), hook.DEFAULT_NUMBERS)
+        os.remove(hook.MODULES_STATE)
+        self.assertEqual(hook._load_numbers()["reset"], ["*61#"])
+        os.remove(os.path.join(hook.MODULES_DIR, "numbers", "module.json"))   # folder deleted
+        self.assertEqual(hook._load_numbers(), hook.DEFAULT_NUMBERS)
 
     def test_broken_file_falls_back(self):
         with open(core.NUMBERS, "w") as f:
@@ -117,6 +137,7 @@ class FakeModule(object):
 class WrapperTests(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox(hook)
+        enable_numbers_module()
         self.fake = FakeModule()
         hook._patch(self.fake.module)
         self.nl = self.fake.cls()

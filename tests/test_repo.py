@@ -12,10 +12,17 @@ import unittest
 from support import ROOT
 
 
+HOOK_FILES = [os.path.join(ROOT, "netswitch_hook.py"), os.path.join(ROOT, "modules", "debuglog", "netswitch_hookdebug.py")]
+
+
 class HookCompatTests(unittest.TestCase):
-    """netswitch_hook.py runs inside DreamPi on Python 2.7."""
+    """netswitch_hook.py, and the debug log module's part that it loads, run inside DreamPi on Python 2.7."""
     def test_no_python3_only_syntax(self):
-        with open(os.path.join(ROOT, "netswitch_hook.py")) as f:
+        for path in HOOK_FILES:
+            self.check_syntax(path)
+
+    def check_syntax(self, path):
+        with open(path) as f:
             tree = ast.parse(f.read())
         for node in ast.walk(tree):
             self.assertNotIsInstance(node, ast.JoinedStr, "f-string at line %d" % getattr(node, "lineno", 0))
@@ -28,7 +35,11 @@ class HookCompatTests(unittest.TestCase):
                 self.assertEqual(node.args.kwonlyargs, [], "keyword-only args in %s" % node.name)
 
     def test_no_python3_only_imports(self):
-        with open(os.path.join(ROOT, "netswitch_hook.py")) as f:
+        for path in HOOK_FILES:
+            self.check_imports(path)
+
+    def check_imports(self, path):
+        with open(path) as f:
             tree = ast.parse(f.read())
         top = set()
         for node in ast.walk(tree):
@@ -43,7 +54,8 @@ class LayeringTests(unittest.TestCase):
     """The small services must not drag the web server in."""
     def test_led_and_buttons_do_not_import_the_web_module(self):
         for mod in ("netswitch_led", "netswitch_led_drivers", "netswitch_buttons", "netswitch_wifi_setup", "netswitch_core", "netswitch_ledconfig", "netswitch_probes"):
-            code = "import sys; sys.path.insert(0, %r); import %s; sys.exit(1 if 'netswitch_web' in sys.modules else 0)" % (ROOT, mod)
+            code = ("import sys; sys.path[:0] = %r; import %s; sys.exit(1 if 'netswitch_web' in sys.modules else 0)"
+                    % ([ROOT] + [os.path.join(ROOT, "modules", m) for m in os.listdir(os.path.join(ROOT, "modules"))], mod))
             self.assertEqual(subprocess.call(["python3", "-c", code]), 0, mod)
 
     def test_core_does_not_import_probes(self):
@@ -72,13 +84,13 @@ class DocsTests(unittest.TestCase):
 
 class CompileTests(unittest.TestCase):
     def test_python_files_compile(self):
-        for path in glob.glob(os.path.join(ROOT, "*.py")) + glob.glob(os.path.join(ROOT, "tests", "*.py")):
+        for path in glob.glob(os.path.join(ROOT, "*.py")) + glob.glob(os.path.join(ROOT, "tests", "*.py")) + glob.glob(os.path.join(ROOT, "modules", "*", "*.py")):
             out = os.path.join(tempfile.mkdtemp(), "x.pyc")
             py_compile.compile(path, cfile=out, doraise=True)
 
     def test_shell_scripts_parse(self):
         sh = shutil.which("sh")
-        for path in glob.glob(os.path.join(ROOT, "*.sh")) + glob.glob(os.path.join(ROOT, "tests", "*.sh")):
+        for path in glob.glob(os.path.join(ROOT, "*.sh")) + glob.glob(os.path.join(ROOT, "tests", "*.sh")) + glob.glob(os.path.join(ROOT, "modules", "*", "*.sh")):
             p = subprocess.run([sh, "-n", path], stderr=subprocess.PIPE)
             self.assertEqual(p.returncode, 0, "%s: %s" % (path, p.stderr.decode()))
 

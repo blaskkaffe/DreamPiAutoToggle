@@ -3,7 +3,7 @@
 # Shows DreamPi's and the modem's live status and internet access, plus an
 # optional debug timeline. It only creates/removes the files that
 # netswitch_hook.py reads. This module is the HTTP side (page, API, HTTPS,
-# watchdog); settings and state are in netswitch_core.py and netswitch_ledconfig.py, measurements in
+# watchdog); settings and state are in netswitch_core.py, the optional features in modules/ (netswitch_modules.py loads them), measurements in
 # netswitch_probes.py. Works on Python 3 and 2.7.
 import gzip
 import io
@@ -24,47 +24,10 @@ except ImportError:
     from SocketServer import ThreadingMixIn
 
 import netswitch_core as core
-import netswitch_numbers as numbers
+import netswitch_modules as modules
 import netswitch_probes as probes
 import netswitch_security as security
 import netswitch_update as updater
-import importlib
-
-# Optional modules. Each is a set of files; with every file present the feature is part of the page, with any of
-# them missing it is simply not there (nothing else notices). The page follows the files while the service runs:
-# refresh_modules() looks at them whenever the page is requested, so adding or deleting them takes effect on the
-# next reload (the LED *service* is started or stopped by install.sh, see docs/led.md).
-#   players: the online-players list              (netswitch_players.py + page/players.js)
-#   led:     the status LEDs and their settings   (netswitch_ledconfig.py, netswitch_led.py, netswitch_led_drivers.py
-#                                                  + page/led.html, led.js, led.css)
-_HERE = os.path.dirname(os.path.abspath(__file__))
-OPTIONAL_MODULES = {
-    "players": {"python": ["netswitch_players.py"], "page": ["players.js"], "import": "netswitch_players"},
-    "led": {"python": ["netswitch_ledconfig.py", "netswitch_led.py", "netswitch_led_drivers.py"],
-            "page": ["led.html", "led.js", "led.css"], "import": "netswitch_ledconfig"},
-}
-LED_PATHS = ("/ledconfig", "/ledhide", "/wbtest", "/wbtestdone")   # answered only while the LED module is present
-
-
-def module_present(name):
-    spec = OPTIONAL_MODULES[name]
-    return (all(os.path.exists(os.path.join(_HERE, f)) for f in spec["python"])
-            and all(os.path.exists(os.path.join(PAGE_DIR, f)) for f in spec["page"]))
-
-
-def _load_optional(name):
-    """The module's Python file when all its files are there and it imports, else None."""
-    if not module_present(name):
-        return None
-    try:
-        return importlib.import_module(OPTIONAL_MODULES[name]["import"])
-    except Exception as e:      # a broken module must not take the page down with it
-        sys.stderr.write("optional module %s not loaded: %s\n" % (name, e))
-        return None
-
-
-players = None      # filled in by refresh_modules() below
-ledconfig = None
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 STATIC_FILES = {   # only these are served from /static/
@@ -83,10 +46,8 @@ KEY = os.path.join(core.BASE_DIR, "https.key")
 
 
 def _dot_look(dstate):
-    """What the DreamPi dot previews: the LED message that is showing (LED module present), else a plain
-    look for the state so the dot still says something."""
-    if ledconfig is not None:
-        return (ledconfig.active_messages(dstate, {"network": True}, wifi=False) or [None])[-1]
+    """What the DreamPi dot previews: a plain look for the state. The LED module replaces it with the look of the
+    LED message that is showing (its api() hook), so the dot still says something without it."""
     dcnet = os.path.exists(core.FLAG)
     plain = {"ok": ("#1c6fe8" if dcnet else "#ff8c00", "breathe"), "busy": ("#ffd000", "breathe"), "off": ("#ff0000", "blink"),
              "call-dcnow": ("#ff8c00", "solid"), "call-dcnet": ("#0046ff", "solid"), "call": ("#aa00ff", "solid"),
@@ -127,60 +88,39 @@ def api_state():
     elif compat is False:
         warnings.append("Modem: %s is known not to work reliably with DreamPi. "
                         "See the Modem row in Settings." % label)
-    wf = core.wifi_state()
-    wf_state = wf.get("state", "idle")
-    if wf_state in ("scanning", "hosting"):
-        warnings.append("Wi-Fi setup: connect a phone or PC to the “%s” Wi-Fi network, then open "
-                        "http://192.168.4.1 to pick a network." % core.WIFI_AP_SSID)
-    elif wf_state == "connecting":
-        warnings.append("Wi-Fi setup: trying to connect to “%s”..." % (wf.get("ssid") or ""))
-    elif wf_state == "failed":
-        warnings.append("Wi-Fi setup: could not connect (%s)." % (wf.get("ssid") or "unknown reason"))
-    return {"network": "dcnet" if os.path.exists(core.FLAG) else "dcnow",
-            "autoreset": os.path.exists(core.AUTORESET),
-            "default": "dcnet" if os.path.exists(core.DEFAULT_DCNET) else "dcnow",
-            "debug": os.path.exists(core.DEBUG_DTMF),
-            # the dot next to DreamPi previews that status's LED message only;
-            # network problems show as warning boxes instead
-            "dreampi": {"state": dstate, "text": dtext,
-                        "look": _dot_look(dstate)},
-            "modem": {"text": mtext, "since": msince, "plugged": plugged, "label": label, "compat": compat},
-            "internet": checks["internet"],
-            "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
-                   "line2": pi.get("line2"), "warn": pi.get("warn")},
-            "wifi": {"state": wf_state, "ssid": wf.get("ssid"), "networks": wf.get("networks"),
-                     "installed": os.path.exists(core.WIFI_ENABLED), "demo": os.path.exists(core.WIFI_DEMO)},
-            "hangup": {"busy": probes._hangup["busy"], "text": probes._hangup["text"]},
-            "pin": security.pin_required(),     # the page asks for it before update / restart / Wi-Fi connect
-            "warnings": warnings, "now": int(time.time())}
+    d = {"network": "dcnet" if os.path.exists(core.FLAG) else "dcnow",
+         "autoreset": os.path.exists(core.AUTORESET),
+         "default": "dcnet" if os.path.exists(core.DEFAULT_DCNET) else "dcnow",
+         "dreampi": {"state": dstate, "text": dtext, "look": _dot_look(dstate)},
+         "modem": {"text": mtext, "since": msince, "plugged": plugged, "label": label, "compat": compat},
+         "internet": checks["internet"],
+         "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
+                "line2": pi.get("line2"), "warn": pi.get("warn")},
+         "hangup": {"busy": probes._hangup["busy"], "text": probes._hangup["text"]},
+         "pin": security.pin_required(),     # the page asks for it before update / restart / Wi-Fi connect
+         "warnings": warnings, "now": int(time.time())}
+    modules.apply_api(d, warnings)          # what the enabled modules add: debug, wifi, the dot's LED look ...
+    return d
 
 
 PAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "page")
 
 
+BASE_PAGE_FILES = ("index.html", "page.css", "page.js")
+
+
 def build_page():
-    """The page is one document: page/index.html with page/page.css and
-    page/page.js put in where it says @@CSS@@ and @@JS@@ (one request, kept in
-    memory by PAGE_BYTES). Edit those three files, not this module. The optional
-    modules add themselves: players.js as a script of its own, the LED module's
-    markup / styles / script at @@LED@@, @@LED_GPIO_ROW@@, @@LED_GPIO_NOTE@@, the end of
-    the CSS and the end of the script. Without a module those markers are just empty."""
+    """The page is one document: page/index.html with page/page.css and page/page.js put in where it says
+    @@CSS@@ and @@JS@@ (one request, kept in memory as PAGE_BYTES). Edit those files, not this module. The
+    enabled modules add themselves (netswitch_modules.page_parts()): their markup at the @@SLOT:name@@ markers,
+    their styles after page.css and their script after page.js. Without a module its markers are just empty."""
     def part(name):
         with io.open(os.path.join(PAGE_DIR, name), encoding="utf-8", newline="") as f:
             return f.read()
-    modules = ""
-    if players is not None and os.path.exists(os.path.join(PAGE_DIR, "players.js")):
-        modules = '<script src="/players.js" defer></script>'
-    css, js = part("page.css"), part("page.js")
-    led_parts = {"LED": "", "LED_GPIO_ROW": "", "LED_GPIO_NOTE": ""}
-    if ledconfig is not None and all(os.path.exists(os.path.join(PAGE_DIR, f)) for f in OPTIONAL_MODULES["led"]["page"]):
-        for name, text in re.findall(r"<!--part:(\w+)-->\n(.*?)(?=<!--part:|\Z)", part("led.html"), re.S):
-            led_parts[name] = text
-        css += "\n" + part("led.css")
-        js += "\n" + part("led.js")
-    html = part("index.html").replace("@@CSS@@", css).replace("@@JS@@", js).replace("@@MODULES@@", modules)
-    for name, text in led_parts.items():
-        html = html.replace("@@%s@@" % name, text)
+    extra = modules.page_parts()
+    html = part("index.html").replace("@@CSS@@", part("page.css") + "\n" + extra["css"]).replace("@@JS@@", part("page.js") + "\n" + extra["js"])
+    for name, text in extra["slots"].items():
+        html = html.replace("@@SLOT:%s@@" % name, text)
     return html
 
 
@@ -195,46 +135,39 @@ def _gzip(body):
 
 
 _static_cache = {}
-_watched = ["index.html", "page.css", "page.js", "players.js", "led.html", "led.js", "led.css"]
 _page_state = {"sig": None}
 _page_lock = threading.Lock()
 PAGE = PAGE_BYTES = None
 
 
-def _signature():
-    files = [os.path.join(PAGE_DIR, f) for f in _watched]
-    for spec in OPTIONAL_MODULES.values():
-        files += [os.path.join(_HERE, f) for f in spec["python"]]
-    sig = []
-    for path in files:
+def _page_signature():
+    sig = [PAGE_DIR]
+    for f in BASE_PAGE_FILES:
         try:
-            sig.append(os.path.getmtime(path))
+            sig.append(os.path.getmtime(os.path.join(PAGE_DIR, f)))
         except OSError:
             sig.append(None)
-    return (PAGE_DIR, tuple(sig))
+    return tuple(sig)
 
 
-def refresh_modules(force=False):
-    """Follow the files: when a page or module file was added, removed or changed since the page was built,
-    load or drop the optional modules and build the page again. Cheap (a few stat calls) and only done
-    when the page itself or one of the module endpoints is asked for."""
-    global players, ledconfig, PAGE, PAGE_BYTES
-    sig = _signature()
-    if sig == _page_state["sig"] and not force:
+def refresh_page(force=False):
+    """Follow the files: when a page file or a module was added, removed, switched or edited since the page was
+    built, load the enabled modules again and build the page again. Cheap (a few stat calls); done for every request
+    so a module switched on, or its files copied in or deleted, shows up on the next page load without a restart."""
+    global PAGE, PAGE_BYTES
+    changed = modules.refresh(force=force)
+    sig = _page_signature()
+    if not changed and sig == _page_state["sig"] and not force:
         return
     with _page_lock:
-        sig = _signature()
-        if sig == _page_state["sig"] and not force:
-            return
-        players = _load_optional("players")
-        ledconfig = _load_optional("led")
+        sig = _page_signature()
         PAGE = build_page()
         PAGE_BYTES = PAGE.encode("utf-8")
         _gz_cache.clear()
         _page_state["sig"] = sig
 
 
-refresh_modules(force=True)
+refresh_page(force=True)
 
 
 def _static(name):
@@ -250,10 +183,15 @@ def _static(name):
     return _static_cache[name]
 
 
-def _numbers_reply():
-    return {"numbers": numbers.numbers(), "defaults": numbers.default_numbers(),
-            "actions": [{"key": a[0], "label": a[1], "sub": a[2]} for a in numbers.ACTIONS],
-            "min": numbers.MIN_LEN, "max": numbers.MAX_LEN, "per_action": numbers.MAX_PER_ACTION}
+def _button_config():
+    return {"button1_gpio": core.button_gpio(1), "button2_gpio": core.button_gpio(2),
+            "button1_function": core.button_function(1), "button2_function": core.button_function(2),
+            "wifi_button": core.wifi_button()}
+
+
+def _button_reply():
+    return {"config": _button_config(), "gpios": core.BUTTON_GPIO_PINS, "functions": core.BUTTON_FUNCTIONS,
+            "wifi_choices": core.WIFI_BUTTON_CHOICES, "wifi": core.wifi_enabled()}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -330,32 +268,29 @@ class Handler(BaseHTTPRequestHandler):
         return self.rfile.read(length) if length else b""
 
     def _get(self):
-        if self.path in ("/", "/ledconfig", "/players", "/players.js") or self.path.startswith("/?"):
-            refresh_modules()
-        if self.path == "/ping":
+        refresh_page()          # follows added / removed / switched modules and edited page files
+        path = self.path.split("?")[0]
+        if path == "/ping":
             self.send("ok\n", "text/plain")
-        elif self.path == "/api":
+        elif path == "/api":
             self.send(json.dumps(api_state()), "application/json")
-        elif self.path.startswith("/log"):
-            m = re.search(r"from=(-?\d+)", self.path)
-            self.send(json.dumps(core.read_log(int(m.group(1)) if m else 0)), "application/json")
-        elif self.path.split("?")[0] == "/tag":
+        elif path == "/tag":
             # For openMenu over the PPP link: a tiny HTTP/1.0 answer, no markup, no caching.
             code = core.tag()
             text = dict(core.TAGS).get(code, "") if "text" in self.path else code
             self.send(text + "\n", "text/plain; charset=utf-8")
-        elif self.path == "/status":
+        elif path == "/status":
             d = api_state()
             self.send("network=%s\ntag=%s\ndefault=%s\nautoreset=%s\ndreampi=%s\nmodem=%s\ninternet=%s\npi=%s\n" % (
                 d["network"], core.tag(), d["default"], "on" if d["autoreset"] else "off", d["dreampi"]["text"],
                 d["modem"]["text"], d["internet"]["text"], d["pi"]["text"]), "text/plain; charset=utf-8")
-        elif self.path == "/about":
+        elif path == "/about":
             rows = probes.about()
             rows.append(("PIN", "Asked before update, restart and Wi-Fi connect" if security.pin_required()
                          else "Off: anyone on your network can update or restart (install.sh --pin sets one)"))
             self.send(json.dumps(rows), "application/json")
-        elif self.path.startswith("/static/"):
-            name = self.path[len("/static/"):].split("?")[0]
+        elif path.startswith("/static/"):
+            name = path[len("/static/"):]
             body = _static(name)
             if body is None:
                 self.send_response(404)
@@ -363,56 +298,22 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             self.send(body, STATIC_FILES[name], cache=86400, fixed=True)
-        elif self.path == "/ledconfig" and ledconfig is None:
-            self._refuse(404, "The LED module is not installed")
-        elif self.path == "/ledconfig" and ledconfig is not None:
-            self.send(json.dumps({"config": ledconfig.led_config(), "defaults": ledconfig.default_led_config(),
-                                  "states": ledconfig.LED_STATES, "groups": ledconfig.GROUPS,
-                                  "effects": ledconfig.EFFECTS, "orders": ledconfig.LED_ORDERS, "count": ledconfig.led_count(),
-                                  "gpio": ledconfig.led_gpio(), "gpios": ledconfig.GPIO_PINS,
-                                  "installed": ledconfig.led_count() > 0, "hidden": ledconfig.led_hidden()}),
-                     "application/json")
-        elif self.path == "/numbers":
-            self.send(json.dumps(_numbers_reply()), "application/json")
-        elif self.path == "/update":
+        elif path == "/modules":
+            self.send(json.dumps({"modules": modules.listing()}), "application/json")
+        elif path == "/update":
             self.send(json.dumps(updater.status()), "application/json")
-        elif self.path == "/players" and players is not None:
-            self.send(json.dumps(players.status()), "application/json")
-        elif self.path == "/players.js" and players is not None and os.path.exists(os.path.join(PAGE_DIR, "players.js")):
-            with open(os.path.join(PAGE_DIR, "players.js"), "rb") as f:
-                self.send(f.read(), "application/javascript; charset=utf-8")
-        elif self.path == "/buttonconfig":
-            self.send(json.dumps({"config": {"button1_gpio": core.button_gpio(1), "button2_gpio": core.button_gpio(2),
-                                             "button1_function": core.button_function(1),
-                                             "button2_function": core.button_function(2),
-                                             "wifi_button": core.wifi_button()},
-                                  "gpios": core.BUTTON_GPIO_PINS, "functions": core.BUTTON_FUNCTIONS,
-                                  "wifi_choices": core.WIFI_BUTTON_CHOICES,
-                                  "wifi": os.path.exists(core.WIFI_ENABLED)}),
-                     "application/json")
-        elif self.path.split("?")[0] == "/dtmf":
-            try:
-                with open(core.DTMF_LOG, "rb") as f:
-                    f.seek(0, 2)
-                    size = f.tell()
-                    full = "all" in self.path.split("?", 1)[-1] if "?" in self.path else False
-                    start = 0 if full or size <= core.TEXT_TAIL else size - core.TEXT_TAIL
-                    f.seek(start)
-                    body = f.read()
-                if start:
-                    body = body[body.find(b"\n") + 1:]   # start at a whole line
-            except IOError:
-                body = b"No debug log yet. Switch on Recording and dial.\n"
-            self.send(body, "text/plain; charset=utf-8")
-        else:
+        elif path == "/buttonconfig":
+            self.send(json.dumps(_button_reply()), "application/json")
+        elif modules.route("GET", path):
+            modules.route("GET", path)(self)         # an enabled module's own endpoint
+        elif path == "/":
             self.send(PAGE_BYTES, "text/html; charset=utf-8", fixed=True)
+        else:
+            self._refuse(404, "Not found (or the module that answers it is off)")
 
     def _post(self):
+        refresh_page()
         path = self.path.split("?")[0]
-        if path in LED_PATHS:
-            refresh_modules()
-        if path in LED_PATHS and ledconfig is None:
-            return self._refuse(404, "The LED module is not installed")
         # Everything here changes something, and some of it runs as root: only the page itself may ask
         # (not another site's form or script), and the actions that reboot, update or change Wi-Fi
         # also need the PIN when one is set.
@@ -425,147 +326,52 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(json.dumps({"started": False, "message": message}), "application/json",
                           status=429 if message.startswith("Too many") else 401)
                 return
-        if self.path == "/ledconfig":
-            try:
-                data = json.loads(self._body(65536).decode("utf-8"))
-                cfg = ledconfig.save_led_config(data)
-                if "count" in data:
-                    ledconfig.save_led_count(data["count"])
-                if "gpio" in data:
-                    ledconfig.save_led_gpio(data["gpio"])
-            except (ValueError, IOError, OSError) as e:
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(str(e).encode("utf-8"))
-                return
-            self.send(json.dumps({"config": cfg, "count": ledconfig.led_count(), "gpio": ledconfig.led_gpio()}),
-                     "application/json")
-            return
-        if self.path == "/reboot":
+        if path == "/reboot":
             started, message = probes.start_reboot()
             self.send(json.dumps({"started": started, "message": message}), "application/json")
             return
-        if self.path in ("/update/check", "/update/start"):
+        if path in ("/update/check", "/update/start"):
             if not self.headers.get("X-Requested-With"):   # the check is harmless but still only for the page
                 return self._refuse(403, "Refused: this request did not come from the page")
             message = ""
-            if self.path == "/update/check":
+            if path == "/update/check":
                 updater.check_in_background()
             else:
                 started, message = updater.start_update()
             self.send(json.dumps({"message": message, "status": updater.status()}), "application/json")
             return
-        if self.path == "/numbers":
-            try:
-                numbers.save_numbers(json.loads(self._body(16384).decode("utf-8")))
-            except (ValueError, IOError, OSError) as e:
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(str(e).encode("utf-8"))
-                return
-            self.send(json.dumps(_numbers_reply()), "application/json")
-            return
-        if self.path == "/buttonconfig":
-            try:
-                data = json.loads(self._body(4096).decode("utf-8"))
-            except (ValueError, IOError, OSError) as e:
-                self.send_response(400)
-                self.end_headers()
-                self.wfile.write(str(e).encode("utf-8"))
-                return
-            try:
-                g1, g2 = int(data["button1_gpio"]), int(data["button2_gpio"])
-            except (KeyError, TypeError, ValueError):
-                g1 = g2 = None
-            if g1 is not None and g2 is not None and g1 != g2:   # reject if they'd collide on one pin
-                core.save_button_gpio(1, g1)
-                core.save_button_gpio(2, g2)
-            if "button1_function" in data:
-                core.save_button_function(1, data["button1_function"])
-            if "button2_function" in data:
-                core.save_button_function(2, data["button2_function"])
-            if "wifi_button" in data:
-                core.save_wifi_button(data["wifi_button"])
-            self.send(json.dumps({"config": {"button1_gpio": core.button_gpio(1), "button2_gpio": core.button_gpio(2),
-                                             "button1_function": core.button_function(1),
-                                             "button2_function": core.button_function(2),
-                                             "wifi_button": core.wifi_button()}}),
-                     "application/json")
-            return
-        if self.path == "/ledhide":
-            if os.path.exists(core.LED_HIDDEN):
-                os.remove(core.LED_HIDDEN)
-                core.debug_log("web page: LED settings shown again")
-            else:
-                open(core.LED_HIDDEN, "w").close()
-                core.debug_log("web page: LED settings hidden")
-        if self.path == "/wbtest":
-            ledconfig.touch_wb_test()
-        elif self.path == "/wbtestdone":
-            ledconfig.clear_wb_test()
-        if self.path == "/dcnet":
+        if path == "/modules":
+            return self._post_modules()
+        if path == "/buttonconfig":
+            return self._post_buttons()
+        if path == "/dcnet":
             open(core.FLAG, "w").close()
             core.debug_log("web page: DCNET selected")
-        elif self.path == "/dcnow":
+        elif path == "/dcnow":
             if os.path.exists(core.FLAG):
                 os.remove(core.FLAG)
             core.debug_log("web page: DCNow! selected")
-        elif self.path == "/default":
+        elif path == "/default":
             if os.path.exists(core.DEFAULT_DCNET):
                 os.remove(core.DEFAULT_DCNET)
                 core.debug_log("web page: default network set to DCNow!")
             else:
                 open(core.DEFAULT_DCNET, "w").close()
                 core.debug_log("web page: default network set to DCNET")
-        elif self.path == "/autoreset":
+        elif path == "/autoreset":
             if os.path.exists(core.AUTORESET):
                 os.remove(core.AUTORESET)
                 core.debug_log("web page: reset on openMenu turned off")
             else:
                 open(core.AUTORESET, "w").close()
                 core.debug_log("web page: reset on openMenu turned on")
-        elif self.path == "/debug":
-            if os.path.exists(core.DEBUG_DTMF):
-                core.debug_log("web page: debug log stopped")
-                os.remove(core.DEBUG_DTMF)
-            else:
-                open(core.DEBUG_DTMF, "w").close()
-                if os.path.exists(core.DTMF_LOG):
-                    os.remove(core.DTMF_LOG)  # start a fresh log
-                core.debug_log("web page: debug log started (network: %s)" %
-                          ("DCNET" if os.path.exists(core.FLAG) else "DCNow!"))
-        elif self.path == "/hangup":
+        elif path == "/hangup":
             probes.start_hangup()
-        elif self.path == "/clearlog":
-            if os.path.exists(core.DTMF_LOG):
-                os.remove(core.DTMF_LOG)
-            core.debug_log("web page: log cleared")
-        elif self.path == "/wifitoggle":
-            if os.path.exists(core.WIFI_ENABLED):
-                if core.wifi_state().get("state", "idle") == "idle":
-                    open(core.WIFI_START, "w").close()
-                    core.debug_log("web page: Wi-Fi setup started")
-                else:
-                    open(core.WIFI_STOP, "w").close()
-                    core.debug_log("web page: Wi-Fi setup stop requested")
-        elif self.path == "/wificonnect":
-            # An alternative to the setup access point's own /connect: lets
-            # this page pick a network too, reachable while it's up over
-            # Ethernet (or anything else besides the Wi-Fi being reconfigured).
-            if os.path.exists(core.WIFI_ENABLED):
-                ssid = ""
-                try:
-                    data = json.loads(self._body(4096).decode("utf-8"))
-                    ssid = str(data.get("ssid") or "").strip()[:32]      # an SSID is at most 32 bytes
-                    password = str(data.get("password") or "")[:63]      # a WPA passphrase at most 63
-                except (ValueError, IOError, OSError, AttributeError):
-                    pass
-                if ssid:
-                    tmp = core.WIFI_CONNECT + ".tmp"
-                    with open(tmp, "w") as f:
-                        json.dump({"ssid": ssid, "password": password}, f)
-                    os.rename(tmp, core.WIFI_CONNECT)
-                    core.debug_log("web page: Wi-Fi connect requested for %s" % ssid)
+        elif modules.route("POST", path):
+            if modules.route("POST", path)(self) is True:    # an enabled module's own endpoint; True = it has answered
+                return
+        else:
+            return self._refuse(404, "Not found (or the module that answers it is off)")
         if self.headers.get("X-Requested-With"):
             self.send_response(204)   # the page's own buttons: nothing to reload
             self.send_header("Content-Length", "0")
@@ -575,6 +381,41 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.send_header("Location", "/")
         self.end_headers()
+
+    def _post_modules(self):
+        """The Modules menu: switch an installed module on or off."""
+        try:
+            data = json.loads(self._body(1024).decode("utf-8"))
+            name, on = data["name"], data["enabled"]
+            if not isinstance(name, type(u"")) or not isinstance(on, bool):
+                raise ValueError("name and enabled needed")
+        except (ValueError, KeyError, TypeError, IOError, OSError) as e:
+            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
+        if not core.save_module_enabled(name, on):
+            return self.send("No such module: %s" % name, "text/plain; charset=utf-8", status=404)
+        core.debug_log("web page: module %s switched %s" % (name, "on" if on else "off"))
+        refresh_page(force=True)
+        self.send(json.dumps({"modules": modules.listing()}), "application/json")
+
+    def _post_buttons(self):
+        try:
+            data = json.loads(self._body(4096).decode("utf-8"))
+        except (ValueError, IOError, OSError) as e:
+            return self.send(str(e), "text/plain; charset=utf-8", status=400)
+        try:
+            g1, g2 = int(data["button1_gpio"]), int(data["button2_gpio"])
+        except (KeyError, TypeError, ValueError):
+            g1 = g2 = None
+        if g1 is not None and g2 is not None and g1 != g2:   # reject if they'd collide on one pin
+            core.save_button_gpio(1, g1)
+            core.save_button_gpio(2, g2)
+        if "button1_function" in data:
+            core.save_button_function(1, data["button1_function"])
+        if "button2_function" in data:
+            core.save_button_function(2, data["button2_function"])
+        if "wifi_button" in data:
+            core.save_wifi_button(data["wifi_button"])
+        self.send(json.dumps({"config": _button_config()}), "application/json")
 
     def log_message(self, *args):
         pass

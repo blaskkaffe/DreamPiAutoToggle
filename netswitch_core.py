@@ -32,7 +32,6 @@ STATE = "/tmp/dreampi-netswitch.state"
 MODEM = "/tmp/dreampi-netswitch.modem"
 DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
 # Wi-Fi setup (netswitch_buttons.py, install.sh --wifi); the buttons themselves are always installed
-WIFI_ENABLED = os.path.join(BASE_DIR, "wifi_enabled")  # written by install.sh --wifi
 WIFI_DEMO = os.path.join(BASE_DIR, "wifi_demo")        # exists = Wi-Fi setup runs on dummy networks (install.sh --wifi-demo)
 WIFI_START = os.path.join(BASE_DIR, "wifi_start")   # touched to ask netswitch_buttons.py to start
 WIFI_STOP = os.path.join(BASE_DIR, "wifi_stop")     # touched to ask it to stop / cancel
@@ -46,6 +45,72 @@ WIFI_STALE = 30       # ignore WIFI_STATE when older than this (the service is d
 WIFI_AP_SSID = "DreamPi WiFi Config"
 NET_STATE = "/tmp/dreampi-netswitch.net"   # shared with the LED service
 NET_STALE = 20        # ignore NET_STATE when older than this (web service down)
+
+
+# ------------------------------------------------------------------ modules
+# The optional features (LED, Wi-Fi setup, phone numbers, online players, debug log) are folders in
+# modules/, each with a module.json. A module is *installed* when its folder is there and *enabled*
+# when the Modules menu has it on (modules.json; a module without an entry uses the "default" in its
+# manifest). Everything that has to know - the web page, the LED service, the buttons service - asks here.
+MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules")
+MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"led": true, "wifi": false, ...} set from the Modules menu
+
+
+def module_manifest(name):
+    """The module's module.json as a dict, or None when it isn't installed."""
+    if not re.match(r"^[a-z][a-z0-9_]*$", name or ""):
+        return None
+    try:
+        with open(os.path.join(MODULES_DIR, name, "module.json")) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else None
+    except (IOError, OSError, ValueError):
+        return None
+
+
+def module_names():
+    """Names of the installed modules (folders with a readable module.json), in menu order."""
+    try:
+        names = [n for n in os.listdir(MODULES_DIR) if module_manifest(n)]
+    except OSError:
+        return []
+    return sorted(names, key=lambda n: (module_manifest(n).get("order", 100), n))
+
+
+def modules_state():
+    try:
+        with open(MODULES_STATE) as f:
+            data = json.load(f)
+        return dict((k, v) for k, v in data.items() if isinstance(v, bool)) if isinstance(data, dict) else {}
+    except (IOError, OSError, ValueError):
+        return {}
+
+
+def module_enabled(name, state=None):
+    """Installed and switched on. state: modules_state() already read (saves a file read per module)."""
+    manifest = module_manifest(name)
+    if manifest is None:
+        return False
+    state = modules_state() if state is None else state
+    return state.get(name, bool(manifest.get("default", True)))
+
+
+def save_module_enabled(name, on):
+    """Switch a module on or off from the Modules menu. False when it isn't installed."""
+    if module_manifest(name) is None:
+        return False
+    state = modules_state()
+    state[name] = bool(on)
+    tmp = MODULES_STATE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(state, f, indent=1, sort_keys=True)
+    os.rename(tmp, MODULES_STATE)
+    return True
+
+
+def wifi_enabled():
+    """Wi-Fi setup module installed and on (the buttons service and the Wi-Fi button functions ask)."""
+    return module_enabled("wifi")
 
 
 # ---------------------------------------------------------------- file state
@@ -139,7 +204,7 @@ def modem_state():
 
 def debug_log(text):
     """Add a line to the debug timeline (same format as the hook)."""
-    if not os.path.exists(DEBUG_DTMF):
+    if not os.path.exists(DEBUG_DTMF) or not module_enabled("debuglog"):
         return
     try:
         now = time.time()
@@ -152,7 +217,6 @@ def debug_log(text):
 
 LOG_MAX = 1000000     # the debug log is trimmed to its newest LOG_KEEP bytes
 LOG_KEEP = 500000     # when it grows past LOG_MAX
-TEXT_TAIL = 256000    # "Open as text" shows this much unless ?all
 
 
 def trim_log():
@@ -171,26 +235,6 @@ def trim_log():
         os.rename(tmp, DTMF_LOG)
     except (IOError, OSError):
         pass
-
-
-def read_log(start):
-    """New log text from byte offset start. If the log was cleared or
-    restarted, everything is returned with reset=True."""
-    try:
-        with open(DTMF_LOG, "rb") as f:
-            f.seek(0, 2)
-            size = f.tell()
-            reset = start > size or start < 0
-            if reset:
-                start = 0
-            # Don't send megabytes to a page that just opened
-            if size - start > 200000:
-                start, reset = size - 200000, True
-            f.seek(start)
-            data = f.read()
-    except IOError:
-        return {"size": 0, "text": "", "reset": start != 0}
-    return {"size": start + len(data), "text": data.decode("utf-8", "replace"), "reset": reset}
 
 
 def network_state():

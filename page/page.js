@@ -1,6 +1,13 @@
 
 function $(id){return document.getElementById(id)}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+// Hooks: how the optional modules (modules/*/page.js, appended to this script) take part. A module calls
+// hook(name, fn); this page calls fire(name, arg) at the matching moment. fire() is true if a hook returned true.
+//   api(d) every /api answer   settingsOpen / settingsClose   escape (true = handled)   buttons(r) button settings loaded
+//   posted after a form post
+var HOOKS={};
+function hook(name,fn){(HOOKS[name]=HOOKS[name]||[]).push(fn)}
+function fire(name,arg){var handled=false;(HOOKS[name]||[]).forEach(function(f){try{if(f(arg)===true)handled=true}catch(e){if(window.console)console.error(name,e)}});return handled}
 function ago(t,now){if(!t)return"";var s=Math.max(0,now-t);
  if(s<60)return"("+s+"s ago)";if(s<3600)return"("+Math.floor(s/60)+" min ago)";return"("+Math.floor(s/3600)+" h ago)"}
 function dot(el,state){el.className="dot "+(state||"")}
@@ -32,56 +39,8 @@ function render(d){
  var defName=d.default=="dcnet"?"DCNET":"DCNow!";
  $("default-b").className="switch "+d.default; $("default-l").textContent=d.default=="dcnet"?"DCNET":"DCNow!";
  $("reset-b").className="cbox "+d.default+(d.autoreset?" on":"");
- $("reset-note").textContent=" (Auto reset is "+(d.autoreset?"on, default: "+defName:"off")+")";
- $("debug-b").innerHTML=(d.debug?"&#9679; Recording":"Recording off");
- $("log-tools").style.display=d.debug?"inline":"none";
- $("log").style.display=(d.debug||logSize)?"block":"none";
- debugOn=d.debug;
- $("wifi-row").style.display=d.wifi.installed?"flex":"none";
- var wl=WIFI_LABELS[d.wifi.state]||WIFI_LABELS.idle;
- $("wifi-b").textContent=wl[0];
- $("wifi-sub").textContent=((d.wifi.demo&&d.wifi.state=="hosting")?"Pick a network below":wl[1].replace("%s",d.wifi.ssid||""))+(d.wifi.demo?" - DEMO: dummy networks, password \u201cdemo\u201d connects":"");
- $("wifi-b").disabled=d.wifi.state=="ok";
- var showNets=d.wifi.state=="hosting"||d.wifi.state=="scanning";
- $("wifi-networks").style.display=showNets?"block":"none";
- if(showNets&&d.wifi.networks){var key=JSON.stringify(d.wifi.networks);
-  if(key!=wifiListKey){wifiListKey=key;renderWifiList(d.wifi.networks)}}
- else if(!showNets){wifiListKey=null;wifiChosen=null;$("wifi-form").style.display="none";$("wifi-list").innerHTML=""}
+ fire("api",d);
 }
-var WIFI_LABELS={
- idle:["Search","Search for a Wi-Fi network to connect the Pi to"],
- scanning:["Stop","Scanning for Wi-Fi networks..."],
- hosting:["Stop","Pick a network below, or connect to “DreamPi WiFi Config” and open http://192.168.4.1"],
- connecting:["Stop","Connecting to “%s”..."],
- ok:["Connected","Connected to “%s”"],
- failed:["Stop","Couldn't connect (%s)"]};
-$("wifi-b").onclick=function(){
- var x=new XMLHttpRequest();x.open("POST","/wifitoggle",true);x.setRequestHeader("X-Requested-With","netswitch");
- x.onload=refresh;x.send()};
-// Wi-Fi network list, shown in Settings too while scanning/hosting (not just on the
-// temporary "DreamPi WiFi Config" page) - useful when this page is still reachable,
-// for example over Ethernet, while the Pi's Wi-Fi is being (re)configured.
-var wifiListKey=null,wifiChosen=null;
-function wifiBars(sig){if(sig==null)return"";var n=sig>=-55?4:sig>=-65?3:sig>=-75?2:1;return " "+"█".repeat(n)+"░".repeat(4-n)}
-function renderWifiList(nets){
- $("wifi-list").innerHTML=nets.map(function(n,i){
-  return '<button type="button" class="wnet" data-i="'+i+'">'+(n.secured?"🔒 ":"")+esc(n.ssid)+
-   '<span class="sig">'+esc(wifiBars(n.signal))+'</span></button>'}).join("")||
-  '<div class="sub" style="margin:4px 0 10px">No networks found. Enter one manually.</div>';
- Array.prototype.forEach.call($("wifi-list").querySelectorAll(".wnet"),function(b){
-  b.onclick=function(){wifiSelect(nets[+b.dataset.i])}})}
-function wifiSelect(n){wifiChosen=n;$("wifi-ssid").value=n.ssid;$("wifi-ssid").readOnly=true;
- $("wifi-pass").style.display=n.secured?"block":"none";$("wifi-pass").value="";
- $("wifi-connect-b").disabled=false;$("wifi-connect-b").textContent="Connect";$("wifi-form").style.display="block"}
-$("wifi-manual").onclick=function(){wifiSelect({ssid:"",secured:true});$("wifi-ssid").readOnly=false;$("wifi-ssid").focus()};
-$("wifi-connect-b").onclick=function(){
- var ssid=$("wifi-ssid").value.trim();if(!ssid)return;
- withPin(function(){
-  $("wifi-connect-b").disabled=true;$("wifi-connect-b").textContent="Connecting...";
-  xhrJson("POST","/wificonnect",function(r,st,body){
-   if(st==401||st==429){$("wifi-connect-b").disabled=false;$("wifi-connect-b").textContent="Connect";alert((body&&body.message)||"PIN refused")}
-   refresh()},{ssid:ssid,password:$("wifi-pass").value})})};
-var logSize=0,debugOn=false,logBusy=false,debugOpen=false;
 function toggleNet(el){el.classList.toggle("open");el.setAttribute("aria-expanded",el.classList.contains("open"))}
 $("net").onclick=function(e){if(e.target.closest&&e.target.closest(".hang"))return;toggleNet(this)};
 $("net").onkeydown=function(e){if((e.key=="Enter"||e.key==" ")&&e.target===this){e.preventDefault();toggleNet(this)}};
@@ -94,37 +53,9 @@ $("hang-f").onsubmit=function(e){e.preventDefault();e.stopPropagation();var b=$(
  hangArm=0;b.disabled=true;b.textContent="Hanging up...";b.className="pill-s";
  var x=new XMLHttpRequest();x.open("POST","/hangup",true);x.setRequestHeader("X-Requested-With","netswitch");x.onload=refresh;x.send()};
 function showSettings(open){$("settings").classList.toggle("open",open);
- if(!open&&window.ledClose)ledClose();
- document.body.classList.toggle("settings-open",open);if(open){if(window.ledOpen)ledOpen();loadButtons();loadNumbers();loadAbout();loadUpdate()}}
-// Phone numbers: five lists (one per action) kept in numbers.json; the hook matches what was dialed against their endings.
-var numCfg=null,numTimer=null;
-function loadNumbers(){var x=new XMLHttpRequest();x.open("GET","/numbers",true);
- x.onload=function(){if(x.status!=200)return;numCfg=JSON.parse(x.responseText);renderNumbers()};x.send()}
-function renderNumbers(){if(!numCfg)return;
- $("num-list").innerHTML=numCfg.actions.map(function(a){var list=numCfg.numbers[a.key]||[];
-  return '<div class="nrow" data-key="'+a.key+'"><b>'+esc(a.label)+'</b><span class="sub">'+esc(a.sub)+'</span>'+
-   '<div class="nchips">'+(list.length?list.map(function(n,i){return '<span class="nchip">'+esc(n)+
-    '<button type="button" data-key="'+a.key+'" data-i="'+i+'" aria-label="Remove '+esc(n)+'">&#10005;</button></span>'}).join(""):
-    '<span class="nempty">No number: this action is off</span>')+'</div>'+
-   '<div class="nadd"><input type="text" maxlength="'+numCfg.max+'" placeholder="Add a number" aria-label="Add a number for '+esc(a.label)+'" data-key="'+a.key+'">'+
-   '<button type="button" class="pill-s" data-add="'+a.key+'">Add</button></div><div class="nmsg" data-msg="'+a.key+'"></div></div>'}).join("");
- Array.prototype.forEach.call($("num-list").querySelectorAll(".nchip button"),function(b){b.onclick=function(){
-  numCfg.numbers[b.dataset.key].splice(+b.dataset.i,1);saveNumbers()}});
- Array.prototype.forEach.call($("num-list").querySelectorAll("button[data-add]"),function(b){b.onclick=function(){addNumber(b.dataset.add)}});
- Array.prototype.forEach.call($("num-list").querySelectorAll(".nadd input"),function(inp){inp.onkeydown=function(e){
-  if(e.key=="Enter"){e.preventDefault();addNumber(inp.dataset.key)}}})}
-function numMsg(key,text){var el=$("num-list").querySelector('[data-msg="'+key+'"]');if(el)el.textContent=text}
-function addNumber(key){var inp=$("num-list").querySelector('.nadd input[data-key="'+key+'"]'),n=inp.value.replace(/[^0-9*#]/g,"");
- if(n.length<numCfg.min)return numMsg(key,"Needs at least "+numCfg.min+" digits, * or #");
- for(var i=0;i<numCfg.actions.length;i++){var a=numCfg.actions[i];
-  if((numCfg.numbers[a.key]||[]).indexOf(n)>=0)return numMsg(key,n+" is already used by "+a.label)}
- if(numCfg.numbers[key].length>=numCfg.per_action)return numMsg(key,"At most "+numCfg.per_action+" numbers");
- numCfg.numbers[key].push(n);saveNumbers()}
-function saveNumbers(){clearTimeout(numTimer);numTimer=setTimeout(function(){
- var x=new XMLHttpRequest();x.open("POST","/numbers",true);x.setRequestHeader("Content-Type","application/json");
- x.onload=function(){if(x.status!=200)return;numCfg=JSON.parse(x.responseText);renderNumbers();var el=$("num-saved");el.classList.add("show");
-  setTimeout(function(){el.classList.remove("show")},1200)};x.send(JSON.stringify(numCfg.numbers))},100)}
-$("num-defaults").onclick=function(){if(!numCfg)return;numCfg.numbers=JSON.parse(JSON.stringify(numCfg.defaults));saveNumbers()};
+ if(!open)fire("settingsClose");
+ document.body.classList.toggle("settings-open",open);
+ if(open){fire("settingsOpen");loadButtons();loadModules();loadAbout();loadUpdate()}}
 // Updates: GET /update (cached GitHub check), POST /update/check, POST /update/start (runs git pull + the installer on the Pi).
 var updTimer=null;
 // The PIN (when one is set with install.sh --pin) is asked for once per page load, before update / restart / Wi-Fi connect.
@@ -198,12 +129,25 @@ $("reboot-b").onclick=function(){
    var x=new XMLHttpRequest();x.open("GET","/ping?"+Date.now(),true);x.timeout=3000;
    x.onload=function(){if(down||tries>60)location.reload();else setTimeout(poll,2000)};
    x.onerror=x.ontimeout=function(){down=true;setTimeout(poll,2000)};x.send()})()})})};
+// Modules menu: every installed module with a switch. Switching reloads the page, because a module's parts are built into it.
+function loadModules(){xhrJson("GET","/modules",function(r){if(!r)return;
+ $("mod-list").innerHTML=r.modules.map(function(m){
+  return '<div class="srow"><span>'+esc(m.title)+'<span class="sub">'+esc(m.description)+(m.note?'<br>'+esc(m.note):'')+
+   (m.error?'<br><b class="modbad">Could not load: '+esc(m.error)+'</b>':'')+'</span></span>'+
+   '<input type="checkbox" class="cbox dcnow" data-module="'+esc(m.name)+'" aria-label="'+esc(m.title)+'"'+(m.enabled?' checked':'')+'></div>'}).join("")||
+  '<div class="sub" style="padding:12px 0">No modules installed.</div>';
+ Array.prototype.forEach.call($("mod-list").querySelectorAll("input[data-module]"),function(c){c.onchange=function(){
+  c.disabled=true;
+  xhrJson("POST","/modules",function(res){
+   if(!res){c.disabled=false;c.checked=!c.checked;return}
+   try{sessionStorage.setItem("netswitch-reopen","1")}catch(e){}
+   location.reload()},{name:c.dataset.module,enabled:c.checked})}})})}
 function loadAbout(){var x=new XMLHttpRequest();x.open("GET","/about",true);
  x.onload=function(){if(x.status!=200)return;$("about").innerHTML=JSON.parse(x.responseText).map(function(r){
   return '<tr><td class="n">'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>'}).join("")};x.send()}
 $("cog").onclick=function(){showSettings(true)};
 $("close-settings").onclick=function(){showSettings(false)};
-document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(!(window.ledEscape&&ledEscape()))showSettings(false)}});
+document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(!fire("escape"))showSettings(false)}});
 // Optional Dreamcast background (static/dc-background.js), remembered per browser
 function bgWanted(){try{return localStorage.getItem("netswitch-bg")==="on"}catch(e){return false}}
 function loadScript(src,done){var sc=document.createElement("script");sc.src=src;sc.onload=done;
@@ -218,16 +162,7 @@ function setBg(on){
  else loadScript("/static/three.min.js",function(){loadScript("/static/dc-background.js",go)})}
 $("bg-b").onchange=function(){setBg(this.checked)};
 if(bgWanted())setBg(true);
-// Debug log menu: hidden unless switched on in settings, remembered per browser
-function setDebugMenu(on){
- try{localStorage.setItem("netswitch-debug",on?"on":"off")}catch(e){}
- $("dbg-b").checked=on;$("debug-bar").style.display=on?"flex":"none";
- if(!on){debugOpen=false;$("debug").style.display="none";$("show-debug").classList.remove("open")}}
-$("dbg-b").onchange=function(){setDebugMenu(this.checked)};
 var wifiInstalled=false;
-function updateGpioSection(){
- if(window.ledGpioRow)ledGpioRow();    // the LED row exists only with the LED module
- $("gpio-wifi-row").style.display=wifiInstalled?"flex":"none"}
 var btn=null,btnTimer=null;
 // Button functions come as [name, label, group, needs Wi-Fi setup, description]: push buttons and
 // toggle switches in two groups; the Wi-Fi switch functions only show once Wi-Fi setup is installed
@@ -246,12 +181,9 @@ function loadButtons(){var x=new XMLHttpRequest();x.open("GET","/buttonconfig",t
   if(!$("btn1-gpio").options.length){var gOpts=r.gpios.map(function(g){return '<option value="'+g+'">GPIO'+g+'</option>'}).join("");
    $("btn1-gpio").innerHTML=gOpts;$("btn2-gpio").innerHTML=gOpts}
   btnFunctions=r.functions;fillFunctions("btn1-fn",btn.button1_function);fillFunctions("btn2-fn",btn.button2_function);
-  if(!$("wifi-btn-sel").options.length)$("wifi-btn-sel").innerHTML=r.wifi_choices.map(function(c){
-   return '<option value="'+c[0]+'">'+esc(c[1])+'</option>'}).join("");
   $("btn1-gpio").value=btn.button1_gpio;$("btn1-fn").value=btn.button1_function;
   $("btn2-gpio").value=btn.button2_gpio;$("btn2-fn").value=btn.button2_function;describeButtons();
-  $("wifi-btn-sel").value=btn.wifi_button;
-  updateGpioSection()};x.send()}
+  fire("buttons",r)};x.send()}
 function saveButtons(){clearTimeout(btnTimer);btnTimer=setTimeout(function(){
  var x=new XMLHttpRequest();x.open("POST","/buttonconfig",true);x.setRequestHeader("Content-Type","application/json");
  x.onload=function(){if(x.status!=200)return;var el=$("gpio-saved");el.classList.add("show");
@@ -260,37 +192,12 @@ $("btn1-gpio").onchange=function(){btn.button1_gpio=parseInt(this.value,10);save
 $("btn1-fn").onchange=function(){btn.button1_function=this.value;describeButtons();saveButtons()};
 $("btn2-gpio").onchange=function(){btn.button2_gpio=parseInt(this.value,10);saveButtons()};
 $("btn2-fn").onchange=function(){btn.button2_function=this.value;describeButtons();saveButtons()};
-$("wifi-btn-sel").onchange=function(){btn.wifi_button=this.value;saveButtons()};
-$("show-debug").onclick=function(){debugOpen=!debugOpen;
- $("debug").style.display=debugOpen?"block":"none";
- this.classList.toggle("open",debugOpen);
- if(debugOpen){pollLog();var el=$("log");el.scrollTop=el.scrollHeight}};
-setDebugMenu((function(){try{return localStorage.getItem("netswitch-debug")==="on"}catch(e){return false}})());
-function cls(line){
- if(/modem: DTMF/.test(line))return"dtmf";
- if(/netswitch:|add-on:/.test(line))return"route";
- if(/web page:/.test(line))return"web";
- if(/underrun/.test(line))return"dim";
- if(/fail|error|Couldn't|Unable|No carrier|NO CARRIER/i.test(line))return"err";
- if(/modem/.test(line))return"modem";
- return"";
-}
-function pollLog(){
- if(!debugOpen||logBusy||(!debugOn&&logSize))return; logBusy=true;
- var x=new XMLHttpRequest();x.open("GET","/log?from="+logSize,true);
- x.onload=function(){logBusy=false;if(x.status!=200)return;var r=JSON.parse(x.responseText);
-  var el=$("log");if(r.reset)el.innerHTML="";
-  if(r.text){var html=r.text.split(/\r?\n/).filter(function(l){return l.length}).map(function(l){
-    return '<div class="'+cls(l)+'">'+esc(l)+'</div>'}).join("");
-   el.insertAdjacentHTML("beforeend",html);
-   if($("follow").checked)el.scrollTop=el.scrollHeight;}
-  logSize=r.size;};
- x.onerror=function(){logBusy=false};x.send();
-}
 function refresh(){var x=new XMLHttpRequest();x.open("GET","/api",true);
  x.onload=function(){if(x.status==200)render(JSON.parse(x.responseText))};x.send()}
 Array.prototype.forEach.call(document.forms,function(f){if(f.id=="hang-f")return;f.onsubmit=function(e){e.preventDefault();
  var x=new XMLHttpRequest();x.open("POST",f.getAttribute("action"),true);x.setRequestHeader("X-Requested-With","netswitch");
- x.onload=function(){refresh();pollLog()};x.send()}});
+ x.onload=function(){refresh();fire("posted")};x.send()}});
 refresh(); setInterval(refresh,1000);
-pollLog(); setInterval(pollLog,700);
+// back in Settings after switching a module (the page was reloaded)
+setTimeout(function(){   // after the modules' scripts have registered their hooks
+ try{if(sessionStorage.getItem("netswitch-reopen")){sessionStorage.removeItem("netswitch-reopen");showSettings(true)}}catch(e){}},0);

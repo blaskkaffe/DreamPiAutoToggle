@@ -1,0 +1,15 @@
+<!--slot:network_rows-->
+ <div class="srow" id="wifi-row"><span>Wi-Fi setup<span class="sub" id="wifi-sub">Search for a Wi-Fi network to connect the Pi to</span></span>
+  <button class="pill-s" id="wifi-b" type="button">Search</button></div>
+ <div id="wifi-networks" style="display:none">
+  <div id="wifi-list"></div>
+  <button type="button" class="pill-s" id="wifi-manual" style="margin-bottom:10px">Enter a network name manually</button>
+  <div id="wifi-form" style="display:none">
+   <input type="text" id="wifi-ssid" placeholder="Network name" aria-label="Network name" readonly>
+   <input type="password" id="wifi-pass" placeholder="Password" aria-label="Wi-Fi password" style="display:none">
+   <button type="button" class="pill-s" id="wifi-connect-b" disabled>Connect</button>
+  </div>
+ </div>
+<!--slot:buttons_rows-->
+ <div class="srow" id="gpio-wifi-row"><span>Wi-Fi setup<span class="sub">Which push button, or both, held 3 s starts it</span></span>
+  <select class="ord" id="wifi-btn-sel" aria-label="Wi-Fi setup button"></select></div>

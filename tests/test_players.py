@@ -4,6 +4,7 @@ import json
 import os
 import threading
 import unittest
+from urllib.error import HTTPError
 from urllib.request import urlopen
 
 from support import core, web, sandbox, cleanup
@@ -192,16 +193,15 @@ class IntegrationTests(unittest.TestCase):
         pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": []})
         try:
             html = urlopen(base + "/", timeout=10).read().decode()
-            self.assertIn('<script src="/players.js" defer></script>', html)
-            js = urlopen(base + "/players.js", timeout=10).read().decode()
-            self.assertIn("/players", js)
-            self.assertIn("60000", js)                       # polls at most once a minute
-            self.assertIn("netswitch-players", js)           # show/hide setting, per browser
-            self.assertIn('id="pl-b"', js)
-            self.assertIn("Online players:", js)
-            self.assertIn("pl-games", js)
-            self.assertIn("pl-toggle", js)
-            self.assertIn("pl-players", js)
+            self.assertIn('id="main-slot"', html)
+            self.assertIn("/players", html)
+            self.assertIn("60000", html)                       # polls at most once a minute
+            self.assertIn("netswitch-players", html)           # show/hide setting, per browser
+            self.assertIn('id="pl-b"', html)
+            self.assertIn("Online players:", html)
+            self.assertIn("pl-games", html)
+            self.assertIn("pl-toggle", html)
+            self.assertIn("pl-players", html)
             r = json.loads(urlopen(base + "/players", timeout=10).read().decode())
             self.assertTrue(r["configured"])
             self.assertIn("links", r)
@@ -211,25 +211,24 @@ class IntegrationTests(unittest.TestCase):
             srv.server_close()
             cleanup(tmp)
 
-    def test_page_builds_without_the_module(self):
-        saved = web.players
-        web.players = None
-        try:
-            self.assertNotIn("players.js", web.build_page())
-        finally:
-            web.players = saved
-
-    def test_page_builds_without_players_js(self):
-        import shutil
+    def test_switched_off_the_page_and_endpoint_are_gone(self):
         tmp = sandbox()
-        d = os.path.join(tmp, "page")
-        shutil.copytree(web.PAGE_DIR, d, ignore=shutil.ignore_patterns("players.js"))
-        saved, web.PAGE_DIR = web.PAGE_DIR, d
+        srv = web.Server(("127.0.0.1", 0), web.Handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        base = "http://127.0.0.1:%d" % srv.server_address[1]
         try:
-            self.assertNotIn("players", web.build_page())
+            core.save_module_enabled("players", False)
+            html = urlopen(base + "/", timeout=10).read().decode()
+            self.assertNotIn("pl-box", html)
+            self.assertNotIn("netswitch-players", html)
+            with self.assertRaises(HTTPError) as cm:
+                urlopen(base + "/players", timeout=10)
+            self.assertEqual(cm.exception.code, 404)
         finally:
-            web.PAGE_DIR = saved
+            srv.shutdown()
+            srv.server_close()
             cleanup(tmp)
+            web.refresh_page(force=True)
 
 
 if __name__ == "__main__":

@@ -20,16 +20,8 @@
 </div>
 <form method="post" action="/dcnow"><button class="pill dcnow-b">DCNow! / DreamPi</button></form>
 <form method="post" action="/dcnet"><button class="pill dcnet-b">DCNET / FLYCAST</button></form>
-<div class="bar" id="debug-bar" style="display:none"><button class="wide" id="show-debug" type="button"><span>Debug log</span><span class="arrow">&#9656;</span></button></div>
-<div id="debug" style="display:none">
-<div class="note">Records every modem event, DreamPi message and routing decision with
-millisecond timing. Turn recording on, then dial.</div>
-<div class="bar" style="margin-top:6px"><form method="post" action="/debug"><button class="pill-s" id="debug-b">Recording</button></form>
-<span id="log-tools" style="display:none"><form method="post" action="/clearlog" style="display:inline"><button class="pill-s">Clear</button></form>
-<a class="pill-s" href="/dtmf" target="_blank" style="text-decoration:none">Newest 256 KB</a>
-<a class="pill-s" href="/dtmf?all" target="_blank" style="text-decoration:none">Full log</a>
-<label class="sub" style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:4px"><input type="checkbox" class="cbox dcnow" id="follow" checked>Follow</label></span></div>
-<pre id="log" style="display:none"></pre>
+<div id="main-slot">
+@@SLOT:main@@
 </div>
 
 <div id="settings" role="dialog" aria-label="Settings"><div class="in">
@@ -42,36 +34,11 @@ millisecond timing. Turn recording on, then dial.</div>
   <button class="switch" id="default-b" type="submit"><span class="lbl" id="default-l">DCNow!</span><span class="knob"></span></button></form>
  <form method="post" action="/autoreset" class="srow"><span>Auto reset<span class="sub">Dialing 111-1111 returns to the default network</span></span>
   <button class="cbox" id="reset-b" type="submit" aria-label="Auto reset"></button></form>
- <div class="srow"><span>Debug log<span class="sub">Show the debug log on the main page (this browser only)</span></span>
-  <input type="checkbox" class="cbox dcnow" id="dbg-b" aria-label="Show debug log"></div>
- <div class="srow" id="wifi-row" style="display:none"><span>Wi-Fi setup<span class="sub" id="wifi-sub">Search for a Wi-Fi network to connect the Pi to</span></span>
-  <button class="pill-s" id="wifi-b" type="button">Search</button></div>
- <div id="wifi-networks" style="display:none">
-  <div id="wifi-list"></div>
-  <button type="button" class="pill-s" id="wifi-manual" style="margin-bottom:10px">Enter a network name manually</button>
-  <div id="wifi-form" style="display:none">
-   <input type="text" id="wifi-ssid" placeholder="Network name" aria-label="Network name" readonly>
-   <input type="password" id="wifi-pass" placeholder="Password" aria-label="Wi-Fi password" style="display:none">
-   <button type="button" class="pill-s" id="wifi-connect-b" disabled>Connect</button>
-  </div>
- </div>
+@@SLOT:network_rows@@
 </div>
 </section>
 
-<section class="sec">
-<h2>Phone numbers <span class="saved" id="num-saved">Saved &#10003;</span></h2>
-<div class="card" id="num-card">
-<div id="num-list"></div>
-<table>
-<tr><td class="n">111-1111</td><td>Always directs to DCNow! for compatibility with openMenu and standard ISP configs (fixed).<br>
-<span class="sub">When &quot;Auto reset&quot; is enabled, dialing it also resets the network to the default network.<span id="reset-note"></span></span></td></tr>
-<tr><td class="n">Any other</td><td>Connects to the currently selected network.<br>
-<span class="sub">Set your Dreamcast ISP config to any 7-digit number to use this feature.</span></td></tr>
-</table>
-</div>
-<div class="note">A number can be a whole number or just its ending: it counts when what the Dreamcast dials <em>ends with</em> it, so prefixes from the ISP config don't matter and the longest match wins. Use digits, <code>*</code> and <code>#</code> (3 to 24 characters), for example <code>*61#</code>. Hang-up numbers select the network, then get a busy tone instead of an answer.</div>
-<div class="bar" style="margin-top:0"><button class="pill-s" id="num-defaults" type="button">Restore default numbers</button></div>
-</section>
+@@SLOT:sections_a@@
 
 <section class="sec">
 <h2>Appearance</h2>
@@ -84,22 +51,24 @@ millisecond timing. Turn recording on, then dial.</div>
 <div id="gpio-section" class="sec" style="position:relative">
 <h2>GPIO <span class="saved" id="gpio-saved">Saved &#10003;</span></h2>
 <div class="card">
-@@LED_GPIO_ROW@@
  <div class="srow" id="gpio-btn1-row" style="flex-wrap:wrap"><span>Button 1</span>
   <div style="display:flex;gap:8px"><select class="ord" id="btn1-fn" aria-label="Button 1 function"></select><select class="ord" id="btn1-gpio" aria-label="Button 1 pin"></select></div>
   <div class="sub" id="btn1-sub" style="flex-basis:100%;margin:-6px 0 2px"></div></div>
  <div class="srow" id="gpio-btn2-row" style="flex-wrap:wrap"><span>Button 2</span>
   <div style="display:flex;gap:8px"><select class="ord" id="btn2-fn" aria-label="Button 2 function"></select><select class="ord" id="btn2-gpio" aria-label="Button 2 pin"></select></div>
   <div class="sub" id="btn2-sub" style="flex-basis:100%;margin:-6px 0 2px"></div></div>
- <div class="srow" id="gpio-wifi-row" style="display:none"><span>Wi-Fi setup<span class="sub">Which push button, or both, held 3 s starts it</span></span>
-  <select class="ord" id="wifi-btn-sel" aria-label="Wi-Fi setup button"></select></div>
-@@LED_GPIO_NOTE@@
+@@SLOT:buttons_rows@@
  <div class="note">A push button's function (Off, Toggle network, Select DCNow!, Select DCNET) fires on a short press; a toggle switch (wired between the pin and GND, on = closed) sets the network, or starts and ends Wi-Fi setup, by its position - also when the Pi starts.</div>
 </div>
 </div>
 
 
-@@LED@@
+@@SLOT:sections_b@@
+<section class="sec">
+<h2>Modules</h2>
+<div class="card" id="mod-list"></div>
+<div class="note">Optional features. Each one is a folder in <code>modules/</code>: switch it off here to hide it and stop what it runs, or delete its folder and run the installer to remove it for good.</div>
+</section>
 <section class="sec">
 <h2>About</h2>
 <div class="card"><table class="about" id="about"></table>
@@ -127,5 +96,4 @@ millisecond timing. Turn recording on, then dial.</div>
 </div></div>
 
 <script>@@JS@@</script>
-@@MODULES@@
 </body></html>

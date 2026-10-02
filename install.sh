@@ -10,8 +10,9 @@
 #                                  hides the LED settings on the page
 #   sudo ./install.sh --led-gpio=21   use GPIO10, 12, 18 (default) or 21 instead
 #   (--led, --led=N and --no-led still work: same as the default, --leds=N and --leds=0)
-#   The LED part is an optional module (see "Optional parts" in the README): without its files in this
-#   folder no LED service is installed and the LED options do nothing.
+#   The LED, Wi-Fi setup, phone numbers, online players and debug log parts are optional modules, one folder each
+#   in modules/ (see "Optional parts" in the README): a folder that is not there is not installed (and one that was
+#   installed before is removed), and the LED / Wi-Fi options below do nothing without their module.
 #   sudo ./install.sh --wifi       add Wi-Fi setup (a temporary access point for joining a network
 #                                  without a keyboard; installs hostapd + dnsmasq): its page controls
 #                                  and the button hold that starts it
@@ -25,8 +26,8 @@
 #
 # The two GPIO buttons (GPIO17/pin11 toggles the network, GPIO4/pin7 is off by
 # default) are always installed; their pins and functions are editable from the
-# page's Settings > GPIO. Once --wifi has been used, later updates keep it until
-# --no-wifi; the LED count is kept too. The LED count, output pin, wire order and white
+# page's Settings > GPIO. Which modules are on is the page's Settings > Modules (--wifi, --no-wifi and
+# --wifi-demo set the Wi-Fi one from here); the LED count is kept too. The LED count, output pin, wire order and white
 # balance can all be changed later from the page's Settings, without
 # --leds=N/--led-gpio=N or a reinstall - except switching to GPIO10, which needs
 # SPI enabled first (this installer does that for --led-gpio=10, but it needs a
@@ -77,23 +78,43 @@ if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
-cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_numbers.py" "$SRC/netswitch_update.py" "$SRC/netswitch_security.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" "$SRC/netswitch_wifi_setup.py" \
+cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_modules.py" "$SRC/netswitch_update.py" "$SRC/netswitch_security.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" \
    "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/static"
-cp "$SRC"/page/*.html "$SRC"/page/*.css "$SRC"/page/*.js "$DEST/page/"
-# optional modules: copy when shipped, remove an old copy when they were dropped from the repo
-for f in netswitch_players.py page/players.js; do
-    if [ -f "$SRC/$f" ]; then cp "$SRC/$f" "$DEST/$f"; else rm -f "$DEST/$f"; fi
-done
-# The LED module (status LEDs, their settings on the page, and the service that drives them) is optional too, but
-# only as a whole: with all of these files in the repo it is installed, with any missing it is removed again.
-LED_FILES="netswitch_ledconfig.py netswitch_led.py netswitch_led_drivers.py page/led.html page/led.js page/led.css"
-LED_MODULE=yes
-for f in $LED_FILES; do [ -f "$SRC/$f" ] || LED_MODULE=no; done
-for f in $LED_FILES; do
-    if [ "$LED_MODULE" = yes ]; then cp "$SRC/$f" "$DEST/$f"; else rm -f "$DEST/$f"; fi
-done
+cp "$SRC"/page/index.html "$SRC"/page/page.css "$SRC"/page/page.js "$DEST/page/"
 cp "$SRC/static/three.min.js" "$SRC/static/dc-background.js" "$SRC/static/LICENSES.txt" "$SRC"/static/*.png "$DEST/static/"
+# Files an older layout kept next to the base (the features are folders in modules/ now)
+rm -f "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" \
+      "$DEST/netswitch_players.py" "$DEST/netswitch_wifi_setup.py" "$DEST/page/led.html" "$DEST/page/led.js" "$DEST/page/led.css" "$DEST/page/players.js"
+
+# >>> sync_modules
+# The optional features: every folder in modules/ is copied to $DEST/modules/. A folder that was installed before but
+# is gone from $SRC/modules gets its remove.sh run (if it has one) and is deleted - that is how a module is removed.
+# Switching a module on or off is done on the page (Settings > Modules), not here.
+ns_module_enable() {   # ns_module_enable <name> on|off : write the Modules menu's switch
+    (cd "$DEST" && python3 -c "import sys, netswitch_core as c; c.save_module_enabled(sys.argv[1], sys.argv[2] == 'on')" "$1" "$2")
+}
+sync_modules() {
+    mkdir -p "$DEST/modules"
+    for ns_dir in "$DEST"/modules/*/; do
+        [ -d "$ns_dir" ] || continue
+        ns_name=$(basename "$ns_dir")
+        if [ ! -d "$SRC/modules/$ns_name" ]; then
+            echo "Module $ns_name is no longer in this folder: removing it."
+            [ -f "$ns_dir/remove.sh" ] && . "$ns_dir/remove.sh"
+            rm -rf "$ns_dir"
+        fi
+    done
+    for ns_dir in "$SRC"/modules/*/; do
+        [ -f "$ns_dir/module.json" ] || continue
+        ns_name=$(basename "$ns_dir")
+        rm -rf "$DEST/modules/$ns_name"
+        cp -r "$ns_dir" "$DEST/modules/$ns_name"
+        find "$DEST/modules/$ns_name" -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true
+    done
+}
+sync_modules
+# <<< sync_modules
 chmod +x "$DEST/uninstall.sh"
 # Add-on version for the settings page: date and commit of this checkout
 if command -v git >/dev/null 2>&1 && git -C "$SRC" rev-parse >/dev/null 2>&1; then
@@ -195,73 +216,6 @@ ProtectKernelModules=yes
 WantedBy=multi-user.target
 EOF
 
-# ---------------------------------------------------------------- NeoPixel
-# Installed with the LED module (see LED_MODULE above): the status LED service runs by default with 1 LED on GPIO18.
-# The count (0 = none: the service idles and the page hides the LED settings),
-# output pin, wire order and colours are editable from the page afterwards.
-# Without the module: no service, no settings on the page, and the settings files stay for when it comes back.
-rm -f "$DEST/led_enabled"   # old marker, no longer used
-if [ "$LED_MODULE" = no ]; then
-    echo "LED module not in this folder: no status LEDs, no LED settings on the page."
-    systemctl disable --now dreampi-netswitch-led.service >/dev/null 2>&1 || true
-    rm -f /etc/systemd/system/dreampi-netswitch-led.service
-    if [ -f "$DEST/spi_added" ]; then     # SPI was only switched on for the LEDs
-        sed -i '/^dtparam=spi=on  # added by dreampi-netswitch$/d' "$(cat "$DEST/spi_added")"
-        rm -f "$DEST/spi_added"
-    fi
-else
-if [ -n "$LED_COUNT" ]; then echo "$LED_COUNT" > "$DEST/led_count"; fi
-[ -f "$DEST/led_count" ] || echo 1 > "$DEST/led_count"
-if [ -n "$LED_GPIO" ]; then echo "$LED_GPIO" > "$DEST/led_gpio"; fi
-[ -f "$DEST/led_gpio" ] || echo 18 > "$DEST/led_gpio"
-GPIO=$(cat "$DEST/led_gpio")
-if [ "$(cat "$DEST/led_count")" = 0 ]; then
-    echo "NeoPixels off (0 LEDs); set a count with --leds=N."
-else
-    echo "NeoPixel output on GPIO$GPIO: $(cat "$DEST/led_count") LED(s)"
-fi
-# GPIO10 needs the kernel's SPI driver; GPIO12/18/21 use /dev/mem directly
-# and don't. Track what we changed in spi_added, so switching away from
-# GPIO10 later (here or from the page) takes the setting back out again.
-CONFIG_TXT=
-for candidate in /boot/firmware/config.txt /boot/config.txt; do
-    [ -f "$candidate" ] && CONFIG_TXT="$candidate" && break
-done
-if [ "$GPIO" = 10 ]; then
-    if [ -n "$CONFIG_TXT" ] && ! grep -q '^dtparam=spi=on' "$CONFIG_TXT"; then
-        printf '\ndtparam=spi=on  # added by dreampi-netswitch\n' >> "$CONFIG_TXT"
-        echo "$CONFIG_TXT" > "$DEST/spi_added"
-        echo "Enabled SPI in $CONFIG_TXT for GPIO10; reboot before the LEDs will work on it."
-    elif [ -z "$CONFIG_TXT" ]; then
-        echo "Could not find config.txt to enable SPI for GPIO10 - add dtparam=spi=on yourself and reboot."
-    fi
-elif [ -f "$DEST/spi_added" ]; then
-    sed -i '/^dtparam=spi=on  # added by dreampi-netswitch$/d' "$(cat "$DEST/spi_added")"
-    rm -f "$DEST/spi_added"
-    echo "Removed the SPI setting added for GPIO10 (not needed for GPIO$GPIO)."
-fi
-cat > /etc/systemd/system/dreampi-netswitch-led.service <<EOF
-[Unit]
-Description=DreamPi Netswitch status NeoPixel
-After=network.target
-StartLimitIntervalSec=0
-# the LED module's files: if they are deleted from $DEST the service is skipped quietly instead of failing in a loop
-ConditionPathExists=$DEST/netswitch_led.py
-ConditionPathExists=$DEST/netswitch_led_drivers.py
-ConditionPathExists=$DEST/netswitch_ledconfig.py
-
-[Service]
-ExecStart=$(command -v python3) $DEST/netswitch_led.py
-Restart=always
-RestartSec=10
-# the LED animation must never slow down the web page or DreamPi
-Nice=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-fi
-
 # ------------------------------------------------------------------ buttons
 # Always installed: two GPIO buttons with a short-press function each (pins and
 # functions editable from the page). Wi-Fi setup is the optional part, below.
@@ -269,7 +223,7 @@ fi
 [ -f "$DEST/button2_gpio" ] || echo "$BUTTON2_GPIO_DEFAULT" > "$DEST/button2_gpio"
 echo "Buttons on GPIO$(cat "$DEST/button1_gpio") and GPIO$(cat "$DEST/button2_gpio") (pins and functions editable from the page's Settings > GPIO)"
 # Older versions had one service for both buttons and Wi-Fi setup, enabled only
-# by --wifi (marker wifi_button_enabled): carry that over.
+# by --wifi (marker wifi_button_enabled): carry that over (modules/wifi/install.sh turns it into the module's switch).
 if [ -f "$DEST/wifi_button_enabled" ]; then mv "$DEST/wifi_button_enabled" "$DEST/wifi_enabled"; fi
 if [ -f /etc/systemd/system/dreampi-netswitch-wifi.service ]; then
     systemctl disable --now dreampi-netswitch-wifi.service 2>/dev/null || true
@@ -291,48 +245,29 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-# ---------------------------------------------------------------- Wi-Fi setup
-if [ "$WIFI" = keep ] && [ -f "$DEST/wifi_enabled" ]; then WIFI=on; fi
-if [ "$WIFI" = on ]; then
-    touch "$DEST/wifi_enabled"
-    # The Wi-Fi setup access point needs hostapd and dnsmasq. Install them if
-    # missing, and make sure their own systemd units stay off: this add-on
-    # starts and stops them itself (dreampi-netswitch-buttons.service), so a
-    # default dnsmasq listening on every interface would conflict with it.
-    if ! command -v hostapd >/dev/null 2>&1 || ! command -v dnsmasq >/dev/null 2>&1; then
-        if command -v apt-get >/dev/null 2>&1; then
-            echo "Installing hostapd and dnsmasq (needed to host the Wi-Fi setup access point)..."
-            apt-get update -q && apt-get install -y -q hostapd dnsmasq \
-                || echo "Could not install hostapd/dnsmasq automatically; install them yourself, then re-run this."
-        else
-            echo "hostapd and/or dnsmasq not found and apt-get isn't available; install them yourself for Wi-Fi setup to work."
-        fi
-    fi
-    systemctl disable --now hostapd.service 2>/dev/null || true
-    systemctl disable --now dnsmasq.service 2>/dev/null || true
-    echo "Wi-Fi setup enabled (choose which button holds to start it in Settings > GPIO)"
-elif [ "$WIFI" = off ]; then
-    rm -f "$DEST/wifi_enabled" "$DEST/wifi_button" "$DEST/wifi_hostapd.conf" "$DEST/wifi_dnsmasq.conf"
-    echo "Wi-Fi setup removed."
-fi
-
-if [ "$WIFI_DEMO" = on ]; then
-    touch "$DEST/wifi_enabled" "$DEST/wifi_demo"
-    echo "Wi-Fi setup DEMO on: dummy networks, password \"demo\" connects, nothing on the Pi's network is touched. End it with --no-wifi-demo."
-elif [ "$WIFI_DEMO" = off ]; then
-    rm -f "$DEST/wifi_demo"
-    echo "Wi-Fi setup demo off. (Add --no-wifi to remove the Wi-Fi setup button as well.)"
+# ------------------------------------------------------------------ modules
+# Each installed module may have an install.sh, sourced here (it sees $DEST, $SRC, $LED_COUNT, $LED_GPIO, $WIFI, $WIFI_DEMO)
+# and adds the systemd units it needs to NS_SERVICES. See modules/led and modules/wifi.
+NS_SERVICES=
+for ns_dir in "$DEST"/modules/*/; do
+    [ -f "$ns_dir/install.sh" ] && . "$ns_dir/install.sh"
+done
+for ns_flag in "$WIFI$WIFI_DEMO"; do
+    case "$ns_flag" in *on*|*off*) [ -d "$DEST/modules/wifi" ] || echo "Wi-Fi options ignored: the Wi-Fi setup module is not in this folder." ;; esac
+done
+if [ -n "$LED_COUNT$LED_GPIO" ] && [ ! -d "$DEST/modules/led" ]; then
+    echo "LED options ignored: the status LED module is not in this folder."
 fi
 
 systemctl daemon-reload
 systemctl enable dreampi-netswitch.service >/dev/null 2>&1
 systemctl restart dreampi-netswitch.service
-if [ "$LED_MODULE" = yes ]; then
-    systemctl enable dreampi-netswitch-led.service >/dev/null 2>&1
-    systemctl restart dreampi-netswitch-led.service
-fi
 systemctl enable dreampi-netswitch-buttons.service >/dev/null 2>&1
 systemctl restart dreampi-netswitch-buttons.service
+for ns_service in $NS_SERVICES; do      # the services of the installed modules
+    systemctl enable "$ns_service" >/dev/null 2>&1
+    systemctl restart "$ns_service"
+done
 systemctl restart dreampi.service 2>/dev/null || echo "Could not restart DreamPi, please reboot."
 
 echo

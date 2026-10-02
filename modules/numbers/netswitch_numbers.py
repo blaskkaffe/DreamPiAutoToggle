@@ -71,3 +71,28 @@ def save_numbers(data):
         json.dump(cleaned, f)
     os.rename(tmp, core.NUMBERS)
     return cleaned
+
+
+# ---------------------------------------------------------------- the page's side (loaded by the web service)
+def _reply():
+    return {"numbers": numbers(), "defaults": default_numbers(),
+            "actions": [{"key": a[0], "label": a[1], "sub": a[2]} for a in ACTIONS],
+            "min": MIN_LEN, "max": MAX_LEN, "per_action": MAX_PER_ACTION}
+
+
+def _get(h):
+    h.send(json.dumps(_reply()), "application/json")
+
+
+def _post(h):
+    try:
+        save_numbers(json.loads(h._body(16384).decode("utf-8")))
+    except (ValueError, IOError, OSError) as e:
+        h.send(str(e), "text/plain; charset=utf-8", status=400)
+        return True
+    h.send(json.dumps(_reply()), "application/json")
+    return True
+
+
+GET = {"/numbers": _get}
+POST = {"/numbers": _post}

@@ -276,3 +276,11 @@ def status():
     out["configured"] = bool(sources())
     out["links"] = LINKS
     return out
+
+
+# ---------------------------------------------------------------- the page's side (loaded by the web service)
+def _get(h):
+    h.send(json.dumps(status()), "application/json")
+
+
+GET = {"/players": _get}

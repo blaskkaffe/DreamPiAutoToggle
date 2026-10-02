@@ -1,0 +1,26 @@
+/* Online players box: on top of the .now box styles it shares with the network box */
+#pl-box.off{display:none}
+#pl-box .pln{white-space:nowrap}
+#pl-box .pln+.pln{margin-left:.6em}
+#pl-box .pln.dcnow{color:var(--dcnow-l)}
+#pl-box .pln.dcnet{color:var(--dcnet-l)}
+#pl-box .mq{display:block;min-width:0}
+#pl-box .mq .dup,#pl-box .mq .sp{display:none}
+#pl-box.sc:not(.open) .row.main .v{flex:1;min-width:0;overflow:hidden}
+#pl-box.sc:not(.open) .mq{white-space:nowrap}
+#pl-box.sc:not(.open) .mq .t{display:inline-block;animation:pl-mq var(--d,20s) linear infinite}
+#pl-box.sc:not(.open) .mq .dup,#pl-box.sc:not(.open) .mq .sp{display:inline}
+@keyframes pl-mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){#pl-box.sc:not(.open) .mq .t{animation:none}
+#pl-box.sc:not(.open) .mq .dup,#pl-box.sc:not(.open) .mq .sp{display:none}}
+#pl-box .list{display:block;width:100%;max-height:40vh;overflow-y:auto;overscroll-behavior:contain}
+#pl-box .p{display:flex;gap:8px;padding:4px 0;border-top:1px solid rgba(255,255,255,.12)}
+#pl-box .p:first-child{border-top:0}
+#pl-box .p .pn{flex:1;min-width:0;overflow-wrap:anywhere}
+#pl-box .p .pg{display:block;color:rgba(255,255,255,.65)}
+#pl-box .p .pw{flex:none;font-weight:bold;white-space:nowrap}
+#pl-box .p .pw.dcnow{color:var(--dcnow-l)}
+#pl-box .p .pw.dcnet{color:var(--dcnet-l)}
+#pl-box .links{display:flex;flex-wrap:wrap;gap:6px}
+#pl-box .links a{color:#fff;opacity:.9;padding:6px 0}
+#pl-box .st{display:block;overflow-wrap:anywhere}

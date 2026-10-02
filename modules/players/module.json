@@ -1,0 +1,2 @@
+{"title": "Online players", "order": 30, "default": true, "web": "netswitch_players",
+ "description": "A box on the main page listing who is online on DCNow! and DCNET (from dc99.net and dreamcast.online)."}

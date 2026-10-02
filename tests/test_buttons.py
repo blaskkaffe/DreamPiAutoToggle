@@ -73,7 +73,7 @@ class LoopTests(unittest.TestCase):
 
     def test_push_button_and_wifi_switch_together(self):
         import os
-        open(core.WIFI_ENABLED, "w").close()
+        core.save_module_enabled("wifi", True)
         # button 1 pushes (toggle), button 2 is an "on = Wi-Fi setup" switch that gets closed at tick 100
         self.run_loop({17: [(0, True), (30, False), (45, True)], 4: [(0, True), (100, False)]},
                       "toggle", "sw_wifi", ticks=200)
@@ -82,13 +82,13 @@ class LoopTests(unittest.TestCase):
 
     def test_held_push_button_still_starts_wifi_next_to_a_switch(self):
         import os
-        open(core.WIFI_ENABLED, "w").close()
+        core.save_module_enabled("wifi", True)
         self.run_loop({17: [(0, True), (10, False)], 4: [(0, True)]}, "toggle", "sw_dcnet", wifi="1", ticks=500)
         self.assertTrue(os.path.exists(core.WIFI_START))
 
     def test_wifi_hold_on_a_switch_button_is_ignored(self):
         import os
-        open(core.WIFI_ENABLED, "w").close()
+        core.save_module_enabled("wifi", True)
         self.run_loop({17: [(0, True), (10, False)]}, "sw_dcnet", "off", wifi="1", ticks=500)
         self.assertFalse(os.path.exists(core.WIFI_START))
 
@@ -201,13 +201,13 @@ class ButtonTests(unittest.TestCase):
         import os
         b._SWITCH_FUNCTIONS["sw_wifi"](True)
         self.assertFalse(os.path.exists(core.WIFI_START))   # Wi-Fi setup not installed: nothing happens
-        open(core.WIFI_ENABLED, "w").close()
+        core.save_module_enabled("wifi", True)
         b._SWITCH_FUNCTIONS["sw_wifi"](True)
         self.assertTrue(os.path.exists(core.WIFI_START))
 
     def test_wifi_switch_start_stop_follow_the_position(self):
         import os
-        open(core.WIFI_ENABLED, "w").close()
+        core.save_module_enabled("wifi", True)
         def set_state(state):
             with open(core.WIFI_STATE, "w") as f:
                 json.dump({"state": state, "time": self.clock.t}, f)

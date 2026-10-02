@@ -1,15 +1,13 @@
-// Status LED settings: the optional LED module's part of the page (page/led.html has its markup, page/led.css its
-// styles). The page builder adds all three, with netswitch_led*.py's GET/POST /ledconfig on the server, only when the
-// module's files are present; page.js calls the hooks at the bottom when they exist. Runs in the same script as page.js.
+// Status LED module, page side: the NeoPixel calibration and Status LED sections of Settings (markup in page.html,
+// styles in page.css). Runs in the same script as the base page.js, after it, and only exists in the page while the
+// module is installed and switched on. Settings opening / closing / Escape reach it through the page's hooks.
 var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledGroups=[],ledEffects=[],ledCount=1,ledGpio=18;
 var wbPreviewOn=false,wbHeartbeat=null;
-var ledInstalled=false,ledHiddenFlag=false;
-function ledGpioRow(){$("gpio-led-row").style.display=ledInstalled&&!ledHiddenFlag?"flex":"none"}   // called by updateGpioSection() in page.js
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
   led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledGroups=r.groups;ledEffects=r.effects;ledCount=r.count||1;ledGpio=r.gpio||18;
   $("led-section").style.display=(r.installed&&!r.hidden)?"block":"none";   // install.sh --led, not hidden
-  ledInstalled=r.installed;ledHiddenFlag=r.hidden;updateGpioSection();
+  
   $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";
   if(!$("led-order").options.length)$("led-order").innerHTML=r.orders.map(function(o){
    return '<option value="'+o+'">'+o+'</option>'}).join("");
@@ -141,9 +139,9 @@ $("led-order").onchange=function(){led.order=this.value;saveLed()};
 $("led-hide-b").onclick=function(){
  if(!confirm("Hide the Status LED settings? This can only be undone on the Pi itself, by deleting led_hidden in /opt/dreampi-netswitch."))return;
  var x=new XMLHttpRequest();x.open("POST","/ledhide",true);x.setRequestHeader("X-Requested-With","netswitch");
- x.onload=function(){$("led-section").style.display="none";ledHiddenFlag=true;updateGpioSection()};x.send()};
+ x.onload=function(){$("led-section").style.display="none"};x.send()};
 
-// hooks called by page.js
-function ledOpen(){loadLed()}                                             // Settings opened
-function ledClose(){closePops();if(wbPreviewOn)setWbPreview(false)}      // Settings closed
-function ledEscape(){if(lvlCur||fxCur){closePops();return true}return false}   // Escape closes an open pop-up first
+// hooks of the base page
+hook("settingsOpen",loadLed);                                                // Settings opened
+hook("settingsClose",function(){closePops();if(wbPreviewOn)setWbPreview(false)});   // Settings closed
+hook("escape",function(){if(lvlCur||fxCur){closePops();return true}});       // Escape closes an open pop-up first

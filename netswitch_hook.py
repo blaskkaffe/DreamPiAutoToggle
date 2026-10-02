@@ -25,9 +25,12 @@ It then wraps Netlink.check_number() with these rules:
 The selection is the file dcnet_mode, the reset toggle is the file autoreset,
 the default network for the reset is the file default_dcnet (exists = DCNET).
 It also reports DreamPi's state (starting / ready / in a call) to
-/tmp/dreampi-netswitch.state for the web page. If the file debug_dtmf exists,
-it also logs every modem event while DreamPi listens for digits to
-/tmp/dreampi-netswitch-dtmf.log, to diagnose misheard numbers.
+/tmp/dreampi-netswitch.state for the web page. Two optional modules (modules/ in
+the add-on folder) hook in here: "numbers" - without it numbers.json is ignored
+and the default numbers above are used - and "debuglog" - it provides the code
+that, while the file debug_dtmf exists, logs every modem event while DreamPi
+listens for digits to /tmp/dreampi-netswitch-dtmf.log, to diagnose misheard
+numbers (modules/debuglog/netswitch_hookdebug.py; without the module nothing is logged).
 No DreamPi file is modified. Written for both Python 2.7 and 3.
 """
 import json
@@ -45,17 +48,18 @@ AUTORESET = os.path.join(BASE_DIR, "autoreset")
 DEFAULT_DCNET = os.path.join(BASE_DIR, "default_dcnet")  # exists = reset goes to DCNET
 STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
-DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")  # exists = log modem events
-DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
+DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")  # exists = log modem events (see modules/debuglog)
+MODULES_DIR = os.path.join(BASE_DIR, "modules")
+MODULES_STATE = os.path.join(BASE_DIR, "modules.json")   # {"numbers": true, ...} from the Modules menu
 MODEM = "/tmp/dreampi-netswitch.modem"
 MODEM_PORT = "/tmp/dreampi-netswitch.port"   # the serial device DreamPi opened, e.g. /dev/ttyUSB0
 NETLINK_DIR = "/home/pi/dreampi"
 
-NUMBERS = os.path.join(BASE_DIR, "numbers.json")   # the five lists below, edited on the web page
+NUMBERS = os.path.join(BASE_DIR, "numbers.json")   # the five lists below, edited on the web page (phone numbers module)
 
 NUM_OPENMENU = "1111111"   # fixed: openMenu always dials this and it must stay on DCNow!
 # Action -> numbers. Order is the tie-break when two entries are equally long.
-# Keep in sync with netswitch_numbers.DEFAULTS (a test compares them).
+# Keep in sync with modules/numbers/netswitch_numbers.py ACTIONS (a test compares them).
 NUMBER_ACTIONS = ("reset", "toggle_dcnow", "toggle_dcnet", "call_dcnow", "call_dcnet")
 DEFAULT_NUMBERS = {"reset": ["1111111#"], "toggle_dcnow": ["5550001#"], "toggle_dcnet": ["5550002#"],
                    "call_dcnow": ["5550001"], "call_dcnet": ["5550002"]}
@@ -97,86 +101,56 @@ def _write_state(state):
         pass
 
 
-_dtmf_last = [0.0]
+def _module_active(name):
+    """The module is installed (its folder with a module.json) and not switched off in the Modules menu.
+    A module without an entry in modules.json counts as on (numbers and debuglog are on by default)."""
+    if not os.path.exists(os.path.join(MODULES_DIR, name, "module.json")):
+        return False
+    try:
+        with open(MODULES_STATE) as f:
+            return json.load(f).get(name) is not False
+    except Exception:
+        return True
+
+
+_debug_module = [None]
+
+
+def _debug_part():
+    """modules/debuglog/netswitch_hookdebug.py once it has been imported, else None (module absent or off)."""
+    if not _module_active("debuglog"):
+        return None
+    if _debug_module[0] is None:
+        folder = os.path.join(MODULES_DIR, "debuglog")
+        sys.path.insert(0, folder)
+        try:
+            import netswitch_hookdebug
+            _debug_module[0] = netswitch_hookdebug
+        except Exception:
+            _debug_module[0] = False
+        finally:
+            try:
+                sys.path.remove(folder)
+            except ValueError:
+                pass
+    return _debug_module[0] or None
 
 
 def _dtmf_log(text):
-    """Append a line to the debug log (only when enabled):
-    time, milliseconds since the previous line, and the event."""
+    """Add a line to the debug log. The debug log module does the writing (and only while recording is on),
+    so without the module nothing is logged."""
     if not os.path.exists(DEBUG_DTMF):
         return
-    try:
-        now = time.time()
-        gap = "" if not _dtmf_last[0] else "+%dms" % int((now - _dtmf_last[0]) * 1000)
-        _dtmf_last[0] = now
-        with open(DTMF_LOG, "a") as f:
-            f.write("%s.%03d %9s  %s\n" % (time.strftime("%H:%M:%S", time.localtime(now)),
-                                          int(now * 1000) % 1000, gap, text))
-    except Exception:
-        pass
-
-
-# What the modem means by <DLE><code> in voice mode (ITU V.253 / Rockwell)
-_DLE_CODES = {
-    "u": "dial tone ran out (transmit underrun)",
-    "o": "receive overrun",
-    "b": "busy tone",
-    "d": "dial tone detected",
-    "s": "silence",
-    "q": "quiet after tone",
-    "c": "fax calling tone",
-    "e": "calling tone from a modem (1300 Hz)",
-    "a": "answer tone (2100 Hz)",
-    "R": "ring",
-    "h": "line hung up",
-    "l": "loop current break",
-    "/": "DTMF tone starts",
-    "~": "DTMF tone ends",
-}
-_serial_buf = [bytearray()]
-
-
-def _serial_feed(data):
-    """Turn raw modem bytes into readable events: <DLE><code> pairs become
-    'DTMF 1' etc., other text is collected into whole lines."""
-    for b in bytearray(data):
-        buf = _serial_buf[0]
-        if buf[:1] == bytearray(b"\x10"):
-            code = chr(b)
-            _serial_buf[0] = bytearray()
-            if code in "0123456789*#ABCD":
-                _dtmf_log("modem: DTMF " + code)
-            else:
-                _dtmf_log("modem: " + _DLE_CODES.get(code, "event <DLE>%r" % code))
-            continue
-        if b in (0x10, 0x0D, 0x0A):
-            text = buf.decode("ascii", "replace").strip()
-            if text:
-                _dtmf_log("modem says: " + text)
-            _serial_buf[0] = bytearray(b"\x10") if b == 0x10 else bytearray()
-            continue
-        buf.append(b)
+    part = _debug_part()
+    if part is not None:
+        part.log(text)
 
 
 def _watch_serial(modem):
-    """Log what the modem reports while DreamPi is listening (dial tone on),
-    which is when dialed digits arrive as <DLE><digit>."""
-    try:
-        ser = getattr(modem, "_serial", None)
-        if ser is None or getattr(ser, "_netswitch", False):
-            return
-        original_read = ser.read
-
-        def read(*args, **kwargs):
-            data = original_read(*args, **kwargs)
-            if data and getattr(modem, "_sending_tone", False) and os.path.exists(DEBUG_DTMF):
-                _serial_feed(data)
-            return data
-
-        ser.read = read
-        ser._netswitch = True
-    except Exception:
-        pass
+    """Log what the modem reports while DreamPi listens for digits (debug log module)."""
+    part = _debug_part()
+    if part is not None:
+        part.watch(modem)
 
 
 # ------------------------------------------------ "switch only" numbers (#)
@@ -244,6 +218,8 @@ def _load_numbers():
     """The number lists from numbers.json; a missing, unreadable or partly
     wrong file falls back to the defaults for what it doesn't provide."""
     numbers = dict((k, list(v)) for k, v in DEFAULT_NUMBERS.items())
+    if not _module_active("numbers"):      # no phone numbers module: only the defaults
+        return numbers
     try:
         with open(NUMBERS) as f:
             data = json.load(f)

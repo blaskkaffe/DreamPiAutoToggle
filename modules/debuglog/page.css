@@ -1,0 +1,4 @@
+ #log{background:#0a0a0a;border:var(--bw) solid var(--line);border-radius:12px;padding:8px;font-size:11px;line-height:1.45;
+      height:55vh;overflow:auto;white-space:pre;margin-top:12px}   /* one entry per row; long ones scroll sideways instead of wrapping */
+ #log .dtmf{color:#6f6;font-weight:bold} #log .route{color:#8bf} #log .web{color:#e0b400}
+ #log .modem{color:#aaa} #log .dim{color:#555} #log .err{color:#f66}

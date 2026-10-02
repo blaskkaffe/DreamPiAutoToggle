@@ -194,12 +194,12 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertEqual(status, 400)
 
     def test_wifi_connect_cuts_long_values(self):
-        open(core.WIFI_ENABLED, "w").close()
+        core.save_module_enabled("wifi", True)
         body = json.dumps({"ssid": "s" * 100, "password": "p" * 200}).encode()
         self.assertEqual(self.req("POST", "/wificonnect", {"X-Requested-With": "x"}, body)[0], 204)
         got = json.load(open(core.WIFI_CONNECT))
         self.assertEqual((len(got["ssid"]), len(got["password"])), (32, 63))
-        os.remove(core.WIFI_ENABLED)
+        core.save_module_enabled("wifi", False)
 
 
 class WifiApTests(unittest.TestCase):

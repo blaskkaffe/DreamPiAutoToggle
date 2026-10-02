@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# DreamPi Netswitch add-on - the GPIO buttons (always installed) and, when
-# install.sh --wifi was used, the trigger for Wi-Fi setup (netswitch_wifi_setup.py).
+# DreamPi Netswitch add-on - the GPIO buttons (base) and, while the Wi-Fi setup module
+# is installed and switched on, the trigger for Wi-Fi setup (modules/wifi/netswitch_wifi_setup.py).
 #
 # Runs as root (service dreampi-netswitch-buttons). Watches up to two GPIO
 # button pins (see netswitch_gpio.py), each independently configured from the
@@ -18,8 +18,25 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import netswitch_core as core  # noqa: E402  (paths, settings, debug_log())
-import netswitch_wifi_setup as wifi  # noqa: E402  (Wi-Fi setup; only used when wifi_enabled())
 from netswitch_gpio import peripheral_base, Block, GPIO_OFFSET, set_input_pullup, read_level  # noqa: E402
+
+_wifi = [None]
+
+
+def get_wifi():
+    """The Wi-Fi setup module's code (modules/wifi/netswitch_wifi_setup.py), or None while that module isn't
+    installed. Looked for again each time, so installing the module needs no restart of this service."""
+    if _wifi[0] is None and core.module_manifest("wifi") is not None:
+        folder = os.path.join(core.MODULES_DIR, "wifi")
+        if folder not in sys.path:
+            sys.path.insert(0, folder)
+        try:
+            import netswitch_wifi_setup
+            _wifi[0] = netswitch_wifi_setup
+        except Exception as e:
+            sys.stderr.write("Wi-Fi setup module not loaded: %s\n" % e)
+    return _wifi[0]
+
 
 HOLD_SECONDS = 3.0        # button hold before Wi-Fi setup starts/stops
 SHORT_PRESS_MIN = 0.03    # ignore a debounced press shorter than this
@@ -261,9 +278,9 @@ def run_buttons(read, apply_pullups, gpio1, gpio2, function1, function2, wifi_as
 
 
 def wifi_enabled():
-    """Wi-Fi setup was installed (install.sh --wifi); without it the buttons
+    """The Wi-Fi setup module is installed and switched on; without it the buttons
     only run their own short-press functions."""
-    return os.path.exists(core.WIFI_ENABLED)
+    return core.wifi_enabled() and get_wifi() is not None
 
 
 def _button_config():
@@ -272,9 +289,16 @@ def _button_config():
             core.wifi_button() if wifi_enabled() else "")
 
 
+def _graceful_exit(*args):
+    wifi = get_wifi()
+    if wifi is not None:
+        wifi.graceful_exit(*args)    # a stop mid-setup must not strand the Wi-Fi interface
+    sys.exit(0)
+
+
 def main():
-    signal.signal(signal.SIGTERM, wifi.graceful_exit)   # a stop mid-setup must not strand the Wi-Fi interface
-    signal.signal(signal.SIGINT, wifi.graceful_exit)
+    signal.signal(signal.SIGTERM, _graceful_exit)
+    signal.signal(signal.SIGINT, _graceful_exit)
     cfg = _button_config()
     stop_event = threading.Event()
     thread = threading.Thread(target=button_watcher, args=cfg + (stop_event,))
@@ -297,6 +321,7 @@ def main():
         if not wifi_enabled():
             time.sleep(HEARTBEAT)
             continue
+        wifi = get_wifi()
         iface = wifi.wifi_iface()
         if wifi.start_requested():
             wifi.clear_flags()

@@ -98,10 +98,6 @@
  .nadd{display:flex;gap:8px;align-items:center} .nadd input[type=text]{flex:1;margin:0;padding:7px 12px}
  .nmsg{color:#f99;font-size:.82em;margin-top:6px;min-height:0}
  .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
- #log{background:#0a0a0a;border:var(--bw) solid var(--line);border-radius:12px;padding:8px;font-size:11px;line-height:1.45;
-      height:55vh;overflow:auto;white-space:pre;margin-top:12px}   /* one entry per row; long ones scroll sideways instead of wrapping */
- #log .dtmf{color:#6f6;font-weight:bold} #log .route{color:#8bf} #log .web{color:#e0b400}
- #log .modem{color:#aaa} #log .dim{color:#555} #log .err{color:#f66}
  #dcbg{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100lvh;z-index:-1;overflow:hidden;pointer-events:none;
        background:linear-gradient(to bottom,#9cc3dc,#4d639c);transform:translateZ(0)}
  body.dcbg #dcbg{display:block} body.dcbg{background:transparent} html.dcbg{background:#4d639c}

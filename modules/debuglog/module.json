@@ -1,0 +1,2 @@
+{"title": "Debug log", "order": 60, "default": true, "web": "netswitch_debuglog",
+ "description": "Records every modem event, DreamPi message and routing decision with millisecond timing, and shows it on the main page."}

@@ -1,29 +1,11 @@
-// Optional "Online players" box. Self-contained: it builds a box with the same markup and classes as the
-// Selected-network box (so it looks exactly like it and follows the same colours), adds a show/hide
-// checkbox to Settings, and talks only to GET /players. To drop the feature delete this file and
-// netswitch_players.py (the page builds without them).
+// Online players module, page side: a box with the same markup and classes as the Selected-network box (so it looks
+// exactly like it and follows the same colours; its extra styles are in page.css), and the show/hide switch in
+// Settings (page.html). Talks only to GET /players.
 (function(){
- var anchor=document.getElementById("debug-bar"),dbg=document.getElementById("dbg-b"),net=document.getElementById("net");
- if(!anchor||!anchor.parentNode)return;
+ var slot=document.getElementById("main-slot"),net=document.getElementById("net");
+ if(!slot)return;
  var KEY="netswitch-players",EVERY=60000,RETRY=2000;
  function wanted(){try{return localStorage.getItem(KEY)!="off"}catch(e){return true}}
- // Only what the network box doesn't have: the two coloured counts, the scrolling games line and the player list.
- var css=document.createElement("style");
- css.textContent=
-  "#pl-box.off{display:none}"+
-  "#pl-box .pln{white-space:nowrap}#pl-box .pln+.pln{margin-left:.6em}#pl-box .pln.dcnow{color:var(--dcnow-l)}#pl-box .pln.dcnet{color:var(--dcnet-l)}"+
-  "#pl-box .mq{display:block;min-width:0}#pl-box .mq .dup,#pl-box .mq .sp{display:none}"+
-  "#pl-box.sc:not(.open) .row.main .v{flex:1;min-width:0;overflow:hidden}"+
-  "#pl-box.sc:not(.open) .mq{white-space:nowrap}#pl-box.sc:not(.open) .mq .t{display:inline-block;animation:pl-mq var(--d,20s) linear infinite}"+
-  "#pl-box.sc:not(.open) .mq .dup,#pl-box.sc:not(.open) .mq .sp{display:inline}"+
-  "@keyframes pl-mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}"+
-  "@media(prefers-reduced-motion:reduce){#pl-box.sc:not(.open) .mq .t{animation:none}#pl-box.sc:not(.open) .mq .dup,#pl-box.sc:not(.open) .mq .sp{display:none}}"+
-  "#pl-box .list{display:block;width:100%;max-height:40vh;overflow-y:auto;overscroll-behavior:contain}"+
-  "#pl-box .p{display:flex;gap:8px;padding:4px 0;border-top:1px solid rgba(255,255,255,.12)}#pl-box .p:first-child{border-top:0}"+
-  "#pl-box .p .pn{flex:1;min-width:0;overflow-wrap:anywhere}#pl-box .p .pg{display:block;color:rgba(255,255,255,.65)}"+
-  "#pl-box .p .pw{flex:none;font-weight:bold;white-space:nowrap}#pl-box .p .pw.dcnow{color:var(--dcnow-l)}#pl-box .p .pw.dcnet{color:var(--dcnet-l)}"+
-  "#pl-box .links{display:flex;flex-wrap:wrap;gap:6px}#pl-box .links a{color:#fff;opacity:.9;padding:6px 0}#pl-box .st{display:block;overflow-wrap:anywhere}";
- document.head.appendChild(css);
  var box=document.createElement("div");box.id="pl-box";box.className="now rows";box.title="Show or hide details";
  box.setAttribute("role","button");box.setAttribute("tabindex","0");box.setAttribute("aria-expanded","false");
  box.innerHTML='<div class="nlabel">Online players:</div>'+
@@ -32,15 +14,11 @@
   '<div class="row more"><span class="k">Players</span><span class="v"><span class="list keep" id="pl-players"></span></span></div>'+
   '<div class="row more" id="pl-status-row"><span class="k">Status</span><span class="v"><span class="st" id="pl-msg"></span></span></div>'+
   '<div class="row more"><span class="k">Links</span><span class="v"><span class="links keep" id="pl-links"></span></span></div>';
- anchor.parentNode.insertBefore(box,anchor);
+ var after=document.getElementById("debug-bar");
+ slot.insertBefore(box,after&&after.parentNode===slot?after:null);   // above the debug log bar when there is one
  // the same colour as the network box (which follows the selected network)
  function syncColour(){box.classList.toggle("dcnet",!!(net&&net.classList.contains("dcnet")))}
  if(net){syncColour();new MutationObserver(syncColour).observe(net,{attributes:true,attributeFilter:["class"]})}
- // setting: show or hide the box (this browser only), next to the debug log switch
- var srow=dbg&&dbg.closest?dbg.closest(".srow"):null;
- if(srow){var s=document.createElement("div");s.className="srow";
-  s.innerHTML='<span>Online players<span class="sub">Show the online players box on the main page (this browser only)</span></span><input type="checkbox" class="cbox dcnow" id="pl-b" aria-label="Show online players">';
-  srow.parentNode.insertBefore(s,srow.nextSibling)}
  var cb=document.getElementById("pl-b"),open=false,timer=null,again=EVERY,gamesText="";
  function esc(t){return String(t).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
  // "Game (3) • Other game (1)", most played first
