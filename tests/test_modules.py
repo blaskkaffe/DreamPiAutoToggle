@@ -15,14 +15,14 @@ from support import ROOT, web, core, sandbox, cleanup
 import netswitch_modules as mods
 
 REAL_MODULES = os.path.join(ROOT, "modules")
-NAMES = ["debuglog", "led", "numbers", "players", "wifi"]
+NAMES = ["background", "debuglog", "led", "numbers", "players", "wifi"]
 # something in the page that only that module provides
-MARKER = {"numbers": 'id="num-card"', "players": 'id="pl-games"', "debuglog": 'id="debug-bar"',
+MARKER = {"background": "body.dcbg", "numbers": 'id="num-card"', "players": 'id="pl-games"', "debuglog": 'id="debug-bar"',
           "led": 'id="led-section"', "wifi": 'id="wifi-row"'}
 # a path only that module answers (GET, or POST when None)
-ENDPOINT = {"numbers": ("GET", "/numbers"), "players": ("GET", "/players"), "debuglog": ("GET", "/dtmf"),
+ENDPOINT = {"background": ("GET", "/background/dc-background.js"), "numbers": ("GET", "/numbers"), "players": ("GET", "/players"), "debuglog": ("GET", "/dtmf"),
             "led": ("GET", "/ledconfig"), "wifi": ("POST", "/wifitoggle")}
-BASE_IDS = ('id="net"', 'class="pill dcnow-b"', 'class="pill dcnet-b"', 'id="about"', 'id="reboot-b"', 'id="bg-b"',
+BASE_IDS = ('id="net"', 'class="pill dcnow-b"', 'class="pill dcnet-b"', 'id="about"', 'id="reboot-b"',
             'id="gpio-section"', 'id="mod-list"', 'id="upd-check"')
 
 
@@ -39,7 +39,8 @@ class Base(unittest.TestCase):
         self.modules = os.path.join(self.tmp, "modules")
         shutil.copytree(REAL_MODULES, self.modules, ignore=shutil.ignore_patterns("__pycache__"))
         self.saved_dir, core.MODULES_DIR = core.MODULES_DIR, self.modules
-        core.save_module_enabled("debuglog", True)          # off by default, the tests want to see it
+        for off_by_default in ("debuglog", "background"):
+            core.save_module_enabled(off_by_default, True)   # the tests want to see them
         if self.ENABLE_WIFI:
             core.save_module_enabled("wifi", True)
         web.refresh_page(force=True)
@@ -86,7 +87,7 @@ class Base(unittest.TestCase):
 
 
 class RepoModules(unittest.TestCase):
-    def test_the_five_modules_are_there_and_well_formed(self):
+    def test_the_modules_are_there_and_well_formed(self):
         self.assertEqual(sorted(n for n in os.listdir(REAL_MODULES) if os.path.isdir(os.path.join(REAL_MODULES, n)) and n != "__pycache__"), NAMES)
         for n in NAMES:
             with open(os.path.join(REAL_MODULES, n, "module.json")) as f:
@@ -98,7 +99,7 @@ class RepoModules(unittest.TestCase):
 
     def test_defaults(self):
         on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["default"]) for n in NAMES)
-        self.assertEqual(on, {"debuglog": False, "led": True, "numbers": True, "players": True, "wifi": False})
+        self.assertEqual(on, {"background": False, "debuglog": False, "led": True, "numbers": True, "players": True, "wifi": False})
 
 
 class WithEverything(Base):
@@ -128,7 +129,7 @@ class WithEverything(Base):
 
     def test_modules_menu_lists_them_all(self):
         got = self.json("/modules")["modules"]
-        self.assertEqual([m["name"] for m in got], ["numbers", "players", "wifi", "led", "debuglog"])   # menu order
+        self.assertEqual([m["name"] for m in got], ["numbers", "players", "wifi", "led", "debuglog", "background"])   # menu order
         self.assertTrue(all(m["enabled"] for m in got))
         self.assertTrue(all(m["title"] and m["description"] for m in got))
         self.assertTrue(any(m["note"] for m in got if m["name"] == "wifi"))
@@ -149,7 +150,7 @@ class WithNothing(Base):
             self.assertIn(ident, html)
         for n in NAMES:
             self.assertNotIn(MARKER[n], html, n)
-        for word in ("led-section", "Status LED", "NeoPixel", "num-card", "Special phone numbers", "debug-bar", "wifi-row", "pl-box",
+        for word in ("led-section", "Status LED", "NeoPixel", "num-card", "Special phone numbers", "dcbg", "debug-bar", "wifi-row", "pl-box",
                      "ledOpen", "@@"):
             self.assertNotIn(word, html, word)
         self.check_js(html)

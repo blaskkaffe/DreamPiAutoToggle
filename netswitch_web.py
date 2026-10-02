@@ -31,9 +31,6 @@ import netswitch_update as updater
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 STATIC_FILES = {   # only these are served from /static/
-    "three.min.js": "application/javascript; charset=utf-8",
-    "dc-background.js": "application/javascript; charset=utf-8",
-    "LICENSES.txt": "text/plain; charset=utf-8",
     "favicon-dcnow.png": "image/png",   # DreamPi logo (without the text)
     "favicon-dcnet.png": "image/png",   # Flycast logo while DCNET is selected
     "touch-dcnow.png": "image/png",

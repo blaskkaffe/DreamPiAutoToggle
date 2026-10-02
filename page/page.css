@@ -84,12 +84,4 @@
  details.guide{margin:6px 4px 14px;color:var(--muted);font-size:.85em} details.guide summary{cursor:pointer;padding:10px 0}
  details.guide code{background:#222;border-radius:6px;padding:1px 6px;color:#ddd} details.guide ol{margin:6px 0;padding-left:20px} details.guide li{margin:4px 0}
  .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
- #dcbg{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100lvh;z-index:-1;overflow:hidden;pointer-events:none;
-       background:linear-gradient(to bottom,#9cc3dc,#4d639c);transform:translateZ(0)}
- body.dcbg #dcbg{display:block} body.dcbg{background:transparent} html.dcbg{background:#4d639c}
- body.dcbg{--card:rgba(20,20,20,.78)} body.dcbg .wide{background:rgba(20,20,20,.78)}
- body.dcbg .now,body.dcbg .now.dcnet{background:rgba(20,20,20,.78)}   /* grey like the Dreamcast BIOS pop-ups; the border keeps the network colour */
- body.dcbg h1{text-shadow:0 1px 4px rgba(0,0,0,.6)}
- body.settings-open > :not(#settings):not(#dcbg){visibility:hidden}
- body.dcbg #settings{background:transparent}
- body.dcbg .note,body.dcbg h2{color:#eee;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+ body.settings-open > :not(#settings):not(.keep-visible){visibility:hidden}

@@ -6,7 +6,6 @@
 <link rel="icon" type="image/png" id="fav" href="/static/favicon-dcnow.png">
 <link rel="apple-touch-icon" id="touch" href="/static/touch-dcnow.png">
 <style>@@CSS@@</style></head><body>
-<div id="dcbg"></div>
 <header><h1>DreamPi</h1><button class="cog" id="cog" type="button" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M10.3 1.5h3.4l.5 2.6a8.3 8.3 0 0 1 2.1.9l2.2-1.5 2.4 2.4-1.5 2.2c.4.7.7 1.4.9 2.1l2.6.5v3.4l-2.6.5a8.3 8.3 0 0 1-.9 2.1l1.5 2.2-2.4 2.4-2.2-1.5c-.7.4-1.4.7-2.1.9l-.5 2.6h-3.4l-.5-2.6a8.3 8.3 0 0 1-2.1-.9l-2.2 1.5-2.4-2.4 1.5-2.2a8.3 8.3 0 0 1-.9-2.1l-2.6-.5v-3.4l2.6-.5c.2-.7.5-1.4.9-2.1L3.4 5.9l2.4-2.4L8 5c.7-.4 1.4-.7 2.1-.9zM12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6z"/></svg></button></header>
 <div id="warnings"></div>
 <div class="now rows" id="net" title="Show or hide details" role="button" tabindex="0" aria-expanded="false">
@@ -28,14 +27,6 @@
 <header><h1>Settings</h1><button class="cog" id="close-settings" type="button" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.6 3.5 12 9.9l6.4-6.4 2.1 2.1-6.4 6.4 6.4 6.4-2.1 2.1-6.4-6.4-6.4 6.4-2.1-2.1 6.4-6.4-6.4-6.4z"/></svg></button></header>
 <div class="cols">
 @@SLOT:sections_a@@
-
-<section class="sec">
-<h2>Appearance</h2>
-<div class="card">
- <div class="srow"><span>Dreamcast background<span class="sub">Animated, saved in this browser only</span></span>
-  <input type="checkbox" class="cbox dcnow" id="bg-b" aria-label="Dreamcast background"></div>
-</div>
-</section>
 
 <div id="gpio-section" class="sec" style="position:relative">
 <h2>GPIO <span class="saved" id="gpio-saved">Saved &#10003;</span></h2>

@@ -145,20 +145,6 @@ function loadAbout(){var x=new XMLHttpRequest();x.open("GET","/about",true);
 $("cog").onclick=function(){showSettings(true)};
 $("close-settings").onclick=function(){showSettings(false)};
 document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(!fire("escape"))showSettings(false)}});
-// Optional Dreamcast background (static/dc-background.js), remembered per browser
-function bgWanted(){try{return localStorage.getItem("netswitch-bg")==="on"}catch(e){return false}}
-function loadScript(src,done){var sc=document.createElement("script");sc.src=src;sc.onload=done;
- sc.onerror=function(){document.body.classList.remove("dcbg")};document.head.appendChild(sc)}
-function setBg(on){
- try{localStorage.setItem("netswitch-bg",on?"on":"off")}catch(e){}
- $("bg-b").checked=on;document.body.classList.toggle("dcbg",on);document.documentElement.classList.toggle("dcbg",on);
- if(!on){if(window.DCBackground)DCBackground.stop();return}
- function go(){if(document.body.classList.contains("dcbg"))DCBackground.start($("dcbg"))}
- if(window.DCBackground)go();
- else if(window.THREE)loadScript("/static/dc-background.js",go);
- else loadScript("/static/three.min.js",function(){loadScript("/static/dc-background.js",go)})}
-$("bg-b").onchange=function(){setBg(this.checked)};
-if(bgWanted())setBg(true);
 var wifiInstalled=false;
 var btn=null,btnTimer=null;
 // Button functions come as [name, label, group, needs Wi-Fi setup, description]: push buttons and

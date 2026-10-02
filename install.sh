@@ -82,9 +82,9 @@ cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_modules.py"
    "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/static"
 cp "$SRC"/page/index.html "$SRC"/page/page.css "$SRC"/page/page.js "$DEST/page/"
-cp "$SRC/static/three.min.js" "$SRC/static/dc-background.js" "$SRC/static/LICENSES.txt" "$SRC"/static/*.png "$DEST/static/"
+cp "$SRC"/static/*.png "$DEST/static/"
 # Files an older layout kept next to the base (the features are folders in modules/ now)
-rm -f "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" \
+rm -f "$DEST/static/three.min.js" "$DEST/static/dc-background.js" "$DEST/static/LICENSES.txt" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" \
       "$DEST/netswitch_players.py" "$DEST/netswitch_wifi_setup.py" "$DEST/page/led.html" "$DEST/page/led.js" "$DEST/page/led.css" "$DEST/page/players.js"
 
 # >>> sync_modules

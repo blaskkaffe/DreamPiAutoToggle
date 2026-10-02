@@ -67,7 +67,7 @@ The web page runs on the Pi as root, because it has to restart DreamPi, reboot t
 
 ### Modules
 
-The add-on is a small **base** plus **modules**. The base is the web page with the Selected-network box, the two network buttons, Appearance, the buttons' GPIO settings, Modules, About (with updates) and Reboot, and the hook inside DreamPi that does the routing. Everything else is a module, a folder in `modules/`:
+The add-on is a small **base** plus **modules**. The base is the web page with the Selected-network box, the two network buttons, the buttons' GPIO settings, Modules, About (with updates) and Reboot, and the hook inside DreamPi that does the routing. Everything else is a module, a folder in `modules/`:
 
 | Module | Folder | Adds | On by default |
 |---|---|---|---|
@@ -75,6 +75,7 @@ The add-on is a small **base** plus **modules**. The base is the web page with t
 | **Online players** | `modules/players/` | the Online players box on the main page | yes |
 | **Wi-Fi setup** | `modules/wifi/` | joining a Wi-Fi network without a keyboard (a temporary access point), and the Wi-Fi rows in Settings | no |
 | **Status LEDs** | `modules/led/` | the NeoPixel service, the NeoPixel calibration and Status LED settings, and the LED count / GPIO pin / wire order | yes |
+| **Dreamcast background** | `modules/background/` | the animated Dreamcast menu background behind the page (see [Credits](#credits)) | no |
 | **Debug log** | `modules/debuglog/` | the Debug log bar and live log on the main page, and its recording inside DreamPi | no |
 
 - **Switch one on or off:** Settings > **Modules**. It takes effect at once: the page reloads without the module's parts, and its endpoints and background work stop (the LED service goes dark while Status LEDs is off). Nothing is deleted, so switching it on again brings your settings back.
@@ -155,9 +156,6 @@ The selected network is DCNow! after every reboot (there is no default-network s
 **Special phone numbers** (Special phone numbers module): the four lists above, editable here, with a short instruction at the bottom.
 
 **Modules:** every installed module with a switch (see [Modules](#modules)).
-
-**Appearance**
-- **Dreamcast background:** an animated background in the style of the Dreamcast menu (see [Credits](#credits)). Off by default, and remembered per browser, so a phone can leave it off while a PC has it on. It pauses while the page is hidden. The Pi serves the files itself (about 600 KB, fetched once), so it works without internet; browsers without WebGL just show the blue gradient. The buttons are slightly see-through so the background shows through them.
 
 **GPIO** (shown when LEDs are installed and not hidden, buttons are installed, or both) - all the physical/wiring settings, in one card, one row per device:
 
@@ -321,4 +319,4 @@ This add-on is built for [DreamPi](https://github.com/Kazade/dreampi) by Luke Be
 
 The page's tab icon is the DreamPi logo (without its text) while DCNow! is selected, and the [Flycast](https://github.com/flyinghead/flycast) logo while DCNET (Flycast's network) is selected. The logos belong to the DreamPi and Flycast projects and are used here only to show which network is selected.
 
-The optional **Dreamcast background** comes from the [VMU Icon Maker](http://dcvmuicons.net/maker/) by **Robert Dale Smith** ([source on GitHub](https://github.com/RobertDaleSmith/vmu-icon-maker), MIT License), part of his [DC VMU Icons](http://dcvmuicons.net/) site. The animated scene, its texture, the waves and the cylinder are his work; this add-on only wraps it so it can be switched on and off (`static/dc-background.js`). It runs on [Three.js](https://threejs.org) r128 (MIT License). The licence texts are in `static/LICENSES.txt`.
+The optional **Dreamcast background** module comes from the [VMU Icon Maker](http://dcvmuicons.net/maker/) by **Robert Dale Smith** ([source on GitHub](https://github.com/RobertDaleSmith/vmu-icon-maker), MIT License), part of his [DC VMU Icons](http://dcvmuicons.net/) site. The animated scene, its texture, the waves and the cylinder are his work; this add-on only wraps it so it can be switched on and off as a module (`modules/background/dc-background.js`). It runs on [Three.js](https://threejs.org) r128 (MIT License). The licence texts are in `modules/background/LICENSES.txt`.
