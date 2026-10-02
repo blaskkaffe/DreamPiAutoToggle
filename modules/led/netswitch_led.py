@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-o
 import netswitch_core as core  # noqa: E402  (module on/off)
 import netswitch_ledconfig as ledconfig  # noqa: E402  (led.json, messages: shared with the web service)
 import netswitch_led_drivers as drivers  # noqa: E402  (open_output(), wire orders)
+import netswitch_led_spi as spi  # noqa: E402  (SPI on/off in config.txt for GPIO10)
 
 FPS = 50
 REFRESH = 0.25     # seconds between re-reading DreamPi's state and led.json
@@ -263,6 +264,24 @@ def render(messages, now, count, clocks=None, white_balance=None, gamma=ledconfi
 
 
 # ---------------------------------------------------------------- main loop
+_warned = set()
+_spi_tried = {}      # on -> when it was last attempted: a pin the hardware can't use yet is retried every 0.25 s, the SPI setup not
+
+
+def _spi(on, now=None):
+    """GPIO10 needs SPI: switch it on in config.txt when that pin is chosen, off again when it is left (best effort)."""
+    now = time.time() if now is None else now
+    if now - _spi_tried.get(on, -1e9) < 30:
+        return
+    _spi_tried[on] = now
+    try:
+        text = spi.ensure_spi(on)
+    except (IOError, OSError) as e:
+        text = "SPI setting not changed (%s)" % e
+    if text:
+        sys.stderr.write(text + "\n")
+
+
 def switch_output(out, count, gpio, new_count, new_gpio):
     """Reopen the hardware output when the LED count or pin was changed on the
     page. Returns (out, count, gpio, switched). out is None while the count is
@@ -273,15 +292,22 @@ def switch_output(out, count, gpio, new_count, new_gpio):
     new_out = None
     if new_count > 0:
         try:
+            if new_gpio == 10:
+                _spi(True)
             new_out = drivers.open_output(new_count, new_gpio)
         except (IOError, OSError) as e:
-            sys.stderr.write("could not switch to GPIO%d, %d LED(s) (%s), keeping the "
-                             "current output\n" % (new_gpio, new_count, e))
+            key = (new_gpio, new_count, str(e))
+            if key not in _warned:        # the page is re-read four times a second: say it once
+                _warned.add(key)
+                sys.stderr.write("could not switch to GPIO%d, %d LED(s) (%s), keeping the "
+                                 "current output\n" % (new_gpio, new_count, e))
             return out, count, gpio, False
     if out is not None:
         out.show([(0, 0, 0)] * count)
         time.sleep(0.02)
         out.close()
+    if new_gpio != 10:
+        _spi(False)       # SPI was only switched on for GPIO10
     return new_out, new_count, new_gpio, True
 
 
@@ -299,10 +325,12 @@ def main():
     out = None   # stays None while the LED count is 0 (the service just waits for it to change)
     if count > 0:
         try:
+            if gpio == 10:
+                _spi(True)
             out = drivers.open_output(count, gpio)
         except (IOError, OSError) as e:
             sys.exit("Cannot drive the LEDs on GPIO%d (%s). The LED service must run as root "
-                     "(and, for GPIO10, SPI must be enabled)." % (gpio, e))
+                     "(for GPIO10 the SPI setting may need a reboot to apply)." % (gpio, e))
         out.order = order
 
     def stop(*_):

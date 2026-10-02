@@ -116,16 +116,14 @@ class WithEverything(Base):
         for n, (method, path) in ENDPOINT.items():
             self.assertIn(self.status(method, path), (200, 204), (n, path))
 
-    def test_led_hardware_settings_live_in_the_led_module(self):
+    def test_led_hardware_settings_are_in_the_gpio_card_and_come_from_the_led_module(self):
         html = self.page()
-        section = html[html.index('id="led-section"'):]
-        self.assertIn('id="led-count-i"', section)
-        self.assertIn('id="led-gpio"', section)
-        self.assertIn('id="led-order"', section)
-        self.assertIn("GPIO10 only works if SPI", section)
         gpio = html[html.index('id="gpio-section"'):html.index('id="led-section"')]
-        self.assertNotIn("led-count-i", gpio)
-        self.assertNotIn("GPIO10 only works", gpio)
+        for ident in ('id="led-count-i"', 'id="led-gpio"', 'id="led-order"', 'id="gpio-led-row"'):
+            self.assertIn(ident, gpio)
+        self.assertNotIn("GPIO10 only works", html)                 # the installer/service sets SPI up, no note on the page
+        section = html[html.index('id="led-section"'):]
+        self.assertNotIn('id="led-count-i"', section)
 
     def test_modules_menu_lists_them_all(self):
         got = self.json("/modules")["modules"]

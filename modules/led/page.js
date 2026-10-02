@@ -7,6 +7,7 @@ function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
   led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledGroups=r.groups;ledEffects=r.effects;ledCount=r.count||1;ledGpio=r.gpio||18;
   $("led-section").style.display=(r.installed&&!r.hidden)?"block":"none";   // install.sh --led, not hidden
+  $("gpio-led-row").style.display=(r.installed&&!r.hidden)?"flex":"none";   // the LED row of the GPIO card goes with it
   
   $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";
   if(!$("led-order").options.length)$("led-order").innerHTML=r.orders.map(function(o){
@@ -123,11 +124,13 @@ function setWbPreview(on){wbPreviewOn=on;$("wb-preview").classList.toggle("on",o
   var h=new XMLHttpRequest();h.open("POST","/wbtest",true);h.setRequestHeader("X-Requested-With","netswitch");h.send()},1000)}
 $("wb-preview").onclick=function(){setWbPreview(!wbPreviewOn)};
 $("wb-reset").onclick=function(){led.white_balance={r:1,g:1,b:1};showWb();saveLed()};
-function saveLed(){clearTimeout(ledTimer);ledTimer=setTimeout(function(){
+var ledHw=false;   // the last change came from the LED row in the GPIO card: confirm there too
+function saveLed(hw){if(hw===true)ledHw=true;clearTimeout(ledTimer);ledTimer=setTimeout(function(){
  var x=new XMLHttpRequest();x.open("POST","/ledconfig",true);x.setRequestHeader("Content-Type","application/json");
  led.count=ledCount;led.gpio=ledGpio;
- x.onload=function(){if(x.status!=200)return;var els=document.querySelectorAll(".led-saved");Array.prototype.forEach.call(els,function(e){e.classList.add("show")});
-  setTimeout(function(){Array.prototype.forEach.call(els,function(e){e.classList.remove("show")})},1200);refresh()};x.send(JSON.stringify(led))},250)}
+ x.onload=function(){if(x.status!=200)return;var els=Array.prototype.slice.call(document.querySelectorAll(".led-saved"));if(ledHw){els.push($("gpio-saved"));ledHw=false}
+  els.forEach(function(e){e.classList.add("show")});
+  setTimeout(function(){els.forEach(function(e){e.classList.remove("show")})},1200);refresh()};x.send(JSON.stringify(led))},250)}
 // Logarithmic slider: the left half covers 0-9 %, where an indicator LED is most useful.
 var LOG_BASE=100;
 function sliderToBright(p){return (Math.pow(LOG_BASE,p/1000)-1)/(LOG_BASE-1)}
@@ -139,9 +142,9 @@ $("led-reset").onclick=function(){var order=led.order,wb=led.white_balance;   //
  led=JSON.parse(JSON.stringify(ledDefaults));led.order=order;led.white_balance=wb;showLed();saveLed()};
 $("led-count-i").onchange=function(){var n=parseInt(this.value,10);
  if(isNaN(n))return;ledCount=Math.max(1,Math.min(300,n));this.value=ledCount;
- $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";saveLed()};
-$("led-gpio").onchange=function(){ledGpio=parseInt(this.value,10);saveLed()};
-$("led-order").onchange=function(){led.order=this.value;saveLed()};
+ $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";saveLed(true)};
+$("led-gpio").onchange=function(){ledGpio=parseInt(this.value,10);saveLed(true)};
+$("led-order").onchange=function(){led.order=this.value;saveLed(true)};
 $("led-hide-b").onclick=function(){
  if(!confirm("Hide the Status LED settings? This can only be undone on the Pi itself, by deleting led_hidden in /opt/dreampi-netswitch."))return;
  var x=new XMLHttpRequest();x.open("POST","/ledhide",true);x.setRequestHeader("X-Requested-With","netswitch");

@@ -14,26 +14,9 @@ if [ "$(cat "$DEST/led_count")" = 0 ]; then
 else
     echo "NeoPixel output on GPIO$GPIO: $(cat "$DEST/led_count") LED(s)"
 fi
-# GPIO10 needs the kernel's SPI driver; GPIO12/18/21 use /dev/mem directly
-# and don't. Track what we changed in spi_added, so switching away from
-# GPIO10 later (here or from the page) takes the setting back out again.
-CONFIG_TXT=
-for candidate in /boot/firmware/config.txt /boot/config.txt; do
-    [ -f "$candidate" ] && CONFIG_TXT="$candidate" && break
-done
-if [ "$GPIO" = 10 ]; then
-    if [ -n "$CONFIG_TXT" ] && ! grep -q '^dtparam=spi=on' "$CONFIG_TXT"; then
-        printf '\ndtparam=spi=on  # added by dreampi-netswitch\n' >> "$CONFIG_TXT"
-        echo "$CONFIG_TXT" > "$DEST/spi_added"
-        echo "Enabled SPI in $CONFIG_TXT for GPIO10; reboot before the LEDs will work on it."
-    elif [ -z "$CONFIG_TXT" ]; then
-        echo "Could not find config.txt to enable SPI for GPIO10 - add dtparam=spi=on yourself and reboot."
-    fi
-elif [ -f "$DEST/spi_added" ]; then
-    sed -i '/^dtparam=spi=on  # added by dreampi-netswitch$/d' "$(cat "$DEST/spi_added")"
-    rm -f "$DEST/spi_added"
-    echo "Removed the SPI setting added for GPIO10 (not needed for GPIO$GPIO)."
-fi
+# GPIO10 needs the kernel's SPI driver (dtparam=spi=on in config.txt); GPIO12/18/21 use /dev/mem directly and don't.
+# The LED service does the same whenever the pin is changed on the page; the helper only takes out a line it added itself.
+"$(command -v python3)" "$DEST/modules/led/netswitch_led_spi.py" sync || true
 cat > /etc/systemd/system/dreampi-netswitch-led.service <<UNIT
 [Unit]
 Description=DreamPi Netswitch status NeoPixel

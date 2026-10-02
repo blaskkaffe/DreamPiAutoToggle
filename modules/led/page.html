@@ -2,12 +2,9 @@
 <div id="led-section" class="sec" style="display:none;position:relative">
 <h2>Status LED<span id="led-count-t"></span> <span class="saved led-saved">Saved &#10003;</span></h2>
 <div class="card" id="led-hw-card">
- <div class="srow" id="led-hw-row"><span>LED<span class="sub">How many, which GPIO pin, wire order</span></span>
-  <div style="display:flex;gap:8px"><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"><select class="ord" id="led-gpio" aria-label="LED output pin"></select><select class="ord" id="led-order" aria-label="Wire order"></select></div></div>
  <div class="srow" id="led-cal-row"><span>Calibration<span class="sub">White balance and maximum brightness</span></span>
   <button class="pill-s" id="cal-open" type="button">Adjust</button></div>
 </div>
-<div class="note">Switching the LED output pin to GPIO10 only works if SPI was enabled when installing (<code>sudo ./install.sh --led-gpio=10</code>, needs a reboot).</div>
 <div class="card">
  <table class="ledtab"><thead><tr><th>Message</th><th>Colour</th><th>Effect</th><th>Level</th></tr></thead><tbody id="led-rows"></tbody></table>
 </div>
@@ -23,7 +20,7 @@
  <div class="range wb"><span>Blue</span><input type="range" id="wb-b" aria-label="Blue" min="0" max="255" step="1" style="accent-color:#39f"><span id="wb-b-v"></span></div>
  <div class="bar" style="justify-content:center;margin:6px 0 8px"><button class="pill-s" id="wb-preview" type="button">Preview on LED</button><button class="pill-s" id="wb-reset" type="button">Reset to neutral</button></div>
  <div class="range wb" style="border-top:1px solid var(--line)"><span>Brightness</span><input type="range" id="led-bright" aria-label="Maximum brightness" min="0" max="1000" step="1"><span id="led-bright-v"></span></div>
- <div class="sub" style="margin:0 0 8px">Preview shows solid white: turn down whichever of R, G or B looks too strong until it looks neutral and leave the others at 255. It corrects every colour. Brightness is the maximum for the whole strip.</div>
+ <div class="sub" style="margin:0 0 8px">Enable "Preview", turn down whichever of R, G or B looks too strong until light is neutral white and leave at least one at 255. Adjust maximum for every LED</div>
  <div class="bar" style="justify-content:flex-end"><button class="pill-s" id="cal-done" type="button">Done</button></div></div>
 <div id="fx-pop" class="pop"><div class="t" id="fx-t"></div>
  <div class="opts" id="fx-opts"></div>
@@ -36,3 +33,7 @@
  <div class="range"><input type="range" id="lvl-r" aria-label="Level brightness" min="0" max="1000" step="1"><span id="lvl-v" style="width:3em;text-align:right"></span></div>
  <div class="bar"><button class="pill-s" id="lvl-base" type="button">Use global</button><button class="pill-s" id="lvl-done" type="button">Done</button></div></div>
 </div>
+<!--slot:buttons_rows-->
+ <div class="srow" id="gpio-led-row" style="flex-wrap:wrap;display:none"><span>LED</span>
+  <div style="display:flex;gap:8px"><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"><select class="ord" id="led-gpio" aria-label="LED output pin"></select><select class="ord" id="led-order" aria-label="Wire order"></select></div>
+  <div class="sub" style="flex-basis:100%;margin:-6px 0 2px">LEDs connected, output pin and wire order</div></div>
