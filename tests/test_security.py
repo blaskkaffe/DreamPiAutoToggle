@@ -6,8 +6,6 @@ import subprocess
 import threading
 import time
 import unittest
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError
 
 from support import sandbox, cleanup, core, probes, web
 import netswitch_security as sec

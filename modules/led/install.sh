@@ -26,6 +26,7 @@ StartLimitIntervalSec=0
 ConditionPathExists=$DEST/modules/led/netswitch_led.py
 ConditionPathExists=$DEST/modules/led/netswitch_led_drivers.py
 ConditionPathExists=$DEST/modules/led/netswitch_ledconfig.py
+ConditionPathExists=$DEST/modules/led/netswitch_led_spi.py
 
 [Service]
 ExecStart=$(command -v python3) $DEST/modules/led/netswitch_led.py

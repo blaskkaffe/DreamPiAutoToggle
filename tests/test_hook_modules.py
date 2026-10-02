@@ -7,7 +7,7 @@ import shutil
 import types
 import unittest
 
-from support import ROOT, core, sandbox, cleanup
+from support import ROOT, sandbox, cleanup
 import netswitch_hook as hook
 import netswitch_hookdebug as hookdebug
 

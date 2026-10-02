@@ -379,8 +379,3 @@ def active_messages(state=None, net_state=None, wifi=True):
     return out
 
 
-def status_look(state=None):
-    """The most important active message (what a single LED shows), or None
-    when every active message is switched off."""
-    msgs = active_messages(state)
-    return msgs[-1] if msgs else None

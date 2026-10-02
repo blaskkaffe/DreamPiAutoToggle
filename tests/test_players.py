@@ -1,7 +1,6 @@
 """The optional online-players list: tolerant parsing of status JSON, the cache
 and the HTTP endpoint (no network: fetch is faked)."""
 import json
-import os
 import threading
 import unittest
 from urllib.error import HTTPError

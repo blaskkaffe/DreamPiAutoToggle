@@ -12,7 +12,6 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from support import ROOT, web, core, sandbox, cleanup
-import netswitch_modules as mods
 
 REAL_MODULES = os.path.join(ROOT, "modules")
 NAMES = ["background", "debuglog", "led", "numbers", "players", "wifi"]

@@ -9,7 +9,6 @@ import gzip
 import io
 import json
 import os
-import re
 import socket
 import ssl
 import sys

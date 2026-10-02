@@ -218,11 +218,6 @@ def reset_dither():
     _dither_err.clear()
 
 
-def scaled(colour, brightness, white_balance=None, gamma=ledconfig.GAMMA):
-    """'#rrggbb' at a brightness, for a single solid pixel."""
-    return to_bytes([hex_rgb(colour)], brightness, white_balance, gamma, dither=False)[0]
-
-
 def _wb(cfg):
     """led.json's white_balance dict -> (r, g, b) multipliers for to_bytes()."""
     wb = (cfg or {}).get("white_balance") or {}

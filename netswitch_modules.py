@@ -92,10 +92,6 @@ def refresh(force=False):
         return True
 
 
-def loaded_names():
-    return [m["name"] for m in _state["loaded"]]
-
-
 def get(name):
     """The imported web entry of an enabled module, or None."""
     for m in _state["loaded"]:

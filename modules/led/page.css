@@ -15,6 +15,7 @@
  .secrow{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
  .secrow button{padding:6px 12px;font-size:.82em}
  .secrow input[type=number],.srow input[type=number]{width:54px;padding:5px 6px;border-radius:8px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.85em}
+ .srow input[type=number]{box-sizing:border-box;height:36px;padding:0 6px}   /* the same height as the drop-down menus beside it */
  .lvl.on{background:#5b6b7e;border-color:#5b6b7e;color:#fff}
  .cbox.neutral:checked,.cbox.neutral.on{background-color:#5b6b7e;border-color:#5b6b7e}
  #wb-preview{min-width:10.5em;text-align:center} #wb-preview.on{background:#fff;border-color:#bbb;color:#111}

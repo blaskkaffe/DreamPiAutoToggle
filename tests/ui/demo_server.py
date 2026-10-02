@@ -5,7 +5,7 @@ BG=1 (the Dreamcast background module on), FAKEUPDATE=1 (fake GitHub: an update 
 players), OFF=led,wifi,... (modules switched off in the Modules menu; OFF=all = the base only), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
 import sys, os, threading, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-from support import web, core, probes, sandbox
+from support import web, core, sandbox
 import netswitch_wifi_setup as wifi
 tmp = sandbox(wifi)
 with open(core.LED_COUNT, 'w') as f: f.write(os.environ.get('LEDS', '3'))

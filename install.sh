@@ -29,9 +29,8 @@
 # page's Settings > GPIO. Which modules are on is the page's Settings > Modules (--wifi, --no-wifi and
 # --wifi-demo set the Wi-Fi one from here); the LED count is kept too. The LED count, output pin, wire order and white
 # balance can all be changed later from the page's Settings, without
-# --leds=N/--led-gpio=N or a reinstall - except switching to GPIO10, which needs
-# SPI enabled first (this installer does that for --led-gpio=10, but it needs a
-# reboot).
+# --leds=N/--led-gpio=N or a reinstall. Choosing GPIO10 switches the Pi's SPI on in
+# config.txt by itself (the LED service does that; a reboot may be needed once).
 set -e
 DEST=/opt/dreampi-netswitch
 SRC="$(cd "$(dirname "$0")" && pwd)"

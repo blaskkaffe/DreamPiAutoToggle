@@ -13,7 +13,6 @@ import binascii
 import hashlib
 import hmac
 import os
-import re
 import socket
 import threading
 import time
