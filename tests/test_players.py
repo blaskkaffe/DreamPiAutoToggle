@@ -199,9 +199,9 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn("netswitch-players", js)           # show/hide setting, per browser
             self.assertIn('id="pl-b"', js)
             self.assertIn("Online players:", js)
-            self.assertIn("DCNow!:", js)
+            self.assertIn("pl-games", js)
             self.assertIn("pl-toggle", js)
-            self.assertIn("pl-row", js)
+            self.assertIn("pl-players", js)
             r = json.loads(urlopen(base + "/players", timeout=10).read().decode())
             self.assertTrue(r["configured"])
             self.assertIn("links", r)

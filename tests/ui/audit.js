@@ -13,6 +13,7 @@ const AUDIT = () => {
     if (!inSettings && el.closest('#settings')) return;
     const r = el.getBoundingClientRect();
     if (el.closest('#log')) return;
+    if (el.closest('.mq') || el.matches('.v')&&el.querySelector('.mq')) return;   // the scrolling games line is meant to run past its box
     if (r.right > W + 1 || r.left < -1) out.push(['outside-viewport', sel(el) + ' ' + Math.round(r.left) + '..' + Math.round(r.right)]);
     const card = el.closest('.card, .pill, .wide, .warnbox, .now');
     if (card && card !== el) { const c = card.getBoundingClientRect(); if (r.right > c.right + 1 || r.left < c.left - 1) out.push(['overflows-box', sel(el) + ' in ' + sel(card) + ' by ' + Math.round(Math.max(r.right - c.right, c.left - r.left)) + 'px']); }
