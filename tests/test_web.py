@@ -94,6 +94,7 @@ class HttpTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = sandbox()
+        core.save_module_enabled("debuglog", True)     # off by default
         cls.srv = web.Server(("127.0.0.1", 0), web.Handler)
         cls.base = "http://127.0.0.1:%d" % cls.srv.server_address[1]
         threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
@@ -125,7 +126,7 @@ class HttpTests(unittest.TestCase):
         d = json.loads(self.get("/api")[2].decode())
         for key in ("network", "dreampi", "modem", "internet", "pi", "hangup", "pin", "warnings", "now"):
             self.assertIn(key, d)
-        self.assertIn("debug", d)               # added by the debug log module (on by default)
+        self.assertIn("debug", d)               # added by the debug log module (switched on in setUpClass; off by default)
         self.assertNotIn("wifi", d)             # the Wi-Fi setup module is off by default
         self.assertIn(d["network"], ("dcnow", "dcnet"))
 

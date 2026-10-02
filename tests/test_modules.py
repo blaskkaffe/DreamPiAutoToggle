@@ -39,6 +39,7 @@ class Base(unittest.TestCase):
         self.modules = os.path.join(self.tmp, "modules")
         shutil.copytree(REAL_MODULES, self.modules, ignore=shutil.ignore_patterns("__pycache__"))
         self.saved_dir, core.MODULES_DIR = core.MODULES_DIR, self.modules
+        core.save_module_enabled("debuglog", True)          # off by default, the tests want to see it
         if self.ENABLE_WIFI:
             core.save_module_enabled("wifi", True)
         web.refresh_page(force=True)
@@ -97,7 +98,7 @@ class RepoModules(unittest.TestCase):
 
     def test_defaults(self):
         on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["default"]) for n in NAMES)
-        self.assertEqual(on, {"debuglog": True, "led": True, "numbers": True, "players": True, "wifi": False})
+        self.assertEqual(on, {"debuglog": False, "led": True, "numbers": True, "players": True, "wifi": False})
 
 
 class WithEverything(Base):

@@ -14,7 +14,7 @@ It then wraps Netlink.check_number() with these rules:
              toggle_dcnet  selects DCNET, hangs up
              call_dcnow    selects DCNow! and connects through DCNow!
              call_dcnet    selects DCNET and connects through DCNET
-           Defaults: 5550001# / 5550002# / 5550001 / 5550002.
+           Defaults: 5550001# / 5550002# / 11111, 111111 and 1111111 / none.
   others   Go to whichever network is selected (website or the numbers above).
            Only calls DreamPi would send to its normal PPP are redirected;
            Netlink/XBAND codes and the built-in *69 prefix are untouched.
@@ -56,7 +56,7 @@ NUM_OPENMENU = "1111111"   # fixed: openMenu always dials this and it must stay 
 # Keep in sync with modules/numbers/netswitch_numbers.py ACTIONS (a test compares them).
 NUMBER_ACTIONS = ("toggle_dcnow", "toggle_dcnet", "call_dcnow", "call_dcnet")
 DEFAULT_NUMBERS = {"toggle_dcnow": ["5550001#"], "toggle_dcnet": ["5550002#"],
-                   "call_dcnow": ["5550001"], "call_dcnet": ["5550002"]}
+                   "call_dcnow": ["11111", "111111", "1111111"], "call_dcnet": []}
 HANGUP_ACTIONS = ("toggle_dcnow", "toggle_dcnet")   # select, then hang up
 
 # __builtin__ first: on Python 2 the "future" package can provide a fake
@@ -230,7 +230,8 @@ def _classify(raw_string, numbers):
     string only has to END with a configured number: DreamPi often hears an
     extra leading digit (e.g. 15550002) and ISP settings add prefixes or area
     codes, so exact matching is unreliable. The longest match wins; openMenu's
-    fixed number is "openmenu" and wins ties."""
+    fixed number is "openmenu" and wins ties, except against "call_dcnow", which
+    goes to DCNow! as well but also selects it (the default list has 1111111)."""
     if not raw_string:
         return None, None
     best, best_len = (None, None), 0
@@ -238,7 +239,8 @@ def _classify(raw_string, numbers):
     for action in NUMBER_ACTIONS:
         candidates += [(action, n) for n in numbers.get(action, [])]
     for action, number in candidates:
-        if number and raw_string.endswith(number) and len(number) > best_len:
+        if number and raw_string.endswith(number) and (
+                len(number) > best_len or (len(number) == best_len and action == "call_dcnow" and best[0] == "openmenu")):
             best, best_len = (action, number), len(number)
     return best
 

@@ -14,7 +14,7 @@ Read before adding, removing or restructuring a feature. Back to [CLAUDE.md](../
 | `players` | `modules/players/` | the Online players box on the main page and `GET /players` | on |
 | `wifi` | `modules/wifi/` | Wi-Fi setup: the Wi-Fi rows in Settings, `POST /wifitoggle` and `/wificonnect`, its own service `dreampi-netswitch-wifi` (`netswitch_wifi_service.py` + `netswitch_wifi_setup.py`) | **off** |
 | `led` | `modules/led/` | the status LEDs: the service (`netswitch_led.py`, `netswitch_led_drivers.py`), `netswitch_ledconfig.py`, the NeoPixel calibration and Status LED settings **including the LED count / GPIO pin / wire order row**, `GET`/`POST /ledconfig` | on |
-| `debuglog` | `modules/debuglog/` | the Debug log bar and live log on the main page, `GET /log`, `/dtmf`, `POST /debug`, `/clearlog`, and the part that runs inside DreamPi (`netswitch_hookdebug.py`) | on |
+| `debuglog` | `modules/debuglog/` | the Debug log bar and live log on the main page, `GET /log`, `/dtmf`, `POST /debug`, `/clearlog`, and the part that runs inside DreamPi (`netswitch_hookdebug.py`) | **off** |
 
 A module is **installed** when its folder (with a `module.json`) is there, and **enabled** when the Modules menu has it on (`modules.json` in `/opt/dreampi-netswitch`: `{"led": true, ...}`; a module without an entry uses `default` from its manifest). Not installed or not enabled = absent: no page parts, no endpoints (404), no service work. `core.module_manifest()`, `module_names()`, `module_enabled()`, `save_module_enabled()` read and write that state; the web service, the LED service, the buttons service and the hook (own Python 2 copy, `_module_active()`) all ask it.
 

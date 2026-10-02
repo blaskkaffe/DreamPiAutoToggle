@@ -9,6 +9,7 @@ from support import web, core, probes, sandbox
 import netswitch_wifi_setup as wifi
 tmp = sandbox(wifi)
 with open(core.LED_COUNT, 'w') as f: f.write(os.environ.get('LEDS', '3'))
+core.save_module_enabled("debuglog", True)     # off by default; on here so the page shows it (OFF=debuglog switches it off again)
 if os.environ.get("WIFI"): core.save_module_enabled("wifi", True)
 if os.environ.get("WIFIDEMO"):
     core.save_module_enabled("wifi", True); open(core.WIFI_DEMO, "w").close()

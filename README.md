@@ -75,7 +75,7 @@ The add-on is a small **base** plus **modules**. The base is the web page with t
 | **Online players** | `modules/players/` | the Online players box on the main page | yes |
 | **Wi-Fi setup** | `modules/wifi/` | joining a Wi-Fi network without a keyboard (a temporary access point), and the Wi-Fi rows in Settings | no |
 | **Status LEDs** | `modules/led/` | the NeoPixel service, the NeoPixel calibration and Status LED settings, and the LED count / GPIO pin / wire order | yes |
-| **Debug log** | `modules/debuglog/` | the Debug log bar and live log on the main page, and its recording inside DreamPi | yes |
+| **Debug log** | `modules/debuglog/` | the Debug log bar and live log on the main page, and its recording inside DreamPi | no |
 
 - **Switch one on or off:** Settings > **Modules**. It takes effect at once: the page reloads without the module's parts, and its endpoints and background work stop (the LED service goes dark while Status LEDs is off). Nothing is deleted, so switching it on again brings your settings back.
 - **Remove one for good:** delete its folder in the folder you installed from and run `sudo ./install.sh`. The installer removes the installed copy (and, for the LEDs, the `dreampi-netswitch-led` service and the SPI setting it added); settings files such as `led.json`, the LED count and pin, and `numbers.json` stay for when it comes back.
@@ -107,16 +107,16 @@ Four actions, each with its own list of numbers that you edit in **Settings > Ph
 |---|---|---|
 | **Toggle DCNow!** | Selects DCNow! / DreamPi and hangs up | `555-0001#` |
 | **Toggle DCNET** | Selects DCNET / FLYCAST and hangs up | `555-0002#` |
-| **Call DCNow!** | Selects DCNow! / DreamPi **and** connects to it | `555-0001` |
-| **Call DCNET** | Selects DCNET / FLYCAST **and** connects to it | `555-0002` |
+| **Call DCNow!** | Selects DCNow! / DreamPi **and** connects to it | `11111`, `111111`, `1111111` |
+| **Call DCNET** | Selects DCNET / FLYCAST **and** connects to it | none (add one to use it) |
 
-Any other number connects to the currently selected network. `111-1111` is fixed (not listed on the page): it always directs to DCNow! for compatibility with openMenu and standard ISP configs, and the selected network is not changed. To go back to DCNow! by phone, add a number to **Call DCNow!** or **Toggle DCNow!**.
+Any other number connects to the currently selected network. `111-1111` is also in the default **Call DCNow!** list, so dialing it (openMenu does) selects DCNow! again, which is how you get back to DCNow! by phone. If you remove it from the list, it still always directs to DCNow! for compatibility with openMenu and standard ISP configs, but the selected network is not changed. The shorter `11111` and `111111` are there because a repeated digit is easy for the modem to mishear. If you already had numbers saved, they are kept; **Restore default numbers** brings these back.
 
 **Hang-up actions** (Toggle): DreamPi doesn't answer. The add-on changes the selection and plays a busy tone for 4 seconds, so the Dreamcast gives up straight away instead of waiting for an answer. After that the normal dial tone comes back and the next call goes to the newly selected network. Use it to change networks from the Dreamcast without opening the web page.
 
 **What counts as a number:** digits, `*` and `#`, 3 to 24 characters, either a whole number or just an ending, for example `*61#` or `0002`. A number counts when what the Dreamcast dialed **ends with** it, so a leading `1` (long-distance prefix), an area code, an outside-line digit or other digits the ISP config puts in front don't matter (DreamPi often hears an extra leading `1`, for example `15550002`), and the longest matching number wins. A number can only belong to one action, and a short ending can't take over openMenu's `111-1111`. Take care with very short endings: anything the Dreamcast dials that ends with it will trigger the action.
 
-- `555-0001` and `555-0002` (the North American fictional-exchange prefix) replace the older `222-2222`/`333-3333`: a run of seven identical digits is the hardest pattern for a DTMF decoder to count correctly (no frequency change marks a digit boundary, only a timing gap), the same kind of issue the [Debug log](#debug-log) helps track down for misheard numbers. If you had `222-2222` or `333-3333` set in a Dreamcast ISP config, update it to the new numbers.
+- `555-0001#` and `555-0002#` (the North American fictional-exchange prefix) replace the older `222-2222`/`333-3333`: a run of seven identical digits is the hardest pattern for a DTMF decoder to count correctly (no frequency change marks a digit boundary, only a timing gap), the same kind of issue the [Debug log](#debug-log) helps track down for misheard numbers. If you had `222-2222` or `333-3333` set in a Dreamcast ISP config, update it to the new numbers.
 - openMenu always dials `111-1111`, so it always gets DCNow! (DCNET wouldn't accept openMenu's login).
 - Netlink/XBAND dial codes and DreamPi's built-in `*69` prefix ("this call to DCNET") keep working as before.
 
@@ -291,7 +291,7 @@ While it's scanning or hosting the setup network, a status LED shows a breathing
 
 ## Debug log
 
-The debug log is for tracking down calls that go wrong, such as misheard numbers. Click the **Debug log** bar at the bottom of the main page to open it (click again to close it), press **Recording off** so it changes to **Recording**, and dial. The panel shows one live timeline with millisecond timing:
+The debug log is for tracking down calls that go wrong, such as misheard numbers. It is off by default: switch the **Debug log** module on in Settings > Modules first. Then click the **Debug log** bar at the bottom of the main page to open it (click again to close it), press **Recording off** so it changes to **Recording**, and dial. The panel shows one live timeline with millisecond timing:
 
 - what the modem reports while DreamPi listens: each dialed digit (`DTMF 1`), dial tone underruns, calling tones, and its replies (`OK`, `CONNECT 33600`),
 - every message DreamPi logs (heard, mode, answering, carrier speed, hang-up),
