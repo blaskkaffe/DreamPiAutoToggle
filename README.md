@@ -101,19 +101,18 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 
 ## Phone numbers
 
-Five actions, each with its own list of numbers that you edit in **Settings > Phone numbers** (add with the field and **Add**, remove with the ✕, **Restore default numbers** puts the list below back):
+Four actions, each with its own list of numbers that you edit in **Settings > Phone numbers** (each block has an **Add** button that opens a small box for the number, remove a number with its ✕, **Restore default numbers** at the bottom puts the list below back):
 
 | Action | What it does | Default number |
 |---|---|---|
-| **Reset** | Selects **DCNow!** and hangs up | `111-1111#` |
-| **Toggle to DCNow!** | Selects DCNow! / DreamPi and hangs up | `555-0001#` |
-| **Toggle to DCNET** | Selects DCNET / FLYCAST and hangs up | `555-0002#` |
+| **Toggle DCNow!** | Selects DCNow! / DreamPi and hangs up | `555-0001#` |
+| **Toggle DCNET** | Selects DCNET / FLYCAST and hangs up | `555-0002#` |
 | **Call DCNow!** | Selects DCNow! / DreamPi **and** connects to it | `555-0001` |
 | **Call DCNET** | Selects DCNET / FLYCAST **and** connects to it | `555-0002` |
 
-Fixed, not editable: `111-1111` always directs to DCNow! for compatibility with openMenu and standard ISP configs (the selected network is not changed), and any other number connects to the currently selected network (set your Dreamcast ISP config to any 7-digit number to use this feature).
+Any other number connects to the currently selected network. `111-1111` is fixed (not listed on the page): it always directs to DCNow! for compatibility with openMenu and standard ISP configs, and the selected network is not changed. To go back to DCNow! by phone, add a number to **Call DCNow!** or **Toggle DCNow!**.
 
-**Hang-up actions** (Reset, Toggle): DreamPi doesn't answer. The add-on changes the selection and plays a busy tone for 4 seconds, so the Dreamcast gives up straight away instead of waiting for an answer. After that the normal dial tone comes back and the next call goes to the newly selected network. Use it to change networks from the Dreamcast without opening the web page.
+**Hang-up actions** (Toggle): DreamPi doesn't answer. The add-on changes the selection and plays a busy tone for 4 seconds, so the Dreamcast gives up straight away instead of waiting for an answer. After that the normal dial tone comes back and the next call goes to the newly selected network. Use it to change networks from the Dreamcast without opening the web page.
 
 **What counts as a number:** digits, `*` and `#`, 3 to 24 characters, either a whole number or just an ending, for example `*61#` or `0002`. A number counts when what the Dreamcast dialed **ends with** it, so a leading `1` (long-distance prefix), an area code, an outside-line digit or other digits the ISP config puts in front don't matter (DreamPi often hears an extra leading `1`, for example `15550002`), and the longest matching number wins. A number can only belong to one action, and a short ending can't take over openMenu's `111-1111`. Take care with very short endings: anything the Dreamcast dials that ends with it will trigger the action.
 
@@ -149,11 +148,11 @@ Fixed, not editable: `111-1111` always directs to DCNow! for compatibility with 
 
 The cogwheel in the top right corner opens the settings. Changes are saved straight away; close them with the ✕ or Esc. On a wide screen the sections flow into as many columns as fit (up to four), so there is less scrolling; a phone keeps the single column.
 
-The selected network is DCNow! after every reboot (there is no default-network setting; to go back to DCNow! by phone use the **Reset** number, see [Phone numbers](#phone-numbers)).
+The selected network is DCNow! after every reboot (there is no default-network setting; to go back to DCNow! by phone use a **Toggle DCNow!** or **Call DCNow!** number, see [Phone numbers](#phone-numbers)).
 
 **About** starts with **Wi-Fi setup** (Wi-Fi setup module): Starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too - tap one, enter its password if it needs one, and connect - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
 
-**Phone numbers** (Phone numbers module): the five lists above, editable here, plus the two fixed rows as a reminder.
+**Phone numbers** (Phone numbers module): the four lists above, editable here, with a short instruction at the bottom.
 
 **Modules:** every installed module with a switch (see [Modules](#modules)).
 

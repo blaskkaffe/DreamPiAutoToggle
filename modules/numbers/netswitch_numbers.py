@@ -1,4 +1,4 @@
-# DreamPi Netswitch add-on - the phone numbers that switch networks: five lists
+# DreamPi Netswitch add-on - the phone numbers that switch networks: four lists
 # (one per action) edited on the web page and read by netswitch_hook.py from
 # numbers.json. Works on Python 3 and 2.7.
 import json
@@ -11,9 +11,8 @@ import netswitch_core as core
 # against the END of each number, longest match first, so an entry can be a
 # short ending or a whole number, with digits, * and # (e.g. "*61#").
 ACTIONS = (
-    ("reset", "Reset", "Selects DCNow! and hangs up", ["1111111#"]),
-    ("toggle_dcnow", "Toggle to DCNow!", "Selects DCNow! and hangs up", ["5550001#"]),
-    ("toggle_dcnet", "Toggle to DCNET", "Selects DCNET and hangs up", ["5550002#"]),
+    ("toggle_dcnow", "Toggle DCNow!", "Selects DCNow! and hangs up", ["5550001#"]),
+    ("toggle_dcnet", "Toggle DCNET", "Selects DCNET and hangs up", ["5550002#"]),
     ("call_dcnow", "Call DCNow!", "Selects DCNow! and connects to it", ["5550001"]),
     ("call_dcnet", "Call DCNET", "Selects DCNET and connects to it", ["5550002"]),
 )

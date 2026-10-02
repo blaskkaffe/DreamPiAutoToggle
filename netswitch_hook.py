@@ -7,15 +7,14 @@ the running program imports DreamPi's netlink.py from /home/pi/dreampi.
 It then wraps Netlink.check_number() with these rules:
 
   1111111  openMenu's number. Always DCNow! (the selection is left alone).
-  numbers  Five lists of numbers set on the web page (numbers.json), matched
+  numbers  Four lists of numbers set on the web page (numbers.json), matched
            against the END of what was dialed (a short ending or a full
            number; the longest match wins):
-             reset         selects DCNow!, hangs up (busy tone)
              toggle_dcnow  selects DCNow!, hangs up
              toggle_dcnet  selects DCNET, hangs up
              call_dcnow    selects DCNow! and connects through DCNow!
              call_dcnet    selects DCNET and connects through DCNET
-           Defaults: 1111111# / 5550001# / 5550002# / 5550001 / 5550002.
+           Defaults: 5550001# / 5550002# / 5550001 / 5550002.
   others   Go to whichever network is selected (website or the numbers above).
            Only calls DreamPi would send to its normal PPP are redirected;
            Netlink/XBAND codes and the built-in *69 prefix are untouched.
@@ -50,15 +49,15 @@ MODEM = "/tmp/dreampi-netswitch.modem"
 MODEM_PORT = "/tmp/dreampi-netswitch.port"   # the serial device DreamPi opened, e.g. /dev/ttyUSB0
 NETLINK_DIR = "/home/pi/dreampi"
 
-NUMBERS = os.path.join(BASE_DIR, "numbers.json")   # the five lists below, edited on the web page (phone numbers module)
+NUMBERS = os.path.join(BASE_DIR, "numbers.json")   # the four lists below, edited on the web page (phone numbers module)
 
 NUM_OPENMENU = "1111111"   # fixed: openMenu always dials this and it must stay on DCNow!
 # Action -> numbers. Order is the tie-break when two entries are equally long.
 # Keep in sync with modules/numbers/netswitch_numbers.py ACTIONS (a test compares them).
-NUMBER_ACTIONS = ("reset", "toggle_dcnow", "toggle_dcnet", "call_dcnow", "call_dcnet")
-DEFAULT_NUMBERS = {"reset": ["1111111#"], "toggle_dcnow": ["5550001#"], "toggle_dcnet": ["5550002#"],
+NUMBER_ACTIONS = ("toggle_dcnow", "toggle_dcnet", "call_dcnow", "call_dcnet")
+DEFAULT_NUMBERS = {"toggle_dcnow": ["5550001#"], "toggle_dcnet": ["5550002#"],
                    "call_dcnow": ["5550001"], "call_dcnet": ["5550002"]}
-HANGUP_ACTIONS = ("reset", "toggle_dcnow", "toggle_dcnet")   # select, then hang up
+HANGUP_ACTIONS = ("toggle_dcnow", "toggle_dcnet")   # select, then hang up
 
 # __builtin__ first: on Python 2 the "future" package can provide a fake
 # "builtins" module, and patching that would do nothing.
@@ -260,7 +259,7 @@ def _patch(module):
         # Hang-up numbers: select a network, don't answer, busy tone (like *70)
         if action in HANGUP_ACTIONS:
             try:
-                dcnet = action == "toggle_dcnet"      # "reset" goes to DCNow!, the default network
+                dcnet = action == "toggle_dcnet"
                 _select_dcnet(dcnet)
                 net = "DCNET" if dcnet else "DCNow!"
                 busy = _play_busy(getattr(self, "modem", None))

@@ -45,28 +45,28 @@ class SettingsTests(unittest.TestCase):
         self.assertIsNone(nums.clean_number(None))
 
     def test_round_trip_dedupe_and_off(self):
-        saved = nums.save_numbers({"reset": ["*61#", "555-0009"], "toggle_dcnow": ["*61#", "5550001#"],
-                                   "call_dcnet": [], "call_dcnow": "nonsense"})
-        self.assertEqual(saved["reset"], ["*61#", "5550009"])
-        self.assertEqual(saved["toggle_dcnow"], ["5550001#"])          # *61# already used by reset
+        saved = nums.save_numbers({"toggle_dcnow": ["*61#", "555-0009"], "toggle_dcnet": ["*61#", "5550002#"],
+                                   "call_dcnet": [], "call_dcnow": "nonsense", "reset": ["1111111#"]})
+        self.assertEqual(saved["toggle_dcnow"], ["*61#", "5550009"])
+        self.assertEqual(saved["toggle_dcnet"], ["5550002#"])          # *61# already used by toggle_dcnow
+        self.assertNotIn("reset", saved)                               # the old Reset list is gone
         self.assertEqual(saved["call_dcnet"], [])                      # empty = action off
         self.assertEqual(saved["call_dcnow"], ["5550001"])             # not a list: default
-        self.assertEqual(saved["toggle_dcnet"], ["5550002#"])          # absent: default
         self.assertEqual(nums.numbers(), saved)
-        self.assertEqual(hook._load_numbers()["reset"], ["*61#", "5550009"])
+        self.assertEqual(hook._load_numbers()["toggle_dcnow"], ["*61#", "5550009"])
 
     def test_limit_per_action(self):
-        saved = nums.save_numbers({"reset": ["%07d" % i for i in range(30)]})
-        self.assertEqual(len(saved["reset"]), nums.MAX_PER_ACTION)
+        saved = nums.save_numbers({"call_dcnow": ["%07d" % i for i in range(30)]})
+        self.assertEqual(len(saved["call_dcnow"]), nums.MAX_PER_ACTION)
 
     def test_without_the_module_the_hook_uses_the_defaults(self):
-        nums.save_numbers({"reset": ["*61#"]})
-        self.assertEqual(hook._load_numbers()["reset"], ["*61#"])
+        nums.save_numbers({"call_dcnow": ["*61#"]})
+        self.assertEqual(hook._load_numbers()["call_dcnow"], ["*61#"])
         with open(hook.MODULES_STATE, "w") as f:                       # switched off in the Modules menu
             json.dump({"numbers": False}, f)
         self.assertEqual(hook._load_numbers(), hook.DEFAULT_NUMBERS)
         os.remove(hook.MODULES_STATE)
-        self.assertEqual(hook._load_numbers()["reset"], ["*61#"])
+        self.assertEqual(hook._load_numbers()["call_dcnow"], ["*61#"])
         os.remove(os.path.join(hook.MODULES_DIR, "numbers", "module.json"))   # folder deleted
         self.assertEqual(hook._load_numbers(), hook.DEFAULT_NUMBERS)
 
@@ -88,7 +88,7 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual(self.c("5550002"), "call_dcnet")
         self.assertEqual(self.c("5550001#"), "toggle_dcnow")
         self.assertEqual(self.c("5550002#"), "toggle_dcnet")
-        self.assertEqual(self.c("1111111#"), "reset")
+        self.assertIsNone(self.c("1111111#"))                       # the old Reset number is no longer special
         self.assertEqual(self.c("1111111"), "openmenu")
         self.assertIsNone(self.c("5551234"))
         self.assertIsNone(self.c(""))
@@ -170,11 +170,6 @@ class WrapperTests(unittest.TestCase):
         r = self.dial("5550001#")
         self.assertEqual((r["client"], self.selected()), ("idle", "dcnow"))
         self.assertEqual(self.fake.calls, [])                   # DreamPi's own check_number never ran
-
-    def test_reset_selects_dcnow_and_hangs_up(self):
-        open(hook.FLAG, "w").close()
-        self.assertEqual(self.dial("1111111#")["client"], "idle")
-        self.assertEqual(self.selected(), "dcnow")
 
     def test_openmenu_always_dcnow_and_leaves_the_selection(self):
         open(hook.FLAG, "w").close()
