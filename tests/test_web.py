@@ -176,6 +176,11 @@ class HttpTests(unittest.TestCase):
         finally:
             c.close()
 
+    def test_system_card_links_to_the_github_project(self):
+        html = self.get("/")[2].decode()
+        self.assertIn('href="https://github.com/blaskkaffe/DreamPiAutoToggle"', html)
+        self.assertIn('rel="noopener noreferrer"', html)
+
     def test_hide_led_settings_is_gone(self):
         self.assertNotIn("hidden", json.loads(self.get("/ledconfig")[2].decode()))
         with self.assertRaises(HTTPError):
