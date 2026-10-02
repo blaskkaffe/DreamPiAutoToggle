@@ -11,6 +11,8 @@ Check this before saying something works. Anything not listed under Verified has
 
 ## Not yet verified
 
+- Animations (`netswitch_led.effect_frame()`): shapes, directions, timing and edge cases are asserted in `tests/test_led_animations.py` and were looked at as rendered pictures; never watched on a real strip (only a single LED on GPIO18 has been run on hardware), so how smooth Scanner / Comet look on an actual strip at 50 fps is unconfirmed.
+
 - Independent LED messages (per-message on/off, colour, effect, level and LED/range; new default look; migration of the old per-network `led.json`), the **Ping** effect and the "State unknown only as fallback" rule: tested off-hardware (`tests/test_led_messages.py`: priority, disabled messages, targeting of one LED / ranges / several messages at once, single LED and strip, ping timing, migration; the page driven in a browser). Not seen on a real LED: how the new orange, amber and red look after gamma on the actual NeoPixels, or how Ping reads on one. *Connecting*, *Call failed*, *Ready for calls - Netlink* and *Network switching* are configurable but are not detected (DreamPi gives no signal for them), so they never light.
 
 - Web-service safety (Host/Origin checks, optional PIN, update origin pinning, systemd sandbox directives on `dreampi-netswitch.service`, `wpa_supplicant.conf` mode 600): tested off-hardware (`tests/test_security.py`, PIN prompt flow driven in a browser against the demo server). Not run on a Pi: whether the sandboxed unit starts and still restarts DreamPi / reboots / starts the update on every Raspberry Pi OS version, and `install.sh --pin` on a real terminal. See [web.md](web.md#security-netswitch_securitypy).

@@ -81,6 +81,35 @@ def _rand(i, salt):
     return x - math.floor(x)
 
 
+def _wave(phase):
+    """Breathing brightness 0..1, starting at full: a raised cosine. It is the brightness as the eye
+    judges it - the gamma step in to_bytes() turns it into LED duty - so no extra squaring here."""
+    return 0.5 + 0.5 * math.cos(2 * math.pi * phase)
+
+
+def _scanner(n, phase):
+    """Cylon / KITT scanner: a bright head sweeps from the first LED to the last and back, leaving a fading
+    trail behind it (what FastLED does with fadeToBlackBy). The trail is worked out from where the head was a
+    moment ago, so it needs no state and flips sides correctly at both ends. The head and trail grow with a
+    longer strip. Returns brightness 0..1 per LED."""
+    span = max(1, n - 1)
+    half = max(1.5, n / 20.0)                   # half-width of the head, in LEDs
+    trail = max(3.0, n / 5.0)                   # length of the trail, in LEDs
+    back = trail / (2.0 * span)                 # how much of the cycle the head needs to cover that distance
+    steps = int(min(40, max(4, math.ceil(trail / (0.6 * half)))))
+    out = [0.0] * n
+    for k in range(steps):
+        age = k / float(steps)                  # 0 = the head now, towards 1 = the oldest part of the trail
+        p = (phase - age * back) % 1.0
+        pos = span * (1 - abs(2 * p - 1))
+        weight = (1 - age) ** 2
+        for i in range(max(0, int(math.floor(pos - half))), min(n - 1, int(math.ceil(pos + half))) + 1):
+            v = weight * (1 - abs(i - pos) / half)
+            if v > out[i]:
+                out[i] = v
+    return out
+
+
 def effect_frame(effect, speed, colour, t, n):
     c = hex_rgb(colour)
     fast = speed == "fast"
@@ -95,31 +124,30 @@ def effect_frame(effect, speed, colour, t, n):
     if effect == "blink":
         return [c if phase < 0.5 else (0, 0, 0)] * n
     if effect == "breathe":
-        f = 0.5 + 0.5 * math.cos(2 * math.pi * phase)    # starts bright
-        return [_mul(c, f * f)] * n
+        return [_mul(c, _wave(phase))] * n
     if n == 1:   # strip effects on a single LED
         if effect == "rainbow":
             return [hue(phase)]
         if effect in ("chase", "twinkle"):
             return [c if phase < 0.5 else (0, 0, 0)]
-        f = 0.5 + 0.5 * math.cos(2 * math.pi * phase)
-        return [_mul(c, f * f)]
+        return [_mul(c, _wave(phase))]
     if effect == "rainbow":
-        return [hue(phase + float(i) / n) for i in range(n)]
+        return [hue(float(i) / n - phase) for i in range(n)]       # flows towards the last LED, like the others
     if effect == "scanner":
-        pos = (n - 1) * (1 - abs(2 * phase - 1))            # back and forth
-        return [_mul(c, max(0.0, 1 - abs(i - pos) / 1.5) ** 2) for i in range(n)]
+        return [_mul(c, v) for v in _scanner(n, phase)]
     if effect == "comet":
-        head = phase * n
+        head = phase * n                                            # LEDs from the first, travelling forward
         tail = max(2.0, n / 4.0)
         out = []
         for i in range(n):
-            d = (head - i) % n
-            out.append(_mul(c, max(0.0, 1 - d / tail) ** 2))
+            d = (head - i) % n                                      # how far behind the head this LED is
+            if d > n - 1:
+                d -= n                                              # just ahead of the head: a soft front edge
+            out.append(_mul(c, 1 + d if d < 0 else max(0.0, 1 - d / tail) ** 2))
         return out
     if effect == "chase":
         step = int(phase * 3 + 1e-6) % 3     # 1e-6: no float rounding at the step edges
-        return [c if (i - step) % 3 == 0 else (0, 0, 0) for i in range(n)]   # moves forward
+        return [c if (i - step) % 3 == 0 else (0, 0, 0) for i in range(n)]   # every third LED, moving forward
     if effect == "twinkle":
         out = []
         for i in range(n):
