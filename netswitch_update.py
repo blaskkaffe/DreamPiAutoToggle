@@ -167,12 +167,29 @@ def update_state():
     return text
 
 
-def _log_tail(n=12):
+_ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[@-_]")
+
+
+def _clean_line(line):
+    """One log line for the page: no colour codes, no progress-bar rewrites (text before a lone
+    carriage return), no control characters, at most 300 characters."""
+    line = _ANSI.sub("", line.rstrip("\r\n"))
+    parts = [p for p in line.split("\r") if p.strip()]
+    line = parts[-1] if parts else ""
+    line = "".join(ch if ch >= " " or ch == "\t" else " " for ch in line).rstrip()
+    return line[:300]
+
+
+def _log_tail(n=14):
     try:
-        with open(core.UPDATE_LOG) as f:
-            return [l.rstrip() for l in f.readlines()[-n:]]
+        with open(core.UPDATE_LOG, "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 16384))
+            text = f.read().decode("utf-8", "replace")
     except (IOError, OSError):
         return []
+    lines = [_clean_line(l) for l in text.split("\n")]
+    return [l for l in lines if l.strip()][-n:]
 
 
 def can_update():

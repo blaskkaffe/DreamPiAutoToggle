@@ -105,6 +105,11 @@
  #wifi-networks{padding:10px 0 14px}
  .wnet{display:block;width:100%;margin-bottom:6px;padding:9px 12px;text-align:left;border-radius:12px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
  .wnet .sig{float:right;opacity:.6;font-size:.85em;margin-left:8px} .wnet{overflow-wrap:anywhere}
+ /* update log: a small console that scrolls inside the card, so long lines never push the rows around */
+ .updlog{margin:2px 0 12px;padding:8px 10px;background:#0b0b0b;border:1px solid var(--line);border-radius:12px;font:.72em/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#bbb;max-height:11.5em;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
+ .updlog div{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;padding:1px 0 1px 12px;text-indent:-12px}
+ .updlog div.lerr{color:#f08a8a} .updlog div.lok{color:#8fe09a} .updlog div.ldim{color:#777} .updlog div.lhd{color:#eee}
+ #upd-row,#upd-do-row{font-size:.88em;padding:10px 3px}   /* the update rows read like the About table above them */
  details.guide{margin:6px 4px 14px;color:var(--muted);font-size:.85em} details.guide summary{cursor:pointer;padding:10px 0}
  details.guide code{background:#222;border-radius:6px;padding:1px 6px;color:#ddd} details.guide ol{margin:6px 0;padding-left:20px} details.guide li{margin:4px 0}
  .nrow{padding:12px 0;border-top:1px solid var(--line)} .nrow:first-child{border-top:0}

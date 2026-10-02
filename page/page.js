@@ -138,6 +138,17 @@ function xhrJson(method,url,cb,body){var x=new XMLHttpRequest();x.open(method,ur
   cb(x.status==200?r:null,x.status,r)};x.onerror=function(){cb(null,0,null)};x.send(body===undefined?undefined:JSON.stringify(body))}
 function loadUpdate(){xhrJson("GET","/update",function(r){if(r)renderUpdate(r);else if(updRunning)$("upd-text").textContent="Restarting the services..."})}
 var updRunning=false,updWatched=false;   // updWatched: this page started or saw the update, so it reloads once when it is done
+// The update log as a small console: one line per row, errors red, success green, nothing wider than the card.
+function renderUpdLog(r){
+ var lg=$("upd-log"),lines=r.log||[];
+ lg.style.display=(lines.length&&r.state!="idle")?"block":"none";
+ var stick=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-8;
+ lg.innerHTML=lines.map(function(l,i){
+  var c=/\b(fail|failed|error|fatal|denied|cannot|could not|not found)\b/i.test(l)?"lerr":
+   /^(ok|done|updated|installed|.*\b(already up to date|fast-forward)\b)/i.test(l)?"lok":
+   /^(updating|running)\b/i.test(l)?"lhd":/^(from|remote:|\s*\d+ file|\s*create mode|\s*delete mode)/i.test(l)?"ldim":"";
+  return '<div'+(c?' class="'+c+'"':'')+'>'+esc(l.slice(0,300))+'</div>'}).join("");
+ if(stick)lg.scrollTop=lg.scrollHeight}
 function renderUpdate(r){var a=r.addon,d=r.dreampi,msg;
  updRunning=r.state=="running";if(updRunning)updWatched=true;
  if(r.state=="running")msg="Updating... the page is unavailable for a few seconds while the services restart.";
@@ -159,7 +170,7 @@ function renderUpdate(r){var a=r.addon,d=r.dreampi,msg;
  $("upd-do-row").style.display=show?"flex":"none";
  $("upd-do-sub").textContent="Fetches the new version from GitHub and installs it ("+(r.branch||"main")+" branch). Settings are kept.";
  $("upd-check").disabled=!!r.checking||updRunning;
- var lg=$("upd-log");lg.style.display=(r.log&&r.log.length&&r.state!="idle")?"block":"none";lg.textContent=(r.log||[]).join("\n");
+ renderUpdLog(r);
  $("upd-cd").textContent="cd "+(r.src||"DreamPiAutoToggle");
  if(r.state=="ok"&&updWatched){updWatched=false;setTimeout(function(){location.reload()},3000)}
  clearTimeout(updTimer);

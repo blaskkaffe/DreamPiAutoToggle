@@ -48,7 +48,7 @@ Options can be combined, for example `sudo ./install.sh --leds=8 --no-https`.
 
 ### Update
 
-The page can do it for you: **Settings > Updates** checks GitHub for a newer version of this add-on (and tells you if DreamPi has newer scripts), and **Update now** fetches and installs it from the checkout you installed from (settings and ports are kept; the page is gone for a few seconds). The same tab has a short guide for updating by hand, which is what the rest of this section describes.
+The page can do it for you: **Settings > About** (the last rows of the About card) checks GitHub for a newer version of this add-on (and tells you if DreamPi has newer scripts), and **Update now** fetches and installs it from the checkout you installed from (settings and ports are kept; the page is gone for a few seconds). The same tab has a short guide for updating by hand, which is what the rest of this section describes.
 
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh

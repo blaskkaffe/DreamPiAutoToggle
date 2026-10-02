@@ -177,6 +177,28 @@ class UpdateRunTests(unittest.TestCase):
         self.assertEqual(up.update_state(), "running")           # a running update never expires
 
 
+class LogTests(unittest.TestCase):
+    def test_lines_are_cleaned_for_the_page(self):
+        self.assertEqual(up._clean_line("\x1b[32mok\x1b[0m done\n"), "ok done")
+        self.assertEqual(up._clean_line("Receiving objects:  10%\rReceiving objects: 100%\r\n"), "Receiving objects: 100%")
+        self.assertEqual(up._clean_line("a\x00b\x07c"), "a b c")
+        self.assertEqual(len(up._clean_line("x" * 1000)), 300)
+        self.assertEqual(up._clean_line("\r\r"), "")
+
+    def test_tail_skips_blank_lines_and_keeps_the_end(self):
+        tmp = sandbox(up)
+        try:
+            with open(core.UPDATE_LOG, "w") as f:
+                f.write("\n".join(["line %d" % i if i % 3 else "" for i in range(60)]) + "\n")
+            tail = up._log_tail()
+            self.assertEqual(len(tail), 14)
+            self.assertEqual(tail[-1], "line 59")
+            self.assertNotIn("", tail)
+            self.assertEqual(up._log_tail.__defaults__, (14,))
+        finally:
+            cleanup(tmp)
+
+
 class RealScriptTests(unittest.TestCase):
     """Run the generated update script against a local 'origin' with a stub installer."""
     def setUp(self):
