@@ -27,25 +27,32 @@
   order.sort(function(a,b){return n[b]-n[a]});
   return order.map(function(g){return g+" ("+n[g]+")"}).join("  •  ");
  }
- // scroll the games line only when it doesn't fit (a duplicate copy makes the loop seamless)
+ // Scroll the games line only when it doesn't fit. The line is two identical halves (text + separator) in one track that
+// slides left by exactly one half and starts over, so it loops without a gap, like a carousel. A resize that changes
+// nothing must not restart it, so the class is only touched when the answer changes.
  function fitGames(){
-  var mq=document.getElementById("pl-games"),t=mq.querySelector(".t");
-  box.classList.remove("sc");
-  if(!t||open||!gamesText)return;
-  var row=document.getElementById("pl-toggle"),arrow=row.querySelector(".arrow");
-  if(t.offsetWidth>row.clientWidth-arrow.offsetWidth-12){
-   box.classList.add("sc");
-   mq.style.setProperty("--d",Math.max(12,Math.round(gamesText.length*0.28))+"s");
+  var mq=document.getElementById("pl-games"),t=mq.querySelector(".t"),scroll=false;
+  if(t&&!open&&gamesText){
+   var row=document.getElementById("pl-toggle"),arrow=row.querySelector(".arrow");
+   scroll=t.offsetWidth>row.clientWidth-arrow.offsetWidth-12;
+  }
+  if(scroll!==box.classList.contains("sc")){
+   box.classList.toggle("sc",scroll);
+   if(scroll)mq.style.setProperty("--d",Math.max(12,Math.round(gamesText.length*0.28))+"s");
   }
  }
  function setGames(text){
+  if(text===gamesText&&document.getElementById("pl-games").firstChild){return}
   gamesText=text;
   var mq=document.getElementById("pl-games");
-  var one='<span class="t">'+esc(text)+'<span class="sp">  •  </span></span>';
-  mq.innerHTML=text?one+one.replace('class="t"','class="t dup"'):"";
-  fitGames();
+  var half='<span class="t">'+esc(text)+'<span class="sp">\u00a0\u00a0\u2022\u00a0\u00a0</span></span>';
+  mq.innerHTML=text?'<span class="trk">'+half+half.replace('class="t"','class="t dup" aria-hidden="true"')+'</span>':"";
+  box.classList.remove("sc");fitGames();
  }
+ var lastKey="";
  function render(r){
+  var key=JSON.stringify([r.configured,r.time,r.players,r.sources,r.links]);   // not "refreshing": the same answer changes nothing on screen
+  if(key===lastKey)return;lastKey=key;
   var msg=document.getElementById("pl-msg"),list=document.getElementById("pl-players");
   document.getElementById("pl-links").innerHTML=(r.links||[]).map(function(l){return '<a href="'+esc(l[1])+'" target="_blank" rel="noopener noreferrer">'+esc(l[0])+'</a>'}).join("");
   var players=r.players||[],bad=(r.sources||[]).filter(function(s){return !s.ok});

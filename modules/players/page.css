@@ -7,10 +7,10 @@
 #pl-box .mq .dup,#pl-box .mq .sp{display:none}
 #pl-box.sc:not(.open) .row.main .v{flex:1;min-width:0;overflow:hidden}
 #pl-box.sc:not(.open) .mq{white-space:nowrap}
-#pl-box.sc:not(.open) .mq .t{display:inline-block;animation:pl-mq var(--d,20s) linear infinite}
+#pl-box.sc:not(.open) .mq .trk{display:inline-block;animation:pl-mq var(--d,20s) linear infinite}
 #pl-box.sc:not(.open) .mq .dup,#pl-box.sc:not(.open) .mq .sp{display:inline}
 @keyframes pl-mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-@media(prefers-reduced-motion:reduce){#pl-box.sc:not(.open) .mq .t{animation:none}
+@media(prefers-reduced-motion:reduce){#pl-box.sc:not(.open) .mq .trk{animation:none}
 #pl-box.sc:not(.open) .mq .dup,#pl-box.sc:not(.open) .mq .sp{display:none}}
 #pl-box .list{display:block;width:100%;max-height:40vh;overflow-y:auto;overscroll-behavior:contain}
 #pl-box .p{display:flex;gap:8px;padding:4px 0;border-top:1px solid rgba(255,255,255,.12)}

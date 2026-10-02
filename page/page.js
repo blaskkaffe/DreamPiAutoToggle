@@ -10,14 +10,19 @@ function hook(name,fn){(HOOKS[name]=HOOKS[name]||[]).push(fn)}
 function fire(name,arg){var handled=false;(HOOKS[name]||[]).forEach(function(f){try{if(f(arg)===true)handled=true}catch(e){if(window.console)console.error(name,e)}});return handled}
 function ago(t,now){if(!t)return"";var s=Math.max(0,now-t);
  if(s<60)return"("+s+"s ago)";if(s<3600)return"("+Math.floor(s/60)+" min ago)";return"("+Math.floor(s/3600)+" h ago)"}
-function dot(el,state){el.className="dot "+(state||"")}
+// The page is redrawn from /api every second: only touch the DOM when something actually changed (no flicker, less work on a slow phone)
+function setText(el,t){t=String(t);if(el.textContent!==t)el.textContent=t}
+function setHtml(el,h){if(el._html!==h){el._html=h;el.innerHTML=h}}
+function setClass(el,c){if(el.className!==c)el.className=c}
+function setStyle(el,prop,v){if(el.style[prop]!==v)el.style[prop]=v}
+function dot(el,state){setClass(el,"dot "+(state||""))}
 // Status dot preview of the LED effect: [keyframes, slow s, fast s, timing]
 var DOT_FX={blink:["blink",1,.4,"steps(1)"],ping:["ping",1.5,.98,"linear"],breathe:["breathe",4,1.6,"ease-in-out"],rgb:["rgbc",20,10,"linear"],
  rainbow:["rgbc",20,10,"linear"],scanner:["breathe",3,1.2,"ease-in-out"],comet:["breathe",3,1.2,"ease-in-out"],
  chase:["blink",.6,.24,"steps(1)"],twinkle:["breathe",3,1.2,"ease-in-out"]};
-function lookDot(el,look){if(!look){el.className="dot";el.style.background="#333";el.style.animation="none";return}
- var f=DOT_FX[look.effect];el.className="dot";el.style.background=look.color;
- el.style.animation=f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none"}
+function lookDot(el,look){setClass(el,"dot");if(!look){setStyle(el,"background","#333");setStyle(el,"animation","none");return}
+ var f=DOT_FX[look.effect];setStyle(el,"background",look.color);
+ setStyle(el,"animation",f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none")}
 var favNet="dcnow";
 function render(d){
  pinNeeded=!!d.pin;
@@ -27,15 +32,15 @@ function render(d){
   if(d.hangup.busy){hb.disabled=true;hb.className="pill-s";
    hb.textContent=d.hangup.text?d.hangup.text.charAt(0).toUpperCase()+d.hangup.text.slice(1):"Hanging up..."}
   else if(hb.disabled){hb.disabled=false;hb.textContent="Hang up"}}
- $("warnings").innerHTML=d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("");
- window.lastDreampiState=d.dreampi.state; lookDot($("d-dot"),d.dreampi.look); $("d-text").textContent=d.dreampi.text;
- $("m-text").textContent=d.modem.text; $("m-since").textContent=ago(d.modem.since,d.now).replace(/[()]/g,"");
- dot($("i-dot"),d.internet.state); $("i-text").textContent=d.internet.text;
+ setHtml($("warnings"),d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join(""));
+ window.lastDreampiState=d.dreampi.state; lookDot($("d-dot"),d.dreampi.look); setText($("d-text"),d.dreampi.text);
+ setText($("m-text"),d.modem.text); setText($("m-since"),ago(d.modem.since,d.now).replace(/[()]/g,""));
+ dot($("i-dot"),d.internet.state); setText($("i-text"),d.internet.text);
  dot($("p-dot"),d.pi.state);
- $("p-text").innerHTML=d.pi.line1?'<span class="nw">'+esc(d.pi.line1)+'</span><span class="sub blk">'+esc(d.pi.line2)+
-  (d.pi.warn?'<br>'+esc(d.pi.warn):'')+'</span>':esc(d.pi.text||"...");
- $("net").className="now rows "+d.network+($("net").classList.contains("open")?" open":"");
- if(d.network!=favNet){favNet=d.network;$("fav").href="/static/favicon-"+d.network+".png";$("touch").href="/static/touch-"+d.network+".png"} $("net-name").textContent=d.network=="dcnet"?"DCNET":"DCNow!";
+ setHtml($("p-text"),d.pi.line1?'<span class="nw">'+esc(d.pi.line1)+'</span><span class="sub blk">'+esc(d.pi.line2)+
+  (d.pi.warn?'<br>'+esc(d.pi.warn):'')+'</span>':esc(d.pi.text||"..."));
+ setClass($("net"),"now rows "+d.network+($("net").classList.contains("open")?" open":""));
+ if(d.network!=favNet){favNet=d.network;$("fav").href="/static/favicon-"+d.network+".png";$("touch").href="/static/touch-"+d.network+".png"} setText($("net-name"),d.network=="dcnet"?"DCNET":"DCNow!");
  fire("api",d);
 }
 function toggleNet(el){el.classList.toggle("open");el.setAttribute("aria-expanded",el.classList.contains("open"))}

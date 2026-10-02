@@ -147,6 +147,35 @@ class HttpTests(unittest.TestCase):
             with self.assertRaises(HTTPError):
                 self.post(path)
 
+    def test_keep_alive_serves_many_requests_on_one_connection(self):
+        import http.client
+        host, port = self.base.split("//")[1].split(":")
+        c = http.client.HTTPConnection(host, int(port), timeout=10)
+        try:
+            for _ in range(3):
+                c.request("GET", "/api")
+                r = c.getresponse()
+                self.assertEqual(r.status, 200)
+                self.assertNotEqual((r.getheader("Connection") or "").lower(), "close")
+                r.read()
+            # a POST that is refused without its body being read must not poison the next request on the connection
+            c.request("POST", "/nothing-here", body=b'{"x": 1}', headers={"X-Requested-With": "netswitch", "Content-Type": "application/json"})
+            r = c.getresponse()
+            self.assertEqual(r.status, 404)
+            r.read()
+            c.request("GET", "/api")
+            r = c.getresponse()
+            self.assertEqual(r.status, 200)
+            r.read()
+            c.request("POST", "/dcnow", headers={"X-Requested-With": "netswitch"})       # no body at all
+            r = c.getresponse()
+            self.assertEqual(r.status, 204)
+            r.read()
+            c.request("GET", "/api")
+            self.assertEqual(c.getresponse().status, 200)
+        finally:
+            c.close()
+
     def test_hide_led_settings_is_gone(self):
         self.assertNotIn("hidden", json.loads(self.get("/ledconfig")[2].decode()))
         with self.assertRaises(HTTPError):

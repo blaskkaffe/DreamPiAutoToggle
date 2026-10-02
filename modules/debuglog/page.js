@@ -27,9 +27,9 @@ function pollLog(){
  x.onerror=function(){logBusy=false};x.send();
 }
 hook("api",function(d){
- $("debug-b").innerHTML=(d.debug?"&#9679; Recording":"Recording off");
- $("log-tools").style.display=d.debug?"inline":"none";
- $("log").style.display=(d.debug||logSize)?"block":"none";
+ setHtml($("debug-b"),d.debug?"&#9679; Recording":"Recording off");
+ setStyle($("log-tools"),"display",d.debug?"inline":"none");
+ setStyle($("log"),"display",(d.debug||logSize)?"block":"none");
  debugOn=d.debug});
 hook("posted",pollLog);
 pollLog(); setInterval(pollLog,700);

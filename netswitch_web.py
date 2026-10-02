@@ -191,6 +191,8 @@ def _button_reply():
 
 class Handler(BaseHTTPRequestHandler):
     timeout = 20          # a client that stops talking can't hold a thread forever
+    protocol_version = "HTTP/1.1"   # keep-alive: the page asks /api every second, a new TLS handshake each time is heavy on a Pi
+    _body_read = 0
 
     def send(self, body, ctype, cache=None, status=200, fixed=False):
         """cache: seconds the browser may keep it (None = always ask again).
@@ -244,15 +246,32 @@ class Handler(BaseHTTPRequestHandler):
         self.send(message + "\n", "text/plain; charset=utf-8", status=status)
 
     def do_GET(self):
+        if self.headers.get("Content-Length") not in (None, "0"):
+            self.close_connection = True      # a GET with a body: don't try to parse the body as the next request
         if not security.host_allowed(self.headers.get("Host")):
             return self._refuse(421, "Unknown host name: use the Pi's IP address or its .local name "
                                      "(or list the name in /opt/dreampi-netswitch/allowed_hosts)")
         self._safely(self._get)
 
     def do_POST(self):
-        if not security.host_allowed(self.headers.get("Host")):
-            return self._refuse(421, "Unknown host name")
-        self._safely(self._post)
+        self._body_read = 0
+        try:
+            if not security.host_allowed(self.headers.get("Host")):
+                return self._refuse(421, "Unknown host name")
+            self._safely(self._post)
+        finally:
+            try:
+                sent = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                sent = -1
+            if sent != self._body_read:               # a refused request's body would be taken for the next request: skip it
+                if 0 < sent - self._body_read <= 1 << 20:
+                    try:
+                        self.rfile.read(sent - self._body_read)
+                    except (socket.timeout, IOError, OSError):
+                        self.close_connection = True
+                else:
+                    self.close_connection = True
 
     def _body(self, limit):
         """The request body, at most `limit` bytes (a negative or bad Content-Length counts as none)."""
@@ -260,7 +279,9 @@ class Handler(BaseHTTPRequestHandler):
             length = max(0, min(int(self.headers.get("Content-Length") or 0), limit))
         except ValueError:
             length = 0
-        return self.rfile.read(length) if length else b""
+        data = self.rfile.read(length) if length else b""
+        self._body_read += len(data)
+        return data
 
     def _get(self):
         refresh_page()          # follows added / removed / switched modules and edited page files
