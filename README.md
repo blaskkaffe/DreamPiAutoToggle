@@ -53,7 +53,7 @@ The page can do it for you: **Settings > About** (the last rows of the About car
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
 ```
-Your settings are kept: selected network, default network, Auto reset, which modules are on, the LED setup and its colours, and the HTTPS certificate. An install from before the modules were folders is converted by the update: its old flat files are removed and the modules are installed from `modules/` (an old Wi-Fi setup install stays on). You don't need to repeat `--leds=N`, `--wifi` or the port options; the installer remembers them (`--leds=0` / `--no-wifi` switch them off, `--https-port=443` turns HTTPS back on after `--no-https`). If the page still looks old afterwards, reload it in the browser.
+Your settings are kept: which modules are on, the LED setup and its colours, and the HTTPS certificate. An install from before the modules were folders is converted by the update: its old flat files are removed and the modules are installed from `modules/` (an old Wi-Fi setup install stays on). You don't need to repeat `--leds=N`, `--wifi` or the port options; the installer remembers them (`--leds=0` / `--no-wifi` switch them off, `--https-port=443` turns HTTPS back on after `--no-https`). If the page still looks old afterwards, reload it in the browser.
 
 ### Safety
 
@@ -67,7 +67,7 @@ The web page runs on the Pi as root, because it has to restart DreamPi, reboot t
 
 ### Modules
 
-The add-on is a small **base** plus **modules**. The base is the web page with the Selected-network box, the two network buttons, Settings > Network (default network, Auto reset), Appearance, the buttons' GPIO settings, Modules, About (with updates) and Reboot, and the hook inside DreamPi that does the routing. Everything else is a module, a folder in `modules/`:
+The add-on is a small **base** plus **modules**. The base is the web page with the Selected-network box, the two network buttons, Appearance, the buttons' GPIO settings, Modules, About (with updates) and Reboot, and the hook inside DreamPi that does the routing. Everything else is a module, a folder in `modules/`:
 
 | Module | Folder | Adds | On by default |
 |---|---|---|---|
@@ -105,13 +105,13 @@ Five actions, each with its own list of numbers that you edit in **Settings > Ph
 
 | Action | What it does | Default number |
 |---|---|---|
-| **Reset** | Selects the **default network** and hangs up | `111-1111#` |
+| **Reset** | Selects **DCNow!** and hangs up | `111-1111#` |
 | **Toggle to DCNow!** | Selects DCNow! / DreamPi and hangs up | `555-0001#` |
 | **Toggle to DCNET** | Selects DCNET / FLYCAST and hangs up | `555-0002#` |
 | **Call DCNow!** | Selects DCNow! / DreamPi **and** connects to it | `555-0001` |
 | **Call DCNET** | Selects DCNET / FLYCAST **and** connects to it | `555-0002` |
 
-Fixed, not editable: `111-1111` always directs to DCNow! for compatibility with openMenu and standard ISP configs (when **Auto reset** is enabled, dialing it also resets the network to the default network), and any other number connects to the currently selected network (set your Dreamcast ISP config to any 7-digit number to use this feature).
+Fixed, not editable: `111-1111` always directs to DCNow! for compatibility with openMenu and standard ISP configs (the selected network is not changed), and any other number connects to the currently selected network (set your Dreamcast ISP config to any 7-digit number to use this feature).
 
 **Hang-up actions** (Reset, Toggle): DreamPi doesn't answer. The add-on changes the selection and plays a busy tone for 4 seconds, so the Dreamcast gives up straight away instead of waiting for an answer. After that the normal dial tone comes back and the next call goes to the newly selected network. Use it to change networks from the Dreamcast without opening the web page.
 
@@ -135,7 +135,7 @@ Fixed, not editable: `111-1111` always directs to DCNow! for compatibility with 
   - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online`, and whether it's connected by Ethernet or Wi-Fi. A red warning box appears at the top of the page when the internet is down.
   - **Hang up** (at the bottom when the box is open, only while DreamPi is in a call): ends a call that got stuck and gets the modem ready again. Tap it twice to confirm. It ends the call the way DreamPi ends one itself, by stopping `pppd` for DCNow! or `dcnet.rpi` for DCNET, after which DreamPi hangs up the modem and starts the dial tone. If DreamPi isn't ready for calls within 30 seconds, or the call process is already gone, it restarts the DreamPi service.
 - The **DCNow! / DreamPi** and **DCNET / FLYCAST** buttons change the selected network.
-- **Online players** (optional module): a box under the two network buttons that looks exactly like the Selected-network box (same classes, so it follows the same colours and the Dreamcast background). Closed, it shows "Online players:", the player count per network ("DCNow! 3  DCNET 2", each in its button colour) and a scrolling line of the games being played with the number of players in each ("Daytona USA 2001 (2) • Quake III Arena (1)"; it only scrolls when it doesn't fit). Tap it and it extends like the network box: Games (the same text, wrapped), the player list (name, game, network), a Status line and the links to DC99, Dreamcast.online, the DCNET status page, Dreamcast Live and DreamPi on GitHub. The "Online players" switch in Settings hides the whole box (this browser only). By default it reads two feeds: `https://dc99.net/online/dcnet_status.php` (dc99.net's combined status page: DCNow!, DCNET and other networks such as KOSnet, one section each) and `https://dreamcast.online/now/api/users.json` (dreamcast.online's own DCNow! list). Players found in both are shown once (a missing game is filled in from the other copy). The Pi fetches them itself (at most once a minute, and only while the page is open and the box is switched on; if HTTPS fails it tries plain HTTP). The Status line says what each feed contained, for example `DC99: dreampi 3/340, dcnet 5, kosnet 2` (shown/listed when some are offline), which helps when a network seems to be missing. You can change or add sources in `/opt/dreampi-netswitch/players_sources.json` (a file containing `[]` switches the list off):
+- **Online players** (optional module): a box under the two network buttons that looks exactly like the Selected-network box (same classes, so it follows the same colours and the Dreamcast background). Closed, it shows "Online players:", the player count per network ("DCNow! 3  DCNET 2", each in its button colour) and a scrolling line of the games being played with the number of players in each ("Daytona USA 2001 (2) • Quake III Arena (1)"; it only scrolls when it doesn't fit). Tap it and it extends like the network box: Games (the same text, wrapped), the player list (name, game, network), a Status line and the links to DC99, Dreamcast.online, the DCNET status page, Dreamcast Live and DreamPi on GitHub. It is always shown while the module is on; switch the module off in Settings > Modules to hide it. By default it reads two feeds: `https://dc99.net/online/dcnet_status.php` (dc99.net's combined status page: DCNow!, DCNET and other networks such as KOSnet, one section each) and `https://dreamcast.online/now/api/users.json` (dreamcast.online's own DCNow! list). Players found in both are shown once (a missing game is filled in from the other copy). The Pi fetches them itself (at most once a minute, and only while the page is open; if HTTPS fails it tries plain HTTP). The Status line says what each feed contained, for example `DC99: dreampi 3/340, dcnet 5, kosnet 2` (shown/listed when some are offline), which helps when a network seems to be missing. You can change or add sources in `/opt/dreampi-netswitch/players_sources.json` (a file containing `[]` switches the list off):
 
   ```
   [{"name": "DC99", "url": "https://.../players.json", "network": "DCNET"},
@@ -143,18 +143,15 @@ Fixed, not editable: `111-1111` always directs to DCNow! for compatibility with 
   ```
 
   `network` is only used for entries that don't say which network they are on. Besides the two feeds above it understands a list of player objects, an object with a `players` list, or games that list their players (field names like `name`/`player`/`username`, `game`/`title`, `network`). Without sources the list says so and the links still work. To remove the feature, delete `netswitch_players.py` and `page/players.js` (the installer then removes the installed copies too).
-- **Debug log:** hidden unless switched on in the settings (see below).
+- **Debug log:** the Debug log bar at the bottom (see below).
 
 ### Settings (cogwheel)
 
 The cogwheel in the top right corner opens the settings. Changes are saved straight away; close them with the ✕ or Esc. On a wide screen the sections flow into as many columns as fit (up to four), so there is less scrolling; a phone keeps the single column.
 
-**Network**
+The selected network is DCNow! after every reboot (there is no default-network setting; to go back to DCNow! by phone use the **Reset** number, see [Phone numbers](#phone-numbers)).
 
-- **Default network:** a switch, orange for DCNow! or blue for DCNET, that sets which network Auto reset goes back to. DCNow! unless changed.
-- **Auto reset:** when ticked, dialing `111-1111` resets the selected network to the default network. Off by default.
-- **Debug log** (Debug log module): when ticked, the **Debug log** bar appears at the bottom of the main page. Off by default and remembered per browser.
-- **Wi-Fi setup** (Wi-Fi setup module): only shown while that module is on (see [Wi-Fi setup button](#buttons-and-wi-fi-setup)). Starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too - tap one, enter its password if it needs one, and connect - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
+**About** starts with **Wi-Fi setup** (Wi-Fi setup module): Starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too - tap one, enter its password if it needs one, and connect - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
 
 **Phone numbers** (Phone numbers module): the five lists above, editable here, plus the two fixed rows as a reminder.
 
@@ -193,8 +190,6 @@ The status dot next to DreamPi on the main page previews that status's colour an
 `http://dreampi.local/api` returns the status as JSON, and `http://dreampi.local/status` as plain text:
 ```
 network=dcnet
-default=dcnow
-autoreset=off
 dreampi=Ready for calls
 modem=Dial tone on, waiting for a call
 internet=Connected via Ethernet (18 ms)
@@ -287,7 +282,7 @@ Two momentary push buttons are always installed, as quick network switches and (
 3. The temporary network closes and the Pi tries to join the network you chose.
 4. If it gets online, the status LED (if installed) goes solid **green** for a few seconds and everything returns to normal; DreamPi keeps using this Wi-Fi network (and any others saved this way) after a reboot too. If it can't get online, the LED goes **red** for a few seconds and the Pi goes back to step 1, hosting "DreamPi WiFi Config" again so you can try another network or password.
 
-While it's scanning or hosting the setup network, a status LED shows a breathing blue light (a scanning animation instead, with a strip). Holding the assigned button(s) again, or the **Wi-Fi setup** control under Network in the settings, cancels it at any point and returns the Pi to its normal Wi-Fi connection.
+While it's scanning or hosting the setup network, a status LED shows a breathing blue light (a scanning animation instead, with a strip). Holding the assigned button(s) again, or the **Wi-Fi setup** control at the top of About in the settings, cancels it at any point and returns the Pi to its normal Wi-Fi connection.
 
 **Wiring:** no resistor needed; the Pi's internal pull-up is used on each pin, so it reads high normally and low while that button is held. GPIO17 and GPIO4 were picked as the defaults because neither has any other function on any Raspberry Pi model (an earlier version of this add-on defaulted the single button to GPIO15, which doubles as the Pi's UART RX pin and could pick up noise from the serial console/Bluetooth if that's in use). A pin or function change from Settings > GPIO takes effect within a couple of seconds, with no service restart. A toggle switch is wired the same way, between the pin and GND (any simple on/off switch; closed = on).
 
@@ -297,7 +292,7 @@ While it's scanning or hosting the setup network, a status LED shows a breathing
 
 ## Debug log
 
-The debug log is for tracking down calls that go wrong, such as misheard numbers. Tick **Debug log** under Network in the settings, then click the **Debug log** bar at the bottom of the main page to open it (click again to close it), press **Recording off** so it changes to **Recording**, and dial. The panel shows one live timeline with millisecond timing:
+The debug log is for tracking down calls that go wrong, such as misheard numbers. Click the **Debug log** bar at the bottom of the main page to open it (click again to close it), press **Recording off** so it changes to **Recording**, and dial. The panel shows one live timeline with millisecond timing:
 
 - what the modem reports while DreamPi listens: each dialed digit (`DTMF 1`), dial tone underruns, calling tones, and its replies (`OK`, `CONNECT 33600`),
 - every message DreamPi logs (heard, mode, answering, carrier speed, hang-up),

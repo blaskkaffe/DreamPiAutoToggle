@@ -278,6 +278,7 @@ def _exit(*_):
 def main():
     signal.signal(signal.SIGTERM, _exit)
     signal.signal(signal.SIGINT, _exit)
+    core.reset_network_after_boot()      # DCNow! after every reboot, before a switch position can set the network
     cfg = _button_config()
     stop_event = threading.Event()
     thread = threading.Thread(target=button_watcher, args=cfg + (stop_event,))

@@ -6,13 +6,11 @@ Loaded automatically by Python (through a .pth file) but does nothing unless
 the running program imports DreamPi's netlink.py from /home/pi/dreampi.
 It then wraps Netlink.check_number() with these rules:
 
-  1111111  openMenu's number. Always DCNow! If the reset toggle is on,
-           it also switches the selected network back to the default
-           network (DCNow! unless the file default_dcnet exists).
+  1111111  openMenu's number. Always DCNow! (the selection is left alone).
   numbers  Five lists of numbers set on the web page (numbers.json), matched
            against the END of what was dialed (a short ending or a full
            number; the longest match wins):
-             reset         selects the default network, hangs up (busy tone)
+             reset         selects DCNow!, hangs up (busy tone)
              toggle_dcnow  selects DCNow!, hangs up
              toggle_dcnet  selects DCNET, hangs up
              call_dcnow    selects DCNow! and connects through DCNow!
@@ -22,8 +20,7 @@ It then wraps Netlink.check_number() with these rules:
            Only calls DreamPi would send to its normal PPP are redirected;
            Netlink/XBAND codes and the built-in *69 prefix are untouched.
 
-The selection is the file dcnet_mode, the reset toggle is the file autoreset,
-the default network for the reset is the file default_dcnet (exists = DCNET).
+The selection is the file dcnet_mode (DCNow! is selected again after every reboot).
 It also reports DreamPi's state (starting / ready / in a call) to
 /tmp/dreampi-netswitch.state for the web page. Two optional modules (modules/ in
 the add-on folder) hook in here: "numbers" - without it numbers.json is ignored
@@ -44,8 +41,6 @@ import time
 
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
-AUTORESET = os.path.join(BASE_DIR, "autoreset")
-DEFAULT_DCNET = os.path.join(BASE_DIR, "default_dcnet")  # exists = reset goes to DCNET
 STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")  # exists = log modem events (see modules/debuglog)
@@ -265,10 +260,7 @@ def _patch(module):
         # Hang-up numbers: select a network, don't answer, busy tone (like *70)
         if action in HANGUP_ACTIONS:
             try:
-                if action == "reset":
-                    dcnet = os.path.exists(DEFAULT_DCNET)
-                else:
-                    dcnet = action == "toggle_dcnet"
+                dcnet = action == "toggle_dcnet"      # "reset" goes to DCNow!, the default network
                 _select_dcnet(dcnet)
                 net = "DCNET" if dcnet else "DCNow!"
                 busy = _play_busy(getattr(self, "modem", None))
@@ -287,12 +279,6 @@ def _patch(module):
             elif action == "call_dcnet":
                 _select_dcnet(True)
                 _log(self, "%s dialed, DCNET selected" % raw_string)
-            elif action == "openmenu" and os.path.exists(AUTORESET):
-                default_dcnet = os.path.exists(DEFAULT_DCNET)
-                if os.path.exists(FLAG) != default_dcnet:
-                    _select_dcnet(default_dcnet)
-                    _log(self, "%s dialed with reset on, back to the default (%s)"
-                         % (raw_string, "DCNET" if default_dcnet else "DCNow!"))
         except Exception as e:
             _log(self, "could not update selection: %s" % e)
 

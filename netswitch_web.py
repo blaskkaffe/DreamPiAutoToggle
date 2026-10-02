@@ -89,8 +89,6 @@ def api_state():
         warnings.append("Modem: %s is known not to work reliably with DreamPi. "
                         "See the Modem row in Settings." % label)
     d = {"network": "dcnet" if os.path.exists(core.FLAG) else "dcnow",
-         "autoreset": os.path.exists(core.AUTORESET),
-         "default": "dcnet" if os.path.exists(core.DEFAULT_DCNET) else "dcnow",
          "dreampi": {"state": dstate, "text": dtext, "look": _dot_look(dstate)},
          "modem": {"text": mtext, "since": msince, "plugged": plugged, "label": label, "compat": compat},
          "internet": checks["internet"],
@@ -281,8 +279,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(text + "\n", "text/plain; charset=utf-8")
         elif path == "/status":
             d = api_state()
-            self.send("network=%s\ntag=%s\ndefault=%s\nautoreset=%s\ndreampi=%s\nmodem=%s\ninternet=%s\npi=%s\n" % (
-                d["network"], core.tag(), d["default"], "on" if d["autoreset"] else "off", d["dreampi"]["text"],
+            self.send("network=%s\ntag=%s\ndreampi=%s\nmodem=%s\ninternet=%s\npi=%s\n" % (
+                d["network"], core.tag(), d["dreampi"]["text"],
                 d["modem"]["text"], d["internet"]["text"], d["pi"]["text"]), "text/plain; charset=utf-8")
         elif path == "/about":
             rows = probes.about()
@@ -351,20 +349,6 @@ class Handler(BaseHTTPRequestHandler):
             if os.path.exists(core.FLAG):
                 os.remove(core.FLAG)
             core.debug_log("web page: DCNow! selected")
-        elif path == "/default":
-            if os.path.exists(core.DEFAULT_DCNET):
-                os.remove(core.DEFAULT_DCNET)
-                core.debug_log("web page: default network set to DCNow!")
-            else:
-                open(core.DEFAULT_DCNET, "w").close()
-                core.debug_log("web page: default network set to DCNET")
-        elif path == "/autoreset":
-            if os.path.exists(core.AUTORESET):
-                os.remove(core.AUTORESET)
-                core.debug_log("web page: reset on openMenu turned off")
-            else:
-                open(core.AUTORESET, "w").close()
-                core.debug_log("web page: reset on openMenu turned on")
         elif path == "/hangup":
             probes.start_hangup()
         elif modules.route("POST", path):
@@ -517,6 +501,7 @@ if __name__ == "__main__":
         PORT = int(sys.argv[1])
     if len(sys.argv) > 2:
         HTTPS_PORT = int(sys.argv[2])
+    core.reset_network_after_boot()      # DCNow! after every reboot
     for target in (probes.checker, watchdog):
         t = threading.Thread(target=target)
         t.daemon = True

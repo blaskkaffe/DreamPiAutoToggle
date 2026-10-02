@@ -47,7 +47,6 @@ const AUDIT = () => {
     page.on('pageerror', e => problems.push(['js-error', String(e)]));
     page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') problems.push(['console-' + m.type(), m.text().slice(0, 120)]); });
     page.on('response', r => { if (r.status() >= 400 && !/favicon|apple-touch/.test(r.url())) problems.push(['http-' + r.status(), r.url()]); });
-    await page.addInitScript(() => { try { localStorage.setItem('netswitch-debug', 'on'); } catch (e) {} });
     page.on('dialog', d => d.accept());
     await page.goto('http://127.0.0.1:' + (process.env.PORT || 8734) + '/', { waitUntil: 'networkidle' });
     await page.waitForTimeout(1200);

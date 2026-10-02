@@ -36,9 +36,6 @@ function render(d){
   (d.pi.warn?'<br>'+esc(d.pi.warn):'')+'</span>':esc(d.pi.text||"...");
  $("net").className="now rows "+d.network+($("net").classList.contains("open")?" open":"");
  if(d.network!=favNet){favNet=d.network;$("fav").href="/static/favicon-"+d.network+".png";$("touch").href="/static/touch-"+d.network+".png"} $("net-name").textContent=d.network=="dcnet"?"DCNET":"DCNow!";
- var defName=d.default=="dcnet"?"DCNET":"DCNow!";
- $("default-b").className="switch "+d.default; $("default-l").textContent=d.default=="dcnet"?"DCNET":"DCNow!";
- $("reset-b").className="cbox "+d.default+(d.autoreset?" on":"");
  fire("api",d);
 }
 function toggleNet(el){el.classList.toggle("open");el.setAttribute("aria-expanded",el.classList.contains("open"))}

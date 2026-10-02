@@ -1,11 +1,10 @@
 // Online players module, page side: a box with the same markup and classes as the Selected-network box (so it looks
-// exactly like it and follows the same colours; its extra styles are in page.css), and the show/hide switch in
-// Settings (page.html). Talks only to GET /players.
+// exactly like it and follows the same colours; its extra styles are in page.css). Always shown while the module is on.
+// Talks only to GET /players.
 (function(){
  var slot=document.getElementById("main-slot"),net=document.getElementById("net");
  if(!slot)return;
- var KEY="netswitch-players",EVERY=60000,RETRY=2000;
- function wanted(){try{return localStorage.getItem(KEY)!="off"}catch(e){return true}}
+ var EVERY=60000,RETRY=2000;
  var box=document.createElement("div");box.id="pl-box";box.className="now rows";box.title="Show or hide details";
  box.setAttribute("role","button");box.setAttribute("tabindex","0");box.setAttribute("aria-expanded","false");
  box.innerHTML='<div class="nlabel">Online players:</div>'+
@@ -19,7 +18,7 @@
  // the same colour as the network box (which follows the selected network)
  function syncColour(){box.classList.toggle("dcnet",!!(net&&net.classList.contains("dcnet")))}
  if(net){syncColour();new MutationObserver(syncColour).observe(net,{attributes:true,attributeFilter:["class"]})}
- var cb=document.getElementById("pl-b"),open=false,timer=null,again=EVERY,gamesText="";
+ var open=false,timer=null,again=EVERY,gamesText="";
  function esc(t){return String(t).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
  // "Game (3) • Other game (1)", most played first
  function gamesLine(players){
@@ -67,7 +66,7 @@
     return x.section+" "+x.shown+(x.listed!=x.shown?"/"+x.listed:"")+(x.offline?" (offline)":"")}).join(", "):s.count)}).join("  ·  ");
   msg.textContent=bad.map(function(s){return s.name+": "+s.error}).join("; ")+(bad.length&&detail?"  ·  ":"")+detail;
  }
- function active(){return wanted()&&!document.hidden}   // the games line is on screen even when the box is closed
+ function active(){return !document.hidden}   // the games line is on screen even when the box is closed
  function load(){clearTimeout(timer);if(!active())return;
   var x=new XMLHttpRequest();x.open("GET","/players",true);
   function next(){clearTimeout(timer);if(active())timer=setTimeout(load,again)}
@@ -75,11 +74,9 @@
   x.onerror=function(){again=EVERY;next()};x.send()}
  // fetched whenever the page is on screen (the closed box shows the games), at most once a minute
  function setOpen(o){open=o;box.classList.toggle("open",o);box.setAttribute("aria-expanded",o);fitGames()}
- function apply(){var on=wanted();box.classList.toggle("off",!on);if(cb)cb.checked=on;if(!on&&open)setOpen(false);load()}
  box.onclick=function(e){if(e&&e.target&&e.target.closest&&e.target.closest("a,.keep"))return;setOpen(!open)};
  box.onkeydown=function(e){if((e.key=="Enter"||e.key==" ")&&e.target===box){e.preventDefault();setOpen(!open)}};
- if(cb)cb.onchange=function(){try{localStorage.setItem(KEY,this.checked?"on":"off")}catch(e){}apply()};
  window.addEventListener("resize",fitGames);
  document.addEventListener("visibilitychange",function(){if(!document.hidden)load()});
- apply();
+ load();
 })();

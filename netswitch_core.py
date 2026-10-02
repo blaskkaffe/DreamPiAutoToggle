@@ -10,8 +10,8 @@ import time
 
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
-AUTORESET = os.path.join(BASE_DIR, "autoreset")
-DEFAULT_DCNET = os.path.join(BASE_DIR, "default_dcnet")
+BOOT_ID = os.path.join(BASE_DIR, "boot_id")              # the kernel's id of the boot the selection was last reset for
+KERNEL_BOOT_ID = "/proc/sys/kernel/random/boot_id"
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
 ADDON_COMMIT = os.path.join(BASE_DIR, "version_commit")  # full commit hash of the checkout that was installed (install.sh)
 ADDON_SRC = os.path.join(BASE_DIR, "src_dir")            # that checkout's folder, used by the web update
@@ -111,6 +111,31 @@ def save_module_enabled(name, on):
 def wifi_enabled():
     """Wi-Fi setup module installed and on (the buttons and the Wi-Fi service ask)."""
     return module_enabled("wifi")
+
+
+def reset_network_after_boot():
+    """DCNow! is the selected network after every reboot: the first service that starts in a boot (web page or
+    buttons) removes dcnet_mode; later calls in the same boot, and restarts of a service, leave the selection alone (so does
+    the first run after an install).
+    Uses the kernel's boot id, not the clock, because a Pi without a clock has a wrong time at boot."""
+    try:
+        with open(KERNEL_BOOT_ID) as f:
+            now = f.read().strip()
+    except (IOError, OSError):
+        return False
+    before = read_file(BOOT_ID)
+    if not now or before == now:
+        return False
+    try:
+        if before is not None and os.path.exists(FLAG):     # no record yet = the add-on was just installed: keep the selection
+            os.remove(FLAG)
+        with open(BOOT_ID, "w") as f:
+            f.write(now + "\n")
+    except OSError:
+        return False
+    if before is not None:
+        debug_log("new boot: DCNow! selected")
+    return before is not None
 
 
 # ---------------------------------------------------------------- file state

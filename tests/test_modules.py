@@ -17,13 +17,13 @@ import netswitch_modules as mods
 REAL_MODULES = os.path.join(ROOT, "modules")
 NAMES = ["debuglog", "led", "numbers", "players", "wifi"]
 # something in the page that only that module provides
-MARKER = {"numbers": 'id="num-card"', "players": 'id="pl-b"', "debuglog": 'id="debug-bar"',
+MARKER = {"numbers": 'id="num-card"', "players": 'id="pl-games"', "debuglog": 'id="debug-bar"',
           "led": 'id="led-section"', "wifi": 'id="wifi-row"'}
 # a path only that module answers (GET, or POST when None)
 ENDPOINT = {"numbers": ("GET", "/numbers"), "players": ("GET", "/players"), "debuglog": ("GET", "/dtmf"),
             "led": ("GET", "/ledconfig"), "wifi": ("POST", "/wifitoggle")}
 BASE_IDS = ('id="net"', 'class="pill dcnow-b"', 'class="pill dcnet-b"', 'id="about"', 'id="reboot-b"', 'id="bg-b"',
-            'id="gpio-section"', 'id="mod-list"', 'id="upd-check"', 'id="default-b"')
+            'id="gpio-section"', 'id="mod-list"', 'id="upd-check"')
 
 
 def inline_script(html):
@@ -93,7 +93,7 @@ class RepoModules(unittest.TestCase):
             for key in ("title", "description", "order", "default", "web"):
                 self.assertIn(key, m, (n, key))
             self.assertTrue(os.path.exists(os.path.join(REAL_MODULES, n, m["web"] + ".py")), n)
-            self.assertTrue(os.path.exists(os.path.join(REAL_MODULES, n, "page.html")), n)
+            self.assertTrue(os.path.exists(os.path.join(REAL_MODULES, n, "page.js")), n)
 
     def test_defaults(self):
         on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["default"]) for n in NAMES)
@@ -263,7 +263,7 @@ class BrokenAndNewModules(Base):
         with open(os.path.join(folder, "netswitch_extra_ok.py"), "w") as f:
             f.write("def _hello(h):\n    h.send('hello', 'text/plain')\n\n\nGET = {'/extra': _hello}\n\n\ndef api(d, warnings):\n    d['extra'] = True\n    warnings.append('extra says hi')\n")
         with open(os.path.join(folder, "page.html"), "w") as f:
-            f.write("<!--slot:main--><div id=\"extra-box\"></div><!--slot:network_rows--><div class=\"srow\" id=\"extra-row\"></div>\n")
+            f.write("<!--slot:main--><div id=\"extra-box\"></div><!--slot:about_top--><div class=\"srow\" id=\"extra-row\"></div>\n")
         with open(os.path.join(folder, "page.js"), "w") as f:
             f.write("hook('api',function(d){});\n")
         with open(os.path.join(folder, "page.css"), "w") as f:
@@ -362,7 +362,7 @@ class InstallerTests(unittest.TestCase):
         self.run_sync(self.src, self.dest)
         for n in NAMES:
             self.assertTrue(os.path.exists(os.path.join(self.dest, "modules", n, "module.json")), n)
-            self.assertTrue(os.path.exists(os.path.join(self.dest, "modules", n, "page.html")), n)
+            self.assertTrue(os.path.exists(os.path.join(self.dest, "modules", n, "page.js")), n)
 
     def test_no_pycache_is_installed(self):
         os.makedirs(os.path.join(self.src, "modules", "led", "__pycache__"))

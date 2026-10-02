@@ -21,7 +21,7 @@ import threading
 
 import netswitch_core as core
 
-SLOTS = ("main", "network_rows", "sections_a", "buttons_rows", "sections_b")   # the @@SLOT:name@@ markers in index.html
+SLOTS = ("main", "about_top", "sections_a", "buttons_rows", "sections_b")   # the @@SLOT:name@@ markers in index.html
 _PAGE_FILES = ("page.html", "page.css", "page.js")
 _lock = threading.Lock()
 _state = {"sig": None, "loaded": [], "errors": {}, "get": {}, "post": {}, "api": []}

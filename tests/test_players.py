@@ -196,8 +196,8 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn('id="main-slot"', html)
             self.assertIn("/players", html)
             self.assertIn("60000", html)                       # polls at most once a minute
-            self.assertIn("netswitch-players", html)           # show/hide setting, per browser
-            self.assertIn('id="pl-b"', html)
+            self.assertNotIn("netswitch-players", html)        # no show/hide setting: always shown while the module is on
+            self.assertNotIn('id="pl-b"', html)
             self.assertIn("Online players:", html)
             self.assertIn("pl-games", html)
             self.assertIn("pl-toggle", html)
@@ -220,7 +220,6 @@ class IntegrationTests(unittest.TestCase):
             core.save_module_enabled("players", False)
             html = urlopen(base + "/", timeout=10).read().decode()
             self.assertNotIn("pl-box", html)
-            self.assertNotIn("netswitch-players", html)
             with self.assertRaises(HTTPError) as cm:
                 urlopen(base + "/players", timeout=10)
             self.assertEqual(cm.exception.code, 404)

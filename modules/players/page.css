@@ -1,5 +1,4 @@
 /* Online players box: on top of the .now box styles it shares with the network box */
-#pl-box.off{display:none}
 #pl-box .pln{white-space:nowrap}
 #pl-box .pln+.pln{margin-left:.6em}
 #pl-box .pln.dcnow{color:var(--dcnow-l)}

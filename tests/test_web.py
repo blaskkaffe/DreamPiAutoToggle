@@ -123,7 +123,7 @@ class HttpTests(unittest.TestCase):
 
     def test_api_shape(self):
         d = json.loads(self.get("/api")[2].decode())
-        for key in ("network", "default", "autoreset", "dreampi", "modem", "internet", "pi", "hangup", "pin", "warnings", "now"):
+        for key in ("network", "dreampi", "modem", "internet", "pi", "hangup", "pin", "warnings", "now"):
             self.assertIn(key, d)
         self.assertIn("debug", d)               # added by the debug log module (on by default)
         self.assertNotIn("wifi", d)             # the Wi-Fi setup module is off by default
@@ -135,14 +135,16 @@ class HttpTests(unittest.TestCase):
         self.post("/dcnow")
         self.assertEqual(json.loads(self.get("/api")[2].decode())["network"], "dcnow")
 
-    def test_settings_toggles(self):
-        self.post("/autoreset")
-        self.assertTrue(json.loads(self.get("/api")[2].decode())["autoreset"])
-        self.post("/autoreset")
-        self.assertFalse(json.loads(self.get("/api")[2].decode())["autoreset"])
-        self.post("/default")
-        self.assertEqual(json.loads(self.get("/api")[2].decode())["default"], "dcnet")
-        self.post("/default")
+    def test_default_network_and_auto_reset_are_gone(self):
+        d = json.loads(self.get("/api")[2].decode())
+        for key in ("default", "autoreset"):
+            self.assertNotIn(key, d)
+        html = self.get("/")[2].decode()
+        for word in ("default-b", "reset-b", 'class="switch', "Auto reset", "Default network"):
+            self.assertNotIn(word, html, word)
+        for path in ("/default", "/autoreset"):
+            with self.assertRaises(HTTPError):
+                self.post(path)
 
     def test_ledconfig_round_trip(self):
         r = json.loads(self.get("/ledconfig")[2].decode())

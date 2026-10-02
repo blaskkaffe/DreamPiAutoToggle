@@ -1,5 +1,5 @@
 <!--slot:main-->
-<div class="bar" id="debug-bar" style="display:none"><button class="wide" id="show-debug" type="button"><span>Debug log</span><span class="arrow">&#9656;</span></button></div>
+<div class="bar" id="debug-bar"><button class="wide" id="show-debug" type="button"><span>Debug log</span><span class="arrow">&#9656;</span></button></div>
 <div id="debug" style="display:none">
 <div class="note">Records every modem event, DreamPi message and routing decision with
 millisecond timing. Turn recording on, then dial.</div>
@@ -10,6 +10,3 @@ millisecond timing. Turn recording on, then dial.</div>
 <label class="sub" style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:4px"><input type="checkbox" class="cbox dcnow" id="follow" checked>Follow</label></span></div>
 <pre id="log" style="display:none"></pre>
 </div>
-<!--slot:network_rows-->
- <div class="srow"><span>Debug log<span class="sub">Show the debug log on the main page (this browser only)</span></span>
-  <input type="checkbox" class="cbox dcnow" id="dbg-b" aria-label="Show debug log"></div>

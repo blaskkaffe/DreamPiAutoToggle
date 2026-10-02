@@ -29,6 +29,4 @@ function saveNumbers(){clearTimeout(numTimer);numTimer=setTimeout(function(){
   setTimeout(function(){el.classList.remove("show")},1200)};x.send(JSON.stringify(numCfg.numbers))},100)}
 $("num-defaults").onclick=function(){if(!numCfg)return;numCfg.numbers=JSON.parse(JSON.stringify(numCfg.defaults));saveNumbers()};
 hook("settingsOpen",loadNumbers);
-hook("api",function(d){
- var defName=d.default=="dcnet"?"DCNET":"DCNow!";
- $("reset-note").textContent=" (Auto reset is "+(d.autoreset?"on, default: "+defName:"off")+")"});
+

@@ -27,17 +27,6 @@
 <div id="settings" role="dialog" aria-label="Settings"><div class="in">
 <header><h1>Settings</h1><button class="cog" id="close-settings" type="button" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.6 3.5 12 9.9l6.4-6.4 2.1 2.1-6.4 6.4 6.4 6.4-2.1 2.1-6.4-6.4-6.4 6.4-2.1-2.1 6.4-6.4-6.4-6.4z"/></svg></button></header>
 <div class="cols">
-<section class="sec">
-<h2>Network</h2>
-<div class="card">
- <form method="post" action="/default" class="srow"><span>Default network<span class="sub">Where Auto reset goes back to</span></span>
-  <button class="switch" id="default-b" type="submit"><span class="lbl" id="default-l">DCNow!</span><span class="knob"></span></button></form>
- <form method="post" action="/autoreset" class="srow"><span>Auto reset<span class="sub">Dialing 111-1111 returns to the default network</span></span>
-  <button class="cbox" id="reset-b" type="submit" aria-label="Auto reset"></button></form>
-@@SLOT:network_rows@@
-</div>
-</section>
-
 @@SLOT:sections_a@@
 
 <section class="sec">
@@ -71,7 +60,9 @@
 </section>
 <section class="sec">
 <h2>About</h2>
-<div class="card"><table class="about" id="about"></table>
+<div class="card">
+@@SLOT:about_top@@
+ <table class="about" id="about"></table>
  <div class="srow" id="upd-row"><span>Updates<span class="sub" id="upd-text">Not checked yet</span></span>
   <button class="pill-s" id="upd-check" type="button">Check</button></div>
  <div id="upd-dreampi" class="sub" style="display:none;padding:0 0 12px"></div>

@@ -11,7 +11,7 @@ import netswitch_core as core
 # against the END of each number, longest match first, so an entry can be a
 # short ending or a whole number, with digits, * and # (e.g. "*61#").
 ACTIONS = (
-    ("reset", "Reset", "Selects the default network and hangs up", ["1111111#"]),
+    ("reset", "Reset", "Selects DCNow! and hangs up", ["1111111#"]),
     ("toggle_dcnow", "Toggle to DCNow!", "Selects DCNow! and hangs up", ["5550001#"]),
     ("toggle_dcnet", "Toggle to DCNET", "Selects DCNET and hangs up", ["5550002#"]),
     ("call_dcnow", "Call DCNow!", "Selects DCNow! and connects to it", ["5550001"]),

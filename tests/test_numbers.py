@@ -171,21 +171,15 @@ class WrapperTests(unittest.TestCase):
         self.assertEqual((r["client"], self.selected()), ("idle", "dcnow"))
         self.assertEqual(self.fake.calls, [])                   # DreamPi's own check_number never ran
 
-    def test_reset_goes_to_the_default_network_and_hangs_up(self):
+    def test_reset_selects_dcnow_and_hangs_up(self):
         open(hook.FLAG, "w").close()
         self.assertEqual(self.dial("1111111#")["client"], "idle")
         self.assertEqual(self.selected(), "dcnow")
-        open(hook.DEFAULT_DCNET, "w").close()
-        self.dial("1111111#")
-        self.assertEqual(self.selected(), "dcnet")
 
-    def test_openmenu_always_dcnow_and_resets_only_with_autoreset(self):
+    def test_openmenu_always_dcnow_and_leaves_the_selection(self):
         open(hook.FLAG, "w").close()
         r = self.dial("1111111")
         self.assertEqual((r["client"], self.selected()), ("PPP", "dcnet"))   # selection untouched, call on DCNow!
-        open(hook.AUTORESET, "w").close()
-        self.dial("1111111")
-        self.assertEqual(self.selected(), "dcnow")
 
     def test_other_numbers_follow_the_selection(self):
         self.assertEqual(self.dial("5551234")["client"], "PPP")

@@ -168,8 +168,8 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertEqual(self.spawned, [1])
         # the check for updates and everyday switches need no PIN
         self.assertEqual(self.req("POST", "/update/check", h)[0], 200)
-        self.assertEqual(self.req("POST", "/autoreset", h)[0], 204)
-        os.path.exists(core.AUTORESET) and os.remove(core.AUTORESET)
+        self.assertEqual(self.req("POST", "/dcnet", h)[0], 204)
+        os.path.exists(core.FLAG) and os.remove(core.FLAG)
 
     def test_api_says_whether_a_pin_is_needed(self):
         self.assertFalse(json.loads(self.req("GET", "/api")[1].decode())["pin"])

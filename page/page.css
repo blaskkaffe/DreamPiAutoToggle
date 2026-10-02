@@ -60,11 +60,6 @@
  @media(min-width:1780px){#settings .in{max-width:1780px}}
  .srow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);margin:0}
  .srow:first-child{border-top:0} .srow .sub{display:block;margin-top:2px}
- .switch{position:relative;flex:none;width:104px;height:40px;padding:0;border-radius:var(--r);font-size:.8em;font-weight:bold;
-         background:rgba(232,118,28,.82);border:var(--bw) solid rgba(246,178,122,.82);transition:background .2s,border-color .2s}
- .switch .knob{position:absolute;top:4px;left:68px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
- .switch .lbl{position:absolute;top:0;bottom:0;left:11px;line-height:32px}
- .switch.dcnet{background:rgba(28,111,232,.82);border-color:rgba(128,177,246,.82)} .switch.dcnet .knob{left:4px} .switch.dcnet .lbl{left:auto;right:12px}
  .cbox{-webkit-appearance:none;appearance:none;flex:none;display:inline-block;width:30px;height:30px;margin:0;padding:0;border-radius:8px;
        border:var(--bw) solid #777;background:transparent center/18px no-repeat;vertical-align:middle;cursor:pointer}
  .cbox.on,.cbox:checked{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
