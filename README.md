@@ -48,11 +48,13 @@ Options can be combined, for example `sudo ./install.sh --leds=8 --no-https`.
 
 ### Update
 
-The page can do it for you: **Settings > About** (the last rows of the About card) checks GitHub for a newer version of this add-on (and tells you if DreamPi has newer scripts), and **Update now** fetches and installs it from the checkout you installed from (settings and ports are kept; the page is gone for a few seconds). The same tab has a short guide for updating by hand, which is what the rest of this section describes.
+The page can do it for you: **Settings > System** (the last rows of the System card) checks GitHub for a newer version of this add-on (and tells you if DreamPi has newer scripts), and **Update now** fetches and installs it from the checkout you installed from (settings and ports are kept; the page is gone for a few seconds). By hand, which is what the rest of this section describes:
 
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
 ```
+DreamPi itself needs no manual update: it updates its own scripts when the Pi starts and has internet (restart the Pi to get a newer version). If `/boot/noautoupdates.txt` exists it does not update itself; remove that file first.
+
 Your settings are kept: which modules are on, the LED setup and its colours, and the HTTPS certificate. An install from before the modules were folders is converted by the update: its old flat files are removed and the modules are installed from `modules/` (an old Wi-Fi setup install stays on). You don't need to repeat `--leds=N`, `--wifi` or the port options; the installer remembers them (`--leds=0` / `--no-wifi` switch them off, `--https-port=443` turns HTTPS back on after `--no-https`). If the page still looks old afterwards, reload it in the browser.
 
 ### Safety
@@ -67,7 +69,7 @@ The web page runs on the Pi as root, because it has to restart DreamPi, reboot t
 
 ### Modules
 
-The add-on is a small **base** plus **modules**. The base is the web page with the Selected-network box, the two network buttons, the buttons' GPIO settings, Modules, About (with updates) and Reboot, and the hook inside DreamPi that does the routing. Everything else is a module, a folder in `modules/`:
+The add-on is a small **base** plus **modules**. The base is the web page with the Selected-network box, the two network buttons, the buttons' GPIO settings, Modules, System (with updates) and Reboot, and the hook inside DreamPi that does the routing. Everything else is a module, a folder in `modules/`:
 
 | Module | Folder | Adds | On by default |
 |---|---|---|---|
@@ -130,7 +132,7 @@ Any other number connects to the currently selected network. `111-1111` is also 
 `http://dreampi.local` updates live, every second.
 
 - **Network box:** the selected network (orange for DCNow!, blue for DCNET) with DreamPi's status and its dot underneath, for example "Ready for calls". Tap the box (the small arrow) to show all status rows:
-  - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DCNow! or DCNET, call ended. A red warning box appears if the modem's USB connection goes away, or if it's a modem not known to work with DreamPi (its make/model, read from its USB info - nothing is ever sent to the modem itself - shows in the **About** card in Settings, with a note if it isn't a known-working one).
+  - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DCNow! or DCNET, call ended. A red warning box appears if the modem's USB connection goes away, or if it's a modem not known to work with DreamPi (its make/model, read from its USB info - nothing is ever sent to the modem itself - shows in the **System** card in Settings, with a note if it isn't a known-working one).
   - **Pi:** CPU use, RAM and temperature on one line (for example "CPU 3%, RAM 128/923MB, 43°C"), with the uptime and the Pi's IP address underneath, plus the Pi's own power and heat warnings (under-voltage, throttling) now and since boot. A weak power supply is a common cause of an unstable Pi, so a red warning box appears at the top of the page while the Pi is short of power or overheating.
   - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online`, and whether it's connected by Ethernet or Wi-Fi. A red warning box appears at the top of the page when the internet is down.
   - **Hang up** (at the bottom when the box is open, only while DreamPi is in a call): ends a call that got stuck and gets the modem ready again. Tap it twice to confirm. It ends the call the way DreamPi ends one itself, by stopping `pppd` for DCNow! or `dcnet.rpi` for DCNET, after which DreamPi hangs up the modem and starts the dial tone. If DreamPi isn't ready for calls within 30 seconds, or the call process is already gone, it restarts the DreamPi service.
@@ -151,19 +153,19 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 
 The selected network is DCNow! after every reboot (there is no default-network setting; to go back to DCNow! by phone use a **Toggle DCNow!** or **Call DCNow!** number, see [Phone numbers](#phone-numbers)).
 
-**About** starts with **Wi-Fi setup** (Wi-Fi setup module): Starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too - tap one, enter its password if it needs one, and connect - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
+**System** starts with **Wi-Fi setup** (Wi-Fi setup module): Starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too - tap one, enter its password if it needs one, and connect - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
 
 **Special phone numbers** (Special phone numbers module): the four lists above, editable here, with a short instruction at the bottom.
 
 **Modules:** every installed module with a switch (see [Modules](#modules)).
 
-**GPIO** (shown when LEDs are installed and not hidden, buttons are installed, or both) - all the physical/wiring settings, in one card, one row per device:
+**GPIO** (shown when LEDs are installed, buttons are installed, or both) - all the physical/wiring settings, in one card, one row per device:
 
 - **LED:** the LED row (it comes with the Status LED module and sits in this card): **LEDs connected** (1 to 300, just where the count starts out), **output pin** (GPIO10, 12, 18 or 21) and **wire order** (`RGB`, `RBG`, `GRB` - most WS2812 strips, `GBR`, `BRG` or `BGR`; wrong order shows the right brightness with the wrong colour, for example a red status looking green). All three take effect within a second.
 - **Button 1** / **Button 2:** each button's **function** and **pin**. Two kinds of function, in two groups in the list: **Push button** (acts on a short press) - **Off**, **Toggle network** (switches between DCNow! and DCNET, the default for button 1), **Select DCNow!** or **Select DCNET** (the default for button 2 is **Off**) - and **Toggle switch** (a latching on/off switch wired between the pin and GND, **on = closed**, which decides the state by its position, also when the Pi starts): **On = DCNET** (on selects DCNET, off selects DCNow!), **On = DCNow!** (the other way round), and, with Wi-Fi setup installed, **On = Wi-Fi setup** (flip it on to start Wi-Fi setup, off to end it and go back to normal) or **Off = Wi-Fi setup** (the opposite position starts it). A text under the row spells out the chosen function. For example: button 1 as a push button that toggles the network (hold it for Wi-Fi setup), or button 1 as an on/off network switch and button 2 as a Wi-Fi setup switch. The pin (see [Wi-Fi setup button](#buttons-and-wi-fi-setup) for the physical wiring and defaults, GPIO17 and GPIO4). Pick two different pins; a change takes effect within a couple of seconds, no reinstall needed.
 - **Wi-Fi setup:** which push button, or **Button 1 + 2** held together, starts Wi-Fi setup with a 3-second hold (the text under the row says which, for example "Hold button 1 for 3 s to start Wi-Fi setup") (a button set to a toggle switch function can't be held, so it's ignored here). A button's own short-press function above still works normally either way - only a press that's actually held long enough to start Wi-Fi setup skips it.
 
-**Status LED** (only shown when the LED count is above 0 - `--leds=0` hides it - and not hidden, see below; the title shows the number of LEDs for a strip) - how the LEDs look, separate from the GPIO wiring settings above. Its top card holds the LED count, output pin and wire order, and a **Calibration** row with an **Adjust** button that opens a small pop-up with the white-balance sliders and the brightness (**Done**, Esc or a tap outside closes it, which also ends the white preview):
+**Status LED** (only shown when the LED count is above 0 - `--leds=0` hides it; the title shows the number of LEDs for a strip) - how the LEDs look, separate from the GPIO wiring settings above. Its top card holds the LED count, output pin and wire order, and a **Calibration** row with an **Adjust** button that opens a small pop-up with the white-balance sliders and the brightness (**Done**, Esc or a tap outside closes it, which also ends the white preview):
 
 - **White balance:** three sliders, **Red**, **Green** and **Blue** (0 to 255, all at 255 by default - no correction). Tap **Preview on LED** to hold the LED at solid white, then turn down whichever channel looks too strong until it looks neutral white rather than tinted - leave the others at 255, don't turn any of them up. Tap **Preview on LED** again (now labelled **Stop preview**) when you're done; it also stops automatically if you close Settings. **Reset to neutral** sets all three back to 255. This corrects every colour the LEDs show, not just white, and takes about 30 to 60 seconds - there's no need to calibrate individual colours.
 - **Brightness** (the maximum brightness) of the LEDs, in the same pop-up as the white balance, 0 to 100% (default 8%), applied after white balance as a ceiling on the whole strip regardless of colour. The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
@@ -172,13 +174,12 @@ The selected network is DCNow! after every reboot (there is no default-network s
   - A **tick box** to use it or not. A message that is off shows nothing; when no ticked message applies, the LED is off.
   - **Colour.**
   - **Effect:** tap it for a small menu. **Solid**, **Blink**, **Breathe** (fading up and down), **Ping** (two quick pulses, then a longer pause) and **RGB** (cycles through all colours, ignoring the colour set: one round every 20 seconds when slow, every 10 when fast) work on any LED. With a strip there are also **Rainbow** (flowing towards the last LED), **Scanner** (a bright dot sweeping back and forth with a fading trail, like KITT or a Cylon), **Comet** (a bright head with a fading tail running round the strip), **Chase** (every third LED, stepping forward) and **Twinkle** (random sparkles). Every effect except Solid has a **Slow** and a **Fast** speed. With a strip, the same menu sets which **LEDs** the message uses: **All**, **One LED**, or a **Range** such as 2 to 5.
-  - **Level:** the brightness for that message. Grey means it uses the maximum brightness above; tap it to give the message its own brightness with a slider, and tap **Use global** to go back.
-- **Reset LED settings to defaults** restores the defaults in [LED messages](#led-messages) and the 8% maximum brightness (not the white balance - that describes your LEDs, not a look to reset).
-- **Hide these settings:** removes the whole Status LED section from Settings, for shipping a Pi with the LEDs already set up and keeping them from being changed by accident. There's a confirmation, because the only way back is deleting `led_hidden` in `/opt/dreampi-netswitch` on the Pi itself (or reinstalling).
+  - **Level:** the brightness for that message. Grey means it uses the maximum brightness from Calibration; tap it to give the message its own brightness with a slider, and tap **Use global** to go back.
+- **Reset LED settings to defaults** (at the bottom of the same box) restores the defaults in [LED messages](#led-messages) and the 8% maximum brightness (not the white balance - that describes your LEDs, not a look to reset).
 
-**About:** the add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model, the operating system, and - once a modem has been detected - its make/model, with a note if it isn't a known-working one.
+**System:** the add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model, the operating system, and - once a modem has been detected - its make/model, with a note if it isn't a known-working one.
 
-**Updates:** checks GitHub for a newer version of this add-on and for newer DreamPi scripts, with an **Update now** button (when installed from a git checkout) and a guide for updating by hand.
+**Updates:** checks GitHub for a newer version of this add-on and for newer DreamPi scripts, with an **Update now** button (when installed from a git checkout).
 
 **Reboot DreamPi** (last card): reboots the whole Raspberry Pi after a confirmation; a call in progress is cut. The page comes back by itself when the Pi is up again (about a minute).
 
@@ -279,7 +280,7 @@ Two momentary push buttons are always installed, as quick network switches and (
 3. The temporary network closes and the Pi tries to join the network you chose.
 4. If it gets online, the status LED (if installed) goes solid **green** for a few seconds and everything returns to normal; DreamPi keeps using this Wi-Fi network (and any others saved this way) after a reboot too. If it can't get online, the LED goes **red** for a few seconds and the Pi goes back to step 1, hosting "DreamPi WiFi Config" again so you can try another network or password.
 
-While it's scanning or hosting the setup network, a status LED shows a breathing blue light (a scanning animation instead, with a strip). Holding the assigned button(s) again, or the **Wi-Fi setup** control at the top of About in the settings, cancels it at any point and returns the Pi to its normal Wi-Fi connection.
+While it's scanning or hosting the setup network, a status LED shows a breathing blue light (a scanning animation instead, with a strip). Holding the assigned button(s) again, or the **Wi-Fi setup** control at the top of System in the settings, cancels it at any point and returns the Pi to its normal Wi-Fi connection.
 
 **Wiring:** no resistor needed; the Pi's internal pull-up is used on each pin, so it reads high normally and low while that button is held. GPIO17 and GPIO4 were picked as the defaults because neither has any other function on any Raspberry Pi model (an earlier version of this add-on defaulted the single button to GPIO15, which doubles as the Pi's UART RX pin and could pick up noise from the serial console/Bluetooth if that's in use). A pin or function change from Settings > GPIO takes effect within a couple of seconds, with no service restart. A toggle switch is wired the same way, between the pin and GND (any simple on/off switch; closed = on).
 

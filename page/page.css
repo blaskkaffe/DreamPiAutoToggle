@@ -81,7 +81,5 @@
  .updlog div{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;padding:1px 0 1px 12px;text-indent:-12px}
  .updlog div.lerr{color:#f08a8a} .updlog div.lok{color:#8fe09a} .updlog div.ldim{color:#777} .updlog div.lhd{color:#eee}
  #upd-row,#upd-do-row{font-size:.88em;padding:10px 3px}   /* the update rows read like the About table above them */
- details.guide{margin:6px 4px 14px;color:var(--muted);font-size:.85em} details.guide summary{cursor:pointer;padding:10px 0}
- details.guide code{background:#222;border-radius:6px;padding:1px 6px;color:#ddd} details.guide ol{margin:6px 0;padding-left:20px} details.guide li{margin:4px 0}
  .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
  body.settings-open > :not(#settings):not(.keep-visible){visibility:hidden}

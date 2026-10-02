@@ -140,10 +140,6 @@ def save_led_gpio(n):
     os.rename(tmp, core.LED_GPIO)
 
 
-def led_hidden():
-    return os.path.exists(core.LED_HIDDEN)
-
-
 _COLOUR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 try:
     _TEXT = basestring  # noqa: F821  (Python 2: json gives unicode)

@@ -1,18 +1,11 @@
 <!--slot:sections_b-->
 <div id="led-section" class="sec" style="display:none;position:relative">
 <h2>Status LED<span id="led-count-t"></span> <span class="saved led-saved">Saved &#10003;</span></h2>
-<div class="card" id="led-hw-card">
+<div class="card" id="led-card">
  <div class="srow" id="led-cal-row"><span>Calibration<span class="sub">White balance and maximum brightness</span></span>
   <button class="pill-s" id="cal-open" type="button">Adjust</button></div>
-</div>
-<div class="card">
  <table class="ledtab"><thead><tr><th>Message</th><th>Colour</th><th>Effect</th><th>Level</th></tr></thead><tbody id="led-rows"></tbody></table>
-</div>
-<div class="bar" style="margin-top:0"><button class="pill-s" id="led-reset" type="button">Reset LED settings to defaults</button></div>
-<div class="note">Every message is set up on its own: tick it to use it, pick its colour, effect and level, and (with a strip) which LEDs it uses. Many start out alike on purpose; they are separate so you can change one or send it to its own LED. Orange is DCNow!, blue is DCNET, purple is Netlink, and red means something is wrong. Errors always win over information, and <em>State unknown</em> only shows when nothing else applies. Messages marked <em>not detected yet</em> can be set up, but DreamPi doesn't tell this add-on when they happen, so they don't show. Effect: Solid, Blink, Breathe, Ping (two quick pulses, then a pause), RGB, or with a strip an animation, plus its speed. Level: its own brightness; grey means the maximum brightness above. The status dot on the main page previews the DreamPi message that is showing.</div>
-<div class="card">
- <div class="srow"><span>Hide these settings<span class="sub">Removes the Status LED section from Settings; only reversible by deleting led_hidden in /opt/dreampi-netswitch</span></span>
-  <button class="pill-s" id="led-hide-b" type="button">Hide</button></div>
+ <div class="srow" id="led-reset-row"><button class="pill-s" id="led-reset" type="button">Reset LED settings to defaults</button></div>
 </div>
 <div id="cal-pop" class="pop cal" role="dialog" aria-label="NeoPixel calibration"><div class="t">White balance and maximum brightness</div>
  <div class="range wb"><span>Red</span><input type="range" id="wb-r" aria-label="Red" min="0" max="255" step="1" style="accent-color:#f33"><span id="wb-r-v"></span></div>

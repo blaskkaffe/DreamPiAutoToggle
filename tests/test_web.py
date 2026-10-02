@@ -147,9 +147,17 @@ class HttpTests(unittest.TestCase):
             with self.assertRaises(HTTPError):
                 self.post(path)
 
+    def test_hide_led_settings_is_gone(self):
+        self.assertNotIn("hidden", json.loads(self.get("/ledconfig")[2].decode()))
+        with self.assertRaises(HTTPError):
+            self.post("/ledhide")
+        html = self.get("/")[2].decode()
+        for word in ("led-hide-b", "Hide these settings", "How to update by hand", "upd-guide"):
+            self.assertNotIn(word, html, word)
+
     def test_ledconfig_round_trip(self):
         r = json.loads(self.get("/ledconfig")[2].decode())
-        for key in ("config", "defaults", "states", "effects", "orders", "count", "gpio", "gpios", "installed", "hidden"):
+        for key in ("config", "defaults", "states", "effects", "orders", "count", "gpio", "gpios", "installed"):
             self.assertIn(key, r)
         cfg = r["config"]
         cfg["white_balance"]["g"] = 200 / 255.0

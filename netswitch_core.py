@@ -27,7 +27,6 @@ LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness, colours, wire 
 LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs, editable from the page
 LED_GPIO = os.path.join(BASE_DIR, "led_gpio")        # output pin (10, 12, 18 or 21), likewise
 SPI_ADDED = os.path.join(BASE_DIR, "spi_added")      # the config.txt this add-on put dtparam=spi=on into (so it can take it out again)
-LED_HIDDEN = os.path.join(BASE_DIR, "led_hidden")    # exists = LED settings hidden on the page
 STATUS = "/tmp/dreampi-netswitch.active"
 STATE = "/tmp/dreampi-netswitch.state"
 MODEM = "/tmp/dreampi-netswitch.modem"

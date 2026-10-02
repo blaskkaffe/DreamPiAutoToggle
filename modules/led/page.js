@@ -6,8 +6,8 @@ var wbPreviewOn=false,wbHeartbeat=null;
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
   led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledGroups=r.groups;ledEffects=r.effects;ledCount=r.count||1;ledGpio=r.gpio||18;
-  $("led-section").style.display=(r.installed&&!r.hidden)?"block":"none";   // install.sh --led, not hidden
-  $("gpio-led-row").style.display=(r.installed&&!r.hidden)?"flex":"none";   // the LED row of the GPIO card goes with it
+  $("led-section").style.display=r.installed?"block":"none";   // hidden while the LED count is 0 (install.sh --leds=0)
+  $("gpio-led-row").style.display=r.installed?"flex":"none";   // the LED row of the GPIO card goes with it
   
   $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";
   if(!$("led-order").options.length)$("led-order").innerHTML=r.orders.map(function(o){
@@ -145,11 +145,6 @@ $("led-count-i").onchange=function(){var n=parseInt(this.value,10);
  $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";saveLed(true)};
 $("led-gpio").onchange=function(){ledGpio=parseInt(this.value,10);saveLed(true)};
 $("led-order").onchange=function(){led.order=this.value;saveLed(true)};
-$("led-hide-b").onclick=function(){
- if(!confirm("Hide the Status LED settings? This can only be undone on the Pi itself, by deleting led_hidden in /opt/dreampi-netswitch."))return;
- var x=new XMLHttpRequest();x.open("POST","/ledhide",true);x.setRequestHeader("X-Requested-With","netswitch");
- x.onload=function(){$("led-section").style.display="none"};x.send()};
-
 // hooks of the base page
 hook("settingsOpen",loadLed);                                                // Settings opened
 hook("settingsClose",function(){closePops();if(wbPreviewOn)setWbPreview(false)});   // Settings closed

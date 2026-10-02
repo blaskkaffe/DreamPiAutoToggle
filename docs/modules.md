@@ -4,7 +4,7 @@ Read before adding, removing or restructuring a feature. Back to [CLAUDE.md](../
 
 ## What is base and what is a module
 
-**Base** (always there): the web page with the Selected-network box (DreamPi, modem, internet and Pi status, Hang up), the two network buttons (`POST /dcnow`, `/dcnet`), Settings with the buttons' GPIO config, **Modules**, About (with updates) and Reboot; the hook inside DreamPi (routing, state files, the fixed openMenu number), the buttons service, `GET /tag`, security (Host/Origin checks, PIN) and the updater.
+**Base** (always there): the web page with the Selected-network box (DreamPi, modem, internet and Pi status, Hang up), the two network buttons (`POST /dcnow`, `/dcnet`), Settings with the buttons' GPIO config, **Modules**, System (with updates) and Reboot; the hook inside DreamPi (routing, state files, the fixed openMenu number), the buttons service, `GET /tag`, security (Host/Origin checks, PIN) and the updater.
 
 **Modules** (`modules/<name>/`, one folder each, all optional):
 
@@ -51,7 +51,7 @@ POSTs pass the same security gate as every other POST (Origin / `X-Requested-Wit
 | Slot | Where |
 |---|---|
 | `main` | `#main-slot`, under the two network buttons (Online players box, Debug log bar) |
-| `about_top` | extra rows at the top of the About card (the Wi-Fi setup row) |
+| `about_top` | extra rows at the top of the System card (the Wi-Fi setup row) |
 | `sections_a` | whole Settings sections before the GPIO card (Special phone numbers) |
 | `buttons_rows` | extra rows in the buttons' GPIO card (the Wi-Fi hold button) |
 | `sections_b` | whole Settings sections after the GPIO card (Status LED, with the calibration pop-up) |

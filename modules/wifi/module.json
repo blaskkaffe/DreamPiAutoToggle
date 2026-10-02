@@ -1,3 +1,3 @@
 {"title": "Wi-Fi setup", "order": 40, "default": false, "web": "netswitch_wifi_web",
- "description": "Join a Wi-Fi network without a keyboard: a temporary access point and a network picker, started from Settings or by holding a button.",
- "note": "Needs hostapd and dnsmasq on the Pi: run sudo ./install.sh --wifi once to install them."}
+ "description": "Join a Wi-Fi network without a keyboard, from Settings or by holding a button.",
+ "note": "Needs hostapd and dnsmasq: run sudo ./install.sh --wifi once."}

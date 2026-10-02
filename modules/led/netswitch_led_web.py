@@ -2,13 +2,10 @@
 # (led.json, the message list, priorities) are in netswitch_ledconfig.py, shared with the LED service.
 #   GET  /ledconfig   the whole configuration plus the lists the page needs (messages, groups, effects, wire orders)
 #   POST /ledconfig   save it (and the LED count / output pin, which are not part of led.json)
-#   POST /ledhide     hide / show the LED settings on the page
 #   POST /wbtest, /wbtestdone   hold the LED at solid white while the white balance is adjusted
 # api() gives the DreamPi dot on the main page the look of the LED message that is showing.
 import json
-import os
 
-import netswitch_core as core
 import netswitch_ledconfig as ledconfig
 
 
@@ -17,7 +14,7 @@ def _get_config(h):
                        "states": ledconfig.LED_STATES, "groups": ledconfig.GROUPS,
                        "effects": ledconfig.EFFECTS, "orders": ledconfig.LED_ORDERS, "count": ledconfig.led_count(),
                        "gpio": ledconfig.led_gpio(), "gpios": ledconfig.GPIO_PINS,
-                       "installed": ledconfig.led_count() > 0, "hidden": ledconfig.led_hidden()}),
+                       "installed": ledconfig.led_count() > 0}),
            "application/json")
 
 
@@ -36,15 +33,6 @@ def _post_config(h):
     return True
 
 
-def _post_hide(h):
-    if os.path.exists(core.LED_HIDDEN):
-        os.remove(core.LED_HIDDEN)
-        core.debug_log("web page: LED settings shown again")
-    else:
-        open(core.LED_HIDDEN, "w").close()
-        core.debug_log("web page: LED settings hidden")
-
-
 def _post_wbtest(h):
     ledconfig.touch_wb_test()
 
@@ -54,7 +42,7 @@ def _post_wbtest_done(h):
 
 
 GET = {"/ledconfig": _get_config}
-POST = {"/ledconfig": _post_config, "/ledhide": _post_hide, "/wbtest": _post_wbtest, "/wbtestdone": _post_wbtest_done}
+POST = {"/ledconfig": _post_config, "/wbtest": _post_wbtest, "/wbtestdone": _post_wbtest_done}
 
 
 def api(d, warnings):

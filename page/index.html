@@ -46,10 +46,9 @@
 <section class="sec">
 <h2>Modules</h2>
 <div class="card" id="mod-list"></div>
-<div class="note">Optional features. Each one is a folder in <code>modules/</code>: switch it off here to hide it and stop what it runs, or delete its folder and run the installer to remove it for good.</div>
 </section>
 <section class="sec">
-<h2>About</h2>
+<h2>System</h2>
 <div class="card">
 @@SLOT:about_top@@
  <table class="about" id="about"></table>
@@ -60,12 +59,6 @@
   <button class="pill-s" id="upd-do" type="button">Update now</button></div>
  <div id="upd-log" class="updlog" role="log" aria-label="Update log" style="display:none"></div>
 </div>
-<div class="note">The DreamPi script versions are the dates DreamPi's own auto-update compares.</div>
-<details class="guide" id="upd-guide"><summary>How to update by hand</summary>
- <p><b>This add-on</b> (a newer version is found on GitHub; your settings are kept):</p>
- <ol><li>Open a terminal on the Pi (SSH).</li><li><code id="upd-cd">cd DreamPiAutoToggle</code></li><li><code>git pull</code></li><li><code>sudo ./install.sh</code> (add the same options you used before, such as <code>--wifi</code> or <code>--leds=30</code>)</li></ol>
- <p><b>DreamPi itself</b> updates its own scripts when the Pi starts and has internet. Restart the Pi (<code>sudo reboot</code>) to get a newer version. If <code>/boot/noautoupdates.txt</code> exists, DreamPi does not update itself: remove that file first.</p>
-</details>
 <section class="sec">
 <div class="card">
  <div class="srow"><span>Reboot DreamPi<span class="sub" id="reboot-sub">Restarts the Raspberry Pi; it is back in about a minute. A call in progress is cut.</span></span>

@@ -81,7 +81,7 @@ function renderUpdate(r){var a=r.addon,d=r.dreampi,msg;
  updRunning=r.state=="running";if(updRunning)updWatched=true;
  if(r.state=="running")msg="Updating... the page is unavailable for a few seconds while the services restart.";
  else if(r.state=="ok")msg=updWatched?"Updated. Reloading...":"The add-on was updated a few minutes ago.";
- else if(r.state=="failed")msg="The update failed. Details below; the guide shows how to update by hand.";
+ else if(r.state=="failed")msg="The update failed. Details below.";
  else if(r.checking)msg="Checking...";
  else if(!r.time)msg="Not checked yet";
  else if(r.error)msg=r.error;
@@ -93,13 +93,12 @@ function renderUpdate(r){var a=r.addon,d=r.dreampi,msg;
  var dp=$("upd-dreampi");dp.style.display="none";
  if(d&&d.newer&&r.state=="idle"){dp.style.display="block";
   dp.textContent="DreamPi has newer scripts: "+d.files.filter(function(f){return f.newer}).map(function(f){return f.name+" "+f.current+" \u2192 "+f.latest}).join(", ")+
-   (d.auto_updates?". It updates itself when the Pi restarts with internet.":". Automatic updates are off (/boot/noautoupdates.txt exists): see the guide below.")}
+   (d.auto_updates?". It updates itself when the Pi restarts with internet.":". Automatic updates are off (/boot/noautoupdates.txt exists).")}
  var show=!!(a&&a.available&&r.can_update&&r.state=="idle");
  $("upd-do-row").style.display=show?"flex":"none";
  $("upd-do-sub").textContent="Fetches the new version from GitHub and installs it ("+(r.branch||"main")+" branch). Settings are kept.";
  $("upd-check").disabled=!!r.checking||updRunning;
  renderUpdLog(r);
- $("upd-cd").textContent="cd "+(r.src||"DreamPiAutoToggle");
  if(r.state=="ok"&&updWatched){updWatched=false;setTimeout(function(){location.reload()},3000)}
  clearTimeout(updTimer);
  if(r.state=="running"||r.checking)updTimer=setTimeout(loadUpdate,2000)}
