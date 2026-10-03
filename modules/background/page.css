@@ -1,7 +1,7 @@
 /* Dreamcast background module: the scene behind the page and the grey translucent boxes on top of it */
-#dcbg{display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;height:100lvh;z-index:-1;overflow:hidden;pointer-events:none;
+#dcbg{display:none;position:fixed;top:-120px;left:0;width:100vw;height:calc(100vh + 240px);height:calc(100lvh + 240px);z-index:-1;overflow:hidden;pointer-events:none;
       background:linear-gradient(to bottom,#9cc3dc,#4d639c);transform:translateZ(0)}
-body.dcbg #dcbg{display:block} body.dcbg{background:transparent} html.dcbg{background:#4d639c}
+body.dcbg #dcbg{display:block} body.dcbg{background:transparent} html.dcbg{background:#4d639c linear-gradient(to bottom,#9cc3dc,#4d639c) fixed}
 body.dcbg{--card:rgba(20,20,20,.78)} body.dcbg .wide{background:rgba(20,20,20,.78)}
 body.dcbg .now{background:rgba(20,20,20,.78)}   /* grey like the Dreamcast BIOS pop-ups; the border keeps the primary colour */
 body.dcbg h1{text-shadow:0 1px 4px rgba(0,0,0,.6)}

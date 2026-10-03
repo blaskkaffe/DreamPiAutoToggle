@@ -56,7 +56,7 @@
  .tag{display:inline-flex;align-items:center;gap:2px;padding:3px 4px 3px 12px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);font-size:.88em}
  .tag button{background:none;color:#aaa;font-size:1.05em;line-height:1;min-width:36px;min-height:32px;padding:0;margin:-6px 0} .tag button:hover{color:#fff}
  .empty{color:var(--muted);font-size:.85em;margin:8px 0 0}
- .swatches{display:flex;gap:8px;flex:none} .swatch{width:34px;height:34px;padding:0;border-radius:50%;border:var(--bw) solid transparent;background:var(--c);box-shadow:0 0 0 1px rgba(255,255,255,.25) inset}
+ .swatches{display:flex;gap:8px;flex:none} .swatch{width:34px;height:34px;padding:0;border-radius:50%;border:var(--bw) solid var(--cl,transparent);background:var(--c);box-shadow:0 0 0 1px rgba(255,255,255,.25) inset}
  .swatches.grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;width:100%;margin-top:6px} .pop .swatches.grid{margin-top:0;gap:10px} .pop .swatches.grid .swatch{max-width:52px} .swatches.grid .swatch{width:100%;height:auto;aspect-ratio:1/1;max-width:36px;justify-self:center}
  .swatch.sel{border-color:#fff} .swatch:focus-visible{outline-offset:3px}
  @media(max-width:420px){.pop .swatches.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}   /* eight across would make the balls too small to tap on a phone */
@@ -105,7 +105,9 @@
  .now .st{display:block;overflow-wrap:anywhere}
  .pop .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0} .pop .frow > span{color:var(--txt2);font-size:.9em}
  .btns{display:flex;gap:8px;flex:none} .srow.foot{padding:12px 0 8px}
- .gdot{display:inline-block;width:.8em;height:.8em;border-radius:50%;margin-right:8px;vertical-align:-.05em;box-shadow:0 0 0 1px rgba(255,255,255,.3) inset}
+ .srow.lk .pill-s,.srow.lk .tag{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgba(var(--primary-l-rgb),.82);text-shadow:0 1px 2px rgba(0,0,0,.55)} .srow.lk .tag button{color:#fff}
+ .srow.lk-blink .pill-s,.srow.lk-blink .tag{animation:blink 1s steps(1) infinite} .srow.lk-blink.lk-fast .pill-s,.srow.lk-blink.lk-fast .tag{animation-duration:.4s}   /* a row that shows an LED look: coloured buttons and tags, blinking as the LED does */
+ @media(prefers-reduced-motion:reduce){.srow.lk-blink .pill-s,.srow.lk-blink .tag{animation:none}}
  .infobtn{flex:none;width:34px;height:34px;padding:0;border-radius:50%;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#ddd;font:italic 600 1.05em Georgia,serif;line-height:1}
  .pop .infotext{font-size:.9em;color:var(--txt2);margin-bottom:10px}
  .tgl{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:4px}

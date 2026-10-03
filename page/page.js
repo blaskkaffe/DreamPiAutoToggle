@@ -27,8 +27,13 @@ ui.popup=function(el){
   var box=par.getBoundingClientRect(),r=anchor.getBoundingClientRect();
   var cs=window.getComputedStyle(par),padL=parseFloat(cs.paddingLeft)||0,padR=parseFloat(cs.paddingRight)||0;
   el.style.left=padL+"px";el.style.width=(box.width-padL-padR)+"px";     // every pop-up spans the card between its left and right padding
-  el.style.top=(r.bottom-box.top+6)+"px"};
- p.close=function(){if(!p.isOpen())return;el.classList.remove("open");p.anchor=null;if(p.onclose)p.onclose()};
+  el.style.top=(r.bottom-box.top+6)+"px";fit();
+  if(window.ResizeObserver&&!p._ro){p._ro=new ResizeObserver(function(){if(p.isOpen())fit()});p._ro.observe(el)}};
+ // A pop-up hangs below its row and may be taller than the card. In the multi-column settings view a box that sticks out of its
+ // card is continued in the next column, so the card grows to hold the pop-up while it is open.
+ function fit(){var par=el.parentNode;if(!par||!p.isOpen())return;par.style.minHeight="";
+  var need=el.offsetTop+el.offsetHeight+8;if(need>par.offsetHeight)par.style.minHeight=need+"px"}
+ p.close=function(){if(!p.isOpen())return;el.classList.remove("open");p.anchor=null;if(el.parentNode)el.parentNode.style.minHeight="";if(p.onclose)p.onclose()};
  p.toggle=function(anchor,e){if(e&&e.stopPropagation)e.stopPropagation();if(p.isOpen()&&p.anchor===anchor)p.close();else p.open(anchor)};
  el.addEventListener("click",function(e){e.stopPropagation()});
  ui._pops.push(p);return p};

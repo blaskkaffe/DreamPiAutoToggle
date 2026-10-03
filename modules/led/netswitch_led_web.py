@@ -17,7 +17,7 @@ def _get_config(h):
                        "messages": [{"key": m[0], "label": m[1], "category": m[2], "description": m[3], "detected": m[4]} for m in ledconfig.MESSAGES],
                        "categories": ledconfig.CATEGORIES, "priority": ledconfig.PRIORITY_ORDER, "effects": ledconfig.EFFECTS,
                        "colours": ledconfig.colour_choices(),
-                       "token_ui": {"dcnow": core.network_colour("dcnow")["ui"], "dcnet": core.network_colour("dcnet")["ui"], "network": core.network_colour(sel)["ui"]},
+                       "token_ui": {t: {"ui": core.network_colour(n)["ui"], "ui_l": core.network_colour(n)["ui_l"]} for t, n in (("dcnow", "dcnow"), ("dcnet", "dcnet"), ("network", sel))},
                        "count": ledconfig.led_count(), "installed": ledconfig.led_count() > 0}),
            "application/json")
 

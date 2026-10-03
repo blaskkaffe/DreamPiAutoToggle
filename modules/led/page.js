@@ -24,14 +24,14 @@ function save(){clearTimeout(timer);timer=setTimeout(function(){
  post("/ledconfig",cfg,function(r){if(r)ctx.saved();refresh()})},250)}
 // ---- the rows
 function colourOf(g){for(var i=0;i<colours.palette.length;i++)if(colours.palette[i].id===g.colour)return colours.palette[i];
- for(var j=0;j<colours.tokens.length;j++)if(colours.tokens[j].id===g.colour)return {id:g.colour,name:colours.tokens[j].name,ui:tokenUi[g.colour]};
- return {id:g.colour,name:g.colour,ui:"#888"}}
+ for(var j=0;j<colours.tokens.length;j++)if(colours.tokens[j].id===g.colour)return {id:g.colour,name:colours.tokens[j].name,ui:tokenUi[g.colour].ui,ui_l:tokenUi[g.colour].ui_l};
+ return {id:g.colour,name:g.colour,ui:"#888888",ui_l:"#aaaaaa"}}
 function effectName(g){var n=g.effect;effects.forEach(function(e){if(e[0]===g.effect)n=e[1]});return g.effect==="solid"?n.toLowerCase():g.speed+" "+n.toLowerCase()}
 function pct(b){var v=b*100;return (v<10&&v>0?String(parseFloat(v.toFixed(1))):Math.round(v))+"%"}
 function ledsText(L){return L[0]===L[1]?"LED "+L[0]:"LEDs "+L[0]+"-"+L[1]}
 function groupSub(g){var t=[g.brightness===null||g.brightness===undefined?"Global level "+pct(cfg.max_brightness):"Level "+pct(g.brightness)];
  if(ledCount>1&&g.leds)t.push(ledsText(g.leds));return t.join(" \u00b7 ")}
-function paintRow(g,r){var c=colourOf(g);r.setTitle(c.name+", "+effectName(g));r.setDot(c.ui);r.setSub(groupSub(g));
+function paintRow(g,r){var c=colourOf(g);r.setTitle(c.name+", "+effectName(g));r.setLook(c,g.effect,g.speed);r.setSub(groupSub(g));
  r.setList(g.messages.map(function(k){return byKey[k]?byKey[k].label:k}),function(i){g.messages.splice(i,1);paintAll();save()})}
 function paintAll(){if(!cfg)return;list.innerHTML="";rowOf={};
  cfg.groups.forEach(function(g){var r=editRow({title:"",button:"Edit",button2:"Add",aria:"Edit this colour",aria2:"Add messages to this colour"});
@@ -56,7 +56,7 @@ function fillEdit(g){editPop.innerHTML="";var c=colourOf(g);
  // colour: the palette, then the colours that follow the networks
  var grid=h("span",{"class":"swatches grid"});
  colours.palette.filter(function(x){return x.id.indexOf("bright-")!==0}).concat(colours.palette.filter(function(x){return x.id.indexOf("bright-")===0})).forEach(function(x){
-  var b=h("button",{type:"button","class":"swatch"+(g.colour===x.id?" sel":""),style:"--c:"+x.ui,"aria-label":x.name});
+  var b=h("button",{type:"button","class":"swatch"+(g.colour===x.id?" sel":""),style:"--c:"+x.ui+";--cl:"+x.ui_l,"aria-label":x.name});
   b.onclick=function(){g.colour=x.id;paintAll();save()};grid.appendChild(b)});
  editPop.appendChild(h("div",{"class":"frow wrapcol"},[h("span",{text:"Colour: "+c.name}),grid]));
  editPop.appendChild(h("div",{"class":"frow"},[h("span",{text:"Or a network colour"}),

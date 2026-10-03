@@ -282,7 +282,7 @@ def save_led_config(data):
 
 def colour_choices():
     """What a group's colour can be, for the page: the palette (id, name, page colour) and the network tokens."""
-    return {"palette": [{"id": c["id"], "name": c["name"], "ui": c["ui"]} for c in core.colours()],
+    return {"palette": [{"id": c["id"], "name": c["name"], "ui": c["ui"], "ui_l": c["ui_l"]} for c in core.colours()],
             "tokens": [{"id": t[0], "name": t[1]} for t in COLOUR_TOKENS]}
 
 

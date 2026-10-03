@@ -376,7 +376,7 @@ class WebTests(Base):
         self.assertEqual([c[0] for c in r["categories"]], [c[0] for c in ledconfig.CATEGORIES])
         self.assertEqual(len(r["colours"]["palette"]), 16)
         self.assertEqual([t["id"] for t in r["colours"]["tokens"]], ["dcnow", "dcnet", "network"])
-        self.assertEqual(r["token_ui"]["dcnow"], core.network_colour("dcnow")["ui"])
+        self.assertEqual(r["token_ui"]["dcnow"], {"ui": core.network_colour("dcnow")["ui"], "ui_l": core.network_colour("dcnow")["ui_l"]})
         self.assertEqual(r["config"]["groups"], r["defaults"]["groups"])
         self.assertEqual(r["priority"], ledconfig.PRIORITY_ORDER)
         self.assertTrue(all(set(m) == {"key", "label", "category", "description", "detected"} for m in r["messages"]))

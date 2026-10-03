@@ -1,7 +1,7 @@
 """Demo server for looking at the page and for tests/ui/audit.js: the real web
 service on a sandbox (all paths in a temp dir). Switches via environment:
 LEDS=n (default 3), WIFI=1, WIFIDEMO=1 (dummy Wi-Fi networks + the setup loop),
-BG=1 (the Dreamcast background module on), FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log), FAKEPLAYERS=1 (made-up
+BG=1 (the Dreamcast background module on), CLOCK=1 (the clock module on; off by default so the box counts are stable), FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log), FAKEPLAYERS=1 (made-up
 players), OFF=led,wifi,... (modules switched off in the module picker; OFF=all = every module the picker can switch, only the always-on ones stay), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
 import sys, os, threading, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
@@ -11,6 +11,7 @@ tmp = sandbox(wifi)
 with open(core.LED_COUNT, 'w') as f: f.write(os.environ.get('LEDS', '3'))
 core.save_module_enabled("debuglog", True)     # off by default; on here so the page shows it (OFF=debuglog switches it off again)
 if os.environ.get("BG"): core.save_module_enabled("background", True)
+if not os.environ.get("CLOCK"): core.save_module_enabled("clock", False)      # the checks count the dashboard boxes: the clock box is only there with CLOCK=1
 if os.environ.get("WIFI"): core.save_module_enabled("wifi", True)
 if os.environ.get("WIFIDEMO"):
     core.save_module_enabled("wifi", True); open(core.WIFI_DEMO, "w").close()

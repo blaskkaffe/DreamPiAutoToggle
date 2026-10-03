@@ -61,7 +61,7 @@ def _layout_script():
     """window.LAYOUT: the boxes, data sources, colours and backgrounds of the enabled modules (netswitch_modules.layout()),
     plus the palette. Put in a <script> tag, so a "</" inside a text is escaped."""
     lay = modules.layout()
-    lay["palette"] = [{"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"]} for c in core.colours()]
+    lay["palette"] = [{"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"], "ui_l": c["ui_l"]} for c in core.colours()]
     return "window.LAYOUT=" + json.dumps(lay).replace("</", "<\\/") + ";"
 
 

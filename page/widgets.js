@@ -152,7 +152,7 @@ W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri
  grid=h("span",{"class":"swatches grid"}),pop=h("div",{"class":"colours"},[h("div",{"class":"t",text:s.title||"Pick a colour"}),grid]),
  el=h("span",{"class":"colourpick"},[btn,pop]),btns={},names={},p=ui.popup(pop);
  paletteOrder().forEach(function(c){names[c.id]=c.name;
-  var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
+  var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui+";--cl:"+c.ui_l,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
   b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){p.close();refresh();ctx.saved()}})};grid.appendChild(b)});
  btn.onclick=function(e){p.toggle(btn,e)};
  function paint(){var cur=(((S.colours||{})[s.mod])||{})[s.key]||"";
@@ -256,14 +256,17 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
 // ---- the standard "edit row": the title and a grey line on the left, a small button on the right (Edit, Add ...), and - once there is
 // something to show - a list of tags underneath. Forms, the phone number table and the colour picks all use this one look.
 //   r.el the row   r.btn the button   r.setSub(text)   r.setList(items, onRemove(i))   (an empty or missing list takes no room)
-function editRow(o){var sub=h("span",{"class":"sub"}),title=document.createTextNode(o.title||""),dot=null,
+function editRow(o){var sub=h("span",{"class":"sub"}),title=document.createTextNode(o.title||""),
  btn=h("button",{type:"button","class":"pill-s",text:o.button||"Edit"}),btn2=o.button2?h("button",{type:"button","class":"pill-s",text:o.button2}):null,
  below=h("div",{"class":"below"}),left=h("span",{},[title,sub]),
  row=h("div",{"class":"srow wrap"},[left,btn2?h("span",{"class":"btns"},[btn,btn2]):btn,below]);
  if(o.aria)btn.setAttribute("aria-label",o.aria);if(o.aria2&&btn2)btn2.setAttribute("aria-label",o.aria2);sh(below,false);sh(sub,false);
  return {el:row,btn:btn,btn2:btn2,
   setTitle:function(t){title.nodeValue=t},
-  setDot:function(css){if(!dot){dot=h("span",{"class":"gdot"});left.insertBefore(dot,left.firstChild)}dot.style.background=css},   // a small colour ball before the title
+  // the row's buttons and tags take a colour ({ui, ui_l}: the fill and its lighter border) and, for effect "blink", blink like the LED
+  setLook:function(c,effect,speed){var rgb=function(x){return parseInt(x.slice(1,3),16)+","+parseInt(x.slice(3,5),16)+","+parseInt(x.slice(5,7),16)};
+   row.style.setProperty("--primary-rgb",rgb(c.ui));row.style.setProperty("--primary-l-rgb",rgb(c.ui_l));
+   row.classList.add("lk");row.classList.toggle("lk-blink",effect==="blink");row.classList.toggle("lk-fast",speed==="fast")},
   setSub:function(t){setLines(sub,t);sh(sub,!!t)},
   setList:function(items,onRemove){below.innerHTML="";items=items||[];sh(below,items.length>0);if(!items.length)return;
    var tags=h("div",{"class":"tags"});

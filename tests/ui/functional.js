@@ -90,6 +90,11 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   const rows0 = await ledRows.count();
   ok(rows0 === 6, 'the LED box starts with the six default colour rows (' + rows0 + ')');
   ok(await ledRows.first().locator('.tag', { hasText: 'DCNow! selected' }).count() === 1, 'the first row holds DCNow! selected');
+  const lookOf = i => ledRows.nth(i).evaluate(e => { const b = e.querySelector('button.pill-s'), t = e.querySelector('.tag'), cs = getComputedStyle(b); return { bg: cs.backgroundColor, border: cs.borderTopColor, tag: t ? getComputedStyle(t).backgroundColor : '', blink: cs.animationName, dot: !!e.querySelector('.gdot') }; });
+  const l0 = await lookOf(0), l4 = await lookOf(4), l5 = await lookOf(5);
+  ok(!l0.dot && l0.bg !== l0.border && l0.bg === l0.tag, 'a row has no dot: its buttons and tags take the colour, with a lighter border (' + l0.bg + ' / ' + l0.border + ')');
+  ok(l4.blink === 'blink' && l0.blink === 'none', 'a blinking look makes the row blink like the LED (Starting up blinks, DCNow! does not)');
+  ok(l0.bg !== l5.bg, 'rows with different colours look different');
   await led.locator('button', { hasText: 'Add colour' }).click(); await settle(900);
   ok(await ledRows.count() === rows0 + 1, 'Add colour adds a row');
   await ledRows.last().locator('button[aria-label="Edit this colour"]').click(); await settle(300);
@@ -236,6 +241,22 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await touch('touchEnd'); await tp.waitForTimeout(700);
   ok(JSON.stringify(await orderT()) === JSON.stringify(startT), 'and a drag up with a finger puts it back');
   await ctx2.close();
+  // ---- wide screen: the settings flow into columns, and a pop-up must stay inside its own card (never be continued in the next column)
+  const wide = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  wide.on('pageerror', e => errors.push('wide page: ' + String(e)));
+  await wide.goto(URL, { waitUntil: 'networkidle' }); await wide.waitForTimeout(1200);
+  await wide.click('#cog'); await wide.waitForTimeout(900);
+  const inside = async (sel, what) => {
+    const b = wide.locator(sel).first(); await b.scrollIntoViewIfNeeded(); await b.click(); await wide.waitForTimeout(500);
+    const g = await wide.evaluate(() => { const p = document.querySelector('.pop.open'), c = p.closest('.card'), pr = p.getBoundingClientRect(), cr = c.getBoundingClientRect();
+      return { top: pr.top - cr.top, bottom: cr.bottom - pr.bottom, left: pr.left - cr.left, right: cr.right - pr.right }; });
+    ok(g.top >= -1 && g.bottom >= -1 && g.left >= -1 && g.right >= -1, 'the ' + what + ' pop-up stays inside its card on a wide screen (' + JSON.stringify(g) + ')');
+    await wide.keyboard.press('Escape'); await wide.waitForTimeout(300);
+  };
+  await inside('[data-box="status led"] button[aria-label="Edit this colour"]', 'LED colour');
+  await inside('[data-box="gpio"] button[aria-label="Edit Button 1"]', 'GPIO');
+  await inside('[data-box="system"] [data-picker="modules"] button', 'modules');
+  await wide.close();
   // ---- no errors anywhere
   ok(errors.length === 0, 'no JavaScript or console errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await browser.close();
