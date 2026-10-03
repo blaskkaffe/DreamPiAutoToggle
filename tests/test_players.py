@@ -303,6 +303,20 @@ class FavoritesTests(unittest.TestCase):
         order = [c["value"] for c in pl.game_choices()]
         self.assertTrue(order.index("Phantasy Star Online") < order.index("Quake III Arena") < order.index("Dead Game"))
 
+    def test_games_played_now_come_first_and_are_marked_for_the_picker(self):
+        pl._cache.update({"time": 1, "games": pl.parse_games(self.GAMES),
+                          "players": [{"player": "Ana", "game": "Quake III Arena", "network": "DCNET"},
+                                      {"player": "Bo", "game": "Outtrigger", "network": "DCNow!"}]})
+        choices = pl.game_choices()
+        self.assertEqual([c["value"] for c in choices if c["now"]], ["Outtrigger", "Quake III Arena"])
+        self.assertEqual([c["value"] for c in choices[:2]], ["Outtrigger", "Quake III Arena"])
+        by = dict((c["value"], c) for c in choices)
+        self.assertEqual(by["Quake III Arena"]["sub"], "work in progress \u00b7 playing now")
+        self.assertFalse(by["Phantasy Star Online"]["now"])
+        group = pl._favorites_reply()["groups"][0]
+        self.assertTrue(group["initial"])
+        self.assertEqual(group["notes"]["Quake III Arena"], "work in progress")
+
     def test_http_round_trip(self):
         web.start_background = getattr(web, "start_background", None)
         pl._cache.update({"time": 1, "games": pl.parse_games(self.GAMES), "players": []})

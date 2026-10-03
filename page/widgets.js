@@ -304,11 +304,11 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
  // a group with "choices" ([{value,label,sub,disabled}]) lets the user pick from the list; the input filters it ("free": it may also add a typed value)
  function paintChoices(g){choices.innerHTML="";sh(choices,!!g.choices);if(!g.choices)return;
   var q=inp.value.toLowerCase(),shown=0;
-  g.choices.forEach(function(c){if(g.items.indexOf(c.value)>=0||(q&&(c.label+" "+c.value).toLowerCase().indexOf(q)<0))return;shown++;
+  g.choices.forEach(function(c){if(g.items.indexOf(c.value)>=0||(q&&(c.label+" "+c.value).toLowerCase().indexOf(q)<0)||(!q&&g.initial&&!c.now))return;shown++;
    var b=h("button",{type:"button","class":"choice",disabled:c.disabled?"disabled":null},[document.createTextNode(c.label||c.value)]);
    if(c.sub)b.appendChild(h("span",{"class":"sub",text:c.sub}));
    b.onclick=function(){g.items.push(c.value);p.close();save()};choices.appendChild(b)});
-  if(!shown)choices.appendChild(h("div",{"class":"sub",text:g.empty||"Nothing to pick"}))}
+  if(!shown)choices.appendChild(h("div",{"class":"sub",text:(!q&&g.initial?g.initial:g.empty)||"Nothing to pick"}))}
  function addItem(){if(!addKey)return;var R=rules(),allowed=new RegExp("[^"+(R.allowed||"\\s\\S")+"]","g"),n=inp.value.replace(allowed,""),say=function(t){setText(msg,t)},g=null;
   cfg.groups.forEach(function(x){if(x.key===addKey)g=x});
   if(n.length<(R.min||1))return say(R.min_msg||"Too short");
