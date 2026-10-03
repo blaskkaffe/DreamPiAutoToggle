@@ -1,0 +1,9 @@
+{
+ "name": "Clock",
+ "description": "Current time on the dashboard, with 24h, 12h or .beat viewing.",
+ "enabled": true,
+ "visible": true,
+ "order": 15,
+ "ui": 2,
+ "web": "netswitch_clock"
+}
