@@ -47,7 +47,8 @@ function setClass(el,c){if(el.className!==c)el.className=c}
 function setStyle(el,prop,v){if(el.style[prop]!==v)el.style[prop]=v}
 function dot(el,state){setClass(el,"dot "+(state||""))}
 // Status dot preview of the LED effect: [keyframes, slow s, fast s, timing]
-var DOT_FX={blink:["blink",1,.4,"steps(1)"]};   // solid has no animation; more effects come back here as the LED engine gets them
+var DOT_FX={blink:["blink",1,.4,"steps(1)"],fade:["blink",3,1.2,"ease-in-out"],breathe:["breathe",4,1.6,"ease-in-out"],      // solid has no animation
+ blink1:["dotb1",1.6,.8,"steps(1)"],blink2:["dotb2",1.6,.8,"steps(1)"],blink3:["dotb3",1.6,.8,"steps(1)"],rainbow:["dotrainbow",6,2,"linear"]};   // periods as in modules/led/netswitch_led.py
 function lookDot(el,look){setClass(el,"dot");if(!look){setStyle(el,"background","#333");setStyle(el,"animation","none");return}
  var f=DOT_FX[look.effect];setStyle(el,"background",look.color);
  setStyle(el,"animation",f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none")}

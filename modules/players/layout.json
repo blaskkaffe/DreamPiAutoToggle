@@ -1,4 +1,10 @@
 {
+ "settings": [
+  {"box": "favorites", "title": "Favorite players and games", "items": [
+   {"type": "picker", "source": "/players/favorites"}]},
+  {"box": "appearance", "title": "Appearance", "items": [
+   {"type": "row", "title": "Online players colour", "sub": "Module", "control": {"type": "swatches", "key": "players", "tint": true, "title": "Colour of the online players box"}}]}
+ ],
  "dashboard": [
   {"box": "players", "items": [
    {"type": "infobox", "label": "Online players:", "parts": "@players.parts", "rows": [

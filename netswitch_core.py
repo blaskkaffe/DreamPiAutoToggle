@@ -10,6 +10,8 @@ import time
 
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
+PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb", "led": "#rrggbb"}}: palette colours the user changed (on screen, on the LED)
+MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
 MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"switcher": {"dcnow": "orange", ...}}: the global-palette colours each module uses
 MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["switcher", "numbers", ...]: the order set in the module picker (top = first, wins)
 BOOT_ID = os.path.join(BASE_DIR, "boot_id")              # the kernel's id of the boot the selection was last reset for
@@ -26,6 +28,7 @@ UPDATE_LOG = "/tmp/dreampi-netswitch.update.log"
 UPDATE_INFO = "/tmp/dreampi-netswitch.updateinfo"        # {"addon": bool|None, "dreampi": bool, "time"}: the latest check, written by the update module for the LEDs
 REBOOT_MARK = "/tmp/dreampi-netswitch.reboot"            # unix time a reboot was asked for (the LEDs show "about to reboot")
 PLAYERS_SOURCES = os.path.join(BASE_DIR, "players_sources.json")   # JSON addresses for the optional online-players list
+PLAYERS_FAVORITES = os.path.join(BASE_DIR, "players_favorites.json")   # {"games": [names], "players": [names]} the user watches
 NUMBERS = os.path.join(BASE_DIR, "numbers.json")     # phone numbers per action, edited on the page, read by the hook
 CLOCK_MODE = os.path.join(BASE_DIR, "clock_mode")    # older versions: "24h", "12h" or "beat" (read once to carry the choice over to clock.json)
 HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id: how a highlighted box looks (Settings > Appearance)
@@ -55,6 +58,8 @@ WIFI_STALE = 30       # ignore WIFI_STATE when older than this (the service is d
 WIFI_AP_SSID = "DreamPi WiFi Config"
 NET_STATE = "/tmp/dreampi-netswitch.net"   # shared with the LED service
 NET_STALE = 20        # ignore NET_STATE when older than this (web service down)
+PLAYERS_WATCH = "/tmp/dreampi-netswitch.players"   # {"time", "games": [favourite games being played], "friends": [favourite players online]}, written by the players module for the LEDs
+PLAYERS_WATCH_STALE = 300     # ignore it when older than this (web service down / list not reachable)
 
 
 # ------------------------------------------------------------------ modules
@@ -219,35 +224,121 @@ def reset_network_after_boot():
 # module's own settings, see module_colour()) or as its  "primary"  colour, the one used on its borders and buttons.
 # id, name, hue group, page colour, its lighter variant (borders, text), LED colour (the LED's own tuning: a screen
 # colour looks different lit on a NeoPixel).
+# Two of the 16 are not fixed colours: "global" (Global main, one colour the user picks in Appearance, for boxes that should
+# share it) and "network" (Selected network: whichever colour DCNow! or DCNET has right now, it follows the switch).
 PALETTE = (
+    ("global", "Global main", "global", "#6f7d99", "#b0b7c7", "#8090ff"),
     ("red", "Red", "red", "#d9363e", "#ef8a8f", "#ff0000"),
-    ("bright-red", "Bright red", "red", "#ff5a5f", "#ffa6a9", "#ff5050"),
     ("orange", "Orange", "orange", "#e8761c", "#f6b27a", "#ff8c00"),
-    ("bright-orange", "Bright orange", "orange", "#ff9a3d", "#ffc896", "#ffa040"),
     ("yellow", "Yellow", "yellow", "#d9a900", "#f0d36a", "#ffd000"),
-    ("bright-yellow", "Bright yellow", "yellow", "#ffd633", "#ffe88f", "#ffe860"),
     ("green", "Green", "green", "#2fa84f", "#8ed9a4", "#00ff00"),
-    ("bright-green", "Bright green", "green", "#4cd964", "#a6efb6", "#50ff70"),
     ("cyan", "Cyan", "cyan", "#1fb5c9", "#7fdbe6", "#00c8ff"),
-    ("bright-cyan", "Bright cyan", "cyan", "#3de0f5", "#9aeefa", "#70e0ff"),
     ("blue", "Blue", "blue", "#1c6fe8", "#80b1f6", "#0046ff"),
-    ("bright-blue", "Bright blue", "blue", "#4a90ff", "#9fc4ff", "#5080ff"),
     ("purple", "Purple", "purple", "#8a4fd6", "#bf9ae8", "#aa00ff"),
+    ("network", "Selected network", "network", "#e8761c", "#f6b27a", "#ff8c00"),
+    ("white", "White", "white", "#b8bec9", "#e6e9ee", "#ffffff"),
+    ("bright-red", "Bright red", "red", "#ff5a5f", "#ffa6a9", "#ff5050"),
+    ("bright-green", "Bright green", "green", "#4cd964", "#a6efb6", "#50ff70"),
+    ("bright-cyan", "Bright cyan", "cyan", "#3de0f5", "#9aeefa", "#70e0ff"),
+    ("bright-blue", "Bright blue", "blue", "#4a90ff", "#9fc4ff", "#5080ff"),
     ("bright-purple", "Bright purple", "purple", "#b070ff", "#d3b0ff", "#cc66ff"),
-    ("pink", "Pink", "pink", "#d6459a", "#ec9bc9", "#ff2a8a"),
     ("bright-pink", "Bright pink", "pink", "#ff6ab8", "#ffaad6", "#ff70b0"),
 )
 PALETTE_IDS = tuple(c[0] for c in PALETTE)
+# colours that were in the palette once: what a saved choice of them becomes
+LEGACY_COLOURS = {"bright-orange": "orange", "bright-yellow": "yellow", "pink": "bright-pink"}
 DEFAULT_COLOUR = "orange"
 
 
+_HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+try:
+    _STR = basestring  # noqa: F821  (Python 2: json gives unicode)
+except NameError:
+    _STR = str
+
+
+def lighter(ui, share=0.45):
+    """The lighter variant of a page colour (borders, text): the colour mixed with white."""
+    return "#%02x%02x%02x" % tuple(int(round(int(ui[i:i + 2], 16) + (255 - int(ui[i:i + 2], 16)) * share)) for i in (1, 3, 5))
+
+
+def palette_overrides():
+    """{id: {"ui": "#rrggbb", "led": "#rrggbb"}}: what the user changed in the palette editor (only valid entries)."""
+    try:
+        with open(PALETTE_FILE) as f:
+            data = json.load(f)
+    except (IOError, OSError, ValueError):
+        return {}
+    out = {}
+    for ident, v in (data.items() if isinstance(data, dict) else []):
+        if ident in PALETTE_IDS and ident != "network" and isinstance(v, dict):
+            keep = dict((k, str(v[k]).lower()) for k in ("ui", "led") if isinstance(v.get(k), _STR) and _HEX.match(v[k]))
+            if keep:
+                out[ident] = keep
+    return out
+
+
 def colours():
-    """The palette as dicts: id, name, group, ui, ui_l, led."""
-    return [{"id": c[0], "name": c[1], "group": c[2], "ui": c[3], "ui_l": c[4], "led": c[5]} for c in PALETTE]
+    """The palette as dicts: id, name, group, ui, ui_l, led, and the defaults (ui_default, led_default) as the add-on ships them."""
+    over, out = palette_overrides(), []
+    for c in PALETTE:
+        o = over.get(c[0], {})
+        ui = o.get("ui", c[3])
+        out.append({"id": c[0], "name": c[1], "group": c[2], "ui": ui, "ui_l": lighter(ui) if "ui" in o else c[4],
+                    "led": o.get("led", c[5]), "ui_default": c[3], "led_default": c[5]})
+    # "Selected network" is the colour of the selected network, as it is now (the network switcher's pick for it)
+    sel = "dcnet" if os.path.exists(FLAG) else "dcnow"
+    pick = module_colours("switcher").get(sel) or {"dcnow": "orange", "dcnet": "blue"}[sel]
+    base = [c for c in out if c["id"] == (pick if pick != "network" else DEFAULT_COLOUR)][0]
+    for i, c in enumerate(out):
+        if c["id"] == "network":
+            out[i] = dict(base, id="network", name=c["name"], group="network", ui_default=base["ui"], led_default=base["led"])
+    return out
+
+
+def set_palette_colour(ident, ui=None, led=None):
+    """Change a palette colour on screen (ui) and / or on the LED (led), "#rrggbb". A value equal to the default is not kept.
+    Returns False for an unknown id or a value that is not a colour."""
+    if ident not in PALETTE_IDS or ident == "network" or any(v is not None and not (isinstance(v, _STR) and _HEX.match(v)) for v in (ui, led)):
+        return False
+    base = [c for c in PALETTE if c[0] == ident][0]
+    over = palette_overrides()
+    entry = over.get(ident, {})
+    for key, value, default in (("ui", ui, base[3]), ("led", led, base[5])):
+        if value is None:
+            continue
+        if value.lower() == default.lower():
+            entry.pop(key, None)
+        else:
+            entry[key] = value.lower()
+    if entry:
+        over[ident] = entry
+    else:
+        over.pop(ident, None)
+    _write_palette(over)
+    return True
+
+
+def reset_palette(ident=None):
+    """Put one palette colour (or all of them) back to the shipped values."""
+    over = palette_overrides()
+    if ident is None:
+        over = {}
+    else:
+        over.pop(ident, None)
+    _write_palette(over)
+
+
+def _write_palette(over):
+    tmp = PALETTE_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(over, f)
+    os.rename(tmp, PALETTE_FILE)
 
 
 def colour(ident):
     """One palette entry as a dict (orange when the id is unknown)."""
+    ident = LEGACY_COLOURS.get(ident, ident)
     for c in colours():
         if c["id"] == ident:
             return c
@@ -283,14 +374,17 @@ def module_colours(name):
     wanted = manifest.get("colours")
     if not isinstance(wanted, dict):
         return {}
-    out = dict((k, v if v in PALETTE_IDS else DEFAULT_COLOUR) for k, v in wanted.items())
+    def ok(v):          # the network switcher's own colours cannot be "the selected network's" (that would be a circle)
+        v = LEGACY_COLOURS.get(v, v)
+        return v in PALETTE_IDS and not (name == "switcher" and v == "network")
+    out = dict((k, LEGACY_COLOURS.get(v, v) if ok(v) else DEFAULT_COLOUR) for k, v in wanted.items())
     mine = _saved_module_colours().get(name)
     if isinstance(mine, dict):
         for k in out:
-            if mine.get(k) in PALETTE_IDS:
-                out[k] = mine[k]
+            if ok(mine.get(k)):
+                out[k] = LEGACY_COLOURS.get(mine[k], mine[k])
     if manifest.get("colours_unique") and len(set(out.values())) < len(out):
-        out = dict((k, v if v in PALETTE_IDS else DEFAULT_COLOUR) for k, v in wanted.items())
+        out = dict((k, LEGACY_COLOURS.get(v, v) if ok(v) else DEFAULT_COLOUR) for k, v in wanted.items())
     return out
 
 
@@ -322,7 +416,8 @@ def set_module_colour(name, key, ident):
     colour gets the old one (a swap), so they never match. Returns the module's new {key: id}, or None when the
     module, key or colour is unknown."""
     cur = module_colours(name)
-    if key not in cur or ident not in PALETTE_IDS:
+    ident = LEGACY_COLOURS.get(ident, ident)
+    if key not in cur or ident not in PALETTE_IDS or (name == "switcher" and ident == "network"):
         return None
     if (module_manifest(name) or {}).get("colours_unique"):
         for k, v in list(cur.items()):
@@ -336,6 +431,46 @@ def set_module_colour(name, key, ident):
         json.dump(data, f, sort_keys=True)
     os.rename(tmp, MODULE_COLOURS)
     return cur
+
+
+def module_tints(name):
+    """{colour key: True | False} for a module: whether the background of what has that colour is highlighted, i.e. coloured (True) or
+    neutral (False). The default is the module's manifest "tints" ({"clock": false}); anything it does not name is highlighted
+    (the network buttons and similar buttons), the boxes on the main page start neutral."""
+    manifest = module_manifest(name) or {}
+    defaults = manifest.get("tints") if isinstance(manifest.get("tints"), dict) else {}
+    try:
+        with open(MODULE_TINTS) as f:
+            saved = json.load(f).get(name)
+    except (IOError, OSError, ValueError, AttributeError):
+        saved = None
+    saved = saved if isinstance(saved, dict) else {}
+    return dict((k, saved[k] if isinstance(saved.get(k), bool) else defaults.get(k) is not False) for k in module_colours(name))
+
+
+def set_module_tint(name, key, coloured):
+    """The user turns the highlight (a coloured background) of one of the module's colours on or off. Returns the module's
+    {key: bool}, or None for an unknown module or key."""
+    if key not in module_colours(name) or not isinstance(coloured, bool):
+        return None
+    try:
+        with open(MODULE_TINTS) as f:
+            data = json.load(f)
+        data = data if isinstance(data, dict) else {}
+    except (IOError, OSError, ValueError):
+        data = {}
+    mine = data.get(name) if isinstance(data.get(name), dict) else {}
+    default = ((module_manifest(name) or {}).get("tints") or {}).get(key) is not False
+    if coloured == default:
+        mine.pop(key, None)                  # only what differs from the default is kept
+    else:
+        mine[key] = coloured
+    data[name] = mine
+    tmp = MODULE_TINTS + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, sort_keys=True)
+    os.rename(tmp, MODULE_TINTS)
+    return module_tints(name)
 
 
 def network_colour(net):
@@ -480,6 +615,18 @@ def network_state():
         return data
     except (IOError, OSError, ValueError):
         return None
+
+
+def players_watch():
+    """{"games": [...], "friends": [...]} of favourites that are online now, written by the players module; empty when stale."""
+    try:
+        with open(PLAYERS_WATCH) as f:
+            data = json.load(f)
+        if time.time() - data.get("time", 0) > PLAYERS_WATCH_STALE:
+            return {"games": [], "friends": []}
+        return {"games": list(data.get("games") or []), "friends": list(data.get("friends") or [])}
+    except (IOError, OSError, ValueError, AttributeError, TypeError):
+        return {"games": [], "friends": []}
 
 
 def wifi_state():

@@ -101,6 +101,19 @@ class Base(unittest.TestCase):
 
 
 class RepoModules(unittest.TestCase):
+    def test_no_json_file_of_a_module_repeats_a_key(self):
+        """A repeated key is silently dropped by JSON (the last wins): two "settings" lists once lost a whole box after a merge."""
+        def no_dupes(pairs):
+            keys = [k for k, _ in pairs]
+            self.assertEqual(len(keys), len(set(keys)), "repeated key in %s" % keys)
+            return dict(pairs)
+        for n in ALL:
+            for fn in ("module.json", "layout.json"):
+                path = os.path.join(REAL_MODULES, n, fn)
+                if os.path.exists(path):
+                    with open(path) as f:
+                        json.load(f, object_pairs_hook=no_dupes)
+
     def test_the_modules_are_there_and_well_formed(self):
         self.assertEqual(sorted(n for n in os.listdir(REAL_MODULES) if os.path.isdir(os.path.join(REAL_MODULES, n)) and n != "__pycache__"), ALL)
         for n in ALL:
@@ -147,7 +160,7 @@ class WithEverything(Base):
         self.assertEqual([w["type"] for w in system["items"] if w["mod"] == "rebootupdate"][-1], "row")      # the Reboot row ends the System box
         self.assertEqual([b["id"] for b in lay["settings"]][-2:], ["about", "system"])                     # System is the very last box, About just above it
         appearance = [b for b in lay["settings"] if b["id"] == "appearance"][0]
-        self.assertEqual((appearance["mods"], appearance["title"]), (["switcher", "clock", "events", "background"], "Appearance"))      # the colours (network, clock, events), the highlight look and the background's switch
+        self.assertEqual((appearance["mods"], appearance["title"]), (["switcher", "clock", "players", "events", "debuglog", "background"], "Appearance"))      # the colours (network, clock, players, events, debug log), the notification highlight look and the background's switch
         self.assertEqual([w["control"]["module"] for w in appearance["items"] if w["type"] == "row" and w["control"]["type"] == "toggle"], ["background"])
         about = [b for b in lay["settings"] if b["id"] == "about"][0]
         self.assertEqual((about["mods"], about["title"]), (["system"], "About"))               # the versions are their own box, not part of System

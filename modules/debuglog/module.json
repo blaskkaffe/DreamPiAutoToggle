@@ -5,5 +5,12 @@
  "visible": true,
  "order": 50,
  "ui": 2,
- "web": "netswitch_debuglog"
+ "web": "netswitch_debuglog",
+ "colours": {
+  "debuglog": "green"
+ },
+ "primary": "debuglog",
+ "tints": {
+  "debuglog": false
+ }
 }

@@ -6,8 +6,11 @@
  "order": 16,
  "ui": 2,
  "colours": {
-  "events": "purple"
+  "events": "bright-pink"
  },
  "primary": "events",
- "web": "netswitch_events"
+ "web": "netswitch_events",
+ "tints": {
+  "events": false
+ }
 }

@@ -1,6 +1,6 @@
 /* Clock module: the city list and the time zone map in the open clock box (with world time on).
-   On a coloured box (the usual look) the highlighted areas are white and the cities white dots; on a grey box (the Dreamcast
-   background makes the boxes grey) the highlighted areas and the dots take the clock's colour. */
+   On a coloured box the highlighted areas are white and the cities white dots; on a neutral (grey) box - the clock colour's
+   Highlight switch off, the default - the highlighted areas and the dots take the clock's colour. */
 [data-mod="clock"] .now.open .row.wcar{display:none}
 .cwrow .k,.mapw .k{display:none} .cwrow.row .v,.mapw.row .v{flex:1;display:block;width:100%}
 .cwl{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:3px 18px;font-size:1.05em}
@@ -14,6 +14,6 @@
 .cmap .z.here{fill:rgba(255,255,255,.9)}
 .cmap .zl{fill:#fff;font-size:5.5px;font-weight:700;text-anchor:middle;paint-order:stroke;stroke:rgba(0,0,0,.7);stroke-width:1.3px;pointer-events:none}
 .cmap .city{fill:#fff;stroke:#000;stroke-width:.8}
-body.dcbg .dbox:not(.hl) .cmap .z.here{fill:var(--primary)}
-body.dcbg .dbox:not(.hl) .cmap .city{fill:var(--primary-l)}
+[data-box="clock"].plain:not(.hl) .cmap .z.here{fill:var(--primary)}
+[data-box="clock"].plain:not(.hl) .cmap .city{fill:var(--primary-l)}
 .cmapnote{margin:6px 0 0;color:rgba(255,255,255,.65);font-size:.95em;text-align:center}

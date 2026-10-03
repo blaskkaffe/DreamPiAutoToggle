@@ -37,7 +37,7 @@ class CheckTests(unittest.TestCase):
             f.write(LOCAL)
         with open(probes.ADDON_VERSION, "w") as f:
             f.write("2026-09-30 12:00 (aaaaaaa)")
-        up._info.update({"time": 0, "checking": False, "addon": None, "dreampi": None, "error": None})
+        up._info.update({"time": 0, "started": 0, "checking": False, "addon": None, "dreampi": None, "error": None})
 
     def tearDown(self):
         up.fetch = self._fetch
@@ -85,6 +85,38 @@ class CheckTests(unittest.TestCase):
         self.assertTrue(up._info["time"])
         self.assertFalse(up._info["checking"])
 
+    def test_pressing_check_says_checking_at_once_and_never_runs_two(self):
+        gate, started = threading.Event(), []
+        def slow(url):
+            started.append(url)
+            gate.wait(5)
+            raise IOError("down")
+        up.fetch = slow
+        up.check_in_background()
+        self.assertTrue(up.status()["checking"])          # no gap before the thread runs: the page's next question already sees it
+        up.check_in_background()                           # a second press while one runs starts nothing
+        gate.set()
+        for _ in range(100):
+            if not up._info["checking"]:
+                break
+            time.sleep(0.05)
+        self.assertFalse(up._info["checking"])
+        self.assertTrue(up._info["time"])
+        self.assertEqual(len([u for u in started if "api.github.com" in u]), 1)
+
+    def test_a_new_check_replaces_the_result_of_the_last_update(self):
+        with open(core.UPDATE_STATUS, "w") as f:
+            f.write("ok\n")
+        os.utime(core.UPDATE_STATUS, (time.time() - 5, time.time() - 5))
+        up.fetch = fake_github(down=True)
+        self.assertEqual(up.update_state(), "ok")                 # right after the update: announced
+        up.check()
+        self.assertEqual(up.update_state(), "idle")               # checking again takes over
+        self.assertIn("Couldn't reach GitHub", up.status()["error"])
+        with open(core.UPDATE_STATUS, "w") as f:                  # a later update announces itself again
+            f.write("failed\n")
+        self.assertEqual(up.update_state(), "failed")
+
     def test_dreampi_versions(self):
         dp = os.path.join(self.tmp, "dreampi")
         os.mkdir(dp)
@@ -106,11 +138,13 @@ class CheckTests(unittest.TestCase):
 
     def test_nothing_checks_for_updates_by_itself(self):
         calls = []
-        up.fetch = lambda url: calls.append(url) or ""
-        up.status()                                       # the page asking for the status must not start a check
-        time.sleep(0.2)
+        saved = up.check, up.check_in_background
+        up.check = up.check_in_background = lambda *a, **k: calls.append(1)      # whoever would start a check is counted, nothing runs
+        try:
+            up.status()                                       # the page asking for the status must not start a check
+        finally:
+            up.check, up.check_in_background = saved
         self.assertEqual(calls, [])
-        self.assertEqual(up._info["time"], 0)
 
 
 class UpdateRunTests(unittest.TestCase):

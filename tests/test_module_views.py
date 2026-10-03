@@ -283,8 +283,10 @@ class ClockView(unittest.TestCase):
         self.assertEqual(clock.save_config({"cities": "Tokyo"})["cities"], clock.DEFAULT_CITIES)   # not a list: the defaults
         r = clock._cities_reply()
         self.assertEqual((r["rules"]["per_group"], r["defaults"]["cities"]), (12, clock.DEFAULT_CITIES))
-        self.assertEqual(len(r["rules"]["choices"]), len(clock.CATALOGUE))
-        self.assertTrue(all(o["group"] for o in r["rules"]["choices"]))
+        self.assertEqual(len(r["groups"][0]["choices"]), len(clock.CATALOGUE))
+        self.assertTrue(all("now" in o["sub"] for o in r["groups"][0]["choices"]))
+        clock.save_config({"cities": many})
+        self.assertEqual(clock._cities_reply()["groups"][0]["choices"], [])               # full: nothing more to add
 
     def test_an_older_mode_file_is_carried_over(self):
         with open(core.CLOCK_MODE, "w") as f:

@@ -81,8 +81,9 @@
     {
      "type": "row",
      "title": "DCNow! colour",
+     "sub": "Network",
      "control": {
-      "type": "swatches",
+      "type": "swatches", "tint": true,
       "key": "dcnow",
       "title": "Colour for DCNow!"
      }
@@ -90,11 +91,18 @@
     {
      "type": "row",
      "title": "DCNET colour",
+     "sub": "Network",
      "control": {
-      "type": "swatches",
+      "type": "swatches", "tint": true,
       "key": "dcnet",
       "title": "Colour for DCNET"
      }
+    },
+    {
+     "type": "row",
+     "title": "Global main colour",
+     "sub": "Pick Global main for a box or a row of the LEDs to give them this colour",
+     "control": {"type": "colourpick", "id": "global", "label": "Global main colour"}
     },
     {
      "type": "form",
@@ -102,7 +110,7 @@
      "post": "/highlight",
      "fields": [
       {
-       "title": "Highlight",
+       "title": "Notification highlight",
        "sub_text": "highlight",
        "controls": [
         {

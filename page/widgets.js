@@ -21,12 +21,16 @@ function setLines(el,t){setHtml(el,lines(t))}
 function sh(el,show){setStyle(el,"display",show?"":"none")}
 // A colour reference: a palette id ("orange"), one of the module's own colour keys ("dcnow") or "module.key" of another module
 function colourId(ref,mod){if(!ref)return"";var c=S.colours||LAY.colours||{};
- if(ref.indexOf(".")>0){var p=ref.split(".");return(c[p[0]]||{})[p[1]]||""}
- return(c[mod]||{})[ref]||ref}
+ if(ref.indexOf(".")>0){var p=ref.split(".");return realColour((c[p[0]]||{})[p[1]]||"")}
+ return realColour((c[mod]||{})[ref]||ref)}
+// "Selected network" is not a colour of its own: it is the colour DCNow! or DCNET has right now, so it follows the switch
+function realColour(id){if(id!=="network")return id;var sw=(S.colours||LAY.colours||{}).switcher||{};return sw[S.network||"dcnow"]||"orange"}
+// Whether the background of a colour is coloured (the default) or neutral: the "Coloured background" box next to a colour pick
+function tintOf(ref,mod){if(!ref)return true;var p=ref.indexOf(".")>0?ref.split("."):[mod,ref],t=(S.tints||LAY.tints||{})[p[0]]||{};return t[p[1]]!==false}
 // An element with its own colour (a button of the module's colour key): it follows S.colours live and is not repainted with the
 // module's primary colour, so the network buttons keep the colours chosen in Settings whichever network is selected.
 function colourClass(el,ref,mod){el.setAttribute("data-own-colour","1");
- function apply(){var id=colourId(val(ref),mod),old=el._cc;if(old===id)return;
+ function apply(){var r=val(ref),id=colourId(r,mod),old=el._cc;el.classList.toggle("plain",!tintOf(r,mod));if(old===id)return;
   if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._cc=id}
  apply();UPD.push(apply)}
 // ---- talking to the server
@@ -84,23 +88,26 @@ function hideEmptyBoxes(){var bs=document.querySelectorAll("[data-box]"),i,j;
 // in /api primary); the top module in the picker that has one also sets the page's own. A module below with another one
 // only uses it for itself.
 var themeKey="";
-function applyTheme(){var p={},k;for(k in (LAY.primary||{}))p[k]=LAY.primary[k];for(k in (S.primary||{}))p[k]=S.primary[k];
- var key=JSON.stringify(p);if(key===themeKey)return;themeKey=key;
+function applyTheme(){var p={},pk={},k;for(k in (LAY.primary||{}))p[k]=LAY.primary[k];for(k in (S.primary||{}))p[k]=S.primary[k];
+ for(k in (LAY.primary_key||{}))pk[k]=LAY.primary_key[k];for(k in (S.primary_key||{}))pk[k]=S.primary_key[k];
+ var key=JSON.stringify([p,pk,S.tints||LAY.tints||{},S.network||"",(S.colours||{}).switcher||""]);if(key===themeKey)return;themeKey=key;
  var els=document.querySelectorAll("[data-mod]"),i,root="";
- for(i=0;i<(LAY.modules||[]).length&&!root;i++)root=p[LAY.modules[i]]||"";
+ for(i=0;i<(LAY.modules||[]).length&&!root;i++)root=realColour(p[LAY.modules[i]]||"");
  function paint(el,id){var old=el._pc;if(old===id)return;if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._pc=id}
  paint(document.body,root);
- for(i=0;i<els.length;i++)if(!els[i].hasAttribute("data-own-colour"))paint(els[i],p[els[i].getAttribute("data-mod")]||"")}
+ for(i=0;i<els.length;i++)if(!els[i].hasAttribute("data-own-colour")){var m=els[i].getAttribute("data-mod");paint(els[i],realColour(p[m]||""));
+  els[i].classList.toggle("plain",!!pk[m]&&!tintOf(m+"."+pk[m],m))}}   // a neutral background where the user switched the colour's background off
 // ---- data sources a module asked for in its layout ("data": {"players": {"url": "/players", "every": 60}}): fetched into S.<name>
 // every N seconds while the page is on screen (with "when": "settings", only while Settings is open); "retry_if": "busy" asks again
 // after "retry" seconds while that field of the answer is true, and after a failed request
 var DATA={};
 function reloadData(){for(var ns in DATA)DATA[ns]()}
 function startData(){var ns;for(ns in (LAY.data||{}))(function(ns,spec){
- var timer=null,every=(spec.every||60)*1000,retry=(spec.retry||2)*1000,onlyInSettings=spec.when==="settings";
+ var timer=null,seq=0,every=(spec.every||60)*1000,retry=(spec.retry||2)*1000,onlyInSettings=spec.when==="settings";
  function wanted(){return !document.hidden&&(!onlyInSettings||$("settings").classList.contains("open"))}
- function load(){clearTimeout(timer);if(!wanted())return;
+ function load(){clearTimeout(timer);if(!wanted())return;var mine=++seq;
   xhrJson("GET",spec.url,function(r){var again=every;
+   if(mine!==seq)return;                      // a newer question was asked meanwhile: its answer counts, this older one must not overwrite it
    if(r){S[ns]=r;engineUpdate();if(spec.retry_if&&getPath(r,spec.retry_if))again=retry}else again=retry;
    timer=setTimeout(load,again)})}
  DATA[ns]=load;
@@ -155,19 +162,37 @@ W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.l
 W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx))};
 // ---- the module's own colour choice: a "Colour" button in the chosen colour that opens a pop-up with the palette's colours;
 // the pick is kept for the module (core.set_module_colour)
-function paletteOrder(){var p=(LAY.palette||[]).slice();return p.filter(function(c){return c.id.indexOf("bright-")!==0}).concat(p.filter(function(c){return c.id.indexOf("bright-")===0}))}
+// the palette in the server's order; the network switcher's own colours cannot be "Selected network" (that would be a circle)
+function paletteOrder(mod){return (LAY.palette||[]).filter(function(c){return !(c.id==="network"&&mod==="switcher")})}
+function colourOfId(id){var r=null;(LAY.palette||[]).forEach(function(p){if(p.id===id)r=p});return r}
+function mixWhite(hex){var n=[1,3,5].map(function(i){var v=parseInt(hex.substr(i,2),16);return Math.round(v+(255-v)*0.45)});return "#"+n.map(function(v){return (v<16?"0":"")+v.toString(16)}).join("")}
+function rgbOf(hex){return parseInt(hex.substr(1,2),16)+","+parseInt(hex.substr(3,2),16)+","+parseInt(hex.substr(5,2),16)}
+// a palette colour changed on the page: every box that uses it follows at once (the next page load has it from the server)
+function applyPaletteVars(c){var s=document.documentElement.style,l=mixWhite(c.ui);
+ s.setProperty("--c-"+c.id,c.ui);s.setProperty("--c-"+c.id+"-l",l);s.setProperty("--c-"+c.id+"-rgb",rgbOf(c.ui));s.setProperty("--c-"+c.id+"-l-rgb",rgbOf(l));
+ (LAY.palette||[]).forEach(function(p){if(p.id===c.id){p.ui=c.ui;p.ui_l=l}})}
+// a colour picker for one palette colour (Global main): it changes the colour everywhere it is used
+W.colourpick=function(s,ctx){var inp=h("input",{type:"color","aria-label":s.label||"Colour"}),timer=null;
+ (LAY.palette||[]).forEach(function(p){if(p.id===s.id)inp.value=p.ui});
+ inp.oninput=function(){var ui=inp.value;applyPaletteVars({id:s.id,ui:ui});clearTimeout(timer);timer=setTimeout(function(){post("/palette",{id:s.id,ui:ui},function(r){if(r)ctx.saved()})},250)};
+ return inp};
 W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri",text:s.label||"Colour","aria-haspopup":"dialog"}),
  grid=h("span",{"class":"swatches grid"}),pop=h("div",{"class":"colours"},[h("div",{"class":"t",text:s.title||"Pick a colour"}),grid]),
- el=h("span",{"class":"colourpick"},[btn,pop]),btns={},names={},p=ui.popup(pop);
- paletteOrder().forEach(function(c){names[c.id]=c.name;
+ tint=s.tint?h("input",{type:"checkbox","class":"cbox pri",title:"Highlight: a coloured background (off = a neutral one)","aria-label":(s.title||"Colour")+": highlight with a coloured background"}):null,
+ el=h("span",{"class":"colourpick"},[tint,btn,pop]),btns={},names={},p=ui.popup(pop);
+ if(tint)colourClass(tint,s.key,s.mod);          // the tick box has the colour of its pick
+ if(tint)tint.onchange=function(){var want=tint.checked;post("/colour",{module:s.mod,key:s.key,tint:want},function(r){if(r){refresh();ctx.saved()}else tint.checked=!want})};
+ paletteOrder(s.mod).forEach(function(c){names[c.id]=c.name;
   var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui+";--cl:"+c.ui_l,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
   b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){p.close();refresh();ctx.saved()}})};grid.appendChild(b)});
  btn.onclick=function(e){p.toggle(btn,e)};
- function paint(){var cur=(((S.colours||{})[s.mod])||{})[s.key]||"";
-  if(btn._cc!==cur){if(btn._cc)btn.classList.remove("c-"+btn._cc);if(cur)btn.classList.add("c-"+cur);btn._cc=cur;
+ function paint(){var cur=(((S.colours||{})[s.mod])||{})[s.key]||"",real=realColour(cur);
+  if(btn._cc!==real){if(btn._cc)btn.classList.remove("c-"+btn._cc);if(real)btn.classList.add("c-"+real);btn._cc=real;
    btn.setAttribute("aria-label",(s.label||"Colour")+": "+(names[cur]||cur||"not set"))}
+  if(btns.network){var nw=colourOfId(realColour("network"));if(nw)btns.network.style.cssText="--c:"+nw.ui+";--cl:"+nw.ui_l}      // the ball shows the network's colour now
   for(var id in btns){var on=id===cur;btns[id].classList.toggle("sel",on);btns[id].setAttribute("aria-pressed",on?"true":"false")}}
- UPD.push(paint);paint();hook("settingsClose",function(){p.close()});return el};
+ function paintTint(){if(tint)tint.checked=tintOf(s.key,s.mod)}
+ UPD.push(paint);UPD.push(paintTint);paint();paintTint();hook("settingsClose",function(){p.close()});return el};
 // ---- a block that opens and closes (the debug log bar)
 W.expander=function(s,ctx){var open=false,body=h("div",{"class":"xbody"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx)),
  b=h("button",{type:"button","class":"wide"},[h("span",{text:s.label}),h("span",{"class":"arrow",html:"&#9656;"})]),
@@ -274,7 +299,9 @@ function editRow(o){var sub=h("span",{"class":"sub"}),title=document.createTextN
   // the row's buttons and tags take a colour ({ui, ui_l}: the fill and its lighter border) and, for effect "blink", blink like the LED
   setLook:function(c,effect,speed){var rgb=function(x){return parseInt(x.slice(1,3),16)+","+parseInt(x.slice(3,5),16)+","+parseInt(x.slice(5,7),16)};
    row.style.setProperty("--primary-rgb",rgb(c.ui));row.style.setProperty("--primary-l-rgb",rgb(c.ui_l));
-   row.classList.add("lk");row.classList.toggle("lk-blink",effect==="blink");row.classList.toggle("lk-fast",speed==="fast")},
+   var fx=effect&&effect!=="solid"?"lk-"+effect:"";
+   row.classList.add("lk");if(row._fx!==fx){if(row._fx){row.classList.remove(row._fx);row.classList.remove("lk-fx")}if(fx){row.classList.add(fx);row.classList.add("lk-fx")}row._fx=fx}
+   row.classList.toggle("lk-fast",speed==="fast")},
   setSub:function(t){setLines(sub,t);sh(sub,!!t)},
   setList:function(items,onRemove){below.innerHTML="";items=items||[];sh(below,items.length>0);if(!items.length)return;
    var tags=h("div",{"class":"tags"});
@@ -292,9 +319,8 @@ function footRow(buttons){var info=h("button",{type:"button","class":"infobtn",t
 // ---- a table to pick values for: groups of short items (phone numbers) with an Add pop-up per group (reply of GET source)
 W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null,addKey=null,
  list=h("div"),restore=h("button",{type:"button","class":"pill-s"}),foot=footRow([restore]),
- pop=h("div"),popT=h("div",{"class":"t"}),inp=h("input",{type:"text","aria-label":"Value to add"}),addB=h("button",{type:"button","class":"pill-s",text:"Add"}),msg=h("div",{"class":"msg"}),
- sel=h("select",{"class":"ord","aria-label":"Value to add"});   // rules.choices: pick from a list instead of typing
- pop.appendChild(popT);pop.appendChild(h("div",{"class":"fld"},[inp,sel,addB]));pop.appendChild(msg);
+ pop=h("div"),popT=h("div",{"class":"t"}),inp=h("input",{type:"text","aria-label":"Value to add"}),addB=h("button",{type:"button","class":"pill-s",text:"Add"}),msg=h("div",{"class":"msg"}),choices=h("div",{"class":"choices"});
+ pop.appendChild(popT);pop.appendChild(h("div",{"class":"fld"},[inp,addB]));pop.appendChild(choices);pop.appendChild(msg);
  el.appendChild(list);el.appendChild(foot.el);el.appendChild(pop);
  var p=ui.popup(pop);p.onclose=function(){addKey=null};
  function rules(){return cfg.rules||{}}
@@ -302,27 +328,30 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
   list.innerHTML="";
   cfg.groups.forEach(function(g){
    var r=editRow({title:g.label,button:R.add_label||"Add",aria:(R.add_label||"Add")+" to "+g.label});
-   r.setSub(g.sub||"");r.setList(g.items,function(i){g.items.splice(i,1);save()});
+   r.setSub(g.sub||"");r.setList(g.items.map(function(n){return g.notes&&g.notes[n]?n+" ("+g.notes[n]+")":n}),function(i){g.items.splice(i,1);save()});
    r.btn.onclick=function(e){openAdd(g,r.btn,e)};list.appendChild(r.el)});
   foot.setInfo(R.help||"");
   sh(restore,!!R.restore);if(R.restore){setText(restore,R.restore);restore.onclick=function(){cfg.groups.forEach(function(g){g.items=(cfg.defaults[g.key]||[]).slice()});save()}}
   sh(foot.el,!!(R.restore||R.help))}
  function openAdd(g,b,e){if(p.isOpen()&&addKey===g.key){p.toggle(b,e);return}addKey=g.key;var R=rules();
   setText(popT,(R.add_title||"Add to {group}").replace("{group}",g.label));inp.value="";inp.maxLength=R.max||40;setText(msg,"");
-  var pick=!!R.choices;sh(inp,!pick);sh(sel,pick);
-  if(pick){var used={},groups={},order=[];cfg.groups.forEach(function(x){if(R.unique||x.key===g.key)x.items.forEach(function(v){used[v]=1})});
-   R.choices.forEach(function(o){if(used[o.value])return;var k=o.group||"";if(!groups[k]){groups[k]=[];order.push(k)}groups[k].push('<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>')});
-   sel.innerHTML=order.map(function(k){return k?'<optgroup label="'+esc(k)+'">'+groups[k].join("")+'</optgroup>':groups[k].join("")}).join("");sh(addB,order.length>0);
-   if(!order.length)setText(msg,"Everything is in the list already")}
-  else sh(addB,true);
-  p.toggle(b,e);(pick?sel:inp).focus()}
- function addItem(){if(!addKey)return;var R=rules(),allowed=new RegExp("[^"+(R.allowed||"\\s\\S")+"]","g"),n=R.choices?sel.value:inp.value.replace(allowed,""),say=function(t){setText(msg,t)},g=null;
+  inp.placeholder=g.choices?(g.free?"Type a name or pick one":"Search"):"";sh(addB,!g.choices||!!g.free);paintChoices(g);p.toggle(b,e);inp.focus()}
+ // a group with "choices" ([{value,label,sub,disabled}]) lets the user pick from the list; the input filters it ("free": it may also add a typed value)
+ function paintChoices(g){choices.innerHTML="";sh(choices,!!g.choices);if(!g.choices)return;
+  var q=inp.value.toLowerCase(),shown=0;
+  g.choices.forEach(function(c){if(g.items.indexOf(c.value)>=0||(q&&(c.label+" "+c.value).toLowerCase().indexOf(q)<0)||(!q&&g.initial&&!c.now))return;shown++;
+   var b=h("button",{type:"button","class":"choice",disabled:c.disabled?"disabled":null},[document.createTextNode(c.label||c.value)]);
+   if(c.sub)b.appendChild(h("span",{"class":"sub",text:c.sub}));
+   b.onclick=function(){g.items.push(c.value);p.close();save()};choices.appendChild(b)});
+  if(!shown)choices.appendChild(h("div",{"class":"sub",text:(!q&&g.initial?g.initial:g.empty)||"Nothing to pick"}))}
+ function addItem(){if(!addKey)return;var R=rules(),allowed=new RegExp("[^"+(R.allowed||"\\s\\S")+"]","g"),n=inp.value.replace(allowed,""),say=function(t){setText(msg,t)},g=null;
   cfg.groups.forEach(function(x){if(x.key===addKey)g=x});
   if(n.length<(R.min||1))return say(R.min_msg||"Too short");
   if(R.unique)for(var i=0;i<cfg.groups.length;i++)if(cfg.groups[i].items.indexOf(n)>=0)return say(n+" is already used by "+cfg.groups[i].label);
   if(R.per_group&&g.items.length>=R.per_group)return say("At most "+R.per_group);
   g.items.push(n);p.close();save()}
  addB.onclick=addItem;inp.onkeydown=function(e){if(e.key=="Enter"){e.preventDefault();addItem()}};
+ inp.oninput=function(){var g=null;cfg.groups.forEach(function(x){if(x.key===addKey)g=x});if(g)paintChoices(g)};
  function load(){xhrJson("GET",s.source,function(r){if(r){cfg=r;paint()}})}
  function save(){clearTimeout(timer);paint();timer=setTimeout(function(){var body={};cfg.groups.forEach(function(g){body[g.key]=g.items});
   post(s.source,body,function(r){if(r){cfg=r;paint();ctx.saved()}})},100)}

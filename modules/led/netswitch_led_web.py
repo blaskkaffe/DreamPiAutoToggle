@@ -67,20 +67,56 @@ def _post_hardware(h):
 
 
 def _post_wbtest(h):
-    ledconfig.touch_wb_test()
+    """Hold the LED at one colour for a few seconds: white (the white balance) or {"colour": "#rrggbb"} (the colour being calibrated)."""
+    colour = None
+    try:
+        body = json.loads(h._body(1024).decode("utf-8") or "{}")
+        colour = body.get("colour") if isinstance(body, dict) else None
+    except (ValueError, IOError, OSError, AttributeError):
+        pass
+    ledconfig.touch_wb_test(colour)
 
 
 def _post_wbtest_done(h):
     ledconfig.clear_wb_test()
 
 
-GET = {"/ledconfig": _get_config, "/ledhardware": _get_hardware}
-POST = {"/ledconfig": _post_config, "/ledhardware": _post_hardware, "/wbtest": _post_wbtest, "/wbtestdone": _post_wbtest_done}
+def _colours_reply():
+    return {"colours": [{"id": c["id"], "name": c["name"], "ui": c["ui"], "led": c["led"], "ui_default": c["ui_default"],
+                         "led_default": c["led_default"], "fixed": c["id"] == "network"} for c in core.colours()]}
+
+
+def _get_colours(h):
+    h.send(json.dumps(_colours_reply()), "application/json")
+
+
+def _post_colours(h):
+    """The palette editor: {"id", "ui", "led"} changes a colour on screen and / or on the LED; {"reset": id | "all"} puts it back."""
+    try:
+        body = json.loads(h._body(1024).decode("utf-8"))
+        if not isinstance(body, dict):
+            raise ValueError("not an object")
+        if "reset" in body:
+            core.reset_palette(None if body["reset"] == "all" else body["reset"])
+        elif not core.set_palette_colour(body.get("id"), body.get("ui"), body.get("led")):
+            raise ValueError("not a palette colour")
+    except (ValueError, IOError, OSError) as e:
+        h.send(str(e), "text/plain; charset=utf-8", status=400)
+        return True
+    h.send(json.dumps(_colours_reply()), "application/json")
+    return True
+
+
+GET = {"/ledconfig": _get_config, "/ledhardware": _get_hardware, "/ledcolours": _get_colours}
+POST = {"/ledconfig": _post_config, "/ledhardware": _post_hardware, "/wbtest": _post_wbtest, "/wbtestdone": _post_wbtest_done,
+        "/ledcolours": _post_colours}
 
 
 def api(d, warnings):
     """The DreamPi dot previews the look of the LED message that is showing (the network switcher fills in the rest); the
     page hides the LED settings while the LED count is 0."""
     count = ledconfig.led_count()
-    d["led"] = {"installed": count > 0, "count": count, "title": "Status LED" + (" (%d LEDs)" % count if count > 1 else "")}
+    sel = "dcnet" if os.path.exists(core.FLAG) else "dcnow"
+    tokens = dict((t, {"ui": core.network_colour(n)["ui"], "ui_l": core.network_colour(n)["ui_l"]}) for t, n in (("dcnow", "dcnow"), ("dcnet", "dcnet"), ("network", sel)))
+    d["led"] = {"installed": count > 0, "count": count, "title": "Status LED" + (" (%d LEDs)" % count if count > 1 else ""), "tokens": tokens}
     d.setdefault("dreampi", {})["look"] = ledconfig.dreampi_look()

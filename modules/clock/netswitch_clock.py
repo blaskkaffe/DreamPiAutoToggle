@@ -215,11 +215,14 @@ def _reply():
 
 def _cities_reply():
     cfg = read_config()
-    choices = [{"value": c[0], "label": c[0], "group": c[4]} for c in CATALOGUE]
+    full = len(cfg["cities"]) >= MAX_CITIES
+    choices = [] if full else [{"value": c[0], "label": c[0], "sub": "%s, %s now" % (c[4], tz.utc_text(tz.offset(c[1]) or 0))}
+                               for c in CATALOGUE if tz.offset(c[1]) is not None]
     return {"groups": [{"key": "cities", "label": "Cities", "sub": "Shown with world time on: %d of %d" % (len(cfg["cities"]), MAX_CITIES),
-                        "items": cfg["cities"]}],
+                        "items": cfg["cities"], "choices": choices, "free": False,
+                        "empty": "The list is full: remove a city first" if full else "No city matches"}],
             "defaults": {"cities": list(DEFAULT_CITIES)},
-            "rules": {"per_group": MAX_CITIES, "unique": True, "choices": choices, "add_label": "Add", "add_title": "Add a city",
+            "rules": {"per_group": MAX_CITIES, "unique": True, "add_label": "Add", "add_title": "Add a city",
                       "restore": "Restore", "help": "The cities of the world time list, in this order. Up to %d. Each one "
                       "follows its own summer and winter time." % MAX_CITIES}}
 

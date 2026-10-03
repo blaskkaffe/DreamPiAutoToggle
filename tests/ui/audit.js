@@ -71,6 +71,8 @@ const AUDIT = () => {
     await page.keyboard.press('Escape');
     await page.click('[data-box="status led"] .srow:has-text("Calibration") > button'); await page.waitForTimeout(300); await check('calibration pop-up');
     await page.keyboard.press('Escape');
+    await page.click('[data-box="status led"] button[aria-label="Adjust the colours"]'); await page.waitForTimeout(500); await check('LED colours pop-up');
+    await page.keyboard.press('Escape');
     // switch button functions
     await page.click('[data-box="gpio"] .srow:has-text("Button 1") > button'); await page.waitForTimeout(400); await check('GPIO edit pop-up');
     await page.selectOption('select[aria-label="Button 1: Function"]', { label: 'On = Wi-Fi setup' }); await page.waitForTimeout(700); await check('switch fn selected');

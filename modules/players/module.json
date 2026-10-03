@@ -5,5 +5,12 @@
  "visible": true,
  "order": 15,
  "ui": 2,
- "web": "netswitch_players"
+ "web": "netswitch_players",
+ "colours": {
+  "players": "purple"
+ },
+ "primary": "players",
+ "tints": {
+  "players": false
+ }
 }

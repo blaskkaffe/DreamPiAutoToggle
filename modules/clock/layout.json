@@ -20,6 +20,6 @@
     "control": {"type": "toggle", "bind": "@clock.world_on", "post": "/clock/world", "label": "World time"}},
    {"type": "picker", "source": "/clock/cities"}]},
   {"box": "appearance", "title": "Appearance", "items": [
-   {"type": "row", "title": "Clock colour", "control": {"type": "swatches", "key": "clock", "title": "Colour of the clock"}}]}
+   {"type": "row", "title": "Clock colour", "sub": "Module", "control": {"type": "swatches", "tint": true, "key": "clock", "title": "Colour of the clock"}}]}
  ]
 }

@@ -20,6 +20,6 @@
    {"type": "picker", "source": "/events/series"},
    {"type": "row", "title": "Sync now", "sub": "@events.status", "control": {"type": "button", "label": "Sync", "post": "/api/sync"}}]},
   {"box": "appearance", "title": "Appearance", "items": [
-   {"type": "row", "title": "DC99 events colour", "control": {"type": "swatches", "key": "events", "title": "Colour of the events box"}}]}
+   {"type": "row", "title": "DC99 events colour", "sub": "Module", "control": {"type": "swatches", "tint": true, "key": "events", "title": "Colour of the events box"}}]}
  ]
 }

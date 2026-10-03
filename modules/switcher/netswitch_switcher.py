@@ -87,6 +87,7 @@ def api(d, warnings):
               "hangup": {"busy": busy, "text": probes._hangup["text"] or "hanging up...",
                          "visible": dstate.startswith("call") or busy}})
     d.setdefault("primary", {})["switcher"] = core.network_colour(sel["id"])["id"]       # the box and its borders take the selected network's colour
+    d.setdefault("primary_key", {})["switcher"] = sel["id"]                               # and the box follows that network's background setting
 
 
 def _select(net):

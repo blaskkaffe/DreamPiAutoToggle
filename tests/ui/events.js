@@ -16,8 +16,14 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   const banner = page.locator('#warnings .notebox');
   ok(await banner.count() === 1 && /Demo Game Night/.test(await banner.textContent()), 'a reminded event that starts soon shows a banner');
   ok(await page.locator('.dbox[data-box="clock"].hl').count() === 1 && await page.locator('.dbox[data-box="events"].hl').count() === 1, 'the clock box and the events box are highlighted');
-  const look = await page.locator('.dbox[data-box="clock"] .now').evaluate(e => getComputedStyle(e).animationName);
-  ok(/hlrainbow/.test(look), 'the highlight is the animated rainbow by default (' + look + ')');
+  const clockNow = page.locator('.dbox[data-box="clock"] .now');
+  const card = await page.evaluate(() => getComputedStyle(document.body).getPropertyValue('--card').trim());
+  const bg = await clockNow.evaluate(e => getComputedStyle(e).backgroundColor);
+  ok(await page.locator('.dbox[data-box="clock"].plain').count() === 1 && !/^rgba?\(2[07], 2[07], 2[07]/.test(bg), 'a neutral (grey) box turns its own colour (' + bg + ', card ' + card + ')');
+  await page.evaluate(() => new Promise(r => xhrJson('POST', '/colour', () => { refresh(); r() }, { module: 'clock', key: 'clock', tint: true })));
+  await settle(1500);
+  const look = await clockNow.evaluate(e => getComputedStyle(e, '::before').animationName);
+  ok(await page.locator('.dbox[data-box="clock"].plain').count() === 0 && /hlrainbow/.test(look), 'a coloured box gets the animated rainbow edge by default (' + look + ')');
   ok(await page.locator('.dbox[data-box="players"].hl').count() === 0, 'other boxes are not highlighted');
   // the events box
   const box = page.locator('.dbox[data-box="events"] .now');
@@ -40,7 +46,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   // the highlight look is a global setting
   await page.click('#cog'); await settle(900);
   const ap = page.locator('section[data-box="appearance"]');
-  ok(await ap.locator('.srow', { hasText: 'Highlight' }).count() === 1, 'Appearance has the Highlight look');
+  ok(await ap.locator('.srow', { hasText: 'Notification highlight' }).count() === 1, 'Appearance has the Notification highlight look');
   const ev = page.locator('section[data-box="events"]');
   ok(await ev.locator('.srow', { hasText: /^Reminder\d+ minutes before/ }).count() === 1 && await ev.locator('.wpicker').count() === 1, 'Settings has the reminder time and the series list');
   await page.click('#close-settings'); await settle(500);

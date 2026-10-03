@@ -281,7 +281,7 @@ class Reminders(Base):
     def test_a_series_reminds_of_every_event_with_that_name(self):
         r = self.post("/events/series", {"series": ["Game Night UK: F355 Challenge", "", 5]}).json()
         self.assertEqual(r["groups"][0]["items"], ["Game Night UK: F355 Challenge"])
-        self.assertIn("US Game Night", [c["value"] for c in r["rules"]["choices"]])
+        self.assertIn("US Game Night", [c["value"] for c in r["groups"][0]["choices"]])
         self.assertEqual(core.event_reminder(utc(2026, 10, 11, 19) - 60)["title"], "Game Night UK: F355 Challenge")
 
     def test_the_led_message(self):

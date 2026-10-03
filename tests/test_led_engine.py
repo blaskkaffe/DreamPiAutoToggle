@@ -8,6 +8,9 @@ import netswitch_led as led
 COLOURS = ["#ff8c00", "#0046ff", "#aa00ff", "#ff0000", "#00ff00", "#00c8ff", "#ffd000", "#ffffff"]
 
 
+PULSE_SHARE = 0.09      # a flash is this share of the round (led.PULSE)
+
+
 class EffectTests(unittest.TestCase):
     def test_solid_is_always_on(self):
         for t in (0, 0.3, 7.9):
@@ -21,11 +24,72 @@ class EffectTests(unittest.TestCase):
             self.assertEqual(led.effect_level("blink", speed, period * 0.99), 0.0)
             self.assertEqual(led.effect_level("blink", speed, period * 1.01), 1.0)         # and round again
 
-    def test_fast_blinks_faster_than_slow(self):
-        self.assertLess(led.BLINK_PERIOD["fast"], led.BLINK_PERIOD["slow"])
+    def test_fast_is_faster_than_slow_for_every_effect(self):
+        for name, (slow, fast) in led.PERIOD.items():
+            self.assertLess(fast, slow, name)
 
     def test_an_unknown_effect_is_just_on(self):
-        self.assertEqual(led.effect_level("breathe", "slow", 0.7), 1.0)
+        self.assertEqual(led.effect_level("disco", "slow", 0.7), 1.0)
+
+    def pattern(self, effect, speed="slow", cells=20):
+        period = led.PERIOD[effect][0 if speed == "slow" else 1]
+        return "".join("o" if led.effect_level(effect, speed, (i + 0.5) * period / cells) > 0 else "-" for i in range(cells))
+
+    def runs(self, effect, speed="slow", cells=400):
+        """The lit stretches of one period as (start, end) shares of it."""
+        period = led.PERIOD[effect][0 if speed == "slow" else 1]
+        lit = [led.effect_level(effect, speed, (i + 0.5) * period / cells) > 0 for i in range(cells)]
+        out, start = [], None
+        for i, on in enumerate(lit + [False]):
+            if on and start is None:
+                start = i
+            elif not on and start is not None:
+                out.append((start / float(cells), i / float(cells)))
+                start = None
+        return out
+
+    def test_one_two_and_three_short_flashes(self):
+        for effect, n in (("blink1", 1), ("blink2", 2), ("blink3", 3)):
+            for speed in ("slow", "fast"):
+                runs = self.runs(effect, speed)
+                self.assertEqual(len(runs), n, (effect, speed))                         # o---   oo---   ooo-  : n flashes ...
+                self.assertEqual(runs[0][0], 0.0)                                       # ... the first one at once ...
+                self.assertLess(runs[-1][1], 0.5)                                       # ... and then dark for the rest of the round
+                self.assertTrue(all(abs((r[1] - r[0]) - PULSE_SHARE) < 0.01 for r in runs))
+
+    def test_fade_goes_smoothly_from_on_to_off_and_back(self):
+        period = led.PERIOD["fade"][0]
+        levels = [led.effect_level("fade", "slow", period * i / 20.0) for i in range(21)]
+        self.assertEqual((levels[0], round(levels[10], 6), round(levels[20], 6)), (1.0, 0.0, 1.0))      # starts lit, off at half time
+        self.assertTrue(all(a >= b for a, b in zip(levels[:10], levels[1:11])))                       # and it is a ramp, not a jump
+
+    def test_breathing_never_goes_fully_off(self):
+        period = led.PERIOD["breathe"][0]
+        levels = [led.effect_level("breathe", "slow", period * i / 40.0) for i in range(41)]
+        self.assertEqual(max(levels), 1.0)
+        self.assertAlmostEqual(min(levels), led.BREATHE_LOW)
+        clocks = {}
+        lit = [led.render([{"key": "b", "effect": "breathe", "speed": "slow", "color": "#ff8c00", "brightness": 0.01, "leds": None}],
+                          10.0 + period * i / 40.0, 1, clocks)[0] for i in range(41)]
+        self.assertNotIn((0, 0, 0), lit)                                           # even at 1 % the dimmest breath still glows
+
+    def test_a_fade_may_reach_off(self):
+        clocks = {}
+        m = {"key": "f", "effect": "fade", "speed": "slow", "color": "#ff8c00", "brightness": 0.08, "leds": None}
+        led.render([m], 10.0, 1, clocks)
+        self.assertEqual(led.render([m], 10.0 + led.PERIOD["fade"][0] / 2.0, 1, clocks), [(0, 0, 0)])
+
+    def test_rainbow_goes_round_the_colour_wheel_whatever_the_colour(self):
+        period = led.PERIOD["rainbow"][0]
+        got = [led.effect_colour("rainbow", "slow", period * i / 6.0, (0.0, 0.0, 1.0)) for i in range(6)]
+        self.assertEqual([tuple(round(c) for c in g) for g in got], [(1, 0, 0), (1, 1, 0), (0, 1, 0), (0, 1, 1), (0, 0, 1), (1, 0, 1)])
+        self.assertEqual(led.effect_colour("solid", "slow", 3.0, (0.2, 0.4, 0.6)), (0.2, 0.4, 0.6))
+
+    def test_every_effect_of_the_page_has_a_function_and_a_period(self):
+        from netswitch_ledconfig import EFFECTS
+        for name, _label, _speed in EFFECTS:
+            self.assertIn(name, led.EFFECT_LEVEL)
+            self.assertTrue(name == "solid" or name in led.PERIOD, name)
 
     def test_render_blink_goes_dark_and_comes_back(self):
         m = {"key": "a", "effect": "blink", "speed": "slow", "color": "#ff0000", "brightness": 1.0, "leds": None}

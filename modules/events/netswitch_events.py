@@ -534,10 +534,11 @@ def _series_reply(now=None):
             titles.append(t)
     return {"groups": [{"key": "series", "label": "Always remind me of",
                         "sub": "Every event with these names" if cfg["series"] else "Every event of a series you pick",
-                        "items": cfg["series"]}],
+                        "items": cfg["series"], "free": False,
+                        "choices": [] if len(cfg["series"]) >= MAX_SERIES else [{"value": t, "label": t} for t in sorted(titles, key=lambda s: s.lower())],
+                        "empty": "The list is full" if len(cfg["series"]) >= MAX_SERIES else "No event matches"}],
             "defaults": {"series": []},
             "rules": {"per_group": MAX_SERIES, "unique": True, "add_label": "Add", "add_title": "Remind me of every",
-                      "choices": [{"value": t, "label": t} for t in sorted(titles, key=lambda s: s.lower())],
                       "help": "Remind me of every event of a series here, or of one event with its bell on the main page. "
                               "A reminder shows as a banner on the main page, makes the clock box stand out and lights the LED message "
                               "\"Event starting soon\" (Settings > Status LED). DC99 lists its times without a time zone: they are read "

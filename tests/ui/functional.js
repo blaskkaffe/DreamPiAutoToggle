@@ -58,43 +58,59 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
     return { left: Math.round(pr.left - cr.left - parseFloat(cs.paddingLeft)), right: Math.round(cr.right - parseFloat(cs.paddingRight) - pr.right), w: Math.round(pr.width) }; });
   const gp1 = await popGeo();
   ok(Math.abs(gp1.left) <= 1 && Math.abs(gp1.right) <= 1, 'the colour pop-up spans the card between its left and right padding (' + JSON.stringify(gp1) + ')');
-  ok(await swatches.count() === 16, 'it opens a pop-up with the 16 palette colours');
+  ok(await swatches.count() === 15, 'it opens a pop-up with the palette (15 colours: the network buttons cannot be "Selected network")');
+  ok(await page.locator('.pop.open .swatch').first().getAttribute('data-id') === 'global', 'Global main is the first ball');
   ok(await page.locator('.pop.open .swatch.sel').count() === 1 && await page.locator('.pop.open .swatch.sel').getAttribute('data-id') === 'orange', 'the current colour is marked');
-  await swatches.nth(7).click(); await settle(1500);                       // pink (the 8 normal colours come first, then the bright ones)
+  await page.locator('.pop.open .swatch[data-id="bright-pink"]').click(); await settle(1500);
   ok(await page.locator('.pop.open').count() === 0, 'picking a colour closes the pop-up');
-  ok(await colourBtn.evaluate(e => e.classList.contains('c-pink')), 'and the Colour button takes it');
-  ok(await page.locator('.pill').nth(0).evaluate(e => e.classList.contains('c-pink')), 'DCNow! button follows the picked colour');
-  ok(await page.evaluate(() => document.body.classList.contains('c-pink')), 'and so does the page primary while DCNow! is selected');
-  await colourBtn.click(); await settle(300); await page.locator('.pop.open .swatches .swatch').nth(1).click(); await settle(1200);   // back to orange
+  ok(await colourBtn.evaluate(e => e.classList.contains('c-bright-pink')), 'and the Colour button takes it');
+  ok(await page.locator('.pill').nth(0).evaluate(e => e.classList.contains('c-bright-pink')), 'DCNow! button follows the picked colour');
+  ok(await page.evaluate(() => document.body.classList.contains('c-bright-pink')), 'and so does the page primary while DCNow! is selected');
+  await colourBtn.click(); await settle(300); await page.locator('.pop.open .swatches .swatch[data-id="orange"]').click(); await settle(1200);   // back to orange
   // ---- the picker table (phone numbers)
-  const group = page.locator('.wpicker .srow').first();
+  const group = page.locator('[data-box="special phone numbers"] .wpicker .srow').first();
   await group.locator('button').first().click();
   const gp2 = await popGeo();
   ok(Math.abs(gp1.w - gp2.w) <= 1, 'and every pop-up has the same width (' + gp1.w + ' and ' + gp2.w + ')');
   ok(Math.abs(gp2.left) <= 1 && Math.abs(gp2.right) <= 1, 'the add-number pop-up does too');
   await page.fill('.pop.open input', '5551234'); await page.click('.pop.open .pill-s'); await settle(900);
-  ok(await page.locator('.wpicker .tag', { hasText: '5551234' }).count() === 1, 'a number is added to its group');
-  await page.locator('.wpicker .tag', { hasText: '5551234' }).locator('button').click(); await settle(900);
-  ok(await page.locator('.wpicker .tag', { hasText: '5551234' }).count() === 0, 'and removed again');
+  ok(await page.locator('[data-box="special phone numbers"] .wpicker .tag', { hasText: '5551234' }).count() === 1, 'a number is added to its group');
+  await page.locator('[data-box="special phone numbers"] .wpicker .tag', { hasText: '5551234' }).locator('button').click(); await settle(900);
+  ok(await page.locator('[data-box="special phone numbers"] .wpicker .tag', { hasText: '5551234' }).count() === 0, 'and removed again');
   ok(await page.locator('text=No number').count() === 0, 'a group with no numbers shows no "No number" text');
-  const hNum = await page.locator('.wpicker .srow').first().evaluate(e => e.getBoundingClientRect().height);
+  const hNum = await page.locator('[data-box="special phone numbers"] .wpicker .srow').first().evaluate(e => e.getBoundingClientRect().height);
   const hGpio = await page.locator('[data-box="gpio"] .srow', { hasText: 'Button 1' }).first().evaluate(e => e.getBoundingClientRect().height);
   ok(Math.abs(hNum - hGpio) <= 6, 'a phone number row is as high as a GPIO row (' + Math.round(hNum) + ' and ' + Math.round(hGpio) + ')');
-  await page.locator('.wpicker .infobtn').click(); await settle(300);
+  await page.locator('[data-box="special phone numbers"] .wpicker .infobtn').click(); await settle(300);
   ok(/numbers ending in the listed numbers/.test(await page.locator('.pop.open .infotext').textContent()), 'the (i) button opens the pop-up with the information text');
   ok(await page.locator('.pop.open button', { hasText: 'Done' }).count() === 0, 'the information pop-up has no Done button (nothing to save)');
   await page.keyboard.press('Escape'); await settle(200);
+  // ---- favorite players and games: pick from the lists (not-online games can't be picked, work in progress is marked)
+  const fav = page.locator('[data-box="favorites"] .wpicker');
+  await fav.locator('.srow').first().locator('button').first().click(); await settle(500);
+  ok(await page.locator('.pop.open .choice').count() >= 4, 'the favorite games pop-up lists the games of the list');
+  ok(await page.locator('.pop.open .choice', { hasText: 'Dead Game Online' }).count() === 0, 'only games being played now are listed at first');
+  ok(await page.locator('.pop.open .choice', { hasText: 'playing now' }).count() >= 4, 'and say that they are played now');
+  await page.fill('.pop.open input', 'dead'); await settle(200);
+  ok(await page.locator('.pop.open .choice:disabled', { hasText: 'Dead Game Online' }).count() === 1, 'searching finds the whole list; a game that is not online is greyed out');
+  await page.fill('.pop.open input', 'outtr'); await settle(200);
+  ok(await page.locator('.pop.open .choice', { hasText: 'work in progress' }).count() === 1, 'a work-in-progress game says so');
+  ok(await page.locator('.pop.open .choice').count() === 1, 'typing filters the list');
+  await page.locator('.pop.open .choice', { hasText: 'Outtrigger' }).click(); await settle(900);
+  ok(await fav.locator('.tag', { hasText: 'Outtrigger (work in progress)' }).count() === 1, 'the picked game is a favorite, marked as work in progress');
+  await fav.locator('.tag', { hasText: 'Outtrigger' }).locator('button').click(); await settle(900);
+  ok(await fav.locator('.tag', { hasText: 'Outtrigger' }).count() === 0, 'and can be removed');
   // ---- Status LED: rows of colour + animation + level, each with the messages that light it
   const led = page.locator('[data-box="status led"]');
   const ledRows = led.locator('.srow:has(button[aria-label="Edit this colour"])');
   const rows0 = await ledRows.count();
-  ok(rows0 === 7, 'the LED box starts with the seven default colour rows (' + rows0 + ')');
+  ok(rows0 === 6, 'the LED box starts with the six default colour rows (' + rows0 + ')');
   ok(await ledRows.first().locator('.tag', { hasText: 'DCNow! selected' }).count() === 1, 'the first row holds DCNow! selected');
   const lookOf = i => ledRows.nth(i).evaluate(e => { const b = e.querySelector('button.pill-s'), t = e.querySelector('.tag'), cs = getComputedStyle(b); return { bg: cs.backgroundColor, border: cs.borderTopColor, tag: t ? getComputedStyle(t).backgroundColor : '', blink: cs.animationName, dot: !!e.querySelector('.gdot') }; });
-  const l0 = await lookOf(0), l4 = await lookOf(4), l5 = await lookOf(5);
+  const l0 = await lookOf(0), l4 = await lookOf(3), l5 = await lookOf(4);
   ok(!l0.dot && l0.bg !== l0.border && l0.bg === l0.tag, 'a row has no dot: its buttons and tags take the colour, with a lighter border (' + l0.bg + ' / ' + l0.border + ')');
   ok(l4.blink === 'lkblink' && l0.blink === 'none', 'a blinking look makes the row blink like the LED (Starting up blinks, DCNow! does not)');
-  const samples = await ledRows.nth(4).evaluate(async e => { const b = e.querySelector('button.pill-s'), out = []; for (let i = 0; i < 30; i++) { const cs = getComputedStyle(b); out.push([cs.backgroundColor, cs.color, cs.opacity]); await new Promise(r => setTimeout(r, 70)); } return out; });
+  const samples = await ledRows.nth(3).evaluate(async e => { const b = e.querySelector('button.pill-s'), out = []; for (let i = 0; i < 30; i++) { const cs = getComputedStyle(b); out.push([cs.backgroundColor, cs.color, cs.opacity]); await new Promise(r => setTimeout(r, 70)); } return out; });
   const bgs = Array.from(new Set(samples.map(x => x[0])));
   ok(bgs.length === 2 && bgs.includes('rgba(42, 42, 42, 0.82)'), 'a blinking button goes between its colour and the default dark grey (' + bgs.join(' / ') + ')');
   ok(new Set(samples.map(x => x[1])).size === 1 && samples.every(x => x[2] === '1'), 'and its text keeps the same colour and brightness all the time');
@@ -121,6 +137,45 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await led.locator('button', { hasText: 'Add colour' }).click(); await settle(600);
   await led.locator('button', { hasText: 'Restore defaults' }).click(); await settle(900);
   ok(await ledRows.count() === rows0, 'Restore defaults brings the default rows back');
+  // every animation of a row: its class says which, the buttons run it between the colour and the grey
+  await ledRows.first().locator('button[aria-label="Edit this colour"]').click(); await settle(300);
+  for (const [label, cls] of [['Fade', 'lk-fade'], ['Breathe', 'lk-breathe'], ['Short blink', 'lk-blink1'], ['Double blink', 'lk-blink2'], ['Triple blink', 'lk-blink3'], ['Rainbow', 'lk-rainbow']]) {
+    await page.locator('.pop.open .seg button', { hasText: new RegExp('^' + label + '$') }).click(); await settle(500);
+    ok(await ledRows.first().evaluate((e, c) => e.classList.contains(c) && getComputedStyle(e.querySelector('button.pill-s')).animationName !== 'none', cls), label + ' makes the row run its animation');
+  }
+  await page.locator('.pop.open .seg button', { hasText: /^Solid$/ }).click(); await settle(500);
+  ok(await ledRows.first().evaluate(e => !e.classList.contains('lk-fx')), 'Solid stops it');
+  await page.keyboard.press('Escape'); await settle(200);
+  // the colours editor: the LED's red need not be the page's red
+  await led.locator('button[aria-label="Adjust the colours"]').click(); await settle(600);
+  const cg = await popGeo();
+  ok(Math.abs(cg.w - gp1.w) <= 1, 'the colours pop-up has the same width as the others (' + cg.w + ')');
+  ok(await page.locator('.pop.open .swatches .swatch').count() === 16, 'it has all 16 colours');
+  await page.locator('.pop.open .swatch[aria-label="Selected network"]').click(); await settle(300);
+  ok(await page.locator('.pop.open input[type=color]').count() === 0 && /follows the switch/.test(await page.locator('.pop.open').textContent()), 'Selected network has no value of its own to edit');
+  await page.locator('.pop.open .swatch[aria-label="Red"]').click(); await settle(300);
+  await page.locator('.pop.open input[aria-label="Red on the LED"]').fill('#e01000'); await settle(900);
+  const led1 = await page.evaluate(async () => (await (await fetch('/ledcolours')).json()).colours.find(c => c.id === 'red'));
+  ok(led1.led === '#e01000' && led1.ui === led1.ui_default, 'the LED value is saved and the page colour is not touched (' + led1.led + ' / ' + led1.ui + ')');
+  await page.locator('.pop.open input[aria-label="Red on screen"]').fill('#aa2222'); await settle(900);
+  ok(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--c-red').trim()) === '#aa2222', 'a page colour changes the page at once');
+  await page.locator('.pop.open button', { hasText: 'Reset all' }).click(); await settle(900);
+  const led2 = await page.evaluate(async () => (await (await fetch('/ledcolours')).json()).colours.find(c => c.id === 'red'));
+  ok(led2.led === led2.led_default && led2.ui === led2.ui_default, 'Reset all puts the shipped colours back');
+  await page.locator('.pop.open button', { hasText: 'Done' }).click(); await page.waitForLoadState('networkidle'); await settle(2000);
+  ok(await page.locator('#settings.open').count() === 1, 'closing it after a change builds the page again with Settings still open');
+  // Appearance: a tick box left of each colour picks a coloured or a neutral background
+  const appr = page.locator('[data-box="appearance"] .srow', { hasText: 'Online players colour' });
+  ok(!(await appr.locator('input[type=checkbox]').isChecked()) && await page.locator('.dbox[data-box="players"].plain').count() === 1, 'a box starts neutral (Highlight off)');
+  await appr.locator('input[type=checkbox]').check(); await settle(1300);
+  ok(await page.locator('.dbox[data-box="players"].plain').count() === 0, 'ticking Highlight makes the box coloured');
+  await appr.locator('input[type=checkbox]').uncheck(); await settle(1300);
+  ok(await page.locator('.dbox[data-box="players"].plain').count() === 1, 'and unticking it makes it neutral again');
+  const dc = page.locator('[data-box="appearance"] .srow', { hasText: 'DCNow! colour' });
+  ok(await dc.locator('input[type=checkbox]').isChecked() && !(await page.locator('.pill').first().evaluate(e => e.classList.contains('plain'))), 'the network buttons are highlighted from the start');
+  await dc.locator('input[type=checkbox]').uncheck(); await settle(1300);
+  ok(await page.locator('.pill').first().evaluate(e => e.classList.contains('plain')) && !(await page.locator('.pill').nth(1).evaluate(e => e.classList.contains('plain'))), 'the network buttons have a background setting each');
+  await dc.locator('input[type=checkbox]').check(); await settle(1000);
   // dividers: every row of a box has a line above it except the first, whichever module or widget it comes from
   const dividers = await page.evaluate(() => Array.from(document.querySelectorAll('#set-boxes .card')).filter(c => c.offsetParent).map(c => {
     const rows = Array.from(c.querySelectorAll('.srow')).filter(r => r.offsetParent && !r.closest('.pop') && !r.closest('.wlist.compact'));
@@ -149,12 +204,21 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(boxIds.includes('appearance') && !boxIds.includes('modules') && !boxIds.includes('network colours'), 'the colours are in Appearance, and the modules have no box of their own');
   ok(await page.locator('[data-box="gpio"] .wform').count() >= 2, 'and one GPIO box holds the forms of the buttons and the LED');
   // ---- Appearance also has the Dreamcast background's switch (the module is off in the demo)
-  const bgToggle = page.locator('[data-box="appearance"] input[type=checkbox]');
+  const bgToggle = page.locator('[data-box="appearance"] .srow:has-text("Dreamcast background") input[type=checkbox]');
   ok(await bgToggle.count() === 1 && !(await bgToggle.isChecked()), 'Appearance has a switch for the Dreamcast background, off');
   await bgToggle.check(); await page.waitForLoadState('networkidle'); await settle(2000);
   ok(await page.evaluate(() => document.body.classList.contains('dcbg') && !!document.getElementById('dcbg')), 'switching it on draws the background (the page was rebuilt with Settings open)');
-  ok(await page.locator('#settings.open').count() === 1 && await page.locator('[data-box="appearance"] input[type=checkbox]').isChecked(), 'and the switch stays on');
-  await page.locator('[data-box="appearance"] input[type=checkbox]').uncheck(); await page.waitForLoadState('networkidle'); await settle(2000);
+  ok(await page.locator('#settings.open').count() === 1 && await page.locator('[data-box="appearance"] .srow:has-text("Dreamcast background") input[type=checkbox]').isChecked(), 'and the switch stays on');
+  // Highlight (a coloured background) works over the background, a neutral one is the grey of the Dreamcast pop-ups
+  await page.click('#close-settings'); await settle(400);
+  const fill = sel => page.locator(sel).first().evaluate(e => getComputedStyle(e).backgroundColor);
+  const hi = await fill('.dbox[data-box="network"] .now');
+  ok(/^rgba\(\d+, \d+, \d+, 0\.\d+\)$/.test(hi) && hi !== 'rgba(20, 20, 20, 0.78)', 'over the Dreamcast background a highlighted box keeps its translucent colour (' + hi + ')');
+  await page.evaluate(() => document.querySelector('.dbox[data-box="network"]').classList.add('plain'));
+  ok(await fill('.dbox[data-box="network"] .now') === 'rgba(20, 20, 20, 0.78)', 'and a neutral one is the translucent grey');
+  await page.evaluate(() => document.querySelector('.dbox[data-box="network"]').classList.remove('plain'));
+  await openSettings();
+  await page.locator('[data-box="appearance"] .srow:has-text("Dreamcast background") input[type=checkbox]').uncheck(); await page.waitForLoadState('networkidle'); await settle(2000);
   ok(await page.evaluate(() => !document.body.classList.contains('dcbg')), 'and off again');
   // ---- the module picker: one row in System with an Edit button; the pop-up holds the list; nothing is applied until Done
   const edit = page.locator('[data-box="system"] [data-picker="modules"] button');

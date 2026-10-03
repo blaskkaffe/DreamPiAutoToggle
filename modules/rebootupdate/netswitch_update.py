@@ -27,7 +27,7 @@ DREAMPI_FILES = ("dreampi.py", "netlink.py", "dcnow.py")
 TIMEOUT = 10
 
 _lock = threading.Lock()
-_info = {"time": 0, "checking": False, "addon": None, "dreampi": None, "error": None}
+_info = {"time": 0, "started": 0, "checking": False, "addon": None, "dreampi": None, "error": None}
 
 
 def fetch(url):
@@ -124,12 +124,24 @@ def check_dreampi():
     return {"files": files, "newer": newer, "auto_updates": not os.path.exists("/boot/noautoupdates.txt")}
 
 
-def check():
-    """Run both checks now (network). Fills the cache the page reads."""
+def _begin():
+    """Mark a check as running; False when one already is. Done before the thread starts so that the page's very next
+    question already says "checking" (a refresh that came in between used to show the old result: the button seemed dead)."""
     with _lock:
         if _info["checking"]:
-            return
+            return False
         _info["checking"] = True
+        _info["started"] = time.time()
+        return True
+
+
+def check():
+    """Run both checks now (network). Fills the cache the page reads."""
+    if _begin():
+        _run()
+
+
+def _run():
     result = {"time": int(time.time()), "addon": None, "dreampi": None, "error": None}
     try:
         try:
@@ -149,14 +161,24 @@ def check():
 
 
 def check_in_background():
-    t = threading.Thread(target=check)
-    t.daemon = True
-    t.start()
+    if _begin():
+        t = threading.Thread(target=_run)
+        t.daemon = True
+        t.start()
 
 
 def update_state():
-    """running / ok / failed, or idle (a finished result is only reported for 10 minutes: core.update_status())."""
-    return core.update_status()
+    """running / ok / failed, or idle (a finished result is only reported for 10 minutes: core.update_status()). A new check
+    replaces a finished result: after an update the page showed "The add-on was updated." for ten minutes whatever the user
+    pressed, so checking again looked dead."""
+    state = core.update_status()
+    if state in ("ok", "failed"):
+        try:
+            if _info.get("started", 0) > os.path.getmtime(core.UPDATE_STATUS):
+                return "idle"
+        except OSError:
+            return "idle"
+    return state
 
 
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[@-_]")
