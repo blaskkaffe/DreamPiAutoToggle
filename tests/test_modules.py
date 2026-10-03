@@ -143,7 +143,9 @@ class WithEverything(Base):
         self.assertEqual(gpio[0]["mods"], ["buttons", "led", "wifi"])          # one GPIO box, three modules in picker order
         self.assertEqual(gpio[0]["title"], "GPIO")
         system = [b for b in lay["settings"] if b["id"] == "system"][0]
-        self.assertEqual(system["mods"], ["wifi", "system", "rebootupdate"])
+        self.assertEqual(system["mods"], ["wifi", "rebootupdate"])
+        about = [b for b in lay["settings"] if b["id"] == "about"][0]
+        self.assertEqual((about["mods"], about["title"]), (["system"], "About"))               # the versions are their own box, not part of System
         self.assertEqual([b["id"] for b in lay["dashboard"]], ["network", "players", "debug log"])
 
     def test_led_hardware_settings_are_in_the_gpio_box_and_come_from_the_led_module(self):

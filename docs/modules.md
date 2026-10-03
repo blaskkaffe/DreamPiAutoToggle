@@ -19,7 +19,7 @@ base or module Python that runs on its own. Moving each service into its module'
 |---|---|---|---|
 | `switcher` (Network switcher) | no, always on | Dashboard: the Selected-network box (DreamPi, modem, internet, Pi, Hang up) and the two network buttons; Settings: **Network colours**; `POST /dcnow`, `/dcnet`, `/hangup`, `GET /status`; the page's primary colour follows the selected network | on |
 | `buttons` (Buttons) | no, always on | Settings > GPIO: function and pin of the two buttons, `GET`/`POST /buttonconfig` (the buttons service itself is base) | on |
-| `system` (System) | no, always on | Settings > System: the versions (`GET /about`) and the GitHub link | on |
+| `system` (System) | no, always on | Settings > **About**: the versions (`GET /about`) and the GitHub link | on |
 | `players` (Online players) | yes | Dashboard: the Online players box (counts, games carousel, player list, sources, links), `GET /players` | on |
 | `numbers` (Special phone numbers) | yes | Settings: the phone numbers table, `GET`/`POST /numbers`, `numbers.json` (the hook only reads it while the module is on) | on |
 | `led` (Status LEDs) | yes | Settings: the LED row in GPIO (count, wire order, pin: `GET`/`POST /ledhardware`) and the **Status LED** box (calibration pop-up and message table, a custom widget: `GET`/`POST /ledconfig`); the LED service | on |
@@ -86,8 +86,8 @@ warning box on the page (and in the picker).
 
 | Box | Put here | Used by now |
 |---|---|---|
-| `system` | things that act on the Pi or the add-on: Wi-Fi setup, updates, reboot | wifi, rebootupdate, system |
-| `about` | read-only information: versions, hardware, links | system (today inside `system`) |
+| `system` | things that act on the Pi or the add-on: Wi-Fi setup, updates, reboot | wifi, rebootupdate |
+| `about` | read-only information: versions, hardware, links | system |
 | `gpio` | anything wired to a GPIO pin: button functions, the LED pin, hold buttons | buttons, led, wifi |
 | `configuration` | a module's general settings that fit no other box; a module with only a few settings adds them here instead of making its own box | (none yet) |
 | `appearance` | colours and the look of the page | (the switcher's colour picks are in `network colours` for now) |

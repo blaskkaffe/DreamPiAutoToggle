@@ -51,7 +51,7 @@ Options can be combined, for example `sudo ./install.sh --leds=8 --no-https`.
 
 ### Update
 
-The page can do it for you while the **Reboot and Update** module is on (see [Modules](#modules)): **Settings > System** (the last rows of the System card) checks GitHub for a newer version of this add-on (and tells you if DreamPi has newer scripts), and **Update now** fetches and installs it from the checkout you installed from (settings and ports are kept; the page is gone for a few seconds). By hand, which is what the rest of this section describes:
+The page can do it for you while the **Reboot and Update** module is on (see [Modules](#modules)): **Settings > System** (the Updates row) checks GitHub for a newer version of this add-on (and tells you if DreamPi has newer scripts), and **Update now** fetches and installs it from the checkout you installed from (settings and ports are kept; the page is gone for a few seconds). By hand, which is what the rest of this section describes:
 
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
@@ -76,13 +76,13 @@ The add-on is a small **base** plus **modules**. The base is the web page's fram
 
 | Module | Folder | Adds | On by default |
 |---|---|---|---|
-| *Network switcher, Buttons, System* | `modules/switcher/`, `buttons/`, `system/` | always on; the network box and buttons, the GPIO box, the versions | yes (not in the picker) |
+| *Network switcher, Buttons, System* | `modules/switcher/`, `buttons/`, `system/` | always on; the network box and buttons, the GPIO box, the About box (versions, GitHub link) | yes (not in the picker) |
 | **Special phone numbers** | `modules/numbers/` | Settings > Special phone numbers, to edit the numbers the Dreamcast dials. Without it the built-in default numbers are used | yes |
 | **Online players** | `modules/players/` | the Online players box on the main page | yes |
 | **Wi-Fi setup** | `modules/wifi/` | joining a Wi-Fi network without a keyboard (a temporary access point), and the Wi-Fi rows in Settings | no |
 | **Status LEDs** | `modules/led/` | the NeoPixel service, the Status LED settings (including the calibration pop-up), and the LED count / GPIO pin / wire order | yes |
 | **Dreamcast background** | `modules/background/` | the animated Dreamcast menu background behind the page (see [Credits](#credits)) | no |
-| **Reboot and Update** | `modules/rebootupdate/` | the Updates rows (check GitHub, **Update now**) in the System card and the Reboot card | yes |
+| **Reboot and Update** | `modules/rebootupdate/` | the Updates rows (check GitHub, **Update now**) in the System box and the Reboot box | yes |
 | **Debug log** | `modules/debuglog/` | the Debug log bar and live log on the main page, and its recording inside DreamPi | no |
 
 - **Switch one on or off, and set its priority:** Settings > **Modules**. A tick box switches it: the page reloads without the module's parts, and its endpoints and background work stop (the LED service goes dark while Status LEDs is off). Nothing is deleted, so switching it on again brings your settings back. Drag a module by its handle (⋮⋮) to move it up or down the list (on a phone, hold the handle and drag; with a keyboard use the arrow keys on the handle). **The top of the list has priority**: its boxes come first, it names a box that several modules share (for example the GPIO box holds the buttons' rows, the LED row and the Wi-Fi row), and where two modules want the same thing, such as a background, the one on top wins. A fullscreen background hides the ones under it; a background that only fills a strip (a taskbar or a logo) lets the next one show too.
@@ -137,7 +137,7 @@ Any other number connects to the currently selected network. `111-1111` is also 
 `http://dreampi.local` updates live, every second.
 
 - **Network box:** the selected network (the box and the page's borders take the network's colour: orange for DCNow!, blue for DCNET unless you changed them in Settings) with DreamPi's status and its dot underneath, for example "Ready for calls". Tap the box (the small arrow) to show all status rows:
-  - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DCNow! or DCNET, call ended. A red warning box appears if the modem's USB connection goes away, or if it's a modem not known to work with DreamPi (its make/model, read from its USB info - nothing is ever sent to the modem itself - shows in the **System** card in Settings, with a note if it isn't a known-working one).
+  - **Modem:** what the modem is doing right now, taken from DreamPi's own log: looking for the modem, dial tone on, number dialed, carrier speed, online via DCNow! or DCNET, call ended. A red warning box appears if the modem's USB connection goes away, or if it's a modem not known to work with DreamPi (its make/model, read from its USB info - nothing is ever sent to the modem itself - shows in the **About** box in Settings, with a note if it isn't a known-working one).
   - **Pi:** CPU use, RAM and temperature on one line (for example "CPU 3%, RAM 128/923MB, 43°C"), with the uptime and the Pi's IP address underneath, plus the Pi's own power and heat warnings (under-voltage, throttling) now and since boot. A weak power supply is a common cause of an unstable Pi, so a red warning box appears at the top of the page while the Pi is short of power or overheating.
   - **Internet:** whether the Pi can reach the internet and resolve `dreamcast.online`, and whether it's connected by Ethernet or Wi-Fi. A red warning box appears at the top of the page when the internet is down.
   - **Hang up** (at the bottom when the box is open, only while DreamPi is in a call): ends a call that got stuck and gets the modem ready again. Tap it twice to confirm. It ends the call the way DreamPi ends one itself, by stopping `pppd` for DCNow! or `dcnet.rpi` for DCNET, after which DreamPi hangs up the modem and starts the dial tone. If DreamPi isn't ready for calls within 30 seconds, or the call process is already gone, it restarts the DreamPi service.
@@ -169,11 +169,11 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
   - **Level:** the brightness for that message. Grey means it uses the maximum brightness from Calibration; tap it to give the message its own brightness with a slider, and tap **Use global** to go back.
   - **Reset LED settings to defaults** restores the defaults in [LED messages](#led-messages) and the 8% maximum brightness (not the white balance or the wire order - those describe your LEDs, not a look to reset).
 - **Modules:** every module that can be switched, with its switch and a drag handle to move it; the top has priority (see [Modules](#modules)).
-- **System:**
-  - **Wi-Fi setup** (Wi-Fi module): at the top. Starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too, as rows with a name, "Secured" or "Open" and the signal strength; tap **Connect** on one, enter its password in the small box if it needs one, and connect (**Other network** is for a hidden one) - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
-  - The add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model, the operating system, whether a PIN is set, a link to this project on GitHub, and - once a modem has been detected - its make/model, with a note if it isn't a known-working one.
+- **System:** what acts on the Pi or the add-on.
+  - **Wi-Fi setup** (Wi-Fi module): starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too, as rows with a name, "Secured" or "Open" and the signal strength; tap **Connect** on one, enter its password in the small box if it needs one, and connect (**Other network** is for a hidden one) - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
   - **Updates** (Reboot and Update module): checks GitHub for a newer version of this add-on and for newer DreamPi scripts, with an **Update now** button (when installed from a git checkout).
-- **Reboot DreamPi** (Reboot and Update module; last card): reboots the whole Raspberry Pi after a confirmation; a call in progress is cut. The page comes back by itself when the Pi is up again (about a minute).
+- **Reboot DreamPi** (Reboot and Update module; below System): reboots the whole Raspberry Pi after a confirmation; a call in progress is cut. The page comes back by itself when the Pi is up again (about a minute).
+- **About** (last): read-only. The add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model, the operating system, whether a PIN is set, a link to this project on GitHub, and - once a modem has been detected - its make/model, with a note if it isn't a known-working one.
 
 The selected network is DCNow! after every reboot (there is no default-network setting; to go back to DCNow! by phone use a **Toggle DCNow!** or **Call DCNow!** number).
 
@@ -274,7 +274,7 @@ Two momentary push buttons are always installed, as quick network switches and (
 3. The temporary network closes and the Pi tries to join the network you chose.
 4. If it gets online, the status LED (if installed) goes solid **green** for a few seconds and everything returns to normal; DreamPi keeps using this Wi-Fi network (and any others saved this way) after a reboot too. If it can't get online, the LED goes **red** for a few seconds and the Pi goes back to step 1, hosting "DreamPi WiFi Config" again so you can try another network or password.
 
-While it's scanning or hosting the setup network, a status LED blinks light blue. Holding the assigned button(s) again, or the **Wi-Fi setup** control at the top of System in the settings, cancels it at any point and returns the Pi to its normal Wi-Fi connection.
+While it's scanning or hosting the setup network, a status LED blinks light blue. Holding the assigned button(s) again, or the **Wi-Fi setup** control in System in the settings, cancels it at any point and returns the Pi to its normal Wi-Fi connection.
 
 **Wiring:** no resistor needed; the Pi's internal pull-up is used on each pin, so it reads high normally and low while that button is held. GPIO17 and GPIO4 were picked as the defaults because neither has any other function on any Raspberry Pi model (an earlier version of this add-on defaulted the single button to GPIO15, which doubles as the Pi's UART RX pin and could pick up noise from the serial console/Bluetooth if that's in use). A pin or function change from Settings > GPIO takes effect within a couple of seconds, with no service restart. A toggle switch is wired the same way, between the pin and GND (any simple on/off switch; closed = on).
 
