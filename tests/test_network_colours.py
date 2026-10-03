@@ -72,6 +72,30 @@ class ModuleColourTests(unittest.TestCase):
         self.assertEqual(core.module_colours("numbers"), {})
 
 
+class TintTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = sandbox()
+
+    def tearDown(self):
+        cleanup(self.tmp)
+
+    def test_every_colour_has_a_coloured_background_until_the_user_says_otherwise(self):
+        self.assertEqual(core.module_tints("switcher"), {"dcnow": True, "dcnet": True})
+        self.assertEqual(core.set_module_tint("switcher", "dcnet", False), {"dcnow": True, "dcnet": False})
+        self.assertEqual(core.module_tints("switcher")["dcnet"], False)
+        self.assertEqual(core.set_module_tint("switcher", "dcnet", True), {"dcnow": True, "dcnet": True})
+
+    def test_unknown_things_are_refused(self):
+        self.assertIsNone(core.set_module_tint("switcher", "nope", False))
+        self.assertIsNone(core.set_module_tint("nomodule", "dcnow", False))
+        self.assertIsNone(core.set_module_tint("switcher", "dcnow", "yes"))
+
+    def test_the_dashboard_modules_each_have_a_colour_of_their_own(self):
+        for name in ("switcher", "clock", "players", "debuglog"):
+            self.assertTrue(core.module_colours(name), name)
+        self.assertEqual(core.module_colours("players"), {"players": "purple"})
+
+
 class LedTests(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox()
@@ -142,6 +166,21 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(api["primary"]["switcher"], "blue")
         self.post("/dcnow", {})
         self.post("/colour", {"module": "switcher", "key": "dcnow", "colour": "orange"})
+
+    def test_the_background_setting_goes_through_the_colour_endpoint_and_into_api(self):
+        r = json.loads(self.post("/colour", {"module": "switcher", "key": "dcnow", "tint": False}).read())
+        self.assertEqual(r["tints"], {"dcnow": False, "dcnet": True})
+        api = json.loads(urlopen(self.base + "/api", timeout=10).read())
+        self.assertEqual(api["tints"]["switcher"]["dcnow"], False)
+        self.assertEqual(api["primary_key"]["switcher"], "dcnow")                    # the box follows the selected network's setting
+        self.assertEqual(api["colours"]["switcher"]["dcnow"], "orange")              # the colour itself is untouched
+        self.post("/colour", {"module": "switcher", "key": "dcnow", "tint": True})
+
+    def test_a_bad_background_setting_is_refused(self):
+        from urllib.error import HTTPError
+        with self.assertRaises(HTTPError) as e:
+            self.post("/colour", {"module": "switcher", "key": "dcnow", "tint": "no"})
+        self.assertEqual(e.exception.code, 400)
 
     def test_a_bad_colour_is_refused(self):
         from urllib.error import HTTPError

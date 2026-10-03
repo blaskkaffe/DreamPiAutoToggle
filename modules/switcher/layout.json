@@ -83,7 +83,7 @@
      "title": "DCNow! colour",
      "sub": "Network",
      "control": {
-      "type": "swatches",
+      "type": "swatches", "tint": true,
       "key": "dcnow",
       "title": "Colour for DCNow!"
      }
@@ -93,7 +93,7 @@
      "title": "DCNET colour",
      "sub": "Network",
      "control": {
-      "type": "swatches",
+      "type": "swatches", "tint": true,
       "key": "dcnet",
       "title": "Colour for DCNET"
      }

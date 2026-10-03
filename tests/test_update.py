@@ -106,11 +106,13 @@ class CheckTests(unittest.TestCase):
 
     def test_nothing_checks_for_updates_by_itself(self):
         calls = []
-        up.fetch = lambda url: calls.append(url) or ""
-        up.status()                                       # the page asking for the status must not start a check
-        time.sleep(0.2)
+        saved = up.check, up.check_in_background
+        up.check = up.check_in_background = lambda *a, **k: calls.append(1)      # whoever would start a check is counted, nothing runs
+        try:
+            up.status()                                       # the page asking for the status must not start a check
+        finally:
+            up.check, up.check_in_background = saved
         self.assertEqual(calls, [])
-        self.assertEqual(up._info["time"], 0)
 
 
 class UpdateRunTests(unittest.TestCase):

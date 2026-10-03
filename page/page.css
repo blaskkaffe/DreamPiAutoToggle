@@ -16,7 +16,9 @@
  .rows .more{display:none} .rows.open .more{display:flex}
  .arrow{color:#aaa;flex:none;margin-left:8px;transition:transform .15s} .rows.open .arrow{transform:rotate(90deg)}
  .dot{display:inline-block;width:.65em;height:.65em;border-radius:50%;margin-right:8px;background:#888}
- @keyframes blink{50%{opacity:.12}}
+ @keyframes blink{50%{opacity:.12}} @keyframes breathe{50%{opacity:.45}}
+ @keyframes dotb1{0%{opacity:1}9%,100%{opacity:.12}} @keyframes dotb2{0%,18%{opacity:1}9%,27%,100%{opacity:.12}} @keyframes dotb3{0%,18%,36%{opacity:1}9%,27%,45%,100%{opacity:.12}}
+ @keyframes dotrainbow{0%,100%{background:#e33}17%{background:#dd3}33%{background:#3c5}50%{background:#3cc}67%{background:#46f}83%{background:#c4c}}   /* the status dot's preview of the LED effects */
  .ok{background:#2c2} .busy,.warn{background:#e0b400} .call{background:#b04cff} .bad,.off{background:#d33}
  .warnbox{background:#7a1f1f;border:var(--bw) solid #a84a4a;padding:10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.9em}
  .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r);text-align:center;background:rgba(var(--primary-rgb),.62);border:var(--bw) solid rgba(var(--primary-l-rgb),.8);line-height:1.35}
@@ -38,6 +40,9 @@
  .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r);font-size:1.1em;font-weight:600;letter-spacing:.02em}
  .pill-s.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgba(var(--primary-l-rgb),.82);text-shadow:0 1px 2px rgba(0,0,0,.55)}   /* a small button in a palette colour (c-<id>), like the colour pick's */
  .pill.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgba(var(--primary-l-rgb),.82)}
+ .pill.plain{background:var(--card)}   /* "Coloured background" off: a neutral fill, the border keeps the colour */
+ .dbox .wide{background:rgba(var(--primary-rgb),.62);border-color:rgba(var(--primary-l-rgb),.8)} .dbox.plain .now,.dbox.plain .wide{background:var(--card)}
+ .colourpick{display:inline-flex;align-items:center;gap:12px}
  .pill:active{filter:brightness(1.1)}
  .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
  .srow .pill-s{white-space:nowrap}
@@ -109,9 +114,23 @@
  .pop .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0} .pop .frow > span{color:var(--txt2);font-size:.9em}
  .btns{display:flex;gap:8px;flex:none} .srow.foot{padding:12px 0 8px}
  .srow.lk .pill-s,.srow.lk .tag{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgba(var(--primary-l-rgb),.82);text-shadow:0 1px 2px rgba(0,0,0,.55);color:#fff} .srow.lk .tag button{color:#fff}
- @keyframes lkblink{50%{background:rgba(42,42,42,.82);border-color:rgba(80,80,80,.85)}}   /* the LED is "off": the default dark grey of a button; the text keeps its colour */
- .srow.lk-blink .pill-s,.srow.lk-blink .tag{animation:lkblink 1s steps(1) infinite} .srow.lk-blink.lk-fast .pill-s,.srow.lk-blink.lk-fast .tag{animation-duration:.4s}   /* a row that shows an LED look: coloured buttons and tags, blinking between the colour and the grey as the LED does (any later effect, such as breathing, also runs between the two) */
- @media(prefers-reduced-motion:reduce){.srow.lk-blink .pill-s,.srow.lk-blink .tag{animation:none}}
+ /* a row that shows an LED look: coloured buttons and tags that run the effect between the row's colour and the default dark grey of a
+    button (the LED "off"); the text keeps its colour. Periods as in modules/led/netswitch_led.py (PERIOD), slow and fast. */
+ @keyframes lkblink{50%{background:rgba(42,42,42,.82);border-color:rgba(80,80,80,.85)}}
+ @keyframes lkfade{0%,100%{background:rgba(var(--primary-rgb),.82);border-color:rgba(var(--primary-l-rgb),.82)}50%{background:rgba(42,42,42,.82);border-color:rgba(80,80,80,.85)}}
+ @keyframes lkb1{0%{background:rgba(var(--primary-rgb),.82);border-color:rgba(var(--primary-l-rgb),.82)}9%,100%{background:rgba(42,42,42,.82);border-color:rgba(80,80,80,.85)}}
+ @keyframes lkb2{0%,18%{background:rgba(var(--primary-rgb),.82);border-color:rgba(var(--primary-l-rgb),.82)}9%,27%,100%{background:rgba(42,42,42,.82);border-color:rgba(80,80,80,.85)}}
+ @keyframes lkb3{0%,18%,36%{background:rgba(var(--primary-rgb),.82);border-color:rgba(var(--primary-l-rgb),.82)}9%,27%,45%,100%{background:rgba(42,42,42,.82);border-color:rgba(80,80,80,.85)}}
+ @keyframes lkrainbow{0%,100%{background:hsla(0,75%,45%,.82);border-color:hsla(0,80%,70%,.82)}17%{background:hsla(60,75%,40%,.82);border-color:hsla(60,80%,65%,.82)}33%{background:hsla(120,65%,38%,.82);border-color:hsla(120,70%,65%,.82)}50%{background:hsla(180,75%,38%,.82);border-color:hsla(180,80%,65%,.82)}67%{background:hsla(240,75%,52%,.82);border-color:hsla(240,80%,75%,.82)}83%{background:hsla(300,65%,45%,.82);border-color:hsla(300,70%,72%,.82)}}
+ .srow.lk-fx .pill-s,.srow.lk-fx .tag{animation:var(--lkn) var(--lkd) var(--lkt) infinite}
+ .srow.lk-blink{--lkn:lkblink;--lkd:1s;--lkt:steps(1)} .srow.lk-blink.lk-fast{--lkd:.4s}
+ .srow.lk-fade{--lkn:lkfade;--lkd:3s;--lkt:ease-in-out} .srow.lk-fade.lk-fast{--lkd:1.2s}
+ .srow.lk-breathe{--lkn:lkfade;--lkd:4s;--lkt:ease-in-out} .srow.lk-breathe.lk-fast{--lkd:1.6s}
+ .srow.lk-blink1{--lkn:lkb1;--lkd:1.6s;--lkt:steps(1)} .srow.lk-blink1.lk-fast{--lkd:.8s}
+ .srow.lk-blink2{--lkn:lkb2;--lkd:1.6s;--lkt:steps(1)} .srow.lk-blink2.lk-fast{--lkd:.8s}
+ .srow.lk-blink3{--lkn:lkb3;--lkd:1.6s;--lkt:steps(1)} .srow.lk-blink3.lk-fast{--lkd:.8s}
+ .srow.lk-rainbow{--lkn:lkrainbow;--lkd:6s;--lkt:linear} .srow.lk-rainbow.lk-fast{--lkd:2s}
+ @media(prefers-reduced-motion:reduce){.srow.lk-fx .pill-s,.srow.lk-fx .tag{animation:none}}
  .infobtn{flex:none;width:34px;height:34px;padding:0;border-radius:50%;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#ddd;font:italic 600 1.05em Georgia,serif;line-height:1}
  .pop .infotext{font-size:.9em;color:var(--txt2);margin-bottom:10px}
  .tgl{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:4px}

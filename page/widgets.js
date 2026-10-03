@@ -23,10 +23,12 @@ function sh(el,show){setStyle(el,"display",show?"":"none")}
 function colourId(ref,mod){if(!ref)return"";var c=S.colours||LAY.colours||{};
  if(ref.indexOf(".")>0){var p=ref.split(".");return(c[p[0]]||{})[p[1]]||""}
  return(c[mod]||{})[ref]||ref}
+// Whether the background of a colour is coloured (the default) or neutral: the "Coloured background" box next to a colour pick
+function tintOf(ref,mod){if(!ref)return true;var p=ref.indexOf(".")>0?ref.split("."):[mod,ref],t=(S.tints||LAY.tints||{})[p[0]]||{};return t[p[1]]!==false}
 // An element with its own colour (a button of the module's colour key): it follows S.colours live and is not repainted with the
 // module's primary colour, so the network buttons keep the colours chosen in Settings whichever network is selected.
 function colourClass(el,ref,mod){el.setAttribute("data-own-colour","1");
- function apply(){var id=colourId(val(ref),mod),old=el._cc;if(old===id)return;
+ function apply(){var r=val(ref),id=colourId(r,mod),old=el._cc;el.classList.toggle("plain",!tintOf(r,mod));if(old===id)return;
   if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._cc=id}
  apply();UPD.push(apply)}
 // ---- talking to the server
@@ -76,13 +78,15 @@ function hideEmptyBoxes(){var bs=document.querySelectorAll("[data-box]"),i,j;
 // in /api primary); the top module in the picker that has one also sets the page's own. A module below with another one
 // only uses it for itself.
 var themeKey="";
-function applyTheme(){var p={},k;for(k in (LAY.primary||{}))p[k]=LAY.primary[k];for(k in (S.primary||{}))p[k]=S.primary[k];
- var key=JSON.stringify(p);if(key===themeKey)return;themeKey=key;
+function applyTheme(){var p={},pk={},k;for(k in (LAY.primary||{}))p[k]=LAY.primary[k];for(k in (S.primary||{}))p[k]=S.primary[k];
+ for(k in (LAY.primary_key||{}))pk[k]=LAY.primary_key[k];for(k in (S.primary_key||{}))pk[k]=S.primary_key[k];
+ var key=JSON.stringify([p,pk,S.tints||LAY.tints||{}]);if(key===themeKey)return;themeKey=key;
  var els=document.querySelectorAll("[data-mod]"),i,root="";
  for(i=0;i<(LAY.modules||[]).length&&!root;i++)root=p[LAY.modules[i]]||"";
  function paint(el,id){var old=el._pc;if(old===id)return;if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._pc=id}
  paint(document.body,root);
- for(i=0;i<els.length;i++)if(!els[i].hasAttribute("data-own-colour"))paint(els[i],p[els[i].getAttribute("data-mod")]||"")}
+ for(i=0;i<els.length;i++)if(!els[i].hasAttribute("data-own-colour")){var m=els[i].getAttribute("data-mod");paint(els[i],p[m]||"");
+  els[i].classList.toggle("plain",!!pk[m]&&!tintOf(m+"."+pk[m],m))}}   // a neutral background where the user switched the colour's background off
 // ---- data sources a module asked for in its layout ("data": {"players": {"url": "/players", "every": 60}}): fetched into S.<name>
 // every N seconds while the page is on screen (with "when": "settings", only while Settings is open); "retry_if": "busy" asks again
 // after "retry" seconds while that field of the answer is true, and after a failed request
@@ -150,7 +154,10 @@ W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(
 function paletteOrder(){var p=(LAY.palette||[]).slice();return p.filter(function(c){return c.id.indexOf("bright-")!==0}).concat(p.filter(function(c){return c.id.indexOf("bright-")===0}))}
 W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri",text:s.label||"Colour","aria-haspopup":"dialog"}),
  grid=h("span",{"class":"swatches grid"}),pop=h("div",{"class":"colours"},[h("div",{"class":"t",text:s.title||"Pick a colour"}),grid]),
- el=h("span",{"class":"colourpick"},[btn,pop]),btns={},names={},p=ui.popup(pop);
+ tint=s.tint?h("input",{type:"checkbox","class":"cbox pri",title:"Coloured background (off = neutral)","aria-label":(s.title||"Colour")+": coloured background"}):null,
+ el=h("span",{"class":"colourpick"},[tint,btn,pop]),btns={},names={},p=ui.popup(pop);
+ if(tint)colourClass(tint,s.key,s.mod);          // the tick box has the colour of its pick
+ if(tint)tint.onchange=function(){var want=tint.checked;post("/colour",{module:s.mod,key:s.key,tint:want},function(r){if(r){refresh();ctx.saved()}else tint.checked=!want})};
  paletteOrder().forEach(function(c){names[c.id]=c.name;
   var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui+";--cl:"+c.ui_l,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
   b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){p.close();refresh();ctx.saved()}})};grid.appendChild(b)});
@@ -159,7 +166,8 @@ W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri
   if(btn._cc!==cur){if(btn._cc)btn.classList.remove("c-"+btn._cc);if(cur)btn.classList.add("c-"+cur);btn._cc=cur;
    btn.setAttribute("aria-label",(s.label||"Colour")+": "+(names[cur]||cur||"not set"))}
   for(var id in btns){var on=id===cur;btns[id].classList.toggle("sel",on);btns[id].setAttribute("aria-pressed",on?"true":"false")}}
- UPD.push(paint);paint();hook("settingsClose",function(){p.close()});return el};
+ function paintTint(){if(tint)tint.checked=tintOf(s.key,s.mod)}
+ UPD.push(paint);UPD.push(paintTint);paint();paintTint();hook("settingsClose",function(){p.close()});return el};
 // ---- a block that opens and closes (the debug log bar)
 W.expander=function(s,ctx){var open=false,body=h("div",{"class":"xbody"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx)),
  b=h("button",{type:"button","class":"wide"},[h("span",{text:s.label}),h("span",{"class":"arrow",html:"&#9656;"})]),
@@ -266,7 +274,9 @@ function editRow(o){var sub=h("span",{"class":"sub"}),title=document.createTextN
   // the row's buttons and tags take a colour ({ui, ui_l}: the fill and its lighter border) and, for effect "blink", blink like the LED
   setLook:function(c,effect,speed){var rgb=function(x){return parseInt(x.slice(1,3),16)+","+parseInt(x.slice(3,5),16)+","+parseInt(x.slice(5,7),16)};
    row.style.setProperty("--primary-rgb",rgb(c.ui));row.style.setProperty("--primary-l-rgb",rgb(c.ui_l));
-   row.classList.add("lk");row.classList.toggle("lk-blink",effect==="blink");row.classList.toggle("lk-fast",speed==="fast")},
+   var fx=effect&&effect!=="solid"?"lk-"+effect:"";
+   row.classList.add("lk");if(row._fx!==fx){if(row._fx){row.classList.remove(row._fx);row.classList.remove("lk-fx")}if(fx){row.classList.add(fx);row.classList.add("lk-fx")}row._fx=fx}
+   row.classList.toggle("lk-fast",speed==="fast")},
   setSub:function(t){setLines(sub,t);sh(sub,!!t)},
   setList:function(items,onRemove){below.innerHTML="";items=items||[];sh(below,items.length>0);if(!items.length)return;
    var tags=h("div",{"class":"tags"});

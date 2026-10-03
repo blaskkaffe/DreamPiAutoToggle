@@ -14,7 +14,7 @@ host.insertBefore(calRow.el,calPop);host.insertBefore(list,calPop);host.insertBe
 var editPop=h("div",{"class":"gpop"}),addPop=h("div",{"class":"gpop"});host.appendChild(editPop);host.appendChild(addPop);
 var pCal=ui.popup(calPop),pEdit=ui.popup(editPop),pAdd=ui.popup(addPop),editing=null,adding=null;
 pEdit.onclose=function(){editing=null};pAdd.onclose=function(){adding=null};
-pCal.onclose=function(){if(wbOn)setWb(false)};                              // the white test ends with the pop-up
+pCal.onclose=function(){stopHold()};                              // the white test ends with the pop-up
 // ---- loading and saving
 function load(){xhrJson("GET","/ledconfig",function(r){if(!r)return;
  cfg=r.config;defaults=r.defaults;messages=r.messages;cats=r.categories;priority=r.priority;colours=r.colours;tokenUi=r.token_ui;effects=r.effects;ledCount=r.count||1;
@@ -23,8 +23,10 @@ function load(){xhrJson("GET","/ledconfig",function(r){if(!r)return;
 function save(){clearTimeout(timer);timer=setTimeout(function(){
  post("/ledconfig",cfg,function(r){if(r)ctx.saved();refresh()})},250)}
 // ---- the rows
+function isToken(id){return colours.tokens.some(function(t){return t.id===id})}
+function tokenColours(){return (S.led&&S.led.tokens)||tokenUi}      // the networks' colours as they are now (they follow the switch)
 function colourOf(g){for(var i=0;i<colours.palette.length;i++)if(colours.palette[i].id===g.colour)return colours.palette[i];
- for(var j=0;j<colours.tokens.length;j++)if(colours.tokens[j].id===g.colour)return {id:g.colour,name:colours.tokens[j].name,ui:tokenUi[g.colour].ui,ui_l:tokenUi[g.colour].ui_l};
+ for(var j=0;j<colours.tokens.length;j++)if(colours.tokens[j].id===g.colour){var tk=tokenColours()[g.colour];return {id:g.colour,name:colours.tokens[j].name,ui:tk.ui,ui_l:tk.ui_l}}
  return {id:g.colour,name:g.colour,ui:"#888888",ui_l:"#aaaaaa"}}
 function effectName(g){var n=g.effect;effects.forEach(function(e){if(e[0]===g.effect)n=e[1]});return g.effect==="solid"?n.toLowerCase():g.speed+" "+n.toLowerCase()}
 function pct(b){var v=b*100;return (v<10&&v>0?String(parseFloat(v.toFixed(1))):Math.round(v))+"%"}
@@ -109,15 +111,59 @@ function showCal(){["r","g","b"].forEach(function(c){var v=Math.round(cfg.white_
 calRow.btn.onclick=function(e){if(!pCal.isOpen())showCal();pCal.toggle(calRow.btn,e)};
 $("cal-done").onclick=function(){pCal.close()};
 ["r","g","b"].forEach(function(c){$("wb-"+c).oninput=function(){cfg.white_balance[c]=Math.round(this.value)/255;$("wb-"+c+"-v").textContent=Math.round(this.value);save()}});
-function setWb(on){wbOn=on;$("wb-preview").classList.toggle("on",on);$("wb-preview").textContent=on?"Stop preview":"Preview on LED";
- clearInterval(wbBeat);
- var x=new XMLHttpRequest();x.open("POST",on?"/wbtest":"/wbtestdone",true);x.setRequestHeader("X-Requested-With","netswitch");x.send();
- if(on)wbBeat=setInterval(function(){var q=new XMLHttpRequest();q.open("POST","/wbtest",true);q.setRequestHeader("X-Requested-With","netswitch");q.send()},1000)}
+// "Preview on LED": the LED holds one solid colour (white for the white balance, or the colour being calibrated) while this is on;
+// the page repeats the request every second, so a closed page stops it.
+var holdColour="#ffffff";
+function holdPost(){var q=new XMLHttpRequest();q.open("POST","/wbtest",true);q.setRequestHeader("X-Requested-With","netswitch");q.setRequestHeader("Content-Type","application/json");q.send(JSON.stringify({colour:holdColour}))}
+function stopHold(){if(!wbOn)return;wbOn=false;clearInterval(wbBeat);var x=new XMLHttpRequest();x.open("POST","/wbtestdone",true);x.setRequestHeader("X-Requested-With","netswitch");x.send();
+ $("wb-preview").classList.remove("on");$("wb-preview").textContent="Preview on LED";if(colPreview){colPreview.classList.remove("on");colPreview.textContent="Preview on LED"}}
+function startHold(colour){holdColour=colour;if(wbOn){holdPost();return}wbOn=true;holdPost();wbBeat=setInterval(holdPost,1000)}
+function setWb(on){if(on){startHold("#ffffff");$("wb-preview").classList.add("on");$("wb-preview").textContent="Stop preview"}else stopHold()}
 $("wb-preview").onclick=function(){setWb(!wbOn)};
 $("wb-reset").onclick=function(){cfg.white_balance={r:1,g:1,b:1};showCal();save()};
 $("led-bright").oninput=function(){cfg.max_brightness=Math.round(sliderToBright(this.value)*1000)/1000;$("led-bright-v").textContent=pct(cfg.max_brightness);paintAll();save()};
+// ---- Colours: how each palette colour looks on screen and on the LED (the LED's red need not be the page's red)
+var colRow=editRow({title:"Colours",button:"Adjust",aria:"Adjust the colours"}),colPop=h("div",{"class":"gpop"}),pCol=ui.popup(colPop),colSel=null,colPreview=null,colChanged=false,colTimer=null,pal=[];
+colRow.setSub("How each colour looks on screen and on the LED");
+host.insertBefore(colRow.el,list);host.appendChild(colPop);
+function mixWhite(hex){var n=[1,3,5].map(function(i){var v=parseInt(hex.substr(i,2),16);return Math.round(v+(255-v)*0.45)});return "#"+n.map(function(v){return (v<16?"0":"")+v.toString(16)}).join("")}
+function rgbOf(hex){return parseInt(hex.substr(1,2),16)+","+parseInt(hex.substr(3,2),16)+","+parseInt(hex.substr(5,2),16)}
+function applyVars(c){var s=document.documentElement.style,l=mixWhite(c.ui);   // the page follows at once; the next page load has it from the server
+ s.setProperty("--c-"+c.id,c.ui);s.setProperty("--c-"+c.id+"-l",l);s.setProperty("--c-"+c.id+"-rgb",rgbOf(c.ui));s.setProperty("--c-"+c.id+"-l-rgb",rgbOf(l));
+ (LAY.palette||[]).forEach(function(p){if(p.id===c.id){p.ui=c.ui;p.ui_l=l}});
+ colours.palette.forEach(function(p){if(p.id===c.id){p.ui=c.ui;p.ui_l=l}})}
+function colSave(body,after){post("/ledcolours",body,function(r){if(r&&r.colours){pal=r.colours;if(after)after()}})}
+function openCol(btn,e){if(pCol.isOpen()){pCol.toggle(btn,e);return}
+ xhrJson("GET","/ledcolours",function(r){if(!r)return;pal=r.colours;colChanged=false;fillCol();pCol.toggle(btn,e)})}
+function fillCol(){colPop.innerHTML="";var cur=null;pal.forEach(function(c){if(c.id===colSel)cur=c});if(!cur&&pal.length){cur=pal[0];colSel=cur.id}
+ colPop.appendChild(h("div",{"class":"t",text:"Colours: the left half of a ball is how it looks on screen, the right half how it is sent to the LED"}));
+ var grid=h("span",{"class":"swatches grid"});
+ pal.filter(function(c){return c.id.indexOf("bright-")!==0}).concat(pal.filter(function(c){return c.id.indexOf("bright-")===0})).forEach(function(c){
+  var b=h("button",{type:"button","class":"swatch"+(c.id===colSel?" sel":""),style:"--c:linear-gradient(90deg,"+c.ui+" 50%,"+c.led+" 50%);--cl:"+mixWhite(c.ui),"aria-label":c.name});
+  b.onclick=function(){colSel=c.id;stopHold();fillCol()};grid.appendChild(b)});
+ colPop.appendChild(grid);
+ if(!cur)return;
+ var uiIn=h("input",{type:"color",value:cur.ui,"aria-label":cur.name+" on screen"}),ledIn=h("input",{type:"color",value:cur.led,"aria-label":cur.name+" on the LED"}),
+  changed=cur.ui!==cur.ui_default||cur.led!==cur.led_default;
+ colPreview=h("button",{type:"button","class":"pill-s"+(wbOn&&holdColour===cur.led?" on":""),text:wbOn&&holdColour===cur.led?"Stop preview":"Preview on LED"});
+ uiIn.oninput=function(){cur.ui=uiIn.value;applyVars(cur);colChanged=true;clearTimeout(colTimer);colTimer=setTimeout(function(){colSave({id:cur.id,ui:cur.ui})},250)};
+ ledIn.oninput=function(){cur.led=ledIn.value;colChanged=true;if(wbOn&&colPreview.classList.contains("on"))startHold(cur.led);
+  clearTimeout(colTimer);colTimer=setTimeout(function(){colSave({id:cur.id,led:cur.led})},250)};
+ colPreview.onclick=function(){if(wbOn&&colPreview.classList.contains("on")){stopHold();return}startHold(cur.led);colPreview.classList.add("on");colPreview.textContent="Stop preview"};
+ colPop.appendChild(h("div",{"class":"frow"},[h("span",{text:cur.name+" on screen"}),uiIn]));
+ colPop.appendChild(h("div",{"class":"frow"},[h("span",{text:cur.name+" on the LED"}),h("span",{"class":"ctls"},[ledIn,colPreview])]));
+ var reset=h("button",{type:"button","class":"pill-s",text:"Reset this colour"}),resetAll=h("button",{type:"button","class":"pill-s danger",text:"Reset all"}),done=h("button",{type:"button","class":"pill-s",text:"Done"});
+ reset.disabled=!changed;
+ reset.onclick=function(){stopHold();colChanged=true;colSave({reset:cur.id},fillCol)};
+ resetAll.onclick=function(){if(!confirm("Put every colour back to the values the add-on shipped with?"))return;stopHold();colChanged=true;colSave({reset:"all"},fillCol)};
+ done.onclick=function(){pCol.close()};
+ colPop.appendChild(h("div",{"class":"bar"},[reset,resetAll,done]));
+ colPop.appendChild(h("div",{"class":"sub",text:"The LED value is the colour asked for, before the white balance and the brightness. Use Preview on LED to see it."}))}
+colRow.btn.onclick=function(e){openCol(colRow.btn,e)};
+pCol.onclose=function(){stopHold();if(colChanged){colChanged=false;reloadInSettings()}};
 // ---- the page's hooks
 hook("settingsOpen",load);
-hook("settingsClose",function(){if(wbOn)setWb(false)});
-hook("api",function(d){if(cfg&&d.led&&d.led.count&&d.led.count!==ledCount){ledCount=d.led.count;paintAll()}});
+hook("settingsClose",function(){stopHold()});
+hook("api",function(d){if(cfg&&d.led&&d.led.count&&d.led.count!==ledCount){ledCount=d.led.count;paintAll()}
+ if(cfg)cfg.groups.forEach(function(g){var r=rowOf[g.id];if(r&&isToken(g.colour))r.setLook(colourOf(g),g.effect,g.speed)})});   // a row in a network's colour follows the switch
 });

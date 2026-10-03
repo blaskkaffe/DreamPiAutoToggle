@@ -16,6 +16,6 @@
    {"type": "row", "title": "World time", "sub": "A scrolling list of cities on the bottom line; tap the clock to see the time zone map",
     "control": {"type": "toggle", "bind": "@clock.world", "post": "/clock/world", "label": "World time"}}]},
   {"box": "appearance", "title": "Appearance", "items": [
-   {"type": "row", "title": "Clock colour", "sub": "Module", "control": {"type": "swatches", "key": "clock", "title": "Colour of the clock"}}]}
+   {"type": "row", "title": "Clock colour", "sub": "Module", "control": {"type": "swatches", "tint": true, "key": "clock", "title": "Colour of the clock"}}]}
  ]
 }
