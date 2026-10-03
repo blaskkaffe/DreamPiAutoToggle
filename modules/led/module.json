@@ -4,6 +4,6 @@
  "enabled": true,
  "visible": true,
  "order": 40,
- "ui": 1,
+ "ui": 2,
  "web": "netswitch_led_web"
 }

@@ -4,6 +4,6 @@
  "enabled": false,
  "visible": true,
  "order": 50,
- "ui": 1,
+ "ui": 2,
  "web": "netswitch_debuglog"
 }

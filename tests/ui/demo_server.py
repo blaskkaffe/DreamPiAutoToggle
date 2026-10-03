@@ -2,7 +2,7 @@
 service on a sandbox (all paths in a temp dir). Switches via environment:
 LEDS=n (default 3), WIFI=1, WIFIDEMO=1 (dummy Wi-Fi networks + the setup loop),
 BG=1 (the Dreamcast background module on), FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log), FAKEPLAYERS=1 (made-up
-players), OFF=led,wifi,... (modules switched off in the Modules menu; OFF=all = the base only), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
+players), OFF=led,wifi,... (modules switched off in the module picker; OFF=all = every module the picker can switch, only the always-on ones stay), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
 import sys, os, threading, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from support import web, core, sandbox
@@ -51,7 +51,7 @@ if os.environ.get("FAKEUPDATE"):
             "Updating 3baa024..21d1ad8\nFast-forward\n page/players.js | 84 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
             " 4 files changed, 64 insertions(+), 37 deletions(-)\n\x1b[31mERROR\x1b[0m: could not write /etc/systemd/system/dreampi-netswitch.service (Read-only file system)\n"
             "A_very_long_unbroken_path_/opt/dreampi-netswitch/page/players_and_more_and_more_and_more_and_more.js\nfailed\n")
-if os.environ.get("OFF"):         # modules switched off, as from the Modules menu
+if os.environ.get("OFF"):         # modules switched off, as from the module picker (the always-on ones can't be)
     for name in (core.module_names() if os.environ["OFF"] == "all" else os.environ["OFF"].split(",")):
         core.save_module_enabled(name, False)
     web.refresh_page(force=True)

@@ -1,12 +1,7 @@
-<!--slot:sections_b-->
-<div id="led-section" class="sec" style="display:none;position:relative">
-<h2>Status LED<span id="led-count-t"></span> <span class="saved led-saved">Saved &#10003;</span></h2>
-<div class="card" id="led-card">
  <div class="srow" id="led-cal-row"><span>Calibration<span class="sub">White balance and maximum brightness</span></span>
   <button class="pill-s" id="cal-open" type="button">Adjust</button></div>
  <table class="ledtab"><thead><tr><th>Message</th><th>Colour</th><th>Effect</th><th>Level</th></tr></thead><tbody id="led-rows"></tbody></table>
  <div class="srow" id="led-reset-row"><button class="pill-s" id="led-reset" type="button">Reset LED settings to defaults</button></div>
-</div>
 <div id="cal-pop" class="pop big" role="dialog" aria-label="NeoPixel calibration"><div class="t">White balance and maximum brightness</div>
  <div class="range grid"><span>Red</span><input type="range" id="wb-r" aria-label="Red" min="0" max="255" step="1" style="accent-color:#f33"><span id="wb-r-v"></span></div>
  <div class="range grid"><span>Green</span><input type="range" id="wb-g" aria-label="Green" min="0" max="255" step="1" style="accent-color:#3f3"><span id="wb-g-v"></span></div>
@@ -25,8 +20,3 @@
 <div id="lvl-pop" class="pop"><div class="t" id="lvl-t"></div>
  <div class="range"><input type="range" id="lvl-r" aria-label="Level brightness" min="0" max="1000" step="1"><span id="lvl-v" style="width:3em;text-align:right"></span></div>
  <div class="bar"><button class="pill-s" id="lvl-base" type="button">Use global</button><button class="pill-s" id="lvl-done" type="button">Done</button></div></div>
-</div>
-<!--slot:buttons_rows-->
- <div class="srow" id="gpio-led-row" style="flex-wrap:wrap;display:none"><span>LED</span>
-  <div style="display:flex;gap:8px"><input type="number" id="led-count-i" min="1" max="300" aria-label="LEDs connected"><select class="ord" id="led-order" aria-label="Wire order"></select><select class="ord" id="led-gpio" aria-label="LED output pin"></select></div>
-  <div class="sub" style="flex-basis:100%;margin:-6px 0 2px">LEDs connected, wire order and output pin</div></div>

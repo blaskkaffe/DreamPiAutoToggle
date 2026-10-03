@@ -1,0 +1,8 @@
+{
+ "settings": [
+  {"box": "system", "title": "System", "items": [
+   {"type": "info", "source": "/about"},
+   {"type": "row", "title": "GitHub", "sub": "Source, instructions and updates",
+    "control": {"type": "link", "label": "Open", "href": "https://github.com/blaskkaffe/DreamPiAutoToggle", "aria": "Open the project on GitHub"}}]}
+ ]
+}

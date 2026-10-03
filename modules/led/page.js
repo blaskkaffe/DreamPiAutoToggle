@@ -1,21 +1,14 @@
-// Status LED module, page side: the NeoPixel calibration and Status LED sections of Settings (markup in page.html,
-// styles in page.css). Runs in the same script as the base page.js, after it, and only exists in the page while the
-// module is installed and switched on. Settings opening / closing / Escape reach it through the page's hooks.
-var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledGroups=[],ledEffects=[],ledCount=1,ledGpio=18;
+// Status LED module, page side: the custom widget "led-messages" of the Status LED box in Settings (markup in messages.html,
+// styles in page.css; layout.json puts it in the box). The LED rows of the GPIO box are a standard form (layout.json).
+// The page builds it when it draws the layout and calls it with the empty host element that holds messages.html; settings
+// opening / closing / Escape reach it through the page's hooks.
+custom("led-messages",function(host,ctx){
+var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledGroups=[],ledEffects=[],ledCount=1;
 var wbPreviewOn=false,wbHeartbeat=null;
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
   netLed=r.net_led;netBound=r.net_bound;
-  led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledGroups=r.groups;ledEffects=r.effects;ledCount=r.count||1;ledGpio=r.gpio||18;
-  $("led-section").style.display=r.installed?"block":"none";   // hidden while the LED count is 0 (install.sh --leds=0)
-  $("gpio-led-row").style.display=r.installed?"flex":"none";   // the LED row of the GPIO card goes with it
-  
-  $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";
-  if(!$("led-order").options.length)$("led-order").innerHTML=r.orders.map(function(o){
-   return '<option value="'+o+'">'+o+'</option>'}).join("");
-  if(!$("led-gpio").options.length)$("led-gpio").innerHTML=r.gpios.map(function(g){
-   return '<option value="'+g+'">GPIO'+g+'</option>'}).join("");
-  $("led-count-i").value=ledCount;$("led-gpio").value=ledGpio;$("led-order").value=led.order;
+  led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledGroups=r.groups;ledEffects=r.effects;ledCount=r.count||1;
   buildLed()};x.send()}
 // The DCNow! / DCNET messages show the networks' global colour (Settings > Network colours): the server gives its LED value.
 var netLed={},netBound={};
@@ -44,7 +37,6 @@ function buildLed(){
  showLed()}
 function effectName(e){for(var i=0;i<ledEffects.length;i++)if(ledEffects[i][0]==e)return ledEffects[i][1];return e}
 function showLed(){$("led-bright").value=brightToSlider(led.max_brightness);$("led-bright-v").textContent=pct(led.max_brightness);
- $("led-order").value=led.order;
  showWb();
  ledStates.forEach(function(s){var st=s[0],c=msgOf(st);
   $("c-"+st).value=colourOf(st);$("c-"+st).disabled=!!netBound[st];$("c-"+st).title=netBound[st]?"The network's colour: change it in Settings > Network colours":"";$("e-"+st).checked=c.enabled!==false;showRow(st);showFx(st);showLvl(st)})}
@@ -123,13 +115,9 @@ function setWbPreview(on){wbPreviewOn=on;$("wb-preview").classList.toggle("on",o
   var h=new XMLHttpRequest();h.open("POST","/wbtest",true);h.setRequestHeader("X-Requested-With","netswitch");h.send()},1000)}
 $("wb-preview").onclick=function(){setWbPreview(!wbPreviewOn)};
 $("wb-reset").onclick=function(){led.white_balance={r:1,g:1,b:1};showWb();saveLed()};
-var ledHw=false;   // the last change came from the LED row in the GPIO card: confirm there too
-function saveLed(hw){if(hw===true)ledHw=true;clearTimeout(ledTimer);ledTimer=setTimeout(function(){
- var x=new XMLHttpRequest();x.open("POST","/ledconfig",true);x.setRequestHeader("Content-Type","application/json");
- led.count=ledCount;led.gpio=ledGpio;
- x.onload=function(){if(x.status!=200)return;var els=Array.prototype.slice.call(document.querySelectorAll(".led-saved"));if(ledHw){els.push($("gpio-saved"));ledHw=false}
-  els.forEach(function(e){e.classList.add("show")});
-  setTimeout(function(){els.forEach(function(e){e.classList.remove("show")})},1200);refresh()};x.send(JSON.stringify(led))},250)}
+function saveLed(){clearTimeout(ledTimer);ledTimer=setTimeout(function(){
+ var x=new XMLHttpRequest();x.open("POST","/ledconfig",true);x.setRequestHeader("X-Requested-With","netswitch");x.setRequestHeader("Content-Type","application/json");
+ x.onload=function(){if(x.status!=200)return;ctx.saved();refresh()};x.send(JSON.stringify(led))},250)}
 // Logarithmic slider: the left half covers 0-9 %, where an indicator LED is most useful.
 var LOG_BASE=100;
 function sliderToBright(p){return (Math.pow(LOG_BASE,p/1000)-1)/(LOG_BASE-1)}
@@ -139,11 +127,9 @@ $("led-bright").oninput=function(){led.max_brightness=Math.round(sliderToBright(
  ledStates.forEach(function(s){showLvl(s[0])});saveLed()};
 $("led-reset").onclick=function(){var order=led.order,wb=led.white_balance;   // wiring facts, not a look to reset
  led=JSON.parse(JSON.stringify(ledDefaults));led.order=order;led.white_balance=wb;showLed();saveLed()};
-$("led-count-i").onchange=function(){var n=parseInt(this.value,10);
- if(isNaN(n))return;ledCount=Math.max(1,Math.min(300,n));this.value=ledCount;
- $("led-count-t").textContent=ledCount>1?" ("+ledCount+" LEDs)":"";saveLed(true)};
-$("led-gpio").onchange=function(){ledGpio=parseInt(this.value,10);saveLed(true)};
-$("led-order").onchange=function(){led.order=this.value;saveLed(true)};
 // hooks of the base page
 hook("settingsOpen",loadLed);                                                // Settings opened
 hook("settingsClose",function(){if(wbPreviewOn)setWbPreview(false)});   // Settings closed (the pop-ups close themselves)
+// the LED count is set in the GPIO box: follow it
+hook("api",function(d){if(led&&d.led&&d.led.count&&d.led.count!==ledCount){ledCount=d.led.count;buildLed()}});
+});

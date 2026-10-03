@@ -66,14 +66,24 @@ MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules"
 MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"led": true, "wifi": false, ...} set from the module picker
 
 
+_manifests = {}     # path -> (mtime, parsed): module.json is asked for many times a second, it changes almost never
+
+
 def module_manifest(name):
     """The module's module.json as a dict, or None when it isn't installed."""
     if not re.match(r"^[a-z][a-z0-9_]*$", name or ""):
         return None
+    path = os.path.join(MODULES_DIR, name, "module.json")
     try:
-        with open(os.path.join(MODULES_DIR, name, "module.json")) as f:
+        mtime = os.path.getmtime(path)
+        cached = _manifests.get(path)
+        if cached and cached[0] == mtime:
+            return cached[1]
+        with open(path) as f:
             data = json.load(f)
-        return data if isinstance(data, dict) else None
+        data = data if isinstance(data, dict) else None
+        _manifests[path] = (mtime, data)
+        return data
     except (IOError, OSError, ValueError):
         return None
 

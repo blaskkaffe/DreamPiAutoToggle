@@ -279,8 +279,55 @@ def status():
 
 
 # ---------------------------------------------------------------- the page's side (loaded by the web service)
+def games_line(players):
+    """["Game (3)", "Other game (1)"], most played first (the carousel shows them joined with a bullet)."""
+    n, order = {}, []
+    for p in players:
+        if not p.get("game"):
+            continue
+        if p["game"] not in n:
+            n[p["game"]] = 0
+            order.append(p["game"])
+        n[p["game"]] += 1
+    order.sort(key=lambda g: -n[g])          # stable: ties keep their order of appearance
+    return ["%s (%d)" % (g, n[g]) for g in order]
+
+
+def view():
+    """The cache plus what the page's widgets show (layout.json binds to these): parts (the counts), games (the carousel),
+    list (the players), status (what each source said) and links."""
+    out = status()
+    players = out.get("players") or []
+    bad = [x for x in (out.get("sources") or []) if not x["ok"]]
+    nets = (("DCNow!", "switcher.dcnow"), ("DCNET", "switcher.dcnet"))
+    if not out["configured"]:
+        out["parts"] = [{"text": "%s -" % n, "colour": c} for n, c in nets]
+        out["games"] = ["No player list source is set up"]
+        out["list"] = []
+        out["status"] = "Add the JSON address of a status page to players_sources.json (see the README), or use the links."
+    elif not out.get("time"):
+        out["parts"] = [{"text": "%s -" % n, "colour": c} for n, c in nets]
+        out["games"] = ["Loading..."]
+        out["list"] = []
+        out["status"] = ""
+    else:
+        out["parts"] = [{"text": "%s %d" % (n, len([p for p in players if p["network"] == n])), "colour": c} for n, c in nets]
+        out["games"] = games_line(players) or ["Nobody is in a game" if players else "Nobody is online"]
+        out["list"] = [{"title": p["player"], "sub": p.get("game") or "(Idle)", "tag": p.get("network") or "",
+                        "colour": dict(nets).get(p.get("network"), "")} for p in players]
+        detail = []
+        for x in out.get("sources") or []:
+            if x["ok"]:
+                sec = x.get("sections")
+                detail.append("%s: %s" % (x["name"], ", ".join("%s %d%s%s" % (v["section"], v["shown"], "/%d" % v["listed"] if v["listed"] != v["shown"] else "",
+                                                                         " (offline)" if v.get("offline") else "") for v in sec) if sec else x["count"]))
+        out["status"] = "; ".join("%s: %s" % (x["name"], x["error"]) for x in bad) + ("  \u00b7  " if bad and detail else "") + "  \u00b7  ".join(detail)
+    out["retry"] = bool(out["configured"] and (not out.get("time") or out.get("refreshing")))      # ask again soon while it is loading
+    return out
+
+
 def _get(h):
-    h.send(json.dumps(status()), "application/json")
+    h.send(json.dumps(view()), "application/json")
 
 
 GET = {"/players": _get}

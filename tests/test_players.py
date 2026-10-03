@@ -192,18 +192,16 @@ class IntegrationTests(unittest.TestCase):
         pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": []})
         try:
             html = urlopen(base + "/", timeout=10).read().decode()
-            self.assertIn('id="main-slot"', html)
-            self.assertIn("/players", html)
-            self.assertIn("60000", html)                       # polls at most once a minute
+            self.assertIn('"url": "/players", "every": 60', html)         # the layout's data source: asked at most once a minute
             self.assertNotIn("netswitch-players", html)        # no show/hide setting: always shown while the module is on
-            self.assertNotIn('id="pl-b"', html)
             self.assertIn("Online players:", html)
-            self.assertIn("pl-games", html)
-            self.assertIn("pl-toggle", html)
-            self.assertIn("pl-players", html)
+            self.assertIn('"@players.games"', html)
+            self.assertIn('"@players.list"', html)
             r = json.loads(urlopen(base + "/players", timeout=10).read().decode())
             self.assertTrue(r["configured"])
             self.assertIn("links", r)
+            for key in ("parts", "games", "list", "status", "retry"):          # what the widgets bind to
+                self.assertIn(key, r)
         finally:
             pl.fetch = saved_fetch
             srv.shutdown()

@@ -178,8 +178,8 @@ class HttpTests(unittest.TestCase):
 
     def test_system_card_links_to_the_github_project(self):
         html = self.get("/")[2].decode()
-        self.assertIn('href="https://github.com/blaskkaffe/DreamPiAutoToggle"', html)
-        self.assertIn('rel="noopener noreferrer"', html)
+        self.assertIn('"href": "https://github.com/blaskkaffe/DreamPiAutoToggle"', html)       # the System module's row (layout.json)
+        self.assertIn("noopener noreferrer", html)                                              # which the link widget opens safely
 
     def test_hide_led_settings_is_gone(self):
         self.assertNotIn("hidden", json.loads(self.get("/ledconfig")[2].decode()))
@@ -195,31 +195,60 @@ class HttpTests(unittest.TestCase):
             self.assertIn(key, r)
         cfg = r["config"]
         cfg["white_balance"]["g"] = 200 / 255.0
-        cfg["count"], cfg["gpio"] = 5, 21
+        cfg["order"] = "BGR"                                 # the wire order belongs to the GPIO form: this POST keeps the saved one
         out = json.loads(self.post("/ledconfig", cfg)[1].decode())
         self.assertAlmostEqual(out["config"]["white_balance"]["g"], 200 / 255.0)
-        self.assertEqual((out["count"], out["gpio"]), (5, 21))
+        self.assertNotEqual(out["config"]["order"], "BGR")
+        hw = json.loads(self.post("/ledhardware", {"values": {"led_count": 5, "led_gpio": 21, "led_order": "RGB"}})[1].decode())
+        self.assertEqual(hw["values"], {"led_count": 5, "led_gpio": 21, "led_order": "RGB"})
+        self.assertEqual([o["value"] for o in hw["options"]["orders"]], list(ledconfig.LED_ORDERS))
         self.assertEqual(json.loads(self.get("/ledconfig")[2].decode())["count"], 5)
+        self.assertEqual(json.loads(self.get("/ledconfig")[2].decode())["config"]["order"], "RGB")
         self.assertTrue(json.loads(self.get("/ledconfig")[2].decode())["installed"])
+        self.post("/ledconfig", dict(cfg, order="GRB"))        # a later save of the looks does not undo the hardware settings
+        self.assertEqual(json.loads(self.get("/ledhardware")[2].decode())["values"]["led_order"], "RGB")
 
     def test_zero_leds_hides_the_led_settings(self):
-        cfg = json.loads(self.get("/ledconfig")[2].decode())["config"]
-        cfg["count"] = 0
-        self.post("/ledconfig", cfg)
+        self.post("/ledhardware", {"values": {"led_count": 0}})
         self.assertFalse(json.loads(self.get("/ledconfig")[2].decode())["installed"])
-        cfg["count"] = 1
-        self.post("/ledconfig", cfg)
+        self.assertFalse(json.loads(self.get("/api")[2].decode())["led"]["installed"])      # the page hides the LED widgets by this
+        self.post("/ledhardware", {"values": {"led_count": 1}})
         self.assertTrue(json.loads(self.get("/ledconfig")[2].decode())["installed"])
+        self.assertTrue(json.loads(self.get("/api")[2].decode())["led"]["installed"])
+
+    def buttons(self):
+        return json.loads(self.get("/buttonconfig")[2].decode())
+
+    def test_buttonconfig_has_the_standard_form_shape(self):
+        r = self.buttons()
+        self.assertEqual(sorted(r["values"]), ["button1_function", "button1_gpio", "button2_function", "button2_gpio"])
+        self.assertEqual([o["value"] for o in r["options"]["gpios"]], list(core.BUTTON_GPIO_PINS))
+        functions = r["options"]["functions"]
+        self.assertTrue(all(f["label"] and f["group"] and f["sub"] for f in functions))
+        self.assertNotIn("sw_wifi", [f["value"] for f in functions])         # the Wi-Fi switch functions wait for the Wi-Fi module
 
     def test_buttonconfig_rejects_shared_pin(self):
-        before = json.loads(self.get("/buttonconfig")[2].decode())["config"]
-        self.post("/buttonconfig", {"button1_gpio": 5, "button2_gpio": 5})
-        after = json.loads(self.get("/buttonconfig")[2].decode())["config"]
+        before = self.buttons()["values"]
+        self.post("/buttonconfig", {"values": {"button1_gpio": 5, "button2_gpio": 5}})
+        after = self.buttons()["values"]
         self.assertEqual((after["button1_gpio"], after["button2_gpio"]), (before["button1_gpio"], before["button2_gpio"]))
-        self.post("/buttonconfig", {"button1_gpio": 5, "button2_gpio": 6, "button1_function": "dcnet", "wifi_button": "2"})
-        after = json.loads(self.get("/buttonconfig")[2].decode())["config"]
-        self.assertEqual((after["button1_gpio"], after["button2_gpio"], after["button1_function"], after["wifi_button"]),
-                         (5, 6, "dcnet", "2"))
+        out = json.loads(self.post("/buttonconfig", {"values": {"button1_gpio": 5, "button2_gpio": 6, "button1_function": "dcnet"}})[1].decode())
+        self.assertEqual((out["values"]["button1_gpio"], out["values"]["button2_gpio"], out["values"]["button1_function"]), (5, 6, "dcnet"))
+        after = self.buttons()["values"]
+        self.assertEqual((after["button1_gpio"], after["button2_gpio"], after["button1_function"]), (5, 6, "dcnet"))
+
+    def test_wifi_functions_are_offered_while_the_wifi_module_is_on(self):
+        core.save_module_enabled("wifi", True)
+        try:
+            self.assertIn("sw_wifi", [f["value"] for f in self.buttons()["options"]["functions"]])
+            out = json.loads(self.post("/wifibutton", {"values": {"wifi_button": "2"}})[1].decode())
+            self.assertEqual(out["values"]["wifi_button"], "2")
+            self.assertEqual([o["sub"] for o in out["options"]["choices"]][0], "Hold button 1 for 3 s to start Wi-Fi setup")
+            self.assertEqual(core.wifi_button(), "2")
+            self.post("/wifibutton", {"values": {"wifi_button": "nope"}})
+            self.assertEqual(core.wifi_button(), "2")
+        finally:
+            core.save_module_enabled("wifi", False)
 
     def test_wbtest_flag(self):
         self.post("/wbtest")
@@ -279,7 +308,7 @@ class PageTests(unittest.TestCase):
 
     def test_finished_update_reloads_only_the_page_that_watched_it(self):
         """An 'ok' update state lasts 10 minutes; reloading on every sight of it closed Settings."""
-        self.assertIn('r.state=="ok"&&updWatched', self.js)
+        self.assertIn('u.state=="ok"&&updWatched', self.js)
 
     @classmethod
     def tearDownClass(cls):
@@ -298,7 +327,8 @@ class PageTests(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stderr.decode())
 
     def test_every_literal_id_exists(self):
-        ids = set(re.findall(r'\bid="([^"]+)"', self.html + self.js)) | set(re.findall(r"\bid='([^']+)'", self.js))
+        text = (self.html + self.js).replace('\\"', '"')                      # markup inside a layout's JSON strings has escaped quotes
+        ids = set(re.findall(r'\bid="([^"]+)"', text)) | set(re.findall(r"\bid='([^']+)'", self.js))
         used = set(re.findall(r'\$\("([^"]+)"\)', self.js))
         self.assertEqual(sorted(used - ids), [])
 

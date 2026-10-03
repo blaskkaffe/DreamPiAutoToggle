@@ -4,6 +4,6 @@
  "enabled": false,
  "visible": true,
  "order": 60,
- "ui": 1,
+ "ui": 2,
  "web": "netswitch_wifi_web"
 }

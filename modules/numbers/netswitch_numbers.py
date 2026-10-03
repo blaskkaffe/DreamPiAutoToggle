@@ -74,9 +74,15 @@ def save_numbers(data):
 
 # ---------------------------------------------------------------- the page's side (loaded by the web service)
 def _reply():
-    return {"numbers": numbers(), "defaults": default_numbers(),
-            "actions": [{"key": a[0], "label": a[1], "sub": a[2]} for a in ACTIONS],
-            "min": MIN_LEN, "max": MAX_LEN, "per_action": MAX_PER_ACTION}
+    """The standard "picker" answer (page/widgets.js W.picker): groups of items plus the rules for adding one."""
+    nums = numbers()
+    return {"groups": [{"key": a[0], "label": a[1], "sub": a[2], "items": nums.get(a[0], [])} for a in ACTIONS],
+            "defaults": default_numbers(),
+            "rules": {"min": MIN_LEN, "max": MAX_LEN, "per_group": MAX_PER_ACTION, "allowed": "0-9*#", "unique": True,
+                      "add_label": "Add", "add_title": "Add a number to {group}", "empty": "No number: this action is off",
+                      "min_msg": "Needs at least %d digits, * or #" % MIN_LEN,
+                      "help": "Functions are triggered by numbers ending in the listed numbers.\nUse 3 - %d digits, numbers 0-9, * and # are allowed." % MAX_LEN,
+                      "restore": "Restore default numbers"}}
 
 
 def _get(h):

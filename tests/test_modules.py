@@ -1,5 +1,5 @@
-"""The module system: every optional feature is a folder in modules/. With its folder the feature is part of the
-page and the web service, without it (or switched off in the Modules menu) it simply isn't there."""
+"""The module system: everything the page shows is a folder in modules/. With its folder the feature is part of the
+page (its layout.json is in window.LAYOUT) and the web service, without it (or switched off in the module picker) it simply isn't there."""
 import json
 import os
 import re
@@ -15,16 +15,29 @@ from support import ROOT, web, core, sandbox, cleanup
 
 REAL_MODULES = os.path.join(ROOT, "modules")
 NAMES = ["background", "debuglog", "led", "numbers", "players", "rebootupdate", "wifi"]      # the modules the picker can switch
-HIDDEN = ["switcher"]                                                                   # always on, not in the picker
+HIDDEN = ["buttons", "switcher", "system"]                                                # always on, not in the picker
 ALL = sorted(NAMES + HIDDEN)
-# something in the page that only that module provides
-MARKER = {"background": "body.dcbg", "numbers": 'id="num-card"', "players": 'id="pl-games"', "debuglog": 'id="debug-bar"',
-          "led": 'id="led-section"', "wifi": 'id="wifi-row"', "rebootupdate": 'id="reboot-b"'}
 # a path only that module answers (GET, or POST when None)
 ENDPOINT = {"background": ("GET", "/background/dc-background.js"), "numbers": ("GET", "/numbers"), "players": ("GET", "/players"), "debuglog": ("GET", "/dtmf"),
             "led": ("GET", "/ledconfig"), "wifi": ("POST", "/wifitoggle"), "rebootupdate": ("GET", "/update")}
-BASE_IDS = ('id="net"', 'class="pill dcnow-b"', 'class="pill dcnet-b"', 'id="about"',
-            'id="gpio-section"', 'id="mod-list"', 'id="github-row"')
+HIDDEN_ENDPOINT = {"switcher": ("GET", "/status"), "buttons": ("GET", "/buttonconfig"), "system": ("GET", "/about")}
+BASE_IDS = ('id="dash"', 'id="set-boxes"', 'id="settings"', 'id="bg"', 'id="warnings"')
+
+
+def layout_of(html):
+    """The window.LAYOUT of a page, parsed."""
+    m = re.search(r"window\.LAYOUT=(\{.*?\});\n", html, re.S)
+    return json.loads(m.group(1))
+
+
+def present(html, name):
+    """Is the module in the page? (its layout is part of window.LAYOUT, and a background module is in "backgrounds" too)"""
+    return name in layout_of(html)["modules"]
+
+
+def widgets(html, name):
+    lay = layout_of(html)
+    return [w for sec in ("dashboard", "settings") for b in lay[sec] for w in b["items"] if w["mod"] == name]
 
 
 def inline_script(html):
@@ -99,36 +112,50 @@ class RepoModules(unittest.TestCase):
             self.assertNotIn("default", m)
             if "web" in m:
                 self.assertTrue(os.path.exists(os.path.join(REAL_MODULES, n, m["web"] + ".py")), n)
+            self.assertFalse(os.path.exists(os.path.join(REAL_MODULES, n, "page.html")), n)       # layout.json replaced the page fragments
 
     def test_defaults(self):
         on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["enabled"]) for n in ALL)
-        self.assertEqual(on, {"background": False, "debuglog": False, "led": True, "numbers": True, "players": True, "rebootupdate": True, "switcher": True, "wifi": False})
+        self.assertEqual(on, {"background": False, "debuglog": False, "led": True, "numbers": True, "players": True, "rebootupdate": True, "switcher": True, "buttons": True, "system": True, "wifi": False})
         hidden = [n for n in ALL if json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["visible"] is False]
-        self.assertEqual(hidden, ["switcher"])             # the network switcher can't be switched off
+        self.assertEqual(hidden, HIDDEN)                   # the network switcher, the buttons and the system info can't be switched off
 
 
 class WithEverything(Base):
     def test_page_has_every_module_and_no_leftover_markers(self):
         html = self.page()
-        for n in NAMES:
-            self.assertIn(MARKER[n], html, n)
+        for n in ALL:
+            self.assertTrue(present(html, n), n)
         for ident in BASE_IDS:
             self.assertIn(ident, html)
         self.assertNotIn("@@", html)
+        self.assertNotIn("SLOT", html)
         self.check_js(html)
 
     def test_endpoints_answer(self):
-        for n, (method, path) in ENDPOINT.items():
+        for n, (method, path) in list(ENDPOINT.items()) + list(HIDDEN_ENDPOINT.items()):
             self.assertIn(self.status(method, path), (200, 204), (n, path))
 
-    def test_led_hardware_settings_are_in_the_gpio_card_and_come_from_the_led_module(self):
-        html = self.page()
-        gpio = html[html.index('id="gpio-section"'):html.index('id="led-section"')]
-        for ident in ('id="led-count-i"', 'id="led-gpio"', 'id="led-order"', 'id="gpio-led-row"'):
-            self.assertIn(ident, gpio)
-        self.assertNotIn("GPIO10 only works", html)                 # the installer/service sets SPI up, no note on the page
-        section = html[html.index('id="led-section"'):]
-        self.assertNotIn('id="led-count-i"', section)
+    def test_boxes_are_shared_by_name_between_modules(self):
+        lay = layout_of(self.page())
+        gpio = [b for b in lay["settings"] if b["id"] == "gpio"]
+        self.assertEqual(len(gpio), 1)
+        self.assertEqual(gpio[0]["mods"], ["buttons", "led", "wifi"])          # one GPIO box, three modules in picker order
+        self.assertEqual(gpio[0]["title"], "GPIO")
+        system = [b for b in lay["settings"] if b["id"] == "system"][0]
+        self.assertEqual(system["mods"], ["wifi", "system", "rebootupdate"])
+        self.assertEqual([b["id"] for b in lay["dashboard"]], ["network", "players", "debug log"])
+
+    def test_led_hardware_settings_are_in_the_gpio_box_and_come_from_the_led_module(self):
+        lay = layout_of(self.page())
+        gpio = [b for b in lay["settings"] if b["id"] == "gpio"][0]
+        keys = [c["key"] for w in gpio["items"] if w["mod"] == "led" for f in w["fields"] for c in f["controls"]]
+        self.assertEqual(keys, ["led_count", "led_order", "led_gpio"])
+        led_box = [b for b in lay["settings"] if b["id"] == "status led"][0]
+        custom = led_box["items"][0]
+        self.assertEqual(custom["type"], "custom")
+        self.assertNotIn("led-count-i", custom["html"])                  # the hardware rows are not in the messages widget
+        self.assertIn('id="led-reset"', custom["html"])                  # but the rest of it is (markup came from messages.html)
 
     def test_protected_paths_are_the_modules_own_post_routes(self):
         import netswitch_modules as mods
@@ -138,7 +165,7 @@ class WithEverything(Base):
 
     def test_modules_menu_lists_them_all(self):
         got = self.json("/modules")["modules"]
-        self.assertEqual([m["name"] for m in got], ["players", "numbers", "led", "debuglog", "wifi", "rebootupdate", "background"])   # picker order; the switcher is not in it
+        self.assertEqual([m["name"] for m in got], ["players", "numbers", "led", "debuglog", "wifi", "rebootupdate", "background"])   # picker order; the hidden modules are not in it
         self.assertTrue(all(m["enabled"] for m in got))
         self.assertTrue(all(m["title"] and m["description"] for m in got))
 
@@ -157,9 +184,9 @@ class WithNothing(Base):
         for ident in BASE_IDS:
             self.assertIn(ident, html)
         for n in NAMES:
-            self.assertNotIn(MARKER[n], html, n)
-        for word in ("led-section", "Status LED", "NeoPixel", "num-card", "Special phone numbers", "dcbg", "debug-bar", "wifi-row", "pl-box",
-                     "ledOpen", "@@"):
+            self.assertFalse(present(html, n), n)
+        self.assertEqual(layout_of(html)["modules"], ["switcher", "buttons", "system"])
+        for word in ("led-section", "Status LED", "NeoPixel", "Special phone numbers", "dcbg", "Debug log", "Online players", "@@"):
             self.assertNotIn(word, html, word)
         self.check_js(html)
 
@@ -180,11 +207,13 @@ class WithNothing(Base):
         self.assertEqual(self.json("/modules"), {"modules": []})
 
     def test_the_dreampi_dot_still_has_a_look(self):
+        import netswitch_modules as mods
+        switcher = mods.get("switcher")
         for state, effect in (("ok", "solid"), ("busy", "blink"), ("off", "blink"), ("call-dcnow", "solid")):
-            look = web._dot_look(state)
+            look = switcher._dot_look(state)
             self.assertEqual(look["effect"], effect, state)
             self.assertRegex(look["color"], r"^#[0-9a-f]{6}$")
-        self.assertIsNone(web._dot_look("somethingelse"))
+        self.assertIsNone(switcher._dot_look("somethingelse"))
 
     def test_unknown_paths_are_404_not_the_page(self):
         self.assertEqual(self.status("GET", "/nothing-here"), 404)
@@ -201,28 +230,43 @@ class OneModuleGone(Base):
             shutil.move(folder, backup)
             self.touch_all()
             html = self.page()
-            self.assertNotIn(MARKER[gone], html, gone)
-            for other in NAMES:
+            self.assertFalse(present(html, gone), gone)
+            for other in ALL:
                 if other != gone and os.path.isdir(os.path.join(self.modules, other)):
-                    self.assertIn(MARKER[other], html, (gone, other))
+                    self.assertTrue(present(html, other), (gone, other))
             self.check_js(html)
             method, path = ENDPOINT[gone]
             self.assertEqual(self.status(method, path), 404, gone)
             shutil.move(backup, folder)                    # and back again while the service keeps running
             self.touch_all()
-            self.assertIn(MARKER[gone], self.page(), gone)
+            self.assertTrue(present(self.page(), gone), gone)
             self.assertIn(self.status(*ENDPOINT[gone]), (200, 204), gone)
+
+    def test_the_always_on_modules_can_be_deleted_alone_too(self):
+        for gone in HIDDEN:
+            folder = os.path.join(self.modules, gone)
+            backup = os.path.join(self.tmp, "backup-" + gone)
+            shutil.move(folder, backup)
+            self.touch_all()
+            html = self.page()
+            self.assertFalse(present(html, gone), gone)
+            self.check_js(html)
+            self.assertEqual(self.status(*HIDDEN_ENDPOINT[gone]), 404, gone)
+            self.assertIn(self.status("GET", "/api"), (200,))
+            shutil.move(backup, folder)
+            self.touch_all()
+            self.assertTrue(present(self.page(), gone), gone)
 
     def test_each_module_can_be_switched_off_and_on_from_the_menu(self):
         for name in NAMES:
             self.assertEqual(self.status("POST", "/modules", {"name": name, "enabled": False}), 200, name)
             html = self.page()
-            self.assertNotIn(MARKER[name], html, name)
+            self.assertFalse(present(html, name), name)
             self.check_js(html)
             self.assertEqual(self.status(*ENDPOINT[name]), 404, name)
             self.assertFalse([m for m in self.json("/modules")["modules"] if m["name"] == name][0]["enabled"])
             self.assertEqual(self.status("POST", "/modules", {"name": name, "enabled": True}), 200, name)
-            self.assertIn(MARKER[name], self.page(), name)
+            self.assertTrue(present(self.page(), name), name)
             self.assertIn(self.status(*ENDPOINT[name]), (200, 204), name)
 
     def test_switching_is_remembered_in_modules_json(self):
@@ -234,6 +278,7 @@ class OneModuleGone(Base):
 
     def test_bad_menu_requests(self):
         self.assertEqual(self.status("POST", "/modules", {"name": "nope", "enabled": True}), 404)
+        self.assertEqual(self.status("POST", "/modules", {"name": "switcher", "enabled": False}), 404)       # not in the picker
         self.assertEqual(self.status("POST", "/modules", {"name": "led"}), 400)
         self.assertEqual(self.status("POST", "/modules", {"name": "led", "enabled": "yes"}), 400)
         self.assertEqual(self.status("POST", "/modules", {"name": "../x", "enabled": True}), 404)
@@ -252,15 +297,15 @@ class BrokenAndNewModules(Base):
         folder = os.path.join(self.modules, "extra")
         os.makedirs(folder)
         with open(os.path.join(folder, "module.json"), "w") as f:
-            json.dump({"title": "Extra", "description": "Broken on purpose", "order": 5, "default": True, "web": "netswitch_extra_broken"}, f)
+            json.dump({"name": "Extra", "description": "Broken on purpose", "order": 5, "enabled": True, "visible": True, "web": "netswitch_extra_broken"}, f)
         with open(os.path.join(folder, "netswitch_extra_broken.py"), "w") as f:
             f.write("raise RuntimeError('broken on purpose')\n")
-        with open(os.path.join(folder, "page.html"), "w") as f:
-            f.write("<!--slot:main--><div id=\"extra-box\"></div>\n")
+        with open(os.path.join(folder, "layout.json"), "w") as f:
+            f.write('{"dashboard": [{"box": "extra", "items": [{"type": "text", "text": "extra-box"}]}]}')
         self.touch_all()
         html = self.page()
         self.assertNotIn("extra-box", html)
-        self.assertIn(MARKER["led"], html)
+        self.assertTrue(present(html, "led"))
         extra = [m for m in self.json("/modules")["modules"] if m["name"] == "extra"][0]
         self.assertIn("broken on purpose", extra["error"])
 
@@ -268,19 +313,22 @@ class BrokenAndNewModules(Base):
         folder = os.path.join(self.modules, "extra")
         os.makedirs(folder)
         with open(os.path.join(folder, "module.json"), "w") as f:
-            json.dump({"title": "Extra", "description": "A new module", "order": 5, "default": True, "web": "netswitch_extra_ok"}, f)
+            json.dump({"name": "Extra", "description": "A new module", "order": 5, "enabled": True, "visible": True, "web": "netswitch_extra_ok"}, f)
         with open(os.path.join(folder, "netswitch_extra_ok.py"), "w") as f:
             f.write("def _hello(h):\n    h.send('hello', 'text/plain')\n\n\nGET = {'/extra': _hello}\n\n\ndef api(d, warnings):\n    d['extra'] = True\n    warnings.append('extra says hi')\n")
-        with open(os.path.join(folder, "page.html"), "w") as f:
-            f.write("<!--slot:main--><div id=\"extra-box\"></div><!--slot:about_top--><div class=\"srow\" id=\"extra-row\"></div>\n")
+        with open(os.path.join(folder, "layout.json"), "w") as f:
+            f.write('{"dashboard": [{"box": "extra", "items": [{"type": "text", "text": "extra-box"}]}], "settings": [{"box": "system", "items": [{"type": "text", "text": "extra-row"}]}]}')
         with open(os.path.join(folder, "page.js"), "w") as f:
             f.write("hook('api',function(d){});\n")
         with open(os.path.join(folder, "page.css"), "w") as f:
             f.write("#extra-box{color:red}\n")
         self.touch_all()
         html = self.page()
-        for needle in ('id="extra-box"', 'id="extra-row"', "#extra-box{color:red}", "hook('api'"):
+        for needle in ('extra-box', 'extra-row', "#extra-box{color:red}", "hook('api'"):
             self.assertIn(needle, html)
+        lay = layout_of(html)
+        self.assertEqual([b["id"] for b in lay["dashboard"]][0], "extra")         # its "order" hint (5) puts it first until the user moves it
+        self.assertIn("extra", [b for b in lay["settings"] if b["id"] == "system"][0]["mods"])      # and its items joined the existing System box
         self.assertEqual(urlopen(self.base + "/extra", timeout=10).read(), b"hello")
         d = self.json("/api")
         self.assertTrue(d["extra"])
@@ -369,9 +417,10 @@ class InstallerTests(unittest.TestCase):
 
     def test_every_module_folder_is_copied(self):
         self.run_sync(self.src, self.dest)
-        for n in NAMES:
+        for n in ALL:
             self.assertTrue(os.path.exists(os.path.join(self.dest, "modules", n, "module.json")), n)
-            self.assertTrue(os.path.exists(os.path.join(self.dest, "modules", n, "page.js")), n)
+            if os.path.exists(os.path.join(REAL_MODULES, n, "layout.json")):
+                self.assertTrue(os.path.exists(os.path.join(self.dest, "modules", n, "layout.json")), n)
 
     def test_no_pycache_is_installed(self):
         os.makedirs(os.path.join(self.src, "modules", "led", "__pycache__"))
@@ -429,7 +478,7 @@ class Layering(unittest.TestCase):
     def test_the_base_never_imports_module_code(self):
         """Removing a module must not break an import anywhere in the base."""
         module_files = set()
-        for n in NAMES:
+        for n in ALL:
             for f in os.listdir(os.path.join(REAL_MODULES, n)):
                 if f.endswith(".py"):
                     module_files.add(f[:-3])
@@ -445,7 +494,7 @@ class Layering(unittest.TestCase):
 
     def test_modules_only_use_the_base_and_themselves(self):
         base = set(f[:-3] for f in os.listdir(ROOT) if f.endswith(".py"))
-        for n in NAMES:
+        for n in ALL:
             own = set(f[:-3] for f in os.listdir(os.path.join(REAL_MODULES, n)) if f.endswith(".py"))
             for f in own:
                 with open(os.path.join(REAL_MODULES, n, f + ".py")) as fh:

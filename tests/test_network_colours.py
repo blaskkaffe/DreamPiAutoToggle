@@ -115,14 +115,26 @@ class HttpTests(unittest.TestCase):
 
     def test_round_trip(self):
         got = json.loads(urlopen(self.base + "/colours", timeout=10).read())
-        self.assertEqual(len(got["options"]), 16)
+        self.assertEqual(len(got["palette"]), 16)
+        self.assertEqual(got["modules"]["switcher"], {"dcnow": "orange", "dcnet": "blue"})
         r = json.loads(self.post("/colour", {"module": "switcher", "key": "dcnet", "colour": "bright-green"}).read())
         self.assertEqual(r["colours"]["dcnet"], "bright-green")
         api = json.loads(urlopen(self.base + "/api", timeout=10).read())
-        self.assertEqual(api["netcolours"]["dcnet"]["id"], "bright-green")
+        self.assertEqual(api["colours"]["switcher"]["dcnet"], "bright-green")       # /api carries them, so another device follows at once
         page = urlopen(self.base + "/", timeout=10).read().decode()
-        self.assertIn("--dcnet:#4cd964", page)
+        self.assertIn("--c-bright-green:#4cd964", page)                              # the palette is in the page's CSS
+        self.assertIn('"dcnet": "bright-green"', page)                               # and the module's pick in its layout
         self.post("/colour", {"module": "switcher", "key": "dcnet", "colour": "blue"})
+
+    def test_the_primary_colour_follows_the_selected_network(self):
+        self.post("/colour", {"module": "switcher", "key": "dcnow", "colour": "bright-orange"})
+        api = json.loads(urlopen(self.base + "/api", timeout=10).read())
+        self.assertEqual(api["primary"]["switcher"], "bright-orange")                # DCNow! is selected: its colour is the primary
+        self.post("/dcnet", {})
+        api = json.loads(urlopen(self.base + "/api", timeout=10).read())
+        self.assertEqual(api["primary"]["switcher"], "blue")
+        self.post("/dcnow", {})
+        self.post("/colour", {"module": "switcher", "key": "dcnow", "colour": "orange"})
 
     def test_a_bad_colour_is_refused(self):
         from urllib.error import HTTPError

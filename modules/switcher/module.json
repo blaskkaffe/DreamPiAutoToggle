@@ -4,7 +4,12 @@
  "enabled": true,
  "visible": false,
  "order": 10,
- "ui": 1,
- "colours": {"dcnow": "orange", "dcnet": "blue"},
- "colours_unique": true
+ "ui": 2,
+ "colours": {
+  "dcnow": "orange",
+  "dcnet": "blue"
+ },
+ "colours_unique": true,
+ "web": "netswitch_switcher",
+ "primary": "dcnow"
 }

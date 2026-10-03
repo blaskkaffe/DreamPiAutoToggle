@@ -1,0 +1,354 @@
+// ===== The layout engine and the standard widgets. A module's layout.json (docs/modules.md, "Layout") says which boxes it
+// fills and with which widgets; this file draws them. Nothing in here knows about a particular module. =====
+//   S            the page's state: the /api answer plus one entry per data source a module asked for (S.players ...)
+//   "@a.b"       in a layout a string that starts with @ is read from S (live: the widget follows it); anything else is literal
+//   custom(name, fn)  a module's page.js registers a custom widget; fn(host, ctx) fills the empty host element
+var S={}, LAY=window.LAYOUT||{modules:[],dashboard:[],settings:[],backgrounds:[],data:{},primary:{},colours:{},palette:[]};
+var UPD=[], CUSTOM={}, W={}, AFTER=[];
+function custom(name,fn){CUSTOM[name]=fn}
+function getPath(o,p){var parts=String(p).split("."),i;for(i=0;i<parts.length;i++){if(o==null)return undefined;o=o[parts[i]]}return o}
+function isBind(v){return typeof v==="string"&&v.charAt(0)==="@"}
+function val(v){return isBind(v)?getPath(S,v.slice(1)):v}
+// bind(v, apply): apply(value) now, and again whenever S is refreshed and the value is a binding (apply decides if anything changed)
+function bind(v,apply){if(v===undefined)return;apply(val(v));if(isBind(v))UPD.push(function(){apply(val(v))})}
+function h(tag,attrs,kids){var el=document.createElement(tag),k;
+ for(k in (attrs||{})){var v=attrs[k];if(v===undefined||v===null)continue;
+  if(k==="class")el.className=v;else if(k==="text")el.textContent=v;else if(k==="html")el.innerHTML=v;
+  else if(k.slice(0,2)==="on")el[k]=v;else el.setAttribute(k,v)}
+ (kids||[]).forEach(function(c){if(c)el.appendChild(c)});return el}
+function lines(t){return esc(t==null?"":t).replace(/\n/g,"<br>")}
+function setLines(el,t){setHtml(el,lines(t))}
+function sh(el,show){setStyle(el,"display",show?"":"none")}
+// A colour reference: a palette id ("orange"), one of the module's own colour keys ("dcnow") or "module.key" of another module
+function colourId(ref,mod){if(!ref)return"";var c=S.colours||LAY.colours||{};
+ if(ref.indexOf(".")>0){var p=ref.split(".");return(c[p[0]]||{})[p[1]]||""}
+ return(c[mod]||{})[ref]||ref}
+function colourClass(el,ref,mod){bind(ref,function(r){var id=colourId(r,mod),old=el._cc;if(old===id)return;
+ if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._cc=id})}
+// ---- talking to the server
+function post(url,body,done){xhrJson("POST",url,function(r,st,b){if(done)done(r,st,b)},body)}
+// after a button's POST: "reload" the page, "wait" until the Pi is back (a reboot), or just look at the new state
+function afterPost(s,r,el){
+ if(r&&r.started===false){alert(r.message||"That did not start");return}
+ if(s.then==="reload"){try{sessionStorage.setItem("netswitch-reopen",s.reopen?"1":"")}catch(e){}location.reload();return}
+ if(s.then==="wait"){if(el){el.disabled=true;setText(el,"Restarting...")}waitForPi();return}
+ refresh();reloadData();fire("posted")}
+function waitForPi(){var down=false,tries=0;
+ (function poll(){tries++;var x=new XMLHttpRequest();x.open("GET","/ping?"+Date.now(),true);x.timeout=3000;
+  x.onload=function(){if(down||tries>60)location.reload();else setTimeout(poll,2000)};
+  x.onerror=x.ontimeout=function(){down=true;setTimeout(poll,2000)};x.send()})()}
+// ---- the engine
+function build(s,ctx){var f=W[s.type];if(!f)return h("div");var el=f(s,ctx);
+ if(s.mod)el.setAttribute("data-mod",s.mod);
+ if(s.show!==undefined)bind(s.show,function(v){sh(el,!!v)});
+ if(s.hide!==undefined)bind(s.hide,function(v){sh(el,!v)});
+ return el}
+function buildAll(list,ctx){return(list||[]).map(function(w){return build(w,ctx)})}
+function box(section,b){var ctx={mod:b.mods[0],box:b.id,saved:function(){}},items=b.items;
+ if(section==="settings"){
+  var saved=h("span",{"class":"saved",text:"Saved ✓"}),
+   tt=h("span"),head=b.title?h("h2",{},[tt,document.createTextNode(" "),saved]):null,
+   card=h("div",{"class":"card"}),sec=h("section",{"class":"sec","data-box":b.id,"data-mod":b.mods[0]},[head,card]);
+  bind(b.title,function(t){setText(tt,t==null?"":t)});
+  ctx.saved=function(){saved.classList.add("show");setTimeout(function(){saved.classList.remove("show")},1200)};
+  buildAll(items,ctx).forEach(function(el){card.appendChild(el)});return sec}
+ var d=h("div",{"class":"dbox","data-box":b.id,"data-mod":b.mods[0]});
+ if(b.title){var dt=h("h2");bind(b.title,function(t){setText(dt,t==null?"":t)});d.appendChild(dt)}
+ buildAll(items,ctx).forEach(function(el){d.appendChild(el)});return d}
+function renderLayout(){
+ var dash=$("dash"),cols=$("set-boxes");
+ (LAY.dashboard||[]).forEach(function(b){dash.appendChild(box("dashboard",b))});
+ (LAY.settings||[]).forEach(function(b){cols.appendChild(box("settings",b))});
+ buildPicker(cols);
+ AFTER.forEach(function(f){f()});AFTER=[]}
+function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});applyTheme();hideEmptyBoxes()}
+// a box whose widgets are all hidden (the LED settings while the LED count is 0) is hidden too
+function hideEmptyBoxes(){var bs=document.querySelectorAll("[data-box]"),i,j;
+ for(i=0;i<bs.length;i++){var b=bs[i],host=b.querySelector(":scope > .card")||b,any=false;
+  for(j=0;j<host.children.length;j++){var c=host.children[j];if(c.tagName!=="H2"&&c.style.display!=="none"){any=true;break}}
+  if(b.getAttribute("data-box")!=="modules")sh(b,any)}}
+// ---- theme: every box and widget takes the primary colour its module gave (a palette id, set in module.json or while running
+// in /api primary); the top module in the picker that has one also sets the page's own. A module below with another one
+// only uses it for itself.
+var themeKey="";
+function applyTheme(){var p={},k;for(k in (LAY.primary||{}))p[k]=LAY.primary[k];for(k in (S.primary||{}))p[k]=S.primary[k];
+ var key=JSON.stringify(p);if(key===themeKey)return;themeKey=key;
+ var els=document.querySelectorAll("[data-mod]"),i,root="";
+ for(i=0;i<(LAY.modules||[]).length&&!root;i++)root=p[LAY.modules[i]]||"";
+ function paint(el,id){var old=el._pc;if(old===id)return;if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._pc=id}
+ paint(document.body,root);
+ for(i=0;i<els.length;i++)paint(els[i],p[els[i].getAttribute("data-mod")]||"")}
+// ---- data sources a module asked for in its layout ("data": {"players": {"url": "/players", "every": 60}}): fetched into S.<name>
+// every N seconds while the page is on screen (with "when": "settings", only while Settings is open); "retry_if": "busy" asks again
+// after "retry" seconds while that field of the answer is true, and after a failed request
+var DATA={};
+function reloadData(){for(var ns in DATA)DATA[ns]()}
+function startData(){var ns;for(ns in (LAY.data||{}))(function(ns,spec){
+ var timer=null,every=(spec.every||60)*1000,retry=(spec.retry||2)*1000,onlyInSettings=spec.when==="settings";
+ function wanted(){return !document.hidden&&(!onlyInSettings||$("settings").classList.contains("open"))}
+ function load(){clearTimeout(timer);if(!wanted())return;
+  xhrJson("GET",spec.url,function(r){var again=every;
+   if(r){S[ns]=r;engineUpdate();if(spec.retry_if&&getPath(r,spec.retry_if))again=retry}else again=retry;
+   timer=setTimeout(load,again)})}
+ DATA[ns]=load;
+ document.addEventListener("visibilitychange",function(){if(!document.hidden)load()});
+ if(onlyInSettings){hook("settingsOpen",load);hook("settingsClose",function(){clearTimeout(timer)})}
+ load()})(ns,LAY.data[ns])}
+// ---- text, rows, buttons, links
+W.text=function(s){var el=h("div",{"class":"wtext"+(s.muted?" sub":"")+(s.cls?" "+s.cls:"")});bind(s.text,function(t){setLines(el,t)});return el};
+W.row=function(s,ctx){var title=h("span"),sub=h("span",{"class":"sub"}),left=h("span",{},[title,sub]),
+ el=h("div",{"class":"srow"+(s.below?" wrap":"")},[left]);
+ bind(s.title,function(t){setText(title,t==null?"":t)});bind(s.sub,function(t){setLines(sub,t);sh(sub,!!t)});
+ if(s.control)el.appendChild(build(Object.assign({mod:s.mod},s.control),ctx));
+ if(s.below)el.appendChild(h("div",{"class":"below"},buildAll(s.below.map(function(w){return Object.assign({mod:s.mod},w)}),ctx)));return el};
+W.link=function(s){var el=h("a",{"class":"pill-s",href:s.href,target:"_blank",rel:"noopener noreferrer"});
+ bind(s.label,function(t){setText(el,t)});if(s.aria)el.setAttribute("aria-label",s.aria);return el};
+var armTimers={};
+W.button=function(s,ctx){var pill=s.style==="pill",
+ el=h(s.href?"a":"button",{"class":(pill?"pill":"pill-s"+(s.style==="danger"?" danger":""))+(pill&&s.colour?" pri":"")});
+ if(!s.href)el.type="button";else{el.href=s.href;el.target="_blank";el.rel="noopener noreferrer"}
+ var label=s.label,busy=false,armed=0;
+ function show(){var t=busy&&s.busy_label!==undefined?val(s.busy_label):(armed?s.arm:val(label));
+  t=t==null?"":String(t);if(busy&&s.busy_label!==undefined&&t)t=t.charAt(0).toUpperCase()+t.slice(1);setText(el,t);
+  setClass(el,el.className.replace(/ ?arm\b/,"")+(armed?" arm":""))}
+ bind(s.label,show);
+ if(s.busy!==undefined)bind(s.busy,function(v){busy=!!v;el.disabled=busy||!!val(s.disabled);show()});
+ if(s.disabled!==undefined)bind(s.disabled,function(v){el.disabled=!!v||busy});
+ if(s.aria)el.setAttribute("aria-label",s.aria);
+ if(pill&&s.colour)colourClass(el,s.colour,s.mod);
+ if(s.href)return el;
+ el.onclick=function(e){e.stopPropagation();if(el.disabled)return;
+  if(s.arm&&Date.now()-armed>4000){armed=Date.now();show();setTimeout(function(){if(Date.now()-armed>=4000){armed=0;show()}},4100);return}
+  armed=0;
+  if(s.confirm&&!confirm(isBind(s.confirm)?val(s.confirm):s.confirm))return;
+  function go(){el.disabled=true;
+   post(s.post,s.body,function(r,st,b){el.disabled=false;
+    if(st==401||st==429){alert((b&&b.message)||"PIN refused");return}
+    afterPost(s,r,el)})}
+  if(s.pin)withPin(go);else go()};
+ return el};
+// a switch: bound to a value on the server and POSTed ({value: true/false}) on change, or kept only in this page with "local": "name" (S._local.name)
+S._local={};
+W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.look||"neutral"),"aria-label":s.label||""}),el=box;
+ if(s.text){el=h("label",{"class":"sub tgl"},[box,document.createTextNode(s.text)])}
+ if(s.colour)colourClass(box,s.colour,s.mod);
+ if(s.local){S._local[s.local]=s["default"]!==false;box.checked=S._local[s.local];box.onchange=function(){S._local[s.local]=box.checked;engineUpdate()};return el}
+ bind(s.bind,function(v){box.checked=!!v});
+ box.onchange=function(){var want=box.checked;post(s.post,s.body?Object.assign({value:want},s.body):{value:want},function(){refresh();ctx.saved()})};return el};
+// a row of widgets side by side (wraps)
+W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx))};
+// ---- the module's own colour choice: a row of the palette's colours; the pick is kept for the module (core.set_module_colour)
+function paletteOrder(){var p=(LAY.palette||[]).slice();return p.filter(function(c){return c.id.indexOf("bright-")!==0}).concat(p.filter(function(c){return c.id.indexOf("bright-")===0}))}
+W.swatches=function(s,ctx){var el=h("span",{"class":"swatches grid"}),btns={};
+ paletteOrder().forEach(function(c){var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
+  b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){refresh();ctx.saved()}})};el.appendChild(b)});
+ UPD.push(function(){var cur=(((S.colours||{})[s.mod])||{})[s.key];for(var id in btns){var on=id===cur;btns[id].classList.toggle("sel",on);btns[id].setAttribute("aria-pressed",on?"true":"false")}});
+ return el};
+// ---- a block that opens and closes (the debug log bar)
+W.expander=function(s,ctx){var open=false,body=h("div",{"class":"xbody"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx)),
+ b=h("button",{type:"button","class":"wide"},[h("span",{text:s.label}),h("span",{"class":"arrow",html:"&#9656;"})]),
+ el=h("div",{"class":"xpand"},[h("div",{"class":"bar"},[b]),body]);sh(body,false);
+ b.onclick=function(){open=!open;sh(body,open);b.classList.toggle("open",open);el.classList.toggle("open",open);fire(open?"expand":"collapse",s.id||s.label)};return el};
+// ---- the status box: a label, a headline and rows that show when it is tapped open (network box, players box)
+function dotLook(el,v){if(v===null||typeof v==="object")lookDot(el,v);else dot(el,v)}
+W.status=function(s){var d=h("span",{"class":"dot"}),t=h("span",{"class":"nw"}),sub=h("span",{"class":"sub blk"}),
+ el=h("span",{"class":"status"},[s.dot!==undefined?d:null,h("span",{},[t,sub])]);
+ if(s.dot!==undefined)bind(s.dot,function(v){dotLook(d,v)});
+ bind(s.text,function(v){setText(t,v==null?"":v)});bind(s.sub,function(v){setLines(sub,v);sh(sub,!!v)});
+ if(s.lines!==undefined)bind(s.lines,function(v){if(!v||!v.length){setHtml(t,"...");setHtml(sub,"");return}setText(t,v[0]);setHtml(sub,v.slice(1).map(esc).join("<br>"))});return el};
+W.infobox=function(s,ctx){
+ var el=h("div",{"class":"now rows",title:"Show or hide details",role:"button",tabindex:"0","aria-expanded":"false"}),
+  head=h("b");
+ if(s.label)el.appendChild(h("div",{"class":"nlabel",text:s.label}));
+ el.appendChild(head);
+ if(s.parts!==undefined)bind(s.parts,function(ps){var html=(ps||[]).map(function(p){return '<span class="pln" data-c="'+esc(p.colour||"")+'">'+esc(p.text)+'</span>'}).join("");
+  if(head._html!==html){setHtml(head,html);Array.prototype.forEach.call(head.querySelectorAll(".pln"),function(x){var c=colourId(x.getAttribute("data-c"),s.mod);if(c)x.style.color="var(--c-"+c+"-l)"})}});
+ else bind(s.title,function(t){setText(head,t==null?"":t)});
+ (s.rows||[]).forEach(function(r){
+  var row=h("div",{"class":"row "+(r.main?"main":"more")+(r.cls?" "+r.cls:"")});
+  row.appendChild(h("span",{"class":"k",text:r.label||""}));
+  var v=h("span",{"class":"v"+(r.value&&r.value.type==="carousel"?" fill":"")});v.appendChild(build(Object.assign({mod:s.mod},r.value||{type:"text",text:""}),ctx));row.appendChild(v);
+  if(r.main)row.appendChild(h("span",{"class":"arrow",html:"&#9656;"}));
+  if(r.show!==undefined)bind(r.show,function(x){sh(row,!!x)});
+  el.appendChild(row)});
+ if(s.actions&&s.actions.length){var act=h("div",{"class":"row more hang keep"});
+  buildAll(s.actions.map(function(w){return Object.assign({mod:s.mod},w)}),ctx).forEach(function(a){act.appendChild(a)});
+  if(s.actions_show!==undefined)bind(s.actions_show,function(x){sh(act,!!x)});el.appendChild(act)}
+ function toggle(){el.classList.toggle("open");el.setAttribute("aria-expanded",el.classList.contains("open"));fire("layout")}
+ el.onclick=function(e){if(e.target.closest&&e.target.closest("a,button,.keep"))return;toggle()};
+ el.onkeydown=function(e){if((e.key=="Enter"||e.key==" ")&&e.target===el){e.preventDefault();toggle()}};
+ return el};
+// ---- carousel: one line of text that scrolls round (like a news ticker) only when it does not fit
+W.carousel=function(s){var el=h("span",{"class":"carousel"}),trk=h("span",{"class":"trk"}),cur=null;el.appendChild(trk);
+ function text(){var v=val(s.items!==undefined?s.items:s.text);return Array.isArray(v)?v.join("  •  "):(v==null?"":String(v))}
+ function fit(){var t=trk.querySelector(".t"),scroll=false,par=el.parentNode;
+  if(t&&cur&&par&&!(el.closest&&el.closest(".now.open")))scroll=t.offsetWidth>par.clientWidth-2;
+  if(scroll!==el.classList.contains("sc")){el.classList.toggle("sc",scroll);if(scroll)el.style.setProperty("--d",Math.max(12,Math.round(cur.length*0.28))+"s")}}
+ function set(t){if(t===cur&&trk.firstChild){fit();return}cur=t;
+  var half='<span class="t">'+esc(t)+'<span class="sp">  •  </span></span>';
+  setHtml(trk,t?half+half.replace('class="t"','class="t dup" aria-hidden="true"'):"");el.classList.remove("sc");fit()}
+ UPD.push(function(){set(text())});set(text());
+ hook("layout",function(){fit()});window.addEventListener("resize",fit);return el};
+// ---- a list of things from the server, each with a button that opens a small form (the Wi-Fi networks)
+W.links=function(s){var el=h("span",{"class":"links keep"});
+ bind(s.items,function(ls){var html=(ls||[]).map(function(l){return '<a href="'+esc(l[1])+'" target="_blank" rel="noopener noreferrer">'+esc(l[0])+'</a>'}).join("");setHtml(el,html)});return el};
+W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" compact keep":"")}),pop=h("div"),popT=h("div",{"class":"t"}),msg=h("div",{"class":"msg"}),
+ fields=[],go=h("button",{type:"button","class":"pill-s"}),cur=null,key="";
+ var P=s.popup||{};
+ pop.appendChild(popT);
+ (P.fields||[]).forEach(function(f){var inp=h("input",{type:f.type==="password"?"password":"text",placeholder:f.label||"","aria-label":f.label||f.key,autocomplete:"off"});
+  inp.onkeydown=function(e){if(e.key=="Enter"){e.preventDefault();submit()}};fields.push({f:f,el:inp});pop.appendChild(inp)});
+ pop.appendChild(msg);pop.appendChild(h("div",{"class":"bar end"},[go]));
+ var inner=h("div"),p;el.appendChild(inner);el.appendChild(pop);p=ui.popup(pop);
+ function compactRow(it){var tag=s.row.tag?it[s.row.tag]:"",c=h("span",{"class":"pw",text:tag}),
+  t=h("span",{"class":"pn"},[document.createTextNode(it[s.row.title||"title"]),h("span",{"class":"pg",text:it[s.row.sub||"sub"]||""})]);
+  if(s.row.tag_colour&&it[s.row.tag_colour]){var id=colourId(it[s.row.tag_colour],s.mod);if(id)c.style.color="var(--c-"+id+"-l)"}
+  return h("div",{"class":"p"},[t,c])}
+ function rowFor(it,i,extra){if(s.style==="compact")return compactRow(it);var info=extra?it.sub:it[s.row.sub||"sub"],
+  title=extra?it.title:it[s.row.title||"title"],b=h("button",{type:"button","class":"pill-s",text:extra?it.button:(s.row.button||"Select"),"aria-label":(extra?it.button:(s.row.button||"Select"))+" "+title});
+  var item=extra?it.item:it;
+  b.onclick=function(e){open(item,b,e)};
+  return h("div",{"class":"srow"},[h("span",{},[document.createTextNode(title),info?h("span",{"class":"sub",text:info}):null]),b])}
+ function open(it,b,e){if(p.isOpen()&&p.anchor===b){p.close();return}cur=it;
+  setText(popT,((it.other&&P.title_other)||P.title||"").replace(/\{(\w+)\}/g,function(m,k){return it[k]!=null?it[k]:""}));setText(msg,"");
+  var first=null;fields.forEach(function(x){var f=x.f,showIt=!f.show_if||!!it[f.show_if];x.el.style.display=showIt?"block":"none";
+   x.el.value=it[f.key]!=null&&!f.blank?it[f.key]:"";if(showIt&&!first&&(f.focus!==false&&x.el.value===""))first=x.el});
+  p.toggle(b,e);(first||go).focus()}
+ function submit(){var body={},missing=null;
+  fields.forEach(function(x){if(x.el.style.display!=="none"){body[x.f.key]=x.el.value;if(x.f.required&&!String(x.el.value).trim())missing=x.f}else if(cur[x.f.key]!=null)body[x.f.key]=cur[x.f.key]});
+  if(missing){setText(msg,missing.required_msg||"Fill in "+(missing.label||missing.key));return}
+  withPin(function(){go.disabled=true;setText(go,P.busy||"Working...");
+   post(P.post,body,function(r,st,b){go.disabled=false;setText(go,P.submit||"OK");
+    if(st==401||st==429){setText(msg,(b&&b.message)||"PIN refused");return}
+    p.close();refresh()})})}
+ setText(go,P.submit||"OK");go.onclick=submit;
+ function paint(){var items=val(s.items)||[],k=JSON.stringify(items);if(k===key)return;key=k;
+  inner.innerHTML="";
+  items.forEach(function(it,i){inner.appendChild(rowFor(it,i,false))});
+  if(!items.length&&s.empty)inner.appendChild(s.style==="compact"?h("span",{text:s.empty}):h("div",{"class":"srow"},[h("span",{text:s.empty})]));
+  (s.extra||[]).forEach(function(x,i){inner.appendChild(rowFor(x,i,true))})}
+ UPD.push(function(){var shown=s.when===undefined||!!val(s.when);if(!shown){if(key!==""){key="";inner.innerHTML="";p.close()}return}paint()});
+ hook("settingsClose",function(){p.close()});return el};
+// ---- a table to pick values for: groups of short items (phone numbers) with an Add pop-up per group (reply of GET source)
+W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null,addKey=null,
+ list=h("div"),help=h("div",{"class":"srow"}),def=h("div",{"class":"srow"}),
+ pop=h("div"),popT=h("div",{"class":"t"}),inp=h("input",{type:"text","aria-label":"Value to add"}),addB=h("button",{type:"button","class":"pill-s",text:"Add"}),msg=h("div",{"class":"msg"});
+ pop.appendChild(popT);pop.appendChild(h("div",{"class":"fld"},[inp,addB]));pop.appendChild(msg);
+ el.appendChild(list);el.appendChild(help);el.appendChild(def);el.appendChild(pop);
+ var p=ui.popup(pop);p.onclose=function(){addKey=null};
+ function rules(){return cfg.rules||{}}
+ function paint(){if(!cfg)return;var R=rules();
+  list.innerHTML="";
+  cfg.groups.forEach(function(g){
+   var tags=h("div",{"class":"tags"});
+   if(g.items.length)g.items.forEach(function(it,i){var t=h("span",{"class":"tag"},[document.createTextNode(it)]),x=h("button",{type:"button","aria-label":"Remove "+it,html:"&#10005;"});
+    x.onclick=function(e){e.stopPropagation();g.items.splice(i,1);save()};t.appendChild(x);tags.appendChild(t)});
+   else tags.appendChild(h("span",{"class":"empty",text:R.empty||"Nothing yet"}));
+   var add=h("button",{type:"button","class":"pill-s",text:R.add_label||"Add","aria-label":(R.add_label||"Add")+" to "+g.label});
+   add.onclick=function(e){openAdd(g,add,e)};
+   var row=h("div",{"class":"srow wrap"},[h("span",{},[document.createTextNode(g.label),g.sub?h("span",{"class":"sub",text:g.sub}):null]),add,h("div",{"class":"below"},[tags])]);
+   list.appendChild(row)});
+  setLines(help.firstChild||help.appendChild(h("span",{"class":"sub"})),R.help||"");
+  def.innerHTML="";if(R.restore){var b=h("button",{type:"button","class":"pill-s",text:R.restore});b.onclick=function(){cfg.groups.forEach(function(g){g.items=(cfg.defaults[g.key]||[]).slice()});save()};def.appendChild(b)}}
+ function openAdd(g,b,e){if(p.isOpen()&&addKey===g.key){p.toggle(b,e);return}addKey=g.key;var R=rules();
+  setText(popT,(R.add_title||"Add to {group}").replace("{group}",g.label));inp.value="";inp.maxLength=R.max||40;setText(msg,"");p.toggle(b,e);inp.focus()}
+ function addItem(){if(!addKey)return;var R=rules(),allowed=new RegExp("[^"+(R.allowed||"\\s\\S")+"]","g"),n=inp.value.replace(allowed,""),say=function(t){setText(msg,t)},g=null;
+  cfg.groups.forEach(function(x){if(x.key===addKey)g=x});
+  if(n.length<(R.min||1))return say(R.min_msg||"Too short");
+  if(R.unique)for(var i=0;i<cfg.groups.length;i++)if(cfg.groups[i].items.indexOf(n)>=0)return say(n+" is already used by "+cfg.groups[i].label);
+  if(R.per_group&&g.items.length>=R.per_group)return say("At most "+R.per_group);
+  g.items.push(n);p.close();save()}
+ addB.onclick=addItem;inp.onkeydown=function(e){if(e.key=="Enter"){e.preventDefault();addItem()}};
+ function load(){xhrJson("GET",s.source,function(r){if(r){cfg=r;paint()}})}
+ function save(){clearTimeout(timer);paint();timer=setTimeout(function(){var body={};cfg.groups.forEach(function(g){body[g.key]=g.items});
+  post(s.source,body,function(r){if(r){cfg=r;paint();ctx.saved()}})},100)}
+ hook("settingsOpen",load);hook("settingsClose",function(){p.close()});return el};
+// ---- a console: lines of text in a box. "lines": "@path" replaces them all; "tail": "/url" adds what is new (GET url?from=N -> {text, size, reset})
+W.console=function(s,ctx){var el=h("div",{"class":"console"+(s.nowrap?" nowrap":""),role:"log","aria-label":s.label||"Log"}),size=0,busy=false,rules=(s.rules||[]).map(function(r){return[new RegExp(r[0],"i"),r[1]]}),
+ follow=s.follow?val(s.follow):true;
+ if(s.height)el.style.height=s.height;
+ function cls(l){for(var i=0;i<rules.length;i++)if(rules[i][0].test(l))return rules[i][1];return""}
+ function row(l){return '<div'+(cls(l)?' class="'+cls(l)+'"':'')+'>'+esc(l.slice(0,300))+'</div>'}
+ if(s.lines!==undefined)bind(s.lines,function(ls){ls=ls||[];var stick=el.scrollTop+el.clientHeight>=el.scrollHeight-8;
+  setHtml(el,ls.map(row).join(""));if(stick)el.scrollTop=el.scrollHeight;if(s.hide_empty)sh(el,!!ls.length)});
+ if(s.tail){var has=false,xp=null;
+  var on=function(){return s.active===undefined||!!val(s.active)},
+   inside=function(){xp=xp||(el.closest&&el.closest(".xpand"));return !xp||xp.classList.contains("open")},
+   poll=function(){sh(el,on()||has);if(busy||!inside()||(!on()&&size))return;busy=true;
+   xhrJson("GET",s.tail+"?from="+size,function(r){busy=false;if(!r)return;
+    if(r.reset)el.innerHTML="";
+    if(r.text){el.insertAdjacentHTML("beforeend",r.text.split(/\r?\n/).filter(function(l){return l.length}).map(row).join(""));
+     if(!s.follow||val(s.follow))el.scrollTop=el.scrollHeight}
+    size=r.size;has=has||size>0;sh(el,on()||has)})};
+  sh(el,false);UPD.push(poll);hook("expand",function(){poll();el.scrollTop=el.scrollHeight})}
+ if(s.show_if!==undefined)bind(s.show_if,function(v){sh(el,!!v)});return el};
+// ---- a read-only table of name / value pairs (the About rows); rows come from "@path" or the reply of "source" (fetched when Settings opens)
+W.info=function(s){var el=h("table",{"class":"about"});
+ function paint(rows){setHtml(el,(rows||[]).map(function(r){return '<tr><td class="n">'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>'}).join(""))}
+ if(s.rows!==undefined)bind(s.rows,paint);
+ if(s.source)hook("settingsOpen",function(){xhrJson("GET",s.source,function(r){if(r)paint(r)})});return el};
+// ---- a module's own widget: its page.js registered custom(name, fn); fn(host, ctx) fills the empty element
+W.custom=function(s,ctx){var host=h("div",{"class":"wcustom"+(s.cls?" "+s.cls:""),html:s.html||""}),f=CUSTOM[s.name];
+ if(f)AFTER.push(function(){f(host,ctx)});          // after the layout is in the page, so the module may look its elements up by id
+ else if(window.console)console.error("no custom widget",s.name);return host};
+// ---- controls that make up a form: select, number, text, slider (bound to one key of the form's values)
+function optionList(spec,F){var o=spec.options;if(typeof o==="string")o=isBind(o)?val(o):(F.options||{})[o];return o||[]}
+function control(spec,F,change){var key=spec.key,el,paint;
+ if(spec.type==="select"){el=h("select",{"class":"ord","aria-label":spec.label||key});var last="";
+  paint=function(){var opts=optionList(spec,F),k=JSON.stringify(opts);
+   if(k!==last){last=k;var groups={},order=[],html="";
+    opts.forEach(function(o,i){var g=o.group||"";if(!groups[g]){groups[g]=[];order.push(g)}groups[g].push('<option value="'+i+'">'+esc(o.label)+'</option>')});
+    el.innerHTML=order.map(function(g){return g?'<optgroup label="'+esc(g)+'">'+groups[g].join("")+'</optgroup>':groups[g].join("")}).join("")}
+   var cur=F.values[key];opts.forEach(function(o,i){if(String(o.value)===String(cur))el.value=String(i)})};
+  el.onchange=function(){var o=optionList(spec,F)[+el.value];if(o){F.values[key]=o.value;change()}};
+  el._paint=paint;return el}
+ if(spec.type==="number"){el=h("input",{type:"number",min:spec.min,max:spec.max,"aria-label":spec.label||key});
+  paint=function(){if(document.activeElement!==el)el.value=F.values[key]==null?"":F.values[key]};
+  el.onchange=function(){var n=parseInt(el.value,10);if(!isNaN(n)){F.values[key]=Math.max(spec.min!=null?spec.min:n,Math.min(spec.max!=null?spec.max:n,n));change()}};
+  el._paint=paint;return el}
+ if(spec.type==="toggle"){el=h("input",{type:"checkbox","class":"cbox neutral","aria-label":spec.label||key});
+  paint=function(){el.checked=!!F.values[key]};el.onchange=function(){F.values[key]=el.checked;change()};el._paint=paint;return el}
+ el=h("input",{type:"text","aria-label":spec.label||key});
+ paint=function(){if(document.activeElement!==el)el.value=F.values[key]==null?"":F.values[key]};
+ el.onchange=function(){F.values[key]=el.value;change()};el._paint=paint;return el}
+// ---- a form: rows of controls kept in one JSON object on the server (GET returns {values, options}, POST takes {values} and returns the same)
+W.form=function(s,ctx){var el=h("div",{"class":"wform"}),F={values:{},options:{}},timer=null,ctls=[],subs=[];
+ (s.fields||[]).forEach(function(f){var left=h("span",{},[document.createTextNode(f.title||"")]),box=h("div",{"class":"ctls"}),
+  sub=h("div",{"class":"sub fsub"}),row=h("div",{"class":"srow wrap"},[left,box,sub]);
+  (f.controls||[]).forEach(function(c){var e=control(c,F,save);ctls.push(e);box.appendChild(e)});
+  if(f.sub_of)subs.push(function(){var c=null;(f.controls||[]).forEach(function(x){if(x.key===f.sub_of)c=x});
+   var txt="";if(c)optionList(c,F).forEach(function(o){if(String(o.value)===String(F.values[c.key]))txt=o.sub||""});setLines(sub,txt);sh(sub,!!txt)});
+  else if(f.sub){setLines(sub,f.sub)}else sh(sub,false);
+  if(f.show!==undefined)bind(f.show,function(v){sh(row,!!v)});
+  el.appendChild(row)});
+ function paint(){ctls.forEach(function(c){c._paint()});subs.forEach(function(f){f()})}
+ function load(){xhrJson("GET",s.get,function(r){if(!r)return;F.values=r.values||{};F.options=r.options||{};paint()})}
+ function save(){clearTimeout(timer);paint();timer=setTimeout(function(){post(s.post||s.get,{values:F.values},function(r){
+  if(r){F.values=r.values||F.values;F.options=r.options||F.options;paint();ctx.saved()}})},250)}
+ hook("settingsOpen",load);load();return el};
+// ---- the module picker (the loader's own box): every module that may be switched, with its switch and a way to move it up or down
+function buildPicker(cols){var saved=h("span",{"class":"saved",text:"Saved ✓"}),card=h("div",{"class":"card"}),
+ sec=h("section",{"class":"sec","data-box":"modules"},[h("h2",{},[document.createTextNode("Modules "),saved]),card]);
+ var before=cols.querySelector('[data-box="system"]');cols.insertBefore(sec,before);
+ function load(){xhrJson("GET","/modules",function(r){if(r)paint(r.modules)})}
+ function paint(list){card.innerHTML="";
+  list.forEach(function(m,i){
+   var cb=h("input",{type:"checkbox","class":"cbox neutral","data-module":m.name,"aria-label":m.title});cb.checked=m.enabled;
+   var up=h("button",{type:"button","class":"mv",title:"Move up","aria-label":"Move "+m.title+" up",html:"&#9650;"}),
+    dn=h("button",{type:"button","class":"mv",title:"Move down","aria-label":"Move "+m.title+" down",html:"&#9660;"});
+   up.disabled=i===0;dn.disabled=i===list.length-1;
+   function move(by){var names=list.map(function(x){return x.name}),t=names.splice(i,1)[0];names.splice(i+by,0,t);
+    post("/modules/order",{order:names},function(r){if(!r)return;try{sessionStorage.setItem("netswitch-reopen","1")}catch(e){}location.reload()})}
+   up.onclick=function(){move(-1)};dn.onclick=function(){move(1)};
+   cb.onchange=function(){cb.disabled=true;post("/modules",{name:m.name,enabled:cb.checked},function(res){
+    if(!res){cb.disabled=false;cb.checked=!cb.checked;return}try{sessionStorage.setItem("netswitch-reopen","1")}catch(e){}location.reload()})};
+   var left=h("span",{},[document.createTextNode(m.title),h("span",{"class":"sub",html:esc(m.description)+(m.note?"<br>"+esc(m.note):"")+(m.error?'<br><b class="modbad">Could not load: '+esc(m.error)+"</b>":"")})]);
+   card.appendChild(h("div",{"class":"srow"},[left,h("span",{"class":"ctls mvs"},[up,dn,cb])]))});
+  if(!list.length)card.appendChild(h("div",{"class":"srow"},[h("span",{text:"No modules installed."})]))}
+ hook("settingsOpen",load);load()}
+// ---- backgrounds: the picker's top background module draws (a fullscreen one hides those below, a part one leaves them)
+function startBackgrounds(){(LAY.backgrounds||[]).forEach(function(b){
+ var host=h("div",{"class":"bgpart "+(b.type==="part"?"part "+(b.position||"bottom"):"fullscreen"),"data-bg":b.mod});$("bg").appendChild(host);
+ if(BACKGROUNDS[b.mod])BACKGROUNDS[b.mod](host,b)})}
+var BACKGROUNDS={};
+function background(mod,fn){BACKGROUNDS[mod]=fn}

@@ -1,2 +1,0 @@
-/* Wi-Fi setup module: rows, pop-up and buttons come from the page kit; only the divider that closes the block is its own */
-#wifi-box{border-bottom:1px solid var(--line)}   /* a divider before the version rows, like between any two rows */

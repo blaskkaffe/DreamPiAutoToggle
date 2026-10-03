@@ -1,0 +1,12 @@
+{
+ "settings": [
+  {"box": "gpio", "title": "GPIO", "items": [
+   {"type": "form", "get": "/buttonconfig", "post": "/buttonconfig", "fields": [
+    {"title": "Button 1", "sub_of": "button1_function", "controls": [
+     {"type": "select", "key": "button1_function", "options": "functions", "label": "Button 1 function"},
+     {"type": "select", "key": "button1_gpio", "options": "gpios", "label": "Button 1 pin"}]},
+    {"title": "Button 2", "sub_of": "button2_function", "controls": [
+     {"type": "select", "key": "button2_function", "options": "functions", "label": "Button 2 function"},
+     {"type": "select", "key": "button2_gpio", "options": "gpios", "label": "Button 2 pin"}]}]}]}
+ ]
+}

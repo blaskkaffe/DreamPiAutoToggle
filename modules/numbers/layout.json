@@ -1,0 +1,6 @@
+{
+ "settings": [
+  {"box": "special phone numbers", "title": "Special phone numbers", "items": [
+   {"type": "picker", "source": "/numbers"}]}
+ ]
+}

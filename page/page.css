@@ -1,6 +1,6 @@
 
- :root{--r:29px;--bw:4px;--dcnow:#e8761c;--dcnow-l:#f6b27a;--dcnet:#1c6fe8;--dcnet-l:#80b1f6;   /* the colours of the two networks: the server puts the chosen ones after this file (Settings > Network colours) */
-         --dcnow-rgb:232,118,28;--dcnow-l-rgb:246,178,122;--dcnet-rgb:28,111,232;--dcnet-l-rgb:128,177,246;--card:#1b1b1b;--line:#2a2a2a;--muted:#999;
+ :root{--r:29px;--bw:4px;--primary:#e8761c;--primary-l:#f6b27a;--primary-rgb:232,118,28;--primary-l-rgb:246,178,122;   /* the page's primary colour: the palette (core.colours_css(), put before this file) and the .c-<id> classes change it per module */
+         --card:#1b1b1b;--line:#2a2a2a;--muted:#999;
          --ctl:#1a1a1a;--ctl-line:#555;--pop:#262626;--sel:#5b6b7e;--sel-line:#9fb0c4;--dim:#777;--txt2:#ccc;--console:#0b0b0b}
  *{box-sizing:border-box}
  body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#111;color:#eee;max-width:460px;margin:24px auto;padding:0 16px}
@@ -17,10 +17,9 @@
  .dot{display:inline-block;width:.65em;height:.65em;border-radius:50%;margin-right:8px;background:#888}
  @keyframes blink{50%{opacity:.12}}
  .ok{background:#2c2} .busy,.warn{background:#e0b400} .call{background:#b04cff} .bad,.off{background:#d33}
- .call-dcnow{background:var(--dcnow)} .call-dcnet{background:var(--dcnet)}
  .warnbox{background:#7a1f1f;border:var(--bw) solid #a84a4a;padding:10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.9em}
- .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r);text-align:center;background:#9e4f10;border:var(--bw) solid #c9793a;line-height:1.35}
- .now b{font-size:1.25em;display:block} .now.dcnet{background:#1c4f9e;border-color:#5a86cf}
+ .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r);text-align:center;background:rgba(var(--primary-rgb),.62);border:var(--bw) solid rgba(var(--primary-l-rgb),.8);line-height:1.35}
+ .now b{font-size:1.25em;display:block}
  /* status rows inside the network box: closed = just the DreamPi status,
     centred under the network name; open = all rows with their labels */
  .now .row{font-size:.62em;line-height:1.35;padding:9px 0;border-top:1px solid rgba(255,255,255,.18);text-align:left}
@@ -36,26 +35,27 @@
  .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.18)}
  .now.open .row.main .k{display:block} .now.open .row.main .v{flex:1}
  .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r);font-size:1.1em;font-weight:600;letter-spacing:.02em}
- .dcnow-b{background:rgba(var(--dcnow-rgb),.82);border:var(--bw) solid rgba(var(--dcnow-l-rgb),.82)} .dcnet-b{background:rgba(var(--dcnet-rgb),.82);border:var(--bw) solid rgba(var(--dcnet-l-rgb),.82)}
+ .pill.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgba(var(--primary-l-rgb),.82)}
  .pill:active{filter:brightness(1.1)}
  .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
  .srow .pill-s{white-space:nowrap}
  .pill-s.danger{background:rgba(160,30,30,.85);border-color:rgba(230,110,110,.85)}
  a.pill-s{text-decoration:none}
- /* ===== The page kit: the building blocks every module uses (docs/modules.md, "The page kit"). A module writes its rows,
-    pop-ups, tags, sliders and consoles with these classes and with ui.row() / ui.popup() in page.js, and only adds CSS for
-    something nothing here covers. Change a look here and every module follows. ===== */
+ /* ===== The page kit: the building blocks every module uses (docs/modules.md, "The page kit"). The standard widgets of
+    page/widgets.js (rows, buttons, forms, boxes, tables, lists, consoles ...) are made of these classes; a module only adds
+    CSS for something nothing here covers. Change a look here and every module follows. ===== */
  .srow.wrap{flex-wrap:wrap} .srow .below{flex-basis:100%}
  .srow > span:first-child{min-width:0;overflow-wrap:anywhere} .srow .pill-s{flex:none}
  input[type=number]{width:54px;box-sizing:border-box;height:36px;padding:0 6px;border-radius:8px;border:var(--bw) solid var(--ctl-line);background:var(--ctl);color:#eee;font:inherit;font-size:.85em}
  input[type=range]{min-height:28px}
- .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range > span:first-child{white-space:nowrap} .range input{flex:1;min-width:60px;accent-color:var(--dcnow)}
+ .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range > span:first-child{white-space:nowrap} .range input{flex:1;min-width:60px;accent-color:var(--primary)}
  .range.grid{display:grid;grid-template-columns:5.6em minmax(0,1fr) 3.1em;gap:12px} .range.grid span:last-child{text-align:right}   /* equal slider lengths */
  .tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
  .tag{display:inline-flex;align-items:center;gap:2px;padding:3px 4px 3px 12px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);font-size:.88em}
  .tag button{background:none;color:#aaa;font-size:1.05em;line-height:1;min-width:36px;min-height:32px;padding:0;margin:-6px 0} .tag button:hover{color:#fff}
  .empty{color:var(--muted);font-size:.85em;margin:8px 0 0}
  .swatches{display:flex;gap:8px;flex:none} .swatch{width:34px;height:34px;padding:0;border-radius:50%;border:var(--bw) solid transparent;background:var(--c);box-shadow:0 0 0 1px rgba(255,255,255,.25) inset}
+ .swatches.grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;width:100%;margin-top:6px} .swatches.grid .swatch{width:100%;height:auto;aspect-ratio:1/1;max-width:36px;justify-self:center}
  .swatch.sel{border-color:#fff} .swatch:focus-visible{outline-offset:3px}
  .msg{color:#f99;font-size:.82em} .msg:empty{display:none}
  .pop{display:none;position:absolute;z-index:20;width:290px;max-width:calc(100% - 16px);padding:12px 16px;border-radius:var(--r);background:var(--pop);box-shadow:0 6px 24px rgba(0,0,0,.6)}
@@ -75,6 +75,30 @@
  .console.nowrap div{white-space:pre;overflow-wrap:normal;word-break:normal;padding:0;text-indent:0}   /* one entry per row, long ones scroll sideways */
  .console .l-err{color:#f08a8a} .console .l-ok{color:#8fe09a} .console .l-dim{color:#777} .console .l-hd{color:#eee}
  .console .l-info{color:#8bf} .console .l-warn{color:#e0b400} .console .l-mod{color:#aaa} .console .l-b{font-weight:bold}
+ .dbox{margin:0} .dbox > h2{margin-top:6px}
+ .ctls{display:flex;gap:8px;align-items:center} .ctls.mvs{gap:6px}
+ .srow.wrap > .ctls{margin-left:auto} .fsub{flex-basis:100%;margin:-6px 0 2px}
+ .mv{width:32px;height:32px;padding:0;border-radius:8px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#ccc;font-size:.7em;line-height:1} .mv:disabled{opacity:.3;cursor:default}
+ .xpand > .bar{margin:20px 0 0} .xbody{margin:0}
+ .wtext{margin:6px 0}
+ .carousel{display:block;min-width:0} .carousel .dup,.carousel .sp{display:none}
+ .carousel.sc{white-space:nowrap;overflow:hidden} .carousel.sc .trk{display:inline-block;animation:marquee var(--d,20s) linear infinite}
+ .carousel.sc .dup,.carousel.sc .sp{display:inline}
+ .now.open .carousel{white-space:normal;overflow:visible} .now.open .carousel .trk{animation:none;display:inline} .now.open .carousel .dup,.now.open .carousel .sp{display:none}
+ @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+ @media(prefers-reduced-motion:reduce){.carousel.sc .trk{animation:none}.carousel.sc .dup,.carousel.sc .sp{display:none}}
+ .now .row.main .v.fill{flex:1;min-width:0;overflow:hidden} .carousel{text-align:center} .carousel.sc,.now.open .carousel{text-align:left}
+ .now .status{display:flex;align-items:baseline;min-width:0} .now .status > .dot{flex:none} .now .status > span:last-child{min-width:0}
+ .now .pln{white-space:nowrap} .now .pln+.pln{margin-left:.6em}
+ .now .wlist.compact{display:block;width:100%;max-height:40vh;overflow-y:auto;overscroll-behavior:contain}
+ .now .wlist .p{display:flex;gap:8px;padding:4px 0;border-top:1px solid rgba(255,255,255,.12)} .now .wlist .p:first-child{border-top:0}
+ .now .wlist .pn{flex:1;min-width:0;overflow-wrap:anywhere} .now .wlist .pg{display:block;color:rgba(255,255,255,.65)}
+ .now .wlist .pw{flex:none;font-weight:bold;white-space:nowrap}
+ .now .links{display:flex;flex-wrap:wrap;gap:6px} .now .links a{color:#fff;opacity:.9;padding:6px 0}
+ .now .st{display:block;overflow-wrap:anywhere}
+ .tgl{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:4px}
+ .bar .bar{margin:0}
+ .bgpart.part{position:fixed;left:0;right:0;z-index:-1;pointer-events:none} .bgpart.part.top{top:0} .bgpart.part.bottom{bottom:0}   /* a background that fills only an area: its module sets the height */
  /* ===== end of the page kit ===== */
  :focus-visible{outline:3px solid #8bf;outline-offset:2px}
  .wide{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 20px;border-radius:var(--r);background:var(--card);border:var(--bw) solid #3a3a3a;color:#eee;font-size:1em;text-align:left}
@@ -98,8 +122,7 @@
  .cbox{-webkit-appearance:none;appearance:none;flex:none;display:inline-block;width:30px;height:30px;margin:0;padding:0;border-radius:8px;
        border:var(--bw) solid #777;background:transparent center/18px no-repeat;vertical-align:middle;cursor:pointer}
  .cbox.on,.cbox:checked{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
- .cbox.on.dcnow,.cbox.dcnow:checked{background-color:var(--dcnow);border-color:var(--dcnow)}
- .cbox.on.dcnet,.cbox.dcnet:checked{background-color:var(--dcnet);border-color:var(--dcnet)}
+ .cbox.on.pri,.cbox.pri:checked{background-color:var(--primary);border-color:var(--primary)}
  table{width:100%;border-collapse:collapse;font-size:.88em}
  td,th{padding:10px 3px;border-top:1px solid var(--line);vertical-align:top;text-align:left;font-weight:normal}
  tr:first-child td{border-top:0}

@@ -1,105 +1,192 @@
-# Modules: the optional features
+# Modules: everything the page shows
 
 Read before adding, removing or restructuring a feature. Back to [CLAUDE.md](../CLAUDE.md).
 
-## What is base and what is a module
+## The idea
 
-**Base** (always there): the web page with the Selected-network box (DreamPi, modem, internet and Pi status, Hang up), the two network buttons (`POST /dcnow`, `/dcnet`), Settings with the buttons' GPIO config, **Modules**, and System (the versions, a GitHub link); the hook inside DreamPi (routing, state files, the fixed openMenu number), the buttons service, `GET /tag` and security (Host/Origin checks, PIN).
+The base is small. It **scans `modules/`**, loads what is there, owns the **theme** (the global colours and the page kit) and the
+**three areas** a module can show something in, and **draws the modules' layouts**. Nothing on the page is the base's own
+except the frame (header, cog, warning boxes, Settings overlay) and the **module picker** (the loader's own box). Every box,
+row and button belongs to a module that says so in a `layout.json`; the base turns that JSON into HTML with its standard widgets
+(`page/widgets.js`). A module needs no HTML of its own, and no JavaScript unless it has something the standard widgets can't do.
 
-**Modules** (`modules/<name>/`, one folder each, all optional):
+Services stay as they are for now: the hook inside DreamPi, the buttons service, the LED service and the Wi-Fi service are
+base or module Python that runs on its own. Moving each service into its module's folder is planned (see CLAUDE.md, Ideas for later).
 
-| Module | Folder | What it is | Default |
+## The modules
+
+| Module | Visible in picker | What it shows / does | Default |
 |---|---|---|---|
-| `numbers` | `modules/numbers/` | the editable phone numbers: Settings > Special phone numbers, `GET`/`POST /numbers`, `numbers.json` (the hook only reads it while the module is on, else it uses its built-in defaults) | on |
-| `players` | `modules/players/` | the Online players box on the main page and `GET /players` | on |
-| `wifi` | `modules/wifi/` | Wi-Fi setup: the Wi-Fi rows in Settings, `POST /wifitoggle` and `/wificonnect`, its own service `dreampi-netswitch-wifi` (`netswitch_wifi_service.py` + `netswitch_wifi_setup.py`) | **off** |
-| `led` | `modules/led/` | the status LEDs: the service (`netswitch_led.py`, `netswitch_led_drivers.py`), `netswitch_ledconfig.py`, the Status LED settings (with the calibration pop-up) **including the LED count / GPIO pin / wire order row**, `GET`/`POST /ledconfig` | on |
-| `background` | `modules/background/` | the animated Dreamcast background: `GET /background/*.js` (its own script files), the `#dcbg` layer and the translucent box styling | **off** |
-| `rebootupdate` | `modules/rebootupdate/` | the Updates rows (check, Update now, log) at the end of the System card, the Reboot card, `GET /update`, `POST /update/check`, `/update/start`, `/reboot`, and `netswitch_update.py` | on |
-| `debuglog` | `modules/debuglog/` | the Debug log bar and live log on the main page, `GET /log`, `/dtmf`, `POST /debug`, `/clearlog`, and the part that runs inside DreamPi (`netswitch_hookdebug.py`) | **off** |
+| `switcher` (Network switcher) | no, always on | Dashboard: the Selected-network box (DreamPi, modem, internet, Pi, Hang up) and the two network buttons; Settings: **Network colours**; `POST /dcnow`, `/dcnet`, `/hangup`, `GET /status`; the page's primary colour follows the selected network | on |
+| `buttons` (Buttons) | no, always on | Settings > GPIO: function and pin of the two buttons, `GET`/`POST /buttonconfig` (the buttons service itself is base) | on |
+| `system` (System) | no, always on | Settings > System: the versions (`GET /about`) and the GitHub link | on |
+| `players` (Online players) | yes | Dashboard: the Online players box (counts, games carousel, player list, sources, links), `GET /players` | on |
+| `numbers` (Special phone numbers) | yes | Settings: the phone numbers table, `GET`/`POST /numbers`, `numbers.json` (the hook only reads it while the module is on) | on |
+| `led` (Status LEDs) | yes | Settings: the LED row in GPIO (count, wire order, pin: `GET`/`POST /ledhardware`) and the **Status LED** box (calibration pop-up and message table, a custom widget: `GET`/`POST /ledconfig`); the LED service | on |
+| `debuglog` (Debug log) | yes | Dashboard: the Debug log bar with the live log; `GET /log`, `/dtmf`, `POST /debug`, `/clearlog`; the part inside DreamPi (`netswitch_hookdebug.py`) | **off** |
+| `wifi` (Wi-Fi setup) | yes | Settings: the Wi-Fi setup row and network list in System, the hold-button row in GPIO; `POST /wifitoggle`, `/wificonnect`, `GET`/`POST /wifibutton`; its own service `dreampi-netswitch-wifi` | **off** |
+| `rebootupdate` (Reboot and Update) | yes | Settings: the Updates rows (check, Update now, log) in System, and the Reboot box; `GET /update`, `POST /update/check`, `/update/start`, `/reboot` | on |
+| `background` (Dreamcast background) | yes | A fullscreen **background**: the animated scene and the translucent box styling; `GET /background/*.js` | **off** |
 
-A module is **installed** when its folder (with a `module.json`) is there, and **enabled** when the Modules menu has it on (`modules.json` in `/opt/dreampi-netswitch`: `{"led": true, ...}`; a module without an entry uses `default` from its manifest). Not installed or not enabled = absent: no page parts, no endpoints (404), no service work. `core.module_manifest()`, `module_names()`, `module_enabled()`, `save_module_enabled()` read and write that state; the web service, the LED service, the buttons service and the hook (own Python 2 copy, `_module_active()`) all ask it.
+A module is **installed** when its folder (with a `module.json`) is there, and **enabled** when the picker has it on (`modules.json` in
+`/opt/dreampi-netswitch`: `{"led": true, ...}`; a module without an entry uses `enabled` from its manifest; a module that is not
+visible in the picker is always on). Not installed or not enabled = absent: no layout, no endpoints (404), no service work.
+`core.module_manifest()`, `module_names()`, `module_enabled()`, `module_visible()`, `save_module_enabled()` are the one place that knows.
 
 ## A module folder
 
 ```
 modules/<name>/
-  module.json      {"title", "description", "order" (menu order), "default" (on/off until the menu says otherwise),
-                    "ui" (the page kit version it was written for, 1), "web" (Python module name of its web entry),
-                    "note" (optional hint shown in the menu)}
+  module.json      {"name", "description", "enabled", "visible"}  + optional "web", "ui", "order", "colours", "colours_unique", "primary", "note"
+  layout.json      what it shows (below); a module with only a web entry or only a background may differ
   netswitch_*.py   its Python: the web entry named in "web", plus anything its services use
-  page.html        fragments for the page's slots:  <!--slot:NAME-->  ...markup...  <!--slot:OTHER--> ...
-  page.css         added to the page's styles (as little as possible: see the page kit below)
-  page.js          added to the page's script (same scope, after page.js; uses hook(), fire(), $, esc ...)
+  page.js          optional: custom widgets, hooks, a background (runs in the page's script after the base scripts)
+  page.css         optional: only for what the page kit has nothing for (see the kit rules below)
+  *.html           optional: markup of a custom widget (layout.json: "html_file")
   install.sh       optional, sourced by install.sh (sees $DEST $SRC $LED_COUNT $LED_GPIO $WIFI $WIFI_DEMO, ns_module_enable)
   remove.sh        optional, sourced when the folder is gone from the repo, and by uninstall.sh
 ```
 
-Python files in a module folder import the base by name (`import netswitch_core as core`): the loader, and the module's own services, put the base folder and the module folder on `sys.path`. The base never imports module code, with one guarded exception: the hook loads `netswitch_hookdebug` (only while the debug log module is installed and on). `tests/test_modules.py` enforces this.
+### module.json
+
+| Key | Meaning |
+|---|---|
+| `name` | the title in the picker (older files: `title`) |
+| `description` | the text under it in the picker |
+| `enabled` | on when first loaded; what the user sets in the picker (`modules.json`) overrides it (older files: `default`) |
+| `visible` | `false` = not in the picker and always on (the network switcher: it can't be removed); default `true` |
+| `web` | Python module name of its web entry (routes, `api()` hook) |
+| `ui` | the page kit version it was written for (now 2); a module for a newer kit is not loaded |
+| `order` | where it starts out in the list until the user moves it (the picker order, `module_order.json`, replaces it) |
+| `colours` | `{"dcnow": "orange", ...}`: colours the module picks from the global palette (below); `colours_unique: true` = no two keys share one |
+| `primary` | the palette id (or one of its own colour keys) it uses as its primary colour; it may change it while running (below) |
+| `note` | an optional second line in the picker |
+
+The picker (**Settings > Modules**) lists the visible modules with a switch each and ▲ ▼ buttons to move them (`POST /modules/order`,
+stored in `module_order.json`). **The order is the priority**: the module at the top comes first inside shared boxes, names a box
+first, sets the page's primary colour and wins when two backgrounds compete. Switching or moving a module reloads the page.
+A folder that is new to the picker starts at its `order` hint among the ones not yet placed.
+
+## layout.json
+
+```json
+{ "dashboard": [ BOX, ... ],
+  "settings":  [ BOX, ... ],
+  "data":      { "players": {"url": "/players", "every": 60, "retry": 2, "retry_if": "retry"} } }
+BOX = { "box": "gpio", "title": "GPIO", "items": [ WIDGET, ... ] }
+```
+
+or, for a **background module**, only `{"background": {"type": "fullscreen"}}` (see Backgrounds). The loader checks it
+(`netswitch_modules.read_layout()`); a layout with an unknown widget, section or key keeps its module out, and the reason shows as a
+warning box on the page (and in the picker).
+
+**Areas.** `dashboard` is the main page, `settings` the Settings overlay, `background` what is drawn behind everything. A module
+can have boxes in both `dashboard` and `settings`.
+
+**Boxes are shared by name.** Boxes with the same `box` name (case-insensitive) in any modules are **one box**: their items follow each
+other in picker order (the items of one module keep their order). The box's title is the first non-empty `title` in picker order, so a
+module that only adds rows leaves it out. Boxes appear in order of first appearance. Example: `buttons`, `led` and `wifi` all
+declare `gpio`; the page shows one GPIO box with Button 1/2, the LED row and the Wi-Fi button row. A settings box is a titled card
+(`<h2>` with a "Saved ✓" flash that any saving widget in it triggers); a dashboard box has no frame, its widgets stand directly on the page.
+A box whose widgets are all hidden (the LED settings while the LED count is 0) is hidden too.
+
+**Bindings.** A string value that starts with `@` is read from the page's state `S` and the widget follows it live:
+`"@modem.text"`. `S` is the latest `/api` answer plus one entry per data source (`S.players`). Anything else is literal. Most
+text-like properties accept a binding (`text`, `title`, `sub`, `label`, `confirm`, `disabled`, `show`, `hide`, `items`, `lines` ...);
+`show` / `hide` on any widget bind to a truthiness. A newline in a text makes a line break.
+
+**Colour references.** A colour in a layout is a palette id (`"orange"`), one of the module's own colour keys (`"dcnow"`) or
+`"module.key"` of another module (`"switcher.dcnow"`, which the Online players box uses so its counts follow the user's choice).
+
+**Data sources** (`"data"`): `{"url", "every" (seconds, default 60), "retry" (seconds, default 2), "retry_if" (a field of the answer; ask
+again after `retry` while it is true), "when": "settings" (only while Settings is open)}`: the page GETs the url into `S.<name>`
+(also after every button POST, and again after `retry` if a request fails). Names are global: the first module to ask for one keeps it.
+
+### The standard widgets
+
+| Type | What it is | Main properties |
+|---|---|---|
+| `text` | a paragraph | `text`, `muted`, `cls` |
+| `row` | a Settings row: title and grey subtitle on the left, a widget on the right | `title`, `sub`, `control` (a widget), `below` (widgets under the row, full width) |
+| `button` | `style` `"small"` (default round button), `"pill"` (big, in the primary colour), `"danger"` | `label`, `post` (a POST to this path), `body`, `colour` (pill: a colour reference), `confirm` (asks first), `pin` (asks for the PIN when one is set), `arm` (text shown on the first tap; a second tap within 4 s does it), `busy` + `busy_label`, `disabled`, `href` (a link instead of a POST), `aria`, `then` (`"reload"`, or `"wait"` = wait until the Pi is back, for a reboot) |
+| `toggle` | a tick box | `bind` + `post` (POSTs `{"value": bool}`), or `local` (kept in the page only, `default`), `text` (label beside it), `look` (`"neutral"` default, `"pri"`) |
+| `swatches` | the 16 palette colours; a pick is stored for the module | `key` (one of the module's `colours` keys) |
+| `link` | a link that looks like a small button | `label`, `href`, `aria` |
+| `form` | rows of controls kept in one JSON object on the server | `get`, `post`, `fields`: `[{"title", "sub", "sub_of": key (shows the `sub` of the selected option), "show", "controls": [{"type": "select"/"number"/"text"/"toggle", "key", "options": name or list, "min", "max", "label"}]}]`; `GET` answers `{"values": {...}, "options": {name: [{"value", "label", "group", "sub"}]}}`, `POST {"values": {...}}` saves and answers the same. Changes save 250 ms after the last one. |
+| `infobox` | the tap-to-open status box | `label`, `title` or `parts` (`[{"text", "colour"}]`), `rows`: `[{"label", "main" (always visible), "show", "value": widget}]`, `actions` (widgets shown when open), `actions_show` |
+| `status` | a dot and text, for infobox rows | `dot` (a state: `ok busy warn bad off call`, or a LED look `{color, effect, speed}`), `text`, `sub`, `lines` (first line + smaller ones) |
+| `expander` | a wide bar that opens a block (the Debug log) | `label`, `items` |
+| `bar` | widgets side by side | `items` |
+| `carousel` | one line that scrolls round, like a ticker, only when it doesn't fit | `items` (list, joined with a bullet) or `text` |
+| `picker` | a table to pick values for: groups of short items with an Add pop-up (the phone numbers; the LED message table will follow it) | `source`: `GET` answers `{"groups": [{"key", "label", "sub", "items": [...]}], "defaults": {key: [...]}, "rules": {"min", "max", "per_group", "allowed" (characters, regex class syntax), "unique", "add_label", "add_title", "empty", "min_msg", "help", "restore"}}`, `POST {key: [...]}` saves and answers the same |
+| `list` | a list from the server, each row with a button that opens a small form (the Wi-Fi networks), or compact rows with a coloured tag (the players) | `items`, `row` (`title`, `sub`, `button` or `tag` / `tag_colour` field names), `style` (`"compact"`), `empty`, `when`, `extra` (fixed rows after the list: `title`, `sub`, `button`, `item`), `popup` (`title`, `title_other`, `fields` `[{key, label, type, show_if, required, blank}]`, `submit`, `busy`, `post`, a PIN is asked for when one is set) |
+| `links` | a row of text links | `items`: `[[label, url], ...]` |
+| `console` | lines of text | `lines` (binding: replaces all) or `tail` (url; `GET url?from=N` answers `{"text", "size", "reset"}`), `rules` (`[[regex, "l-err"], ...]`, first match wins), `nowrap`, `height`, `follow`, `active`, `hide_empty`, `label` |
+| `info` | a read-only table of name / value pairs | `rows` (binding) or `source` (a url, fetched when Settings opens, `[[name, value], ...]`) |
+| `custom` | a box of the module's own | `name`, `html` or `html_file` (a file in the module folder), `cls` |
+
+A **custom widget** is registered by the module's `page.js`: `custom("led-messages", function(host, ctx){ ... })`. The page calls
+it after the whole layout is in the document, so it can look its elements up by id; `host` is the element holding the markup,
+`ctx.saved()` flashes the box's "Saved ✓", `ctx.mod` is the module name. Pop-ups inside it use `ui.popup(el)` (below). Use a custom widget only for what no standard widget does
+yet; a new widget that two modules could use goes into `page/widgets.js` instead (plus `WIDGETS` in `netswitch_modules.py`; a test keeps the two lists equal).
+
+### Backgrounds
+
+A module with `{"background": {"type": "fullscreen" | "part", "position": "top" | "bottom"}}` is a **background module** and can have
+**nothing else** (no boxes, no data): it is the only kind of module that draws behind the boxes. The page walks the enabled background modules in
+picker order: the first one is drawn; if it is `fullscreen` nothing below it is (and its script isn't even sent); if it is `part` (a
+taskbar-like strip or a logo that only fills an area; `position` pins it to the top or bottom, the module sets its height) the next one is drawn too.
+The module's `page.js` calls `background("<module name>", function(host, spec){ ... })` and draws into `host`
+(a div in the page's `#bg` layer). The Dreamcast background is the fullscreen one; it also restyles the boxes (a theme, the one place a module's CSS may restyle base classes).
 
 ### Web entry
 
 The module named in `"web"` may define:
 
-- `GET = {"/path": fn(handler)}` and `POST = {...}`: exact paths. `fn` answers with `handler.send(body, ctype, status=200)`; a POST function returns `True` once it has answered (else the web service sends the usual 204 / 303). `handler._body(limit)` reads the request body.
-- `api(d, warnings)`: called for every `GET /api`; add keys to the answer dict `d` and lines to `warnings` (the warning boxes).
+- `GET = {"/path": fn(handler)}` and `POST = {...}`: exact paths. `fn` answers with `handler.send(body, ctype, status=200)`; a POST function returns `True` once it has answered (else the web service sends 204 / 303). `handler._body(limit)` reads the request body.
+- `api(d, warnings)`: called for every `GET /api`, in picker order; add keys to the answer dict `d` (what the module's widgets bind to: put ready-to-show texts here, not logic in the page) and lines to `warnings` (the warning boxes). A hook should not depend on another module's keys (the LED module sets `d["dreampi"]["look"]`, the switcher adds the rest with `setdefault` rules).
 - `PROTECTED = ("/path", ...)`: POST paths of this module that run as root (reboot, update, joining a network): they need the PIN when one is set.
 
-POSTs pass the same security gate as every other POST (Origin / `X-Requested-With`); only paths a module lists in its web entry's `PROTECTED = (...)` tuple need the PIN (and the page's header, never a plain form post): `/reboot`, `/update/start` (Reboot and Update) and `/wificonnect` (Wi-Fi setup). A module that is off has no protected paths at all, because it has no routes. Unknown paths answer 404, so a module's endpoints disappear with the module.
+POSTs pass the same security gate as every other POST (Origin / `X-Requested-With`); only paths a module lists in `PROTECTED` need the PIN: `/reboot`, `/update/start` and `/wificonnect`. A module that is off has no protected paths at all, because it has no routes. Unknown paths answer 404.
 
-### Page slots
+## Colours and the theme
 
-`page/index.html` has `@@SLOT:name@@` markers; each module's `page.html` fills the ones it names (modules in menu order):
+The base owns the theme. **One global palette of 16 named colours** (`core.PALETTE`, a terminal's 16 as 8 hues × normal / bright: red, orange, yellow, green, cyan, blue, purple, pink and `bright-` each) with a page colour, a lighter variant for borders and the LED's own tuning. The page gets them as CSS variables (`--c-<id>`, `--c-<id>-l`, `-rgb` triples) and a class `.c-<id>` that makes an element and everything inside it use that colour as its `--primary`.
 
-| Slot | Where |
-|---|---|
-| `main` | `#main-slot`, under the two network buttons (Online players box, Debug log bar) |
-| `about_top` | extra rows at the top of the System card (the Wi-Fi setup row) |
-| `about_bottom` | extra rows at the end of the System card (the Updates rows) |
-| `system_after` | whole cards after the System card (the Reboot card) |
-| `sections_a` | whole Settings sections before the GPIO card (Special phone numbers) |
-| `buttons_rows` | extra rows in the buttons' GPIO card (the Wi-Fi hold button) |
-| `sections_b` | whole Settings sections after the GPIO card (Status LED, with the calibration pop-up) |
+- A module **never writes a colour of its own**. It names palette ids in `module.json` `"colours": {"dcnow": "orange", "dcnet": "blue"}` — defaults the user changes in the module's own settings (`swatches` widget, `POST /colour`, kept in `colours.json`; `core.module_colours(name)`, `core.set_module_colour()`; with `colours_unique` picking the other key's colour swaps the two). `/api` carries `colours` (`{module: {key: id}}`) so every device follows.
+- A module also has a **primary colour**: the one used on its borders and primary buttons. It is set statically (`"primary"` in `module.json`: a palette id or one of its own colour keys) or while running through its `api()` hook (`d["primary"][name] = id`). The network switcher does the second: its primary is the selected network's colour. Each box and widget takes the primary of its own module (a `.c-<id>` class); the top module in picker order that has a primary also sets the page's. **A lower module that picks another colour only uses it for itself.**
+- `core.network_colour("dcnow"|"dcnet")` is what the LED service and the status dot ask for (the switcher's picks, orange / blue without it). The LED messages for the networks store the tokens `"dcnow"` / `"dcnet"` as their colour.
 
-Client-side hooks (`page/page.js`): a module's `page.js` calls `hook(name, fn)`, the page calls `fire(name, arg)`: `api` (d, every second), `settingsOpen`, `settingsClose`, `escape` (return `true` if handled), `buttons` (the button settings were loaded), `posted` (after a form post). Settings opening, closing and refreshing never mention a module by name.
+## The page kit (what is left for a module's own CSS and JS)
 
-### The page kit
+A module does not decide how things look. The base page (`page/page.css`, the block marked "The page kit", `ui` in `page/page.js` and the widgets in `page/widgets.js`) provides the building blocks, so a change there changes every module. `ui.version` and `UI_KIT` in `netswitch_modules.py` are its version (now 2); a module's `"ui"` says which it was written for.
 
-A module does not decide how things look. The base page (`page/page.css`, the block marked "The page kit", and `ui` in `page/page.js`) provides the building blocks, and every module is written with them, so a change in the kit changes every module, current and future. `ui.version` in `page.js` and `UI_KIT` in `netswitch_modules.py` are its version (now 1); a module's `"ui"` says which version it was written for, and a module that wants a newer one than the page has is not loaded (the Modules menu says why).
+- Layout, rows, buttons, forms, boxes, tables, lists, consoles, colour pickers: the widgets above, nothing else needed.
+- **Pop-ups** inside a custom widget: an element in a card (`<div class="t">Title</div> ... <div class="msg"></div>`; `fld` puts an input and a button on one line, `bar` / `bar end` / `bar center` lay out buttons, `big` makes it wider) and `var p = ui.popup(el)`; `button.onclick = function(e){ p.toggle(this, e) }`, `p.close()`, `p.onclose`. It moves into its card the first time it opens. Esc, a click elsewhere, opening another pop-up and closing Settings close it.
+- **CSS classes** for a custom widget's markup: `srow` (+ `wrap`, `below`), `pill-s` (+ `danger`), `cbox` (+ `neutral`), `select.ord`, `tags` / `tag`, `range` (+ `grid`), `console` (+ `nowrap`; line classes `l-err l-ok l-dim l-hd l-info l-warn l-mod l-b`), `msg`, `empty`, `sub`.
+- **Hooks** (`hook(name, fn)` / `fire(name, arg)` in `page/page.js`): `api` (d, every second), `settingsOpen`, `settingsClose`, `escape` (return `true` if handled), `posted` (after a button's POST), `layout` (a box changed size), `expand` / `collapse` (an expander).
 
-| You want | Use |
-|---|---|
-| A Settings section | `<section class="sec"><h2>Title</h2><div class="card">...</div></section>` (the base's own classes), put in a slot |
-| A row: title, grey subtitle, control on the right | `ui.row({title, sub, control, below, id, cls})` in JS, or `<div class="srow"><span>Title<span class="sub">...</span></span> control</div>` in `page.html`. `below` adds full-width content under the row (it makes the row wrap). |
-| A small button | `ui.btn("Text", {attr: value})` or `<button class="pill-s">`; a link that looks like one: `<a class="pill-s">`; a dangerous action: `pill-s danger` |
-| Tick box | `<input type="checkbox" class="cbox dcnow">` (or `neutral`) |
-| Drop-down, number box | `<select class="ord">`, `<input type="number">`: both are 36 px high |
-| Removable items (numbers, say) | `<div class="tags">` with `ui.tag("text", {attr: value})` for each; `<span class="empty">` when there are none |
-| A pop-up under a button | an element in a card or section (`<div id="x"><div class="t">Title</div> ... <div class="msg"></div></div>`; `fld` puts an input and a button on one line, `bar` / `bar end` / `bar center` lay out buttons, `big` makes it wider) and `var p = ui.popup($("x"))`; then `button.onclick = function(e){ p.toggle(this, e) }`, `p.close()`, `p.onclose`. Esc, a click elsewhere, opening another pop-up and closing Settings close it. |
-| A slider row | `<div class="range"><span>Label</span><input type="range"><span>value</span></div>`; `range grid` lines several of them up |
-| A log / console | `<div class="console">` (add `nowrap` for one entry per line); line classes `l-err l-ok l-dim l-hd l-info l-warn l-mod l-b` |
-| An error line | `<div class="msg">` (empty = hidden) |
-| Colours | the CSS variables in `:root` (`--card --line --muted --ctl --ctl-line --pop --sel --sel-line --dim --txt2 --console --dcnow --dcnet` ...), never a colour written out |
+Rules (`tests/test_ui_kit.py` checks them): a module's `page.css` does not style a base class on its own (`.srow{...}` would change every row; `#my-list .srow{...}` and the module's own class names are fine), does not write colours as `#hex` (except white and black), and its `page.js` does not write `.srow` markup or open pop-ups by hand. The LED message table keeps its CSS in its own `page.css` until it moves to a standard table; a theme such as the Dreamcast background restyles base classes on purpose and is the one exception. To add something new that two modules could use, add it to the kit (CSS, widget, this table, a test) instead of to a module.
 
-Rules (`tests/test_ui_kit.py` checks them): a module's `page.css` does not style a base class on its own (`.srow{...}` would change every row; `#my-list .srow{...}` and the module's own class names are fine), does not write colours as `#hex` (except white and black), and its `page.js` builds rows with `ui.row()` and pop-ups with `ui.popup()`. A module whose look has nothing in the kit (the LED message table, the players box) keeps that CSS in its own `page.css`, scoped to its own ids and classes. A theme such as the Dreamcast background restyles base classes on purpose and is the one exception. To add something new that two modules could use, add it to the kit (CSS, helper, this table, a test) instead of to a module.
+## The loader (`netswitch_modules.py`)
 
-### The loader (`netswitch_modules.py`)
+`refresh()` runs for every request (`netswitch_web.refresh_page()`): when the signature (mtimes of the module folders, `modules.json`, `module_order.json`, `colours.json`, the base page files) changed, it checks every enabled module (`ui` version, `layout.json`), imports the web entries, collects routes and `api` hooks and the web service builds the page again: **adding or deleting a module folder, editing its files, switching or moving it in the picker takes effect on the next page load**, without restarting the web service. A module whose layout or Python is broken is skipped and reported (`errors()`: a warning box, and in the picker). `layout()` merges the layouts (`window.LAYOUT` in the page); `page_parts()` returns the modules' `page.css` / `page.js` (a background module that isn't drawn is left out); `live_colours()` feeds `/api`.
 
-`refresh()` is called for every request (`netswitch_web.refresh_page()`): when the signature (mtimes of the module folders and `modules.json`, the base page files) changed, it imports the web entries of the enabled modules, collects their routes and `api` hooks, and the web service builds the page again. So **adding or deleting a module folder, editing its files, or switching it in the Modules menu takes effect on the next page load**, without restarting the web service. A module whose Python fails to import is skipped and reported (`error` in `GET /modules`, shown in the menu) - the page still works.
+`GET /modules` lists the visible modules with `enabled`; `POST /modules {"name", "enabled"}` switches one; `POST /modules/order {"order": [names]}` moves them. Both need the page's own request header, and both reload the page.
 
-`GET /modules` lists the installed modules with `enabled`; `POST /modules {"name", "enabled"}` switches one (needs the page's own request header). The page then reloads and reopens Settings.
+The page itself (`page/`): `index.html` is only the frame (`#bg`, header, `#warnings`, `#dash`, the Settings overlay with `#set-boxes`); `page.js` the kit, hooks and `/api` loop; `widgets.js` the layout engine and the widgets; `boot.js` draws the layout and starts the loop last.
 
 ## Services and the installer
 
-- The **LED service** (`dreampi-netswitch-led`, `modules/led/netswitch_led.py`) drives `ledconfig.led_count()` LEDs while the module is on and **0 (closed, dark) while it is off** (`wanted_count()`), so the Modules menu needs no systemctl. Its unit has `ConditionPathExists=` for the three files, so deleting the folder from `/opt/dreampi-netswitch` makes systemd skip it quietly.
-- The **buttons service** is base and loads no module code. While the Wi-Fi module is on, a hold only touches `wifi_start` / `wifi_stop` (the same files the page's button touches). The **Wi-Fi service** (`dreampi-netswitch-wifi`, written by the module's `install.sh`, removed by its `remove.sh`) idles until a start request, runs `setup_cycle()`, and treats switching the module off mid-setup as a stop. Its unit has `ConditionPathExists` for the module's files.
-- `install.sh` `sync_modules`: copies every `modules/*/` that has a `module.json` to `$DEST/modules/` (replacing the old copy as a whole); a folder that was installed before but is gone from the repo gets its `remove.sh` run and is deleted. Then every installed module's `install.sh` is sourced (the LED one writes its unit and handles SPI for GPIO10; the Wi-Fi one handles `--wifi` / `--no-wifi` / `--wifi-demo` and installs hostapd + dnsmasq) and the services they add (`NS_SERVICES`) are enabled and restarted. `--wifi` turns the Wi-Fi module on (`ns_module_enable`), an old `wifi_enabled` marker is converted. `uninstall.sh` sources every `remove.sh` first.
+- The **LED service** (`dreampi-netswitch-led`, `modules/led/netswitch_led.py`) drives `ledconfig.led_count()` LEDs while the module is on and **0 (closed, dark) while it is off** (`wanted_count()`), so the picker needs no systemctl. Its unit has `ConditionPathExists=` for its files, so deleting the folder from `/opt/dreampi-netswitch` makes systemd skip it quietly.
+- The **buttons service** is base and loads no module code. While the Wi-Fi module is on, a hold only touches `wifi_start` / `wifi_stop` (the same files the page's button touches). The **Wi-Fi service** (`dreampi-netswitch-wifi`, written by the module's `install.sh`, removed by its `remove.sh`) idles until a start request, runs `setup_cycle()`, and treats switching the module off mid-setup as a stop.
+- `install.sh` `sync_modules`: copies every `modules/*/` that has a `module.json` to `$DEST/modules/` (replacing the old copy as a whole); a folder that was installed before but is gone from the repo gets its `remove.sh` run and is deleted. Then every installed module's `install.sh` is sourced (the LED one writes its unit and handles SPI for GPIO10; the Wi-Fi one handles `--wifi` / `--no-wifi` / `--wifi-demo`). It also copies the base page files (`index.html`, `page.css`, `page.js`, `widgets.js`, `boot.js`).
 - To **remove a module for good**: delete its folder in the folder you installed from and run `sudo ./install.sh` (its service and files go; its settings files like `led.json`, `led_count`, `numbers.json` stay for when it comes back). To **add one**: put the folder in and run the installer. To only hide it: switch it off in Settings > Modules.
 
 ## Adding a new module
 
-Make `modules/<name>/` with a `module.json`, a web entry (even an empty `GET = {}`), `page.html` / `page.css` / `page.js` as needed, and an `install.sh` / `remove.sh` if it has a service. Add it to `NAMES` / `MARKER` / `ENDPOINT` in `tests/test_modules.py` so the "every module can be removed or switched off alone" tests cover it. Keep the module's markup, styles and script in its own files: `index.html`, `page.css` and `page.js` must not mention it.
+Make `modules/<name>/` with a `module.json` (`name`, `description`, `enabled`, `visible`, `ui: 2`), a `layout.json` with its boxes, and a web entry for its endpoints and `api()` texts (`"web"`). Put the texts the widgets show in `api()` (or in the reply of a data source), not in JavaScript. Add it to `NAMES` / `ENDPOINT` in `tests/test_modules.py` so the "every module can be removed or switched off alone" tests cover it, and a view test (`tests/test_module_views.py`) for what it hands to the widgets. Add an `install.sh` / `remove.sh` if it has a service. If you need a widget the base lacks, add it to `page/widgets.js` (and the kit, docs, a test) rather than a one-off in the module.
 
 ## Tests
 
-`tests/test_modules.py`: the five modules well formed; the page and endpoints with everything on; with nothing (the base alone, JS syntax-checked with node); each module deleted alone and switched off alone from the menu and back, while the web service keeps running; bad menu requests; a broken module; a new folder picked up; the LED service following the menu; the installer's `sync_modules` on temp folders; layering. `tests/test_hook_modules.py`: the hook with the debug log module present, absent and off. `OFF=led,wifi` (or `OFF=all`) with `tests/ui/demo_server.py` shows the page with modules off. **Not run on a Pi:** the installer's service handling (removing the LED unit when the module is gone, `ConditionPathExists=`).
+`tests/test_module_picker.py` (manifest keys, visible, order, the picker's HTTP), `tests/test_layout.py` (boxes shared by name, picker order, backgrounds, validation, data sources, primary colours), `tests/test_network_colours.py` (the palette, module colours, the primary following the network), `tests/test_module_views.py` (the texts and lists the modules hand to the widgets), `tests/test_modules.py` (the modules well formed; the page and endpoints with everything on; with nothing (the base alone, JS syntax-checked with node); each module deleted alone and switched off alone and back while the web service keeps running; a broken module; a new folder picked up; the services following the picker; the installer's `sync_modules` on temp folders; layering), `tests/test_ui_kit.py` (the kit rules, the loader and page agreeing on the widget list). `sh tests/ui/run.sh` (optional, needs Chromium) audits the page at four widths and runs `tests/ui/functional.js`, which drives the real page: network switching and its primary colour, the colour pick, the numbers table, a saving form, moving and switching modules, the debug log.

@@ -1,0 +1,9 @@
+{
+ "name": "Buttons",
+ "description": "Choose what the two GPIO buttons do and which pins they use.",
+ "enabled": true,
+ "visible": false,
+ "order": 30,
+ "ui": 2,
+ "web": "netswitch_buttons_web"
+}

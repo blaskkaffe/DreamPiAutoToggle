@@ -6,64 +6,14 @@
 <link rel="icon" type="image/png" id="fav" href="/static/favicon-dcnow.png">
 <link rel="apple-touch-icon" id="touch" href="/static/touch-dcnow.png">
 <style>@@CSS@@</style></head><body>
+<div id="bg" class="keep-visible"></div>
 <header><h1>DreamPi</h1><button class="cog" id="cog" type="button" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M10.3 1.5h3.4l.5 2.6a8.3 8.3 0 0 1 2.1.9l2.2-1.5 2.4 2.4-1.5 2.2c.4.7.7 1.4.9 2.1l2.6.5v3.4l-2.6.5a8.3 8.3 0 0 1-.9 2.1l1.5 2.2-2.4 2.4-2.2-1.5c-.7.4-1.4.7-2.1.9l-.5 2.6h-3.4l-.5-2.6a8.3 8.3 0 0 1-2.1-.9l-2.2 1.5-2.4-2.4 1.5-2.2a8.3 8.3 0 0 1-.9-2.1l-2.6-.5v-3.4l2.6-.5c.2-.7.5-1.4.9-2.1L3.4 5.9l2.4-2.4L8 5c.7-.4 1.4-.7 2.1-.9zM12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6z"/></svg></button></header>
 <div id="warnings"></div>
-<div class="now rows" id="net" title="Show or hide details" role="button" tabindex="0" aria-expanded="false">
- <div class="nlabel">Selected network:</div><b id="net-name">...</b>
- <div class="row main"><span class="k">DreamPi</span><span class="v"><span class="dot" id="d-dot"></span><span id="d-text">...</span></span><span class="arrow">&#9656;</span></div>
- <div class="row more"><span class="k">Modem</span><span class="v"><span><span class="nw" id="m-text">...</span><span class="sub blk" id="m-since"></span></span></span></div>
- <div class="row more"><span class="k">Internet</span><span class="v"><span class="dot" id="i-dot"></span><span id="i-text">...</span></span></div>
- <div class="row more"><span class="k">Pi</span><span class="v"><span class="dot" id="p-dot"></span><span id="p-text">...</span></span></div>
- <div class="row more hang" id="hang-row" style="display:none"><form method="post" action="/hangup" id="hang-f"><button class="pill-s" id="hang-b" type="submit"
-  title="Ends the current call and gets the modem ready again">Hang up</button></form></div>
-</div>
-<form method="post" action="/dcnow"><button class="pill dcnow-b">DCNow! / DreamPi</button></form>
-<form method="post" action="/dcnet"><button class="pill dcnet-b">DCNET / FLYCAST</button></form>
-<div id="main-slot">
-@@SLOT:main@@
-</div>
+<div id="dash"></div>
 
 <div id="settings" role="dialog" aria-label="Settings"><div class="in">
 <header><h1>Settings</h1><button class="cog" id="close-settings" type="button" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.6 3.5 12 9.9l6.4-6.4 2.1 2.1-6.4 6.4 6.4 6.4-2.1 2.1-6.4-6.4-6.4 6.4-2.1-2.1 6.4-6.4-6.4-6.4z"/></svg></button></header>
-<div class="cols">
-@@SLOT:sections_a@@
-
-<section class="sec" id="colours-section">
-<h2>Network colours <span class="saved" id="colours-saved">Saved &#10003;</span></h2>
-<div class="card" id="colours-card"></div>
-</section>
-
-<div id="gpio-section" class="sec" style="position:relative">
-<h2>GPIO <span class="saved" id="gpio-saved">Saved &#10003;</span></h2>
-<div class="card">
- <div class="srow" id="gpio-btn1-row" style="flex-wrap:wrap"><span>Button 1</span>
-  <div style="display:flex;gap:8px"><select class="ord" id="btn1-fn" aria-label="Button 1 function"></select><select class="ord" id="btn1-gpio" aria-label="Button 1 pin"></select></div>
-  <div class="sub" id="btn1-sub" style="flex-basis:100%;margin:-6px 0 2px"></div></div>
- <div class="srow" id="gpio-btn2-row" style="flex-wrap:wrap"><span>Button 2</span>
-  <div style="display:flex;gap:8px"><select class="ord" id="btn2-fn" aria-label="Button 2 function"></select><select class="ord" id="btn2-gpio" aria-label="Button 2 pin"></select></div>
-  <div class="sub" id="btn2-sub" style="flex-basis:100%;margin:-6px 0 2px"></div></div>
-@@SLOT:buttons_rows@@
-</div>
-</div>
-
-
-@@SLOT:sections_b@@
-<section class="sec">
-<h2>Modules</h2>
-<div class="card" id="mod-list"></div>
-</section>
-<section class="sec">
-<h2>System</h2>
-<div class="card">
-@@SLOT:about_top@@
- <table class="about" id="about"></table>
- <div class="srow" id="github-row"><span>GitHub<span class="sub">Source, instructions and updates</span></span>
-  <a class="pill-s" href="https://github.com/blaskkaffe/DreamPiAutoToggle" target="_blank" rel="noopener noreferrer" aria-label="Open the project on GitHub">Open</a></div>
-@@SLOT:about_bottom@@
-</div>
-@@SLOT:system_after@@
-</section>
-</div>
+<div class="cols" id="set-boxes"></div>
 </div></div>
 
 <script>@@JS@@</script>

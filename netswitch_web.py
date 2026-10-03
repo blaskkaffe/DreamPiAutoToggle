@@ -40,92 +40,42 @@ CERT = os.path.join(core.BASE_DIR, "https.crt")   # self-signed, made by install
 KEY = os.path.join(core.BASE_DIR, "https.key")
 
 
-def _dot_look(dstate):
-    """What the DreamPi dot previews: a plain look for the state. The LED module replaces it with the look of the
-    LED message that is showing (its api() hook), so the dot still says something without it."""
-    dcnet = os.path.exists(core.FLAG)
-    net = core.network_colour("dcnet" if dcnet else "dcnow")["led"]
-    plain = {"ok": (net, "solid"), "busy": ("#ffd000", "blink"), "off": ("#ff0000", "blink"),
-             "call-dcnow": (core.network_colour("dcnow")["led"], "solid"), "call-dcnet": (core.network_colour("dcnet")["led"], "solid"),
-             "call": ("#aa00ff", "solid"), "unknown": ("#3c3c3c", "solid")}.get(dstate)
-    return {"color": plain[0], "effect": plain[1], "speed": "slow"} if plain else None
-
-
 def api_state():
-    dstate, dtext = core.dreampi_state()
-    mtext, msince = core.modem_state()
-    warnings = []
-    problem = core.hook_problem()
-    if problem:
-        warnings.append("Add-on not active: %s. Calls are not affected until it is." % problem)
-    problem = core.dcnet_problem()
-    if problem:
-        warnings.append("DCNET unavailable: %s. All calls go to DCNow!" % problem)
-    with probes._checks_lock:
-        checks = json.loads(json.dumps(probes._checks))
-    pi = checks.get("pi", {})
-    if pi.get("undervoltage"):
-        warnings.append("Power: the Pi is getting too little power (under-voltage). Use a stronger power "
-                        "supply or a shorter, thicker cable; this can make the Pi unstable or drop off the network.")
-    elif pi.get("problem"):
-        warnings.append("Too hot: the Pi is at %.0f\u00b0C and slows itself down. Give it more air or a heatsink."
-                        % (pi.get("temp") or 0))
-    net = core.network_state()
-    if net and not net.get("network"):
-        warnings.append("No network: the Pi has no working network connection.")
-    elif net and net.get("internet") is False:
-        why = "name lookups (DNS) fail" if "DNS" in checks["internet"]["text"] \
-            else "the network works, but the internet can't be reached"
-        warnings.append("No internet: %s. Dreamcast games can't get online right now." % why)
-    plugged = probes.modem_plugged()
-    compat, label = probes.modem_compat(probes._usb_info(probes.modem_port()))
-    if plugged is False:
-        warnings.append("Modem not detected: its USB serial port is gone. Check the cable/connection.")
-    elif compat is False:
-        warnings.append("Modem: %s is known not to work reliably with DreamPi. "
-                        "See the Modem row in Settings." % label)
-    d = {"network": "dcnet" if os.path.exists(core.FLAG) else "dcnow",
-         "netcolours": dict((n, dict((k, v) for k, v in core.network_colour(n).items() if k in ("id", "name", "ui", "ui_l"))) for n in ("dcnow", "dcnet")),
-         "dreampi": {"state": dstate, "text": dtext, "look": _dot_look(dstate)},
-         "modem": {"text": mtext, "since": msince, "plugged": plugged, "label": label, "compat": compat},
-         "internet": checks["internet"],
-         "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"),
-                "line2": pi.get("line2"), "warn": pi.get("warn")},
-         "hangup": {"busy": probes._hangup["busy"], "text": probes._hangup["text"]},
-         "pin": security.pin_required(),     # the page asks for it before update / restart / Wi-Fi connect
+    """The /api answer. The base only has the page-wide parts (PIN flag, warnings, time, the modules' colours); everything
+    else is added by the enabled modules' api() hooks (the network switcher adds the network and the status rows)."""
+    warnings = ["Module %s is not loaded: %s" % (name, why) for name, why in sorted(modules.errors().items())]
+    d = {"pin": security.pin_required(),     # the page asks for it before update / restart / Wi-Fi connect
+         "colours": modules.live_colours(), "primary": {},
          "warnings": warnings, "now": int(time.time())}
-    modules.apply_api(d, warnings)          # what the enabled modules add: debug, wifi, the dot's LED look ...
+    modules.apply_api(d, warnings)          # what the enabled modules add: network, status, debug, wifi, the dot's LED look ...
     return d
 
 
 PAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "page")
 
 
-BASE_PAGE_FILES = ("index.html", "page.css", "page.js")
+BASE_PAGE_FILES = ("index.html", "page.css", "page.js", "widgets.js", "boot.js")
 
 
-def _legacy_network_css():
-    """--dcnow / --dcnet (the network switcher's two colours) for the parts of the page that are not modules yet."""
-    out = ":root{"
-    for net in ("dcnow", "dcnet"):
-        c = core.network_colour(net)
-        rgb = lambda h: "%d,%d,%d" % (int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16))
-        out += "--%s:%s;--%s-l:%s;--%s-rgb:%s;--%s-l-rgb:%s;" % (net, c["ui"], net, c["ui_l"], net, rgb(c["ui"]), net, rgb(c["ui_l"]))
-    return out + "}\n"
+def _layout_script():
+    """window.LAYOUT: the boxes, data sources, colours and backgrounds of the enabled modules (netswitch_modules.layout()),
+    plus the palette. Put in a <script> tag, so a "</" inside a text is escaped."""
+    lay = modules.layout()
+    lay["palette"] = [{"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"]} for c in core.colours()]
+    return "window.LAYOUT=" + json.dumps(lay).replace("</", "<\\/") + ";"
 
 
 def build_page():
-    """The page is one document: page/index.html with page/page.css and page/page.js put in where it says
-    @@CSS@@ and @@JS@@ (one request, kept in memory as PAGE_BYTES). Edit those files, not this module. The
-    enabled modules add themselves (netswitch_modules.page_parts()): their markup at the @@SLOT:name@@ markers,
-    their styles after page.css and their script after page.js. Without a module its markers are just empty."""
+    """The page is one document: page/index.html with page/page.css, page/widgets.js, page/page.js and page/boot.js put in where
+    it says @@CSS@@ and @@JS@@ (one request, kept in memory as PAGE_BYTES). Edit those files, not this module. The
+    enabled modules add themselves (netswitch_modules.page_parts()): their layout (window.LAYOUT, drawn by the engine in
+    widgets.js), their styles after page.css and their script after the base script (custom widgets, hooks, a background)."""
     def part(name):
         with io.open(os.path.join(PAGE_DIR, name), encoding="utf-8", newline="") as f:
             return f.read()
     extra = modules.page_parts()
-    html = part("index.html").replace("@@CSS@@", part("page.css") + "\n" + extra["css"] + "\n" + _legacy_network_css() + core.colours_css()).replace("@@JS@@", part("page.js") + "\n" + extra["js"])
-    for name, text in extra["slots"].items():
-        html = html.replace("@@SLOT:%s@@" % name, text)
+    js = _layout_script() + "\n" + part("page.js") + "\n" + part("widgets.js") + "\n" + extra["js"] + "\n" + part("boot.js")
+    html = part("index.html").replace("@@CSS@@", core.colours_css() + part("page.css") + "\n" + extra["css"]).replace("@@JS@@", js)
     return html
 
 
@@ -188,21 +138,8 @@ def _static(name):
     return _static_cache[name]
 
 
-def _button_config():
-    return {"button1_gpio": core.button_gpio(1), "button2_gpio": core.button_gpio(2),
-            "button1_function": core.button_function(1), "button2_function": core.button_function(2),
-            "wifi_button": core.wifi_button()}
-
-
-def _button_reply():
-    return {"config": _button_config(), "gpios": core.BUTTON_GPIO_PINS, "functions": core.BUTTON_FUNCTIONS,
-            "wifi_choices": core.WIFI_BUTTON_CHOICES, "wifi": core.wifi_enabled()}
-
-
 def _colour_reply():
-    return {"options": [{"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"]} for c in core.colours()],
-            "current": core.module_colours("switcher"),
-            "modules": dict((n, core.module_colours(n)) for n in core.module_names() if core.module_enabled(n) and core.module_colours(n))}
+    return {"palette": core.colours(), "modules": modules.live_colours()}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -311,16 +248,6 @@ class Handler(BaseHTTPRequestHandler):
             code = core.tag()
             text = dict(core.TAGS).get(code, "") if "text" in self.path else code
             self.send(text + "\n", "text/plain; charset=utf-8")
-        elif path == "/status":
-            d = api_state()
-            self.send("network=%s\ntag=%s\ndreampi=%s\nmodem=%s\ninternet=%s\npi=%s\n" % (
-                d["network"], core.tag(), d["dreampi"]["text"],
-                d["modem"]["text"], d["internet"]["text"], d["pi"]["text"]), "text/plain; charset=utf-8")
-        elif path == "/about":
-            rows = probes.about()
-            rows.append(("PIN", "Asked before update, restart and Wi-Fi connect" if security.pin_required()
-                         else "Off: anyone on your network can update or restart (install.sh --pin sets one)"))
-            self.send(json.dumps(rows), "application/json")
         elif path.startswith("/static/"):
             name = path[len("/static/"):]
             body = _static(name)
@@ -332,8 +259,6 @@ class Handler(BaseHTTPRequestHandler):
             self.send(body, STATIC_FILES[name], cache=86400, fixed=True)
         elif path == "/modules":
             self.send(json.dumps({"modules": modules.listing()}), "application/json")
-        elif path == "/buttonconfig":
-            self.send(json.dumps(_button_reply()), "application/json")
         elif path == "/colours":
             self.send(json.dumps(_colour_reply()), "application/json")
         elif modules.route("GET", path):
@@ -364,20 +289,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_module_order()
         if path == "/colour":
             return self._post_colour()
-        if path == "/buttonconfig":
-            return self._post_buttons()
-        if path == "/netcolour":
-            return self._post_netcolour()
-        if path == "/dcnet":
-            open(core.FLAG, "w").close()
-            core.debug_log("web page: DCNET selected")
-        elif path == "/dcnow":
-            if os.path.exists(core.FLAG):
-                os.remove(core.FLAG)
-            core.debug_log("web page: DCNow! selected")
-        elif path == "/hangup":
-            probes.start_hangup()
-        elif modules.route("POST", path):
+        if modules.route("POST", path):
             if modules.route("POST", path)(self) is True:    # an enabled module's own endpoint; True = it has answered
                 return
         else:
@@ -431,37 +343,6 @@ class Handler(BaseHTTPRequestHandler):
         refresh_page(force=True)       # the colours are built into the page
         core.debug_log("web page: %s colours %s" % (data["module"], json.dumps(got, sort_keys=True)))
         self.send(json.dumps({"module": data["module"], "colours": got}), "application/json")
-
-    def _post_netcolour(self):
-        """Settings > Network colours: {"network": "dcnow"|"dcnet", "colour": id}."""
-        try:
-            data = json.loads(self._body(1024).decode("utf-8"))
-            core.set_module_colour("switcher", data.get("network"), data.get("colour"))
-        except (ValueError, IOError, OSError, AttributeError) as e:
-            return self.send(str(e), "text/plain; charset=utf-8", status=400)
-        refresh_page(force=True)       # the colours are built into the page
-        core.debug_log("web page: network colours %s" % json.dumps(core.module_colours("switcher"), sort_keys=True))
-        self.send(json.dumps(_colour_reply()), "application/json")
-
-    def _post_buttons(self):
-        try:
-            data = json.loads(self._body(4096).decode("utf-8"))
-        except (ValueError, IOError, OSError) as e:
-            return self.send(str(e), "text/plain; charset=utf-8", status=400)
-        try:
-            g1, g2 = int(data["button1_gpio"]), int(data["button2_gpio"])
-        except (KeyError, TypeError, ValueError):
-            g1 = g2 = None
-        if g1 is not None and g2 is not None and g1 != g2:   # reject if they'd collide on one pin
-            core.save_button_gpio(1, g1)
-            core.save_button_gpio(2, g2)
-        if "button1_function" in data:
-            core.save_button_function(1, data["button1_function"])
-        if "button2_function" in data:
-            core.save_button_function(2, data["button2_function"])
-        if "wifi_button" in data:
-            core.save_wifi_button(data["wifi_button"])
-        self.send(json.dumps({"config": _button_config()}), "application/json")
 
     def log_message(self, *args):
         pass

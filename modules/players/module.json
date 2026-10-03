@@ -4,6 +4,6 @@
  "enabled": true,
  "visible": true,
  "order": 15,
- "ui": 1,
+ "ui": 2,
  "web": "netswitch_players"
 }

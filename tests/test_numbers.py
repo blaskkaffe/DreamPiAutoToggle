@@ -231,12 +231,14 @@ class HttpNumbersTests(unittest.TestCase):
         base = "http://127.0.0.1:%d" % srv.server_address[1]
         try:
             r = json.loads(urlopen(base + "/numbers", timeout=10).read().decode())
-            self.assertEqual(r["numbers"], nums.default_numbers())
-            self.assertEqual([a["key"] for a in r["actions"]], list(hook.NUMBER_ACTIONS))
+            self.assertEqual(dict((g["key"], g["items"]) for g in r["groups"]), nums.default_numbers())
+            self.assertEqual([g["key"] for g in r["groups"]], list(hook.NUMBER_ACTIONS))
+            self.assertEqual(r["defaults"], nums.default_numbers())
+            self.assertEqual((r["rules"]["min"], r["rules"]["max"], r["rules"]["allowed"], r["rules"]["unique"]), (nums.MIN_LEN, nums.MAX_LEN, "0-9*#", True))
             body = json.dumps({"call_dcnet": ["5550002", "*61#"]}).encode()
             req = Request(base + "/numbers", data=body, method="POST", headers={"Content-Type": "application/json", "X-Requested-With": "netswitch"})
             out = json.loads(urlopen(req, timeout=10).read().decode())
-            self.assertEqual(out["numbers"]["call_dcnet"], ["5550002", "*61#"])
+            self.assertEqual([g["items"] for g in out["groups"] if g["key"] == "call_dcnet"], [["5550002", "*61#"]])
             self.assertEqual(nums.numbers()["call_dcnet"], ["5550002", "*61#"])
         finally:
             srv.shutdown()

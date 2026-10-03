@@ -2,20 +2,28 @@
 #
 # A module is a folder in modules/ with a module.json (see netswitch_core.module_manifest()). The web
 # service runs the Python part of every *enabled* module (the "web" entry in its manifest) and builds the
-# module's page files into the page:
-#   page.html  fragments for named slots of page/index.html, written as  <!--slot:NAME-->  sections
-#   page.css   added to the page's styles
-#   page.js    added to the page's script (it runs after page.js, in the same scope)
+# module's files into the page:
+#   layout.json  what the module shows (below), drawn by the standard widgets of page/widgets.js
+#   page.css   added to the page's styles (only for what the page kit has nothing for)
+#   page.js    added to the page's script (it runs after the base scripts, in the same scope): custom widgets, hooks, a background
 # A module's web entry may define
 #   GET = {"/path": fn(handler)}    POST = {"/path": fn(handler)}   answer a request itself (handler.send(...)); a
 #                                                                    POST function returns True once it has answered
 #   api(d, warnings)                add to the /api answer (d is its dict) and to the warning boxes
 #   PROTECTED = ("/path", ...)      POST paths that need the PIN when one is set (they run as root)
 # module.json "ui": N is the page kit version the module was written for (see UI_KIT); a newer one is not loaded.
+# A module may have a layout.json: what it shows, as data, which the base page turns into HTML (see layout()):
+#   {"dashboard": [BOX, ...], "settings": [BOX, ...], "data": {...}}       or, for a background module only, {"background": {...}}
+#   BOX = {"box": "gpio", "title": "GPIO", "items": [WIDGET, ...]}
+# Modules that name the same box (case-insensitive) share it: their items come one after the other in picker order and
+# the first module (in that order) that gives a title names it. A WIDGET is {"type": ..., ...} from WIDGETS below.
+# A background module (type "fullscreen" or "part") has a background and nothing else; the top one in picker order is
+# drawn and, if it is fullscreen, nothing below it is.
 # Nothing outside this file and the web service knows which modules exist. A module whose folder is missing,
 # that is switched off, or whose Python fails to import is simply absent. Works on Python 3 and 2.7.
 import importlib
 import io
+import json
 import os
 import re
 import sys
@@ -23,9 +31,16 @@ import threading
 
 import netswitch_core as core
 
-UI_KIT = 1       # the version of the page kit (ui in page/page.js, the kit block in page.css); a module may ask for an older one
-SLOTS = ("main", "about_top", "about_bottom", "system_after", "sections_a", "buttons_rows", "sections_b")   # the @@SLOT:name@@ markers in index.html
-_PAGE_FILES = ("page.html", "page.css", "page.js")
+UI_KIT = 2       # the version of the page kit (ui in page/page.js, the kit block in page.css); a module may ask for an older one
+_PAGE_FILES = ("page.css", "page.js")
+# the standard widgets the page can draw from a layout (docs/modules.md, "Layout"); "custom" hands a box to the module's own page.js
+WIDGETS = ("text", "row", "button", "toggle", "swatches", "link", "form", "infobox", "status", "expander", "bar", "carousel",
+           "picker", "list", "links", "console", "info", "custom")
+CONTROLS = ("select", "number", "text", "toggle")      # what a form field may hold (W.form, control() in page/widgets.js)
+SECTIONS = ("dashboard", "settings")
+BACKGROUND_TYPES = ("fullscreen", "part")
+_LAYOUT_KEYS = SECTIONS + ("background", "data")
+_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _lock = threading.Lock()
 _state = {"sig": None, "loaded": [], "errors": {}, "get": {}, "post": {}, "api": [], "protected": set()}
 
@@ -38,10 +53,11 @@ def _read(path):
 def signature():
     """Changes whenever a module is added, removed, switched or edited."""
     parts = [core.MODULES_DIR]
-    try:
-        parts.append(os.path.getmtime(core.MODULES_STATE))
-    except OSError:
-        parts.append(None)
+    for path in (core.MODULES_STATE, core.MODULE_ORDER, core.MODULE_COLOURS):       # what the picker and the colour pickers write
+        try:
+            parts.append(os.path.getmtime(path))
+        except OSError:
+            parts.append(None)
     try:
         names = sorted(os.listdir(core.MODULES_DIR))
     except OSError:
@@ -84,12 +100,17 @@ def refresh(force=False):
                 errors[name] = "needs page kit %s, this page has %d" % (need, UI_KIT)
                 continue
             try:
+                layout = read_layout(name)
+            except ValueError as e:
+                errors[name] = "layout.json: %s" % e
+                continue
+            try:
                 web = _import_web(name, manifest)
             except Exception as e:      # a broken module must not take the page down with it
                 errors[name] = "%s: %s" % (e.__class__.__name__, e)
                 sys.stderr.write("module %s not loaded: %s\n" % (name, errors[name]))
                 continue
-            loaded.append({"name": name, "manifest": manifest, "web": web})
+            loaded.append({"name": name, "manifest": manifest, "web": web, "layout": layout})
             if web is not None:
                 get.update(getattr(web, "GET", None) or {})
                 post.update(getattr(web, "POST", None) or {})
@@ -98,6 +119,164 @@ def refresh(force=False):
                     api.append(web.api)
         _state.update(sig=sig, loaded=loaded, errors=errors, get=get, post=post, api=api, protected=protected)
         return True
+
+
+def _check_widget(w, where):
+    """A widget is a dict with a known "type". Widgets nested inside one are checked too: a row's control, the items of an
+    expander or bar, a form field's controls, an infobox row's value, an infobox's actions. (The items of a carousel or a
+    list are data, not widgets.)"""
+    if not isinstance(w, dict):
+        raise ValueError("%s: a widget must be an object" % where)
+    t = w.get("type")
+    if t not in WIDGETS:
+        raise ValueError("%s: unknown widget type %r" % (where, t))
+    for key in ("control", "value"):
+        if isinstance(w.get(key), dict):
+            _check_widget(w[key], "%s.%s" % (where, key))
+    for key in (("items",) if t in ("expander", "bar") else ("actions",) if t == "infobox" else ()):
+        if key in w:
+            if not isinstance(w[key], list):
+                raise ValueError("%s.%s must be a list" % (where, key))
+            for i, sub in enumerate(w[key]):
+                _check_widget(sub, "%s.%s[%d]" % (where, key, i))
+    for key in ("fields", "rows"):          # entries that are not widgets themselves but hold some
+        if key in w:
+            if not isinstance(w[key], list):
+                raise ValueError("%s.%s must be a list" % (where, key))
+            for i, sub in enumerate(w[key]):
+                if not isinstance(sub, dict):
+                    raise ValueError("%s.%s[%d] must be an object" % (where, key, i))
+                for k2 in ("control", "value"):
+                    if isinstance(sub.get(k2), dict):
+                        _check_widget(sub[k2], "%s.%s[%d].%s" % (where, key, i, k2))
+                if "controls" in sub:
+                    if not isinstance(sub["controls"], list):
+                        raise ValueError("%s.%s[%d].controls must be a list" % (where, key, i))
+                    for j, c in enumerate(sub["controls"]):
+                        if not isinstance(c, dict) or c.get("type") not in CONTROLS:
+                            raise ValueError("%s.%s[%d].controls[%d]: a form control is one of %s" % (where, key, i, j, ", ".join(CONTROLS)))
+
+
+def _check_layout(layout):
+    if not isinstance(layout, dict):
+        raise ValueError("must be an object")
+    for key in layout:
+        if key not in _LAYOUT_KEYS:
+            raise ValueError("unknown key %r (use %s)" % (key, ", ".join(_LAYOUT_KEYS)))
+    if "background" in layout:
+        if any(k in layout for k in SECTIONS + ("data",)):
+            raise ValueError("a background module can only have a background, no dashboard or settings boxes")
+        bg = layout["background"]
+        if not isinstance(bg, dict) or bg.get("type") not in BACKGROUND_TYPES:
+            raise ValueError("background.type must be one of %s" % ", ".join(BACKGROUND_TYPES))
+        return
+    for sec in SECTIONS:
+        if sec not in layout:
+            continue
+        boxes = layout[sec]
+        if not isinstance(boxes, list):
+            raise ValueError("%s must be a list of boxes" % sec)
+        for i, box in enumerate(boxes):
+            where = "%s[%d]" % (sec, i)
+            if not isinstance(box, dict) or not isinstance(box.get("box"), type(u"")) or not box["box"].strip():
+                raise ValueError('%s needs a "box" name' % where)
+            if not isinstance(box.get("items", []), list):
+                raise ValueError("%s.items must be a list" % where)
+            for j, w in enumerate(box.get("items", [])):
+                _check_widget(w, "%s.items[%d]" % (where, j))
+    data = layout.get("data", {})
+    if not isinstance(data, dict):
+        raise ValueError("data must be an object")
+    for ns, spec in data.items():
+        if not _NAME_RE.match(ns) or not isinstance(spec, dict) or not isinstance(spec.get("url"), type(u"")) or not spec["url"].startswith("/"):
+            raise ValueError('data %r needs a name like "players" and a "url" starting with /' % ns)
+
+
+def read_layout(name):
+    """The parsed, checked layout.json of a module, or None when it has none. ValueError says what is wrong."""
+    path = os.path.join(core.MODULES_DIR, name, "layout.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        layout = json.loads(_read(path))
+    except ValueError as e:
+        raise ValueError("not valid JSON (%s)" % e)
+    _check_layout(layout)
+    return layout
+
+
+def _primary_of(name, manifest):
+    """The palette id a module always uses as its primary colour (manifest "primary": a palette id, or one of its own
+    colour keys), or None. A module can change it while running through its api hook (d["primary"][name])."""
+    want = manifest.get("primary")
+    cols = core.module_colours(name)
+    if want in cols:
+        return cols[want]
+    return want if want in core.PALETTE_IDS else None
+
+
+def _module_file(name, filename):
+    """The text of a file in the module's folder (no sub-folders), or "" when it isn't there."""
+    if not re.match(r"^[A-Za-z0-9_.-]+$", filename or "") or filename.startswith("."):
+        return ""
+    try:
+        return _read(os.path.join(core.MODULES_DIR, name, filename))
+    except (IOError, OSError):
+        return ""
+
+
+def layout():
+    """What the page draws, from the enabled modules in picker order:
+    {"modules": [names], "dashboard": [box], "settings": [box], "backgrounds": [{"mod", "type", ...}],
+     "data": {namespace: {"url", "every", "mod"}}, "primary": {name: palette id}, "colours": {name: {key: id}}}
+    box = {"id": lower-case name, "title", "mods": [names], "items": [widget + "mod"]}."""
+    out = {"modules": [], "dashboard": [], "settings": [], "backgrounds": [], "data": {}, "primary": {}, "colours": {}}
+    boxes = dict((sec, {}) for sec in SECTIONS)
+    covered = False                       # a fullscreen background above hides every one below it
+    for m in _state["loaded"]:
+        name, lay = m["name"], m.get("layout") or {}
+        out["modules"].append(name)
+        prim = _primary_of(name, m["manifest"])
+        if prim:
+            out["primary"][name] = prim
+        cols = core.module_colours(name)
+        if cols:
+            out["colours"][name] = cols
+        if "background" in lay:
+            if not covered:
+                out["backgrounds"].append(dict(lay["background"], mod=name))
+                covered = lay["background"]["type"] == "fullscreen"
+            continue
+        for sec in SECTIONS:
+            for box in lay.get(sec, []):
+                key = box["box"].strip().lower()
+                b = boxes[sec].get(key)
+                if b is None:
+                    b = boxes[sec][key] = {"id": key, "title": "", "mods": [], "items": []}
+                    out[sec].append(b)
+                if not b["title"] and box.get("title"):
+                    b["title"] = box["title"]
+                if name not in b["mods"]:
+                    b["mods"].append(name)
+                for w in box.get("items", []):
+                    w = dict(w, mod=name)
+                    if w.get("type") == "custom" and w.get("html_file"):         # the markup of a custom widget lives in a file of the module
+                        w["html"] = _module_file(name, w.pop("html_file"))
+                    b["items"].append(w)
+        for ns, spec in (lay.get("data") or {}).items():
+            out["data"].setdefault(ns, dict(spec, mod=name))      # the first module to ask for a name keeps it
+    return out
+
+
+def errors():
+    """{module: why} for every module that could not be loaded (a missing or broken layout, a Python error)."""
+    return dict(_state["errors"])
+
+
+def live_colours():
+    """{module: {key: palette id}} for the enabled modules that have colours of their own (in every /api answer, so a change
+    made on another device shows at once)."""
+    return dict((m["name"], core.module_colours(m["name"])) for m in _state["loaded"] if m["manifest"].get("colours"))
 
 
 def get(name):
@@ -141,17 +320,18 @@ def listing():
 
 
 def page_parts():
-    """{"slots": {name: html}, "css": text, "js": text} of the loaded modules, in menu order."""
-    slots, css, js = dict((s, "") for s in SLOTS), [], []
+    """{"css": text, "js": text} of the loaded modules, in picker order: their page.css and page.js (a module only needs
+    them for what the standard widgets can't do: custom widgets, hooks, a background). The page of a background module
+    that is not drawn (another one is on top of it) is left out."""
+    drawn = set(b["mod"] for b in layout()["backgrounds"])
+    css, js = [], []
     for m in _state["loaded"]:
+        if "background" in (m.get("layout") or {}) and m["name"] not in drawn:
+            continue
         folder = os.path.join(core.MODULES_DIR, m["name"])
         paths = dict((f, os.path.join(folder, f)) for f in _PAGE_FILES)
-        if os.path.exists(paths["page.html"]):
-            for slot, text in re.findall(r"<!--slot:(\w+)-->\n?(.*?)(?=<!--slot:|\Z)", _read(paths["page.html"]), re.S):
-                if slot in slots:
-                    slots[slot] += text
         if os.path.exists(paths["page.css"]):
             css.append("/* module %s */\n%s" % (m["name"], _read(paths["page.css"])))
         if os.path.exists(paths["page.js"]):
             js.append("// module %s\n%s" % (m["name"], _read(paths["page.js"])))
-    return {"slots": slots, "css": "\n".join(css), "js": "\n".join(js)}
+    return {"css": "\n".join(css), "js": "\n".join(js)}

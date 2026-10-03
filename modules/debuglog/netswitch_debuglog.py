@@ -81,4 +81,6 @@ POST = {"/debug": _post_debug, "/clearlog": _post_clear}
 
 
 def api(d, warnings):
-    d["debug"] = os.path.exists(core.DEBUG_DTMF)
+    on = os.path.exists(core.DEBUG_DTMF)
+    d["debug"] = on
+    d["debuglog"] = {"on": on, "label": "\u25cf Recording" if on else "Recording off"}
