@@ -27,7 +27,7 @@ DREAMPI_FILES = ("dreampi.py", "netlink.py", "dcnow.py")
 TIMEOUT = 10
 
 _lock = threading.Lock()
-_info = {"time": 0, "checking": False, "addon": None, "dreampi": None, "error": None}
+_info = {"time": 0, "started": 0, "checking": False, "addon": None, "dreampi": None, "error": None}
 
 
 def fetch(url):
@@ -131,6 +131,7 @@ def _begin():
         if _info["checking"]:
             return False
         _info["checking"] = True
+        _info["started"] = time.time()
         return True
 
 
@@ -167,8 +168,17 @@ def check_in_background():
 
 
 def update_state():
-    """running / ok / failed, or idle (a finished result is only reported for 10 minutes: core.update_status())."""
-    return core.update_status()
+    """running / ok / failed, or idle (a finished result is only reported for 10 minutes: core.update_status()). A new check
+    replaces a finished result: after an update the page showed "The add-on was updated." for ten minutes whatever the user
+    pressed, so checking again looked dead."""
+    state = core.update_status()
+    if state in ("ok", "failed"):
+        try:
+            if _info.get("started", 0) > os.path.getmtime(core.UPDATE_STATUS):
+                return "idle"
+        except OSError:
+            return "idle"
+    return state
 
 
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[@-_]")

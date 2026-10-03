@@ -37,7 +37,7 @@ class CheckTests(unittest.TestCase):
             f.write(LOCAL)
         with open(probes.ADDON_VERSION, "w") as f:
             f.write("2026-09-30 12:00 (aaaaaaa)")
-        up._info.update({"time": 0, "checking": False, "addon": None, "dreampi": None, "error": None})
+        up._info.update({"time": 0, "started": 0, "checking": False, "addon": None, "dreampi": None, "error": None})
 
     def tearDown(self):
         up.fetch = self._fetch
@@ -103,6 +103,19 @@ class CheckTests(unittest.TestCase):
         self.assertFalse(up._info["checking"])
         self.assertTrue(up._info["time"])
         self.assertEqual(len([u for u in started if "api.github.com" in u]), 1)
+
+    def test_a_new_check_replaces_the_result_of_the_last_update(self):
+        with open(core.UPDATE_STATUS, "w") as f:
+            f.write("ok\n")
+        os.utime(core.UPDATE_STATUS, (time.time() - 5, time.time() - 5))
+        up.fetch = fake_github(down=True)
+        self.assertEqual(up.update_state(), "ok")                 # right after the update: announced
+        up.check()
+        self.assertEqual(up.update_state(), "idle")               # checking again takes over
+        self.assertIn("Couldn't reach GitHub", up.status()["error"])
+        with open(core.UPDATE_STATUS, "w") as f:                  # a later update announces itself again
+            f.write("failed\n")
+        self.assertEqual(up.update_state(), "failed")
 
     def test_dreampi_versions(self):
         dp = os.path.join(self.tmp, "dreampi")
