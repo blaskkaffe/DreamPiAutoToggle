@@ -57,14 +57,35 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   // ---- shared boxes: wifi, system and the update rows are one box
   ok(await page.locator('[data-box="system"]').count() === 1, 'one System box is shared by several modules');
   ok(await page.locator('[data-box="gpio"] .wform').count() >= 2, 'and one GPIO box holds the forms of the buttons and the LED');
-  // ---- the module picker: move a module and switch one off
-  const order = async () => page.locator('[data-box="modules"] .srow > span:first-child').evaluateAll(els => els.map(e => e.firstChild.textContent));
-  const first = (await order())[0];
-  await page.locator('[data-box="modules"] .mv[title="Move down"]').first().click(); await page.waitForLoadState('networkidle'); await settle(1500);
-  ok((await order())[0] !== first, 'a module moves down in the picker (the page reloads in Settings)');
+  // ---- the module picker: drag a module by its handle, move one with the keyboard, switch one off
+  const order = async () => page.locator('[data-box="modules"] .srow[data-id]').evaluateAll(els => els.map(e => e.getAttribute('data-id')));
+  const grip = n => page.locator('[data-box="modules"] .srow[data-id] .grip').nth(n);
+  const drag = async (from, to) => {                                       // from / to are row numbers; the pointer ends on the lower half of `to`
+    await grip(Math.min(from, to)).scrollIntoViewIfNeeded();
+    const a = await grip(from).boundingBox(), rows = page.locator('[data-box="modules"] .srow[data-id]');
+    const b = await rows.nth(to).boundingBox();
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down();
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2 + (from < to ? 5 : -5), { steps: 3 });
+    await page.mouse.move(a.x + a.width / 2, from < to ? b.y + b.height - 4 : b.y + 4, { steps: 12 });
+    return a;
+  };
+  const before0 = await order();
+  await drag(0, 1);
+  ok(JSON.stringify(await order()) !== JSON.stringify(before0) && await page.locator('[data-box="modules"] .srow.drag').count() === 1, 'dragging a row moves it while the others make room');
+  await page.mouse.up(); await page.waitForLoadState('networkidle'); await settle(1500);
+  const after = await order();
+  ok(after[0] === before0[1] && after[1] === before0[0], 'dropping saves the new order (the page reloads in Settings)');
   ok(await page.locator('#settings.open').count() === 1, 'and Settings stays open');
-  await page.locator('[data-box="modules"] .mv[title="Move up"]').nth(1).click(); await page.waitForLoadState('networkidle'); await settle(1500);
-  ok((await order())[0] === first, 'and moves back up');
+  await drag(1, 0); await page.mouse.up(); await page.waitForLoadState('networkidle'); await settle(1500);
+  ok(JSON.stringify(await order()) === JSON.stringify(before0), 'and a drag back restores it');
+  await drag(0, 2); await page.keyboard.press('Escape');
+  ok(JSON.stringify(await order()) === JSON.stringify(before0) && await page.locator('[data-box="modules"] .srow.drag').count() === 0, 'Esc while dragging cancels');
+  await page.mouse.up(); await settle(500);
+  await grip(0).focus(); await page.keyboard.press('ArrowDown'); await settle(1300); await page.waitForLoadState('networkidle'); await settle(1200);
+  ok((await order())[0] === before0[1], 'the arrow keys on a handle move the row too');
+  await grip(1).focus(); await page.keyboard.press('ArrowUp'); await settle(1300); await page.waitForLoadState('networkidle'); await settle(1200);
+  ok(JSON.stringify(await order()) === JSON.stringify(before0), 'and back');
+  ok(await page.locator('[data-box="modules"] .mv').count() === 0, 'there are no arrow buttons any more');
   const players = page.locator('[data-box="modules"] input[data-module="players"]');
   await players.uncheck(); await page.waitForLoadState('networkidle'); await settle(1500);
   await page.click('#close-settings');

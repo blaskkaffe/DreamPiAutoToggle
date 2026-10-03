@@ -76,9 +76,12 @@
  .console .l-err{color:#f08a8a} .console .l-ok{color:#8fe09a} .console .l-dim{color:#777} .console .l-hd{color:#eee}
  .console .l-info{color:#8bf} .console .l-warn{color:#e0b400} .console .l-mod{color:#aaa} .console .l-b{font-weight:bold}
  .dbox{margin:0} .dbox > h2{margin-top:6px}
- .ctls{display:flex;gap:8px;align-items:center} .ctls.mvs{gap:6px}
+ .ctls{display:flex;gap:8px;align-items:center}
  .srow.wrap > .ctls{margin-left:auto} .fsub{flex-basis:100%;margin:-6px 0 2px}
- .mv{width:32px;height:32px;padding:0;border-radius:8px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#ccc;font-size:.7em;line-height:1} .mv:disabled{opacity:.3;cursor:default}
+ .grip{flex:none;width:30px;height:38px;margin:-4px 0 -4px -6px;padding:0;background:none;color:#777;font-size:1.1em;letter-spacing:-.15em;line-height:1;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none} .grip:hover,.grip:focus-visible{color:#ccc}
+ .srow[data-id] > span:nth-child(2){flex:1}
+ .dragging{user-select:none;-webkit-user-select:none} .dragging .grip{cursor:grabbing}
+ .srow.drag{position:relative;z-index:5;background:var(--card);border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.65);border-top-color:transparent}
  .xpand > .bar{margin:20px 0 0} .xbody{margin:0}
  .wtext{margin:6px 0}
  .carousel{display:block;min-width:0} .carousel .dup,.carousel .sp{display:none}

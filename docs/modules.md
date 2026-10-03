@@ -62,8 +62,8 @@ modules/<name>/
 | `primary` | the palette id (or one of its own colour keys) it uses as its primary colour; it may change it while running (below) |
 | `note` | an optional second line in the picker |
 
-The picker (**Settings > Modules**) lists the visible modules with a switch each and ▲ ▼ buttons to move them (`POST /modules/order`,
-stored in `module_order.json`). **The order is the priority**: the module at the top comes first inside shared boxes, names a box
+The picker (**Settings > Modules**) lists the visible modules with a switch each and a **drag handle** (⋮⋮): drag a row to move it (mouse, finger or pen; the other rows make room, Esc cancels, and near the edge Settings scrolls along), or focus the handle and use the up / down arrow keys (`POST /modules/order`,
+stored in `module_order.json`). The drag is the standard `sortable()` in `page/widgets.js`. **The order is the priority**: the module at the top comes first inside shared boxes, names a box
 first, sets the page's primary colour and wins when two backgrounds compete. Switching or moving a module reloads the page.
 A folder that is new to the picker starts at its `order` hint among the ones not yet placed.
 
@@ -80,8 +80,20 @@ or, for a **background module**, only `{"background": {"type": "fullscreen"}}` (
 (`netswitch_modules.read_layout()`); a layout with an unknown widget, section or key keeps its module out, and the reason shows as a
 warning box on the page (and in the picker).
 
-**Areas.** `dashboard` is the main page, `settings` the Settings overlay, `background` what is drawn behind everything. A module
-can have boxes in both `dashboard` and `settings`.
+**Areas.** `dashboard` is the main page, `settings` the Settings overlay, `background` what is drawn behind everything. **One module can make any number of boxes in both `dashboard` and `settings`**, each with any mix of widgets. The network switcher is one module: a dashboard box `network` (one expandable `infobox` widget plus two `button` widgets) and a settings box `network colours`; the LED module is one module with the `gpio` box (its LED row) and the `status led` box.
+
+**Box names (best practice).** Not enforced by code, but use the same names for the same kind of thing, so modules land in the box the user expects and share it instead of adding a box each (a module's own feature gets a box named after it, like `special phone numbers` or `status led`):
+
+| Box | Put here | Used by now |
+|---|---|---|
+| `system` | things that act on the Pi or the add-on: Wi-Fi setup, updates, reboot | wifi, rebootupdate, system |
+| `about` | read-only information: versions, hardware, links | system (today inside `system`) |
+| `gpio` | anything wired to a GPIO pin: button functions, the LED pin, hold buttons | buttons, led, wifi |
+| `configuration` | a module's general settings that fit no other box; a module with only a few settings adds them here instead of making its own box | (none yet) |
+| `appearance` | colours and the look of the page | (the switcher's colour picks are in `network colours` for now) |
+| `network` | (dashboard) the network selection and its status | switcher |
+
+Use the same title for the same box everywhere (`System`, `About`, `GPIO`, `Configuration`): the first module in picker order that gives one names it. Lower-case in `layout.json`, as the box id.
 
 **Boxes are shared by name.** Boxes with the same `box` name (case-insensitive) in any modules are **one box**: their items follow each
 other in picker order (the items of one module keep their order). The box's title is the first non-empty `title` in picker order, so a

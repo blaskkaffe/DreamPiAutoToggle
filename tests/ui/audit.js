@@ -58,10 +58,10 @@ const AUDIT = () => {
     await page.screenshot({ path: `/tmp/dpns-audit-main-${w}.png`, fullPage: true });
     await page.click('#cog'); await page.waitForTimeout(1500); await check('settings');
     // wifi flow states
-    await page.click('.srow:has-text("Wi-Fi setup") > button'); await page.waitForTimeout(4500); await check('settings wifi list');
+    await page.click('[data-box="system"] .srow:has-text("Wi-Fi setup") > button'); await page.waitForTimeout(4500); await check('settings wifi list');
     await page.click('.wlist .srow:nth-child(4) button'); await page.waitForTimeout(300); await check('settings wifi pop-up, long ssid');
     await page.screenshot({ path: `/tmp/dpns-audit-settings-${w}.png`, fullPage: true });
-    await page.click('.srow:has-text("Wi-Fi setup") > button'); await page.waitForTimeout(1500);
+    await page.click('[data-box="system"] .srow:has-text("Wi-Fi setup") > button'); await page.waitForTimeout(1500);
     // popups
     await page.evaluate(() => { const b = document.querySelector('#led-rows .fx'); if (b) b.click(); }); await page.waitForTimeout(300); await check('fx popup');
     await page.keyboard.press('Escape');

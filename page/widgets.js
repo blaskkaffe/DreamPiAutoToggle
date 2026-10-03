@@ -327,24 +327,61 @@ W.form=function(s,ctx){var el=h("div",{"class":"wform"}),F={values:{},options:{}
   if(r){F.values=r.values||F.values;F.options=r.options||F.options;paint();ctx.saved()}})},250)}
  hook("settingsOpen",load);load();return el};
 // ---- the module picker (the loader's own box): every module that may be switched, with its switch and a way to move it up or down
-function buildPicker(cols){var saved=h("span",{"class":"saved",text:"Saved ✓"}),card=h("div",{"class":"card"}),
+// ---- drag and drop ordering: rows of a container, each with a ".grip" handle. Grab the handle (mouse, finger or pen) and move the row;
+// the others make room as it passes them and onDone(names) gets the new order of the rows' data-id values when it is dropped.
+// The handle also takes the arrow keys (up / down move the row, then onDone), so it works without a pointer. Esc while dragging cancels.
+function sortable(box,onDone){
+ function rows(){return Array.prototype.filter.call(box.children,function(r){return r.hasAttribute("data-id")})}
+ function names(){return rows().map(function(r){return r.getAttribute("data-id")})}
+ function same(a,b){return a.join("\n")===b.join("\n")}
+ rows().forEach(function(row){var grip=row.querySelector(".grip");if(!grip)return;
+  grip.addEventListener("pointerdown",function(e){
+   if(e.pointerType==="mouse"&&e.button!==0)return;
+   e.preventDefault();var start=names(),grab=e.clientY-row.getBoundingClientRect().top,y=e.clientY,done=false,
+    scroller=$("settings");
+   try{grip.setPointerCapture(e.pointerId)}catch(x){}
+   row.classList.add("drag");box.classList.add("dragging");
+   function place(){row.style.transform="";var nat=row.getBoundingClientRect(),want=y-grab,guard=0;   // natural place first, then where the pointer wants it
+    row.style.transform="translateY("+(want-nat.top)+"px)";
+    while(guard++<30){var c=want+nat.height/2,prev=row.previousElementSibling,next=row.nextElementSibling;
+     function mid(el){var r=el.getBoundingClientRect();return r.top+r.height/2}
+     if(prev&&prev.hasAttribute("data-id")&&c<mid(prev)){box.insertBefore(row,prev)}
+     else if(next&&next.hasAttribute("data-id")&&c>mid(next)){box.insertBefore(next,row)}
+     else break;
+     row.style.transform="";nat=row.getBoundingClientRect();row.style.transform="translateY("+(want-nat.top)+"px)"}}
+   function move(ev){y=ev.clientY;place()}
+   var scroll=setInterval(function(){var h=window.innerHeight;                         // near the top / bottom edge: scroll Settings along
+    if(y<70)scroller.scrollTop-=14;else if(y>h-70)scroller.scrollTop+=14;else return;place()},16);
+   function finish(cancel){if(done)return;done=true;clearInterval(scroll);
+    grip.removeEventListener("pointermove",move);grip.removeEventListener("pointerup",up);grip.removeEventListener("pointercancel",cancelled);document.removeEventListener("keydown",esc,true);
+    row.classList.remove("drag");box.classList.remove("dragging");row.style.transform="";
+    if(cancel){start.forEach(function(n){box.appendChild(rows().filter(function(r){return r.getAttribute("data-id")===n})[0])});return}
+    var now=names();if(!same(start,now))onDone(now)}
+   function up(){finish(false)}function cancelled(){finish(true)}
+   function esc(ev){if(ev.key==="Escape"){ev.stopPropagation();finish(true)}}
+   grip.addEventListener("pointermove",move);grip.addEventListener("pointerup",up);grip.addEventListener("pointercancel",cancelled);document.addEventListener("keydown",esc,true)});
+  var keyTimer=null;
+  grip.addEventListener("keydown",function(e){if(e.key!=="ArrowUp"&&e.key!=="ArrowDown")return;e.preventDefault();
+   var other=e.key==="ArrowUp"?row.previousElementSibling:row.nextElementSibling;
+   if(!other||!other.hasAttribute("data-id"))return;
+   if(e.key==="ArrowUp")box.insertBefore(row,other);else box.insertBefore(other,row);
+   grip.focus();clearTimeout(keyTimer);keyTimer=setTimeout(function(){onDone(names())},900)})})}
+// ---- the module picker (the loader's own box): every module that may be switched, with its switch; drag a row by its handle to move it
+function buildPicker(cols){var saved=h("span",{"class":"saved",text:"Saved \u2713"}),card=h("div",{"class":"card"}),
  sec=h("section",{"class":"sec","data-box":"modules"},[h("h2",{},[document.createTextNode("Modules "),saved]),card]);
  var before=cols.querySelector('[data-box="system"]');cols.insertBefore(sec,before);
+ function reloadInSettings(){try{sessionStorage.setItem("netswitch-reopen","1")}catch(e){}location.reload()}
  function load(){xhrJson("GET","/modules",function(r){if(r)paint(r.modules)})}
  function paint(list){card.innerHTML="";
-  list.forEach(function(m,i){
+  list.forEach(function(m){
    var cb=h("input",{type:"checkbox","class":"cbox neutral","data-module":m.name,"aria-label":m.title});cb.checked=m.enabled;
-   var up=h("button",{type:"button","class":"mv",title:"Move up","aria-label":"Move "+m.title+" up",html:"&#9650;"}),
-    dn=h("button",{type:"button","class":"mv",title:"Move down","aria-label":"Move "+m.title+" down",html:"&#9660;"});
-   up.disabled=i===0;dn.disabled=i===list.length-1;
-   function move(by){var names=list.map(function(x){return x.name}),t=names.splice(i,1)[0];names.splice(i+by,0,t);
-    post("/modules/order",{order:names},function(r){if(!r)return;try{sessionStorage.setItem("netswitch-reopen","1")}catch(e){}location.reload()})}
-   up.onclick=function(){move(-1)};dn.onclick=function(){move(1)};
    cb.onchange=function(){cb.disabled=true;post("/modules",{name:m.name,enabled:cb.checked},function(res){
-    if(!res){cb.disabled=false;cb.checked=!cb.checked;return}try{sessionStorage.setItem("netswitch-reopen","1")}catch(e){}location.reload()})};
-   var left=h("span",{},[document.createTextNode(m.title),h("span",{"class":"sub",html:esc(m.description)+(m.note?"<br>"+esc(m.note):"")+(m.error?'<br><b class="modbad">Could not load: '+esc(m.error)+"</b>":"")})]);
-   card.appendChild(h("div",{"class":"srow"},[left,h("span",{"class":"ctls mvs"},[up,dn,cb])]))});
-  if(!list.length)card.appendChild(h("div",{"class":"srow"},[h("span",{text:"No modules installed."})]))}
+    if(!res){cb.disabled=false;cb.checked=!cb.checked;return}reloadInSettings()})};
+   var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+m.title+": drag, or use the up and down arrow keys",html:"&#8942;&#8942;"}),
+    left=h("span",{},[document.createTextNode(m.title),h("span",{"class":"sub",html:esc(m.description)+(m.note?"<br>"+esc(m.note):"")+(m.error?'<br><b class="modbad">Could not load: '+esc(m.error)+"</b>":"")})]);
+   card.appendChild(h("div",{"class":"srow","data-id":m.name},[grip,left,cb]))});
+  if(!list.length)card.appendChild(h("div",{"class":"srow"},[h("span",{text:"No modules installed."})]));
+  sortable(card,function(order){post("/modules/order",{order:order},function(r){if(r)reloadInSettings();else load()})})}
  hook("settingsOpen",load);load()}
 // ---- backgrounds: the picker's top background module draws (a fullscreen one hides those below, a part one leaves them)
 function startBackgrounds(){(LAY.backgrounds||[]).forEach(function(b){
