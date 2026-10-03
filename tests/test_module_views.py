@@ -11,6 +11,7 @@ import netswitch_wifi_web as wifi
 import netswitch_rebootupdate as ru
 import netswitch_switcher as sw
 import netswitch_probes as probes
+import netswitch_clock as clock
 
 
 class PlayersView(unittest.TestCase):
@@ -241,6 +242,56 @@ class ModemCompat(unittest.TestCase):
         self.assertTrue(probes.modem_compat(self.usb("Conceptronic", "C56U-V2"))[0])
         self.assertIsNone(probes.modem_compat(self.usb("Acme", "Fax Thing"))[0])
         self.assertEqual(probes.modem_compat(None), (None, None))
+
+
+class ClockView(unittest.TestCase):
+    def setUp(self):
+        self.tmp = sandbox()
+        self.tz = os.environ.get("TZ")
+        os.environ["TZ"] = "UTC"
+        time.tzset()
+
+    def tearDown(self):
+        if self.tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = self.tz
+        time.tzset()
+        cleanup(self.tmp)
+
+    def test_the_mode_file_is_a_core_path_and_defaults_to_24h(self):
+        # the module once read core.CLOCK_MODE before core had it, so /api and /clock both failed
+        self.assertTrue(core.CLOCK_MODE.startswith(self.tmp))
+        self.assertEqual(clock.read_format(), "24h")
+        self.assertEqual(clock.save_format(" 12H "), "12h")
+        self.assertEqual(clock.read_format(), "12h")
+        self.assertEqual(clock.save_format("nonsense"), "24h")
+        self.assertEqual(clock.save_format(None), "24h")
+
+    def test_beat_is_biel_mean_time_not_the_pi_time_zone(self):
+        self.assertEqual(clock.format_time("beat", 0), "@041")             # 00:00 UTC = 01:00 BMT
+        self.assertEqual(clock.format_time("beat", 23 * 3600), "@000")     # 23:00 UTC = BMT midnight
+        self.assertEqual(clock.format_time("beat", 23 * 3600 - 1), "@999")
+        os.environ["TZ"] = "Asia/Tokyo"
+        time.tzset()
+        self.assertEqual(clock.format_time("beat", 0), "@041")             # the same moment everywhere
+
+    def test_12h_and_24h_use_local_time(self):
+        t = 13 * 3600 + 5 * 60 + 9
+        self.assertEqual(clock.format_time("24h", t), "13:05:09")
+        self.assertEqual(clock.format_time("12h", t), "1:05:09 PM")
+        self.assertEqual(clock.format_time("12h", 0), "12:00:00 AM")
+
+    def test_api_and_form_answer(self):
+        clock.save_format("beat")
+        d = {}
+        clock.api(d, [])
+        self.assertEqual((d["clock"]["mode"], d["clock"]["label"]), ("beat", ".beat"))
+        self.assertRegex(d["clock"]["text"], r"^@\d{3}$")
+        r = clock._reply()
+        self.assertEqual(r["values"], {"format": "beat"})
+        self.assertEqual([o["value"] for o in r["options"]["formats"]], ["24h", "12h", "beat"])
+        self.assertEqual(r["texts"]["clock"], "Shown as .beat")
 
 
 if __name__ == "__main__":

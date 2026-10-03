@@ -14,11 +14,11 @@ from urllib.request import Request, urlopen
 from support import ROOT, web, core, sandbox, cleanup
 
 REAL_MODULES = os.path.join(ROOT, "modules")
-NAMES = ["background", "debuglog", "led", "numbers", "players", "rebootupdate", "wifi"]      # the modules the picker can switch
+NAMES = ["background", "clock", "debuglog", "led", "numbers", "players", "rebootupdate", "wifi"]      # the modules the picker can switch
 HIDDEN = ["switcher", "system"]                                                # always on, not in the picker
 ALL = sorted(NAMES + HIDDEN)
 # a path only that module answers (GET, or POST when None)
-ENDPOINT = {"background": ("GET", "/background/dc-background.js"), "numbers": ("GET", "/numbers"), "players": ("GET", "/players"), "debuglog": ("GET", "/dtmf"),
+ENDPOINT = {"background": ("GET", "/background/dc-background.js"), "clock": ("GET", "/clock"), "numbers": ("GET", "/numbers"), "players": ("GET", "/players"), "debuglog": ("GET", "/dtmf"),
             "led": ("GET", "/ledconfig"), "wifi": ("POST", "/wifitoggle"), "rebootupdate": ("GET", "/update")}
 HIDDEN_ENDPOINT = {"switcher": ("GET", "/status"), "system": ("GET", "/about")}
 BASE_IDS = ('id="dash"', 'id="set-boxes"', 'id="settings"', 'id="bg"', 'id="warnings"')
@@ -116,7 +116,7 @@ class RepoModules(unittest.TestCase):
 
     def test_defaults(self):
         on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["enabled"]) for n in ALL)
-        self.assertEqual(on, {"background": False, "debuglog": False, "led": True, "numbers": True, "players": True, "rebootupdate": True, "switcher": True, "system": True, "wifi": False})
+        self.assertEqual(on, {"background": False, "clock": True, "debuglog": False, "led": True, "numbers": True, "players": True, "rebootupdate": True, "switcher": True, "system": True, "wifi": False})
         hidden = [n for n in ALL if json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["visible"] is False]
         self.assertEqual(hidden, HIDDEN)                   # the network switcher and the system info can't be switched off
 
@@ -151,7 +151,7 @@ class WithEverything(Base):
         self.assertEqual([w["control"]["module"] for w in appearance["items"] if w["type"] == "row" and w["control"]["type"] == "toggle"], ["background"])
         about = [b for b in lay["settings"] if b["id"] == "about"][0]
         self.assertEqual((about["mods"], about["title"]), (["system"], "About"))               # the versions are their own box, not part of System
-        self.assertEqual([b["id"] for b in lay["dashboard"]], ["network", "players", "debug log"])
+        self.assertEqual([b["id"] for b in lay["dashboard"]], ["network", "clock", "players", "debug log"])
 
     def test_led_hardware_settings_are_in_the_gpio_box_and_come_from_the_led_module(self):
         lay = layout_of(self.page())
@@ -179,7 +179,7 @@ class WithEverything(Base):
 
     def test_modules_menu_lists_them_all(self):
         got = self.json("/modules")["modules"]
-        self.assertEqual([m["name"] for m in got], ["switcher", "players", "numbers", "led", "debuglog", "system", "wifi", "rebootupdate", "background"])   # picker order, the always-on modules included
+        self.assertEqual([m["name"] for m in got], ["switcher", "clock", "players", "numbers", "led", "debuglog", "system", "wifi", "rebootupdate", "background"])   # picker order, the always-on modules included
         self.assertEqual([m["name"] for m in got if m["visible"] is False], ["switcher", "system"])                     # which the page lists without a switch
         self.assertTrue(all(m["enabled"] for m in got))
         self.assertTrue(all(m["title"] and m["description"] for m in got))

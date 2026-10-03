@@ -1,0 +1,42 @@
+{
+ "dashboard": [
+  {
+   "box": "clock",
+   "title": "Clock",
+   "items": [
+    {
+     "type": "text",
+     "text": "@clock.text",
+     "cls": "clock-display"
+    }
+   ]
+  }
+ ],
+ "settings": [
+  {
+   "box": "clock",
+   "title": "Clock",
+   "items": [
+    {
+     "type": "form",
+     "get": "/clock",
+     "post": "/clock",
+     "fields": [
+      {
+       "title": "Time format",
+       "sub_text": "clock",
+       "controls": [
+        {
+         "type": "select",
+         "key": "format",
+         "options": "formats",
+         "label": "Display"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

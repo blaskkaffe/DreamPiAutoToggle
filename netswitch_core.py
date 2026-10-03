@@ -27,6 +27,7 @@ UPDATE_INFO = "/tmp/dreampi-netswitch.updateinfo"        # {"addon": bool|None, 
 REBOOT_MARK = "/tmp/dreampi-netswitch.reboot"            # unix time a reboot was asked for (the LEDs show "about to reboot")
 PLAYERS_SOURCES = os.path.join(BASE_DIR, "players_sources.json")   # JSON addresses for the optional online-players list
 NUMBERS = os.path.join(BASE_DIR, "numbers.json")     # phone numbers per action, edited on the page, read by the hook
+CLOCK_MODE = os.path.join(BASE_DIR, "clock_mode")    # "24h", "12h" or "beat": how the clock module shows the time
 LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness, colours, wire order, white balance
 LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs, editable from the page
 LED_GPIO = os.path.join(BASE_DIR, "led_gpio")        # output pin (10, 12, 18 or 21), likewise
