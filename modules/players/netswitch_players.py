@@ -6,6 +6,7 @@
 # Works on Python 3 and 2.7.
 import json
 import os
+import re
 import threading
 import time
 
@@ -24,8 +25,13 @@ import netswitch_core as core
 DEFAULT_SOURCES = [{"name": "DC99", "url": "https://dc99.net/online/dcnet_status.php"},
                    {"name": "Dreamcast.online", "url": "https://dreamcast.online/now/api/users.json"}]
 # Game lists (sources with "kind": "games" in players_sources.json): which online games exist and how far each one works.
-# UNVERIFIED: the address and the field names are a guess, the host could not be reached from the development sandbox.
-DEFAULT_GAME_SOURCES = [{"name": "Dreamcast Live", "url": "https://dreamcastlive.net/games.json", "kind": "games"}]
+# Dreamcast Live's table is HTML (parse_games_html: the status is an icon). The page that holds it is not known for sure, so the
+# addresses are tried in turn until one gives games; games_snapshot.json (a copy of the table) is the fallback.
+# UNVERIFIED: the addresses are guesses, the host could not be reached from the development sandbox.
+DEFAULT_GAME_SOURCES = [{"name": "Dreamcast Live", "kind": "games", "url": "https://dreamcastlive.net/",
+                         "urls": ["https://dreamcastlive.net/", "https://dreamcastlive.net/online-games/", "https://dreamcastlive.net/games/"]}]
+GAMES_EVERY = 6 * 3600       # the game list changes rarely: fetched this often once it has been read
+GAMES_RETRY = 1800           # ... and this often while only the snapshot is known
 CACHE_SECONDS = 60
 WATCH_EVERY = 60          # the background check for favourites (only while there are favourites)
 MAX_FAVORITES = 30
@@ -53,7 +59,7 @@ except NameError:
     _TEXT = str
 
 _lock = threading.Lock()
-_cache = {"time": 0, "refreshing": False, "players": [], "sources": [], "games": []}
+_cache = {"time": 0, "refreshing": False, "players": [], "sources": [], "games": [], "games_time": 0, "games_live": False}
 
 
 def fetch(url):
@@ -286,6 +292,56 @@ def parse_games(data):
     return out
 
 
+_ICONS = (("wip-icon", "wip"), ("offline-icon", "offline"), ("online-icon", "online"))
+_TAG = re.compile(r"<[^>]*>")
+
+
+def _unescape(text):
+    try:
+        import html
+        return html.unescape(text)
+    except ImportError:    # Python 2.7
+        from HTMLParser import HTMLParser
+        return HTMLParser().unescape(text)
+
+
+def parse_games_html(text):
+    """Dreamcast Live's table of online games: one <tr> per game, the name is the first cell that has text (the cover image cell
+    has none), the status is an icon in the row: online-icon (green) / wip-icon (work in progress) / offline-icon."""
+    out = []
+    for row in re.findall(r"<tr\b.*?</tr>", str(text), re.S | re.I):
+        cells = re.findall(r"<td\b.*?</td>", row, re.S | re.I)
+        name = ""
+        for c in cells:
+            name = " ".join(_unescape(_TAG.sub("", c)).split())
+            if name:
+                break
+        status = "unknown"
+        for marker, value in _ICONS:
+            if marker in row.lower():
+                status = value
+                break
+        if name and cells and status != "unknown":
+            out.append({"name": name[:60], "status": status})
+    return out
+
+
+def parse_games_text(text):
+    """A game list from a JSON answer or from Dreamcast Live's HTML table."""
+    try:
+        return parse_games(json.loads(text))
+    except ValueError:
+        return parse_games_html(text)
+
+
+def snapshot_games():
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "games_snapshot.json")) as f:
+            return parse_games(json.load(f).get("games"))
+    except (IOError, OSError, ValueError, AttributeError):
+        return []
+
+
 def _norm(text):
     return " ".join(str(text or "").lower().split())
 
@@ -358,20 +414,38 @@ def refresh():
         _cache["refreshing"] = True
     players, report, games = [], [], []
     try:
-        for s in game_sources():
-            name = str(s.get("name") or s["url"])[:30]
-            try:
-                try:
-                    text = fetch(s["url"])
-                except Exception:
-                    if not s["url"].startswith("https://"):
-                        raise
-                    text = fetch("http://" + s["url"][len("https://"):])
-                found = parse_games(json.loads(text))
-                games += found
-                report.append({"name": name, "ok": True, "count": len(found), "error": None, "kind": "games"})
-            except Exception as e:
-                report.append({"name": name, "ok": False, "count": 0, "error": str(getattr(e, "reason", None) or e)[:80], "kind": "games"})
+        with _lock:
+            have, gtime, live = list(_cache["games"]), _cache["games_time"], _cache["games_live"]
+        if have and time.time() - gtime < (GAMES_EVERY if live else GAMES_RETRY):
+            games, gtime = have, gtime                  # the list was read recently: keep it
+        else:
+            gtime, live = int(time.time()), False
+            for s in game_sources():
+                name = str(s.get("name") or s["url"])[:30]
+                error, found = "no games found", []
+                for url in s.get("urls") or [s["url"]]:
+                    try:
+                        try:
+                            text = fetch(url)
+                        except Exception:
+                            if not url.startswith("https://"):
+                                raise
+                            text = fetch("http://" + url[len("https://"):])
+                        found = parse_games_text(text)
+                        if found:
+                            break
+                    except Exception as e:
+                        error = str(getattr(e, "reason", None) or e)[:80]
+                if found:
+                    games += found
+                    live = True
+                    report.append({"name": name, "ok": True, "count": len(found), "error": None, "kind": "games"})
+                else:
+                    report.append({"name": name, "ok": False, "count": 0, "error": error, "kind": "games"})
+            if not games:
+                games = snapshot_games()
+                if games:
+                    report.append({"name": "Game list", "ok": True, "count": len(games), "error": None, "kind": "games", "snapshot": True})
         for s in sources():
             name = str(s.get("name") or s["url"])[:30]
             try:
@@ -404,7 +478,8 @@ def refresh():
         players.sort(key=lambda p: (order.get(p["network"], 2), p["network"], p["game"].lower(), p["player"].lower()))
     finally:
         with _lock:
-            _cache.update({"time": int(time.time()), "players": players[:MAX_PLAYERS], "sources": report, "games": games, "refreshing": False})
+            _cache.update({"time": int(time.time()), "players": players[:MAX_PLAYERS], "sources": report, "games": games,
+                           "games_time": gtime, "games_live": live, "refreshing": False})
         write_watch()
 
 

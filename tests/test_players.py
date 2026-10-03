@@ -239,7 +239,7 @@ class FavoritesTests(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox()
         self._fetch = pl.fetch
-        pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": [], "games": []})
+        pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": [], "games": [], "games_time": 0, "games_live": False})
 
     def tearDown(self):
         pl.fetch = self._fetch
@@ -279,7 +279,7 @@ class FavoritesTests(unittest.TestCase):
     def test_refresh_writes_the_watch_file_the_leds_read(self):
         pl.save_favorites({"games": ["Phantasy Star Online"], "players": ["Ana"]})
         self.assertEqual(core.players_watch(), {"games": [], "friends": []})     # nothing loaded yet
-        pl.fetch = lambda url: json.dumps(self.GAMES if "games" in url else DC99)
+        pl.fetch = lambda url: json.dumps(self.GAMES if "dreamcastlive" in url else DC99)
         pl.refresh()
         self.assertEqual(core.players_watch(), {"games": ["Phantasy Star Online"], "friends": ["Ana"]})
         pl.save_favorites({"games": ["Quake III Arena"], "players": []})
@@ -319,3 +319,69 @@ class FavoritesTests(unittest.TestCase):
         self.assertEqual(groups["games"]["notes"], {"Quake III Arena": "work in progress", "Dead Game": "not online yet"})
         self.assertEqual(groups["players"]["items"], ["Ana"])
         self.assertTrue(groups["players"]["free"] and not groups["games"]["free"])
+
+
+def _row(name, icon, link=True):
+    cell = '<a href="https://dreamcastlive.net/x/">%s</a>' % name if link else name
+    return ('<tr><td class="c"><img src="https://dreamcastlive.net/wp-content/uploads/a-cover.jpg" alt=""></td><td>%s</td>'
+            '<td>4</td><td>Modem</td><td>Multiplayer</td><td><img src="https://dreamcastlive.net/wp-content/uploads/us-flag-rnd.png" alt=""></td>'
+            '<td class="c"><img src="https://dreamcastlive.net/wp-content/uploads/2023/03/%s.png" alt=""></td><td>N/A</td></tr>' % (cell, icon))
+
+
+HTML = ('<table><thead><tr><th>Game</th><th></th><th>Players</th><th>Status</th></tr></thead><tbody>'
+        + _row("4&times;4 Evolution", "online-icon") + _row("Capcom &amp; Psikyo All Stars", "wip-icon-v2", False)
+        + _row("Gundam Battle Online", "offline-icon") + _row("JoJo\u2019s Matching Service", "wip-icon-v2") + '</tbody></table>')
+
+
+class GameTableTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = sandbox()
+        self._fetch = pl.fetch
+        pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": [], "games": [], "games_time": 0, "games_live": False})
+
+    def tearDown(self):
+        pl.fetch = self._fetch
+        cleanup(self.tmp)
+
+    def test_the_html_table_gives_names_and_status_from_the_icon(self):
+        got = [(g["name"], g["status"]) for g in pl.parse_games_html(HTML)]
+        self.assertEqual(got, [("4\u00d74 Evolution", "online"), ("Capcom & Psikyo All Stars", "wip"),
+                               ("Gundam Battle Online", "offline"), ("JoJo\u2019s Matching Service", "wip")])
+
+    def test_text_is_json_or_html(self):
+        self.assertEqual(pl.parse_games_text('{"Sonic": "green"}'), [{"name": "Sonic", "status": "online"}])
+        self.assertEqual(len(pl.parse_games_text(HTML)), 4)
+        self.assertEqual(pl.parse_games_text("<html>nothing</html>"), [])
+
+    def test_the_snapshot_holds_the_whole_list(self):
+        games = dict((g["name"], g["status"]) for g in pl.snapshot_games())
+        self.assertGreater(len(games), 90)
+        self.assertEqual((games["Quake III Arena"], games["QuakeWorld"], games["Net Versus: Chess"]), ("online", "wip", "offline"))
+
+    def test_the_addresses_are_tried_in_turn(self):
+        calls = []
+        def fetch(url):
+            calls.append(url)
+            if url.endswith("/online-games/"):
+                return HTML
+            raise IOError("404")
+        pl.fetch = fetch
+        pl.refresh()
+        self.assertEqual(len(pl._cache["games"]), 4)
+        self.assertTrue(pl._cache["games_live"])
+        self.assertIn("https://dreamcastlive.net/online-games/", calls)
+        before = len(calls)
+        pl.refresh()                                                  # the list is kept for hours: not fetched again
+        self.assertEqual([c for c in calls[before:] if "dreamcastlive" in c], [])
+
+    def test_when_nothing_can_be_read_the_snapshot_fills_the_picker(self):
+        def fetch(url):
+            raise IOError("blocked")
+        pl.fetch = fetch
+        pl.refresh()
+        self.assertFalse(pl._cache["games_live"])
+        self.assertGreater(len(pl._cache["games"]), 90)
+        by = dict((c["value"], c) for c in pl.game_choices())
+        self.assertFalse(by["Quake III Arena"]["disabled"])
+        self.assertTrue(by["Net Versus: Chess"]["disabled"])
+        self.assertEqual(by["QuakeWorld"]["sub"], "work in progress")
