@@ -3,7 +3,7 @@
  "description": "Versions of the add-on, DreamPi and the Pi, and a link to the project on GitHub.",
  "enabled": true,
  "visible": false,
- "order": 70,
+ "order": 55,
  "ui": 2,
  "web": "netswitch_system"
 }

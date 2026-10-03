@@ -15,12 +15,12 @@ from support import ROOT, web, core, sandbox, cleanup
 
 REAL_MODULES = os.path.join(ROOT, "modules")
 NAMES = ["background", "debuglog", "led", "numbers", "players", "rebootupdate", "wifi"]      # the modules the picker can switch
-HIDDEN = ["buttons", "switcher", "system"]                                                # always on, not in the picker
+HIDDEN = ["switcher", "system"]                                                # always on, not in the picker
 ALL = sorted(NAMES + HIDDEN)
 # a path only that module answers (GET, or POST when None)
 ENDPOINT = {"background": ("GET", "/background/dc-background.js"), "numbers": ("GET", "/numbers"), "players": ("GET", "/players"), "debuglog": ("GET", "/dtmf"),
             "led": ("GET", "/ledconfig"), "wifi": ("POST", "/wifitoggle"), "rebootupdate": ("GET", "/update")}
-HIDDEN_ENDPOINT = {"switcher": ("GET", "/status"), "buttons": ("GET", "/buttonconfig"), "system": ("GET", "/about")}
+HIDDEN_ENDPOINT = {"switcher": ("GET", "/status"), "system": ("GET", "/about")}
 BASE_IDS = ('id="dash"', 'id="set-boxes"', 'id="settings"', 'id="bg"', 'id="warnings"')
 
 
@@ -116,9 +116,9 @@ class RepoModules(unittest.TestCase):
 
     def test_defaults(self):
         on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["enabled"]) for n in ALL)
-        self.assertEqual(on, {"background": False, "debuglog": False, "led": True, "numbers": True, "players": True, "rebootupdate": True, "switcher": True, "buttons": True, "system": True, "wifi": False})
+        self.assertEqual(on, {"background": False, "debuglog": False, "led": True, "numbers": True, "players": True, "rebootupdate": True, "switcher": True, "system": True, "wifi": False})
         hidden = [n for n in ALL if json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["visible"] is False]
-        self.assertEqual(hidden, HIDDEN)                   # the network switcher, the buttons and the system info can't be switched off
+        self.assertEqual(hidden, HIDDEN)                   # the network switcher and the system info can't be switched off
 
 
 class WithEverything(Base):
@@ -140,10 +140,12 @@ class WithEverything(Base):
         lay = layout_of(self.page())
         gpio = [b for b in lay["settings"] if b["id"] == "gpio"]
         self.assertEqual(len(gpio), 1)
-        self.assertEqual(gpio[0]["mods"], ["buttons", "led", "wifi"])          # one GPIO box, three modules in picker order
+        self.assertEqual(gpio[0]["mods"], ["switcher", "led", "wifi"])          # one GPIO box, three modules in picker order (the network buttons are the switcher's)
         self.assertEqual(gpio[0]["title"], "GPIO")
         system = [b for b in lay["settings"] if b["id"] == "system"][0]
         self.assertEqual(system["mods"], ["wifi", "rebootupdate"])
+        self.assertEqual([w["type"] for w in system["items"] if w["mod"] == "rebootupdate"][-1], "row")      # the Reboot row ends the System box
+        self.assertEqual([b["id"] for b in lay["settings"]][-2:], ["about", "system"])                     # System is the very last box, About just above it
         about = [b for b in lay["settings"] if b["id"] == "about"][0]
         self.assertEqual((about["mods"], about["title"]), (["system"], "About"))               # the versions are their own box, not part of System
         self.assertEqual([b["id"] for b in lay["dashboard"]], ["network", "players", "debug log"])
@@ -187,7 +189,7 @@ class WithNothing(Base):
             self.assertIn(ident, html)
         for n in NAMES:
             self.assertFalse(present(html, n), n)
-        self.assertEqual(layout_of(html)["modules"], ["switcher", "buttons", "system"])
+        self.assertEqual(layout_of(html)["modules"], ["switcher", "system"])
         for word in ("led-section", "Status LED", "NeoPixel", "Special phone numbers", "dcbg", "Debug log", "Online players", "@@"):
             self.assertNotIn(word, html, word)
         self.check_js(html)

@@ -1,20 +1,88 @@
 {
  "settings": [
-  {"box": "system", "title": "System", "items": [
-   {"type": "row", "title": "Updates", "sub": "@update.text",
-    "control": {"type": "button", "label": "Check", "post": "/update/check", "disabled": "@update.check_disabled"}},
-   {"type": "text", "text": "@update.dreampi_text", "muted": true, "show": "@update.dreampi_text", "cls": "updnote"},
-   {"type": "row", "title": "Update the add-on", "sub": "@update.do_sub", "show": "@update.show_update",
-    "control": {"type": "button", "label": "Update now", "post": "/update/start", "pin": true,
-                "confirm": "Update the add-on now? It is fetched from GitHub and installed; this page is unavailable for a few seconds."}},
-   {"type": "console", "lines": "@update.log", "hide_empty": true, "label": "Update log", "rules": [
-     ["\\b(fail|failed|error|fatal|denied|cannot|could not|not found)\\b", "l-err"],
-     ["^(ok|done|updated|installed|.*\\b(already up to date|fast-forward)\\b)", "l-ok"],
-     ["^(updating|running)\\b", "l-hd"],
-     ["^(from|remote:|\\s*\\d+ file|\\s*create mode|\\s*delete mode)", "l-dim"]]}]},
-  {"box": "reboot", "items": [
-   {"type": "row", "title": "Reboot DreamPi", "sub": "Restarts the Raspberry Pi\nA call in progress is cut",
-    "control": {"type": "button", "style": "danger", "label": "Reboot", "post": "/reboot", "pin": true, "confirm": "@reboot.confirm", "then": "wait"}}]}
+  {
+   "box": "system",
+   "title": "System",
+   "items": [
+    {
+     "type": "row",
+     "title": "Updates",
+     "sub": "@update.text",
+     "control": {
+      "type": "button",
+      "label": "Check",
+      "post": "/update/check",
+      "disabled": "@update.check_disabled"
+     }
+    },
+    {
+     "type": "text",
+     "text": "@update.dreampi_text",
+     "muted": true,
+     "show": "@update.dreampi_text",
+     "cls": "updnote"
+    },
+    {
+     "type": "row",
+     "title": "Update the add-on",
+     "sub": "@update.do_sub",
+     "show": "@update.show_update",
+     "control": {
+      "type": "button",
+      "label": "Update now",
+      "post": "/update/start",
+      "pin": true,
+      "confirm": "Update the add-on now? It is fetched from GitHub and installed; this page is unavailable for a few seconds."
+     }
+    },
+    {
+     "type": "console",
+     "lines": "@update.log",
+     "hide_empty": true,
+     "label": "Update log",
+     "rules": [
+      [
+       "\\b(fail|failed|error|fatal|denied|cannot|could not|not found)\\b",
+       "l-err"
+      ],
+      [
+       "^(ok|done|updated|installed|.*\\b(already up to date|fast-forward)\\b)",
+       "l-ok"
+      ],
+      [
+       "^(updating|running)\\b",
+       "l-hd"
+      ],
+      [
+       "^(from|remote:|\\s*\\d+ file|\\s*create mode|\\s*delete mode)",
+       "l-dim"
+      ]
+     ]
+    },
+    {
+     "type": "row",
+     "title": "Reboot DreamPi",
+     "sub": "Restarts the Raspberry Pi\nA call in progress is cut",
+     "control": {
+      "type": "button",
+      "style": "danger",
+      "label": "Reboot",
+      "post": "/reboot",
+      "pin": true,
+      "confirm": "@reboot.confirm",
+      "then": "wait"
+     }
+    }
+   ]
+  }
  ],
- "data": {"update": {"url": "/update", "every": 30, "retry": 2, "retry_if": "busy", "when": "settings"}}
+ "data": {
+  "update": {
+   "url": "/update",
+   "every": 30,
+   "retry": 2,
+   "retry_if": "busy",
+   "when": "settings"
+  }
+ }
 }

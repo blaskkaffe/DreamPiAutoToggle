@@ -1,5 +1,7 @@
 # DreamPi Netswitch add-on - network switcher module, web side: the selected network, DreamPi's / the modem's / the internet's
-# / the Pi's status for the network box, the two network buttons' POSTs, hang up and the plain-text /status.
+# / the Pi's status for the network box, the two network buttons' POSTs, hang up and the plain-text /status, and the module's
+# GPIO settings: which function and pin the two physical network buttons have (GET/POST /buttonconfig, the standard form answer
+# {values, options}; the always-running buttons service, netswitch_buttons.py, only follows the files written here).
 # Everything it shows is in layout.json; the numbers and texts come from the /api answer built in api() below.
 import json
 import os
@@ -111,5 +113,46 @@ def _status(h):
         d["modem"]["text"], d["internet"]["text"], d["pi"]["text"]), "text/plain; charset=utf-8")
 
 
-GET = {"/status": _status}
-POST = {"/dcnow": _select("dcnow"), "/dcnet": _select("dcnet"), "/hangup": _hangup}
+def _values():
+    return {"button1_function": core.button_function(1), "button1_gpio": core.button_gpio(1),
+            "button2_function": core.button_function(2), "button2_gpio": core.button_gpio(2)}
+
+
+def _reply():
+    values = _values()
+    functions = []
+    for name, label, group, needs_wifi, sub in core.BUTTON_FUNCTIONS:
+        # the Wi-Fi switch functions only while the Wi-Fi module is on (or while one is already chosen)
+        if needs_wifi and not core.wifi_enabled() and name not in (values["button1_function"], values["button2_function"]):
+            continue
+        functions.append({"value": name, "label": label, "group": group, "sub": sub})
+    return {"values": values, "options": {"functions": functions,
+                                          "gpios": [{"value": g, "label": "GPIO%d" % g} for g in core.BUTTON_GPIO_PINS]}}
+
+
+def _get_buttons(h):
+    h.send(json.dumps(_reply()), "application/json")
+
+
+def _post_buttons(h):
+    try:
+        data = json.loads(h._body(4096).decode("utf-8")).get("values") or {}
+    except (ValueError, IOError, OSError, AttributeError) as e:
+        return h.send(str(e), "text/plain; charset=utf-8", status=400)
+    try:
+        g1, g2 = int(data["button1_gpio"]), int(data["button2_gpio"])
+    except (KeyError, TypeError, ValueError):
+        g1 = g2 = None
+    if g1 is not None and g2 is not None and g1 != g2:   # reject if they'd collide on one pin
+        core.save_button_gpio(1, g1)
+        core.save_button_gpio(2, g2)
+    if "button1_function" in data:
+        core.save_button_function(1, data["button1_function"])
+    if "button2_function" in data:
+        core.save_button_function(2, data["button2_function"])
+    h.send(json.dumps(_reply()), "application/json")
+    return True
+
+
+GET = {"/status": _status, "/buttonconfig": _get_buttons}
+POST = {"/dcnow": _select("dcnow"), "/dcnet": _select("dcnet"), "/hangup": _hangup, "/buttonconfig": _post_buttons}

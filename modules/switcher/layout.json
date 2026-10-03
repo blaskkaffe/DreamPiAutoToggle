@@ -1,21 +1,151 @@
 {
  "dashboard": [
-  {"box": "network", "items": [
-   {"type": "infobox", "label": "Selected network:", "title": "@selected.title",
-    "rows": [
-     {"label": "DreamPi", "main": true, "value": {"type": "status", "dot": "@dreampi.look", "text": "@dreampi.text"}},
-     {"label": "Modem", "value": {"type": "status", "text": "@modem.text", "sub": "@modem.since_text"}},
-     {"label": "Internet", "value": {"type": "status", "dot": "@internet.state", "text": "@internet.text"}},
-     {"label": "Pi", "value": {"type": "status", "dot": "@pi.state", "lines": "@pi.lines"}}],
-    "actions": [{"type": "button", "style": "danger", "label": "Hang up", "arm": "Tap again to hang up", "busy": "@hangup.busy",
-                 "busy_label": "@hangup.text", "post": "/hangup", "aria": "Ends the current call and gets the modem ready again"}],
-    "actions_show": "@hangup.visible"},
-   {"type": "button", "style": "pill", "label": "DCNow! / DreamPi", "colour": "dcnow", "post": "/dcnow"},
-   {"type": "button", "style": "pill", "label": "DCNET / FLYCAST", "colour": "dcnet", "post": "/dcnet"}]}
+  {
+   "box": "network",
+   "items": [
+    {
+     "type": "infobox",
+     "label": "Selected network:",
+     "title": "@selected.title",
+     "rows": [
+      {
+       "label": "DreamPi",
+       "main": true,
+       "value": {
+        "type": "status",
+        "dot": "@dreampi.look",
+        "text": "@dreampi.text"
+       }
+      },
+      {
+       "label": "Modem",
+       "value": {
+        "type": "status",
+        "text": "@modem.text",
+        "sub": "@modem.since_text"
+       }
+      },
+      {
+       "label": "Internet",
+       "value": {
+        "type": "status",
+        "dot": "@internet.state",
+        "text": "@internet.text"
+       }
+      },
+      {
+       "label": "Pi",
+       "value": {
+        "type": "status",
+        "dot": "@pi.state",
+        "lines": "@pi.lines"
+       }
+      }
+     ],
+     "actions": [
+      {
+       "type": "button",
+       "style": "danger",
+       "label": "Hang up",
+       "arm": "Tap again to hang up",
+       "busy": "@hangup.busy",
+       "busy_label": "@hangup.text",
+       "post": "/hangup",
+       "aria": "Ends the current call and gets the modem ready again"
+      }
+     ],
+     "actions_show": "@hangup.visible"
+    },
+    {
+     "type": "button",
+     "style": "pill",
+     "label": "DCNow! / DreamPi",
+     "colour": "dcnow",
+     "post": "/dcnow"
+    },
+    {
+     "type": "button",
+     "style": "pill",
+     "label": "DCNET / FLYCAST",
+     "colour": "dcnet",
+     "post": "/dcnet"
+    }
+   ]
+  }
  ],
  "settings": [
-  {"box": "network colours", "title": "Network colours", "items": [
-   {"type": "row", "title": "DCNow!", "control": {"type": "swatches", "key": "dcnow", "title": "Colour for DCNow!"}},
-   {"type": "row", "title": "DCNET", "control": {"type": "swatches", "key": "dcnet", "title": "Colour for DCNET"}}]}
+  {
+   "box": "network colours",
+   "title": "Network colours",
+   "items": [
+    {
+     "type": "row",
+     "title": "DCNow!",
+     "control": {
+      "type": "swatches",
+      "key": "dcnow",
+      "title": "Colour for DCNow!"
+     }
+    },
+    {
+     "type": "row",
+     "title": "DCNET",
+     "control": {
+      "type": "swatches",
+      "key": "dcnet",
+      "title": "Colour for DCNET"
+     }
+    }
+   ]
+  },
+  {
+   "box": "gpio",
+   "title": "GPIO",
+   "items": [
+    {
+     "type": "form",
+     "get": "/buttonconfig",
+     "post": "/buttonconfig",
+     "fields": [
+      {
+       "title": "Button 1",
+       "sub_of": "button1_function",
+       "controls": [
+        {
+         "type": "select",
+         "key": "button1_function",
+         "options": "functions",
+         "label": "Button 1 function"
+        },
+        {
+         "type": "select",
+         "key": "button1_gpio",
+         "options": "gpios",
+         "label": "Button 1 pin"
+        }
+       ]
+      },
+      {
+       "title": "Button 2",
+       "sub_of": "button2_function",
+       "controls": [
+        {
+         "type": "select",
+         "key": "button2_function",
+         "options": "functions",
+         "label": "Button 2 function"
+        },
+        {
+         "type": "select",
+         "key": "button2_gpio",
+         "options": "gpios",
+         "label": "Button 2 pin"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
  ]
 }

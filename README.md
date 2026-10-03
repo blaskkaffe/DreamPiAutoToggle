@@ -72,17 +72,17 @@ The web page runs on the Pi as root, because it has to restart DreamPi, reboot t
 
 ### Modules
 
-The add-on is a small **base** plus **modules**. The base is the web page's frame and theme (the global colours and the look every module shares), the module picker, and the hook inside DreamPi that does the routing. **Everything the page shows is a module**, a folder in `modules/` that describes its boxes in a `layout.json`; the page reads the folders and draws them. Three modules are always on and not in the picker: the **Network switcher** (the Selected-network box, the two network buttons, Network colours), **Buttons** (the GPIO box) and **System** (the versions and a GitHub link). The others you can switch and move:
+The add-on is a small **base** plus **modules**. The base is the web page's frame and theme (the global colours and the look every module shares), the module picker, and the hook inside DreamPi that does the routing. **Everything the page shows is a module**, a folder in `modules/` that describes its boxes in a `layout.json`; the page reads the folders and draws them. Two modules are always on and not in the picker: the **Network switcher** (the Selected-network box, the two network buttons, Network colours, and the GPIO settings of the two physical buttons) and **System** (the versions and a GitHub link). The others you can switch and move:
 
 | Module | Folder | Adds | On by default |
 |---|---|---|---|
-| *Network switcher, Buttons, System* | `modules/switcher/`, `buttons/`, `system/` | always on; the network box and buttons, the GPIO box, the About box (versions, GitHub link) | yes (not in the picker) |
+| *Network switcher, System* | `modules/switcher/`, `system/` | always on; the network box and buttons, Network colours and the GPIO settings of the two physical buttons (switcher); the About box with versions and the GitHub link (system) | yes (not in the picker) |
 | **Special phone numbers** | `modules/numbers/` | Settings > Special phone numbers, to edit the numbers the Dreamcast dials. Without it the built-in default numbers are used | yes |
 | **Online players** | `modules/players/` | the Online players box on the main page | yes |
 | **Wi-Fi setup** | `modules/wifi/` | joining a Wi-Fi network without a keyboard (a temporary access point), and the Wi-Fi rows in Settings | no |
 | **Status LEDs** | `modules/led/` | the NeoPixel service, the Status LED settings (including the calibration pop-up), and the LED count / GPIO pin / wire order | yes |
 | **Dreamcast background** | `modules/background/` | the animated Dreamcast menu background behind the page (see [Credits](#credits)) | no |
-| **Reboot and Update** | `modules/rebootupdate/` | the Updates rows (check GitHub, **Update now**) in the System box and the Reboot box | yes |
+| **Reboot and Update** | `modules/rebootupdate/` | the Updates rows (check GitHub, **Update now**) and the Reboot row, both in the System box | yes |
 | **Debug log** | `modules/debuglog/` | the Debug log bar and live log on the main page, and its recording inside DreamPi | no |
 
 - **Switch one on or off, and set its priority:** Settings > **Modules**. A tick box switches it: the page reloads without the module's parts, and its endpoints and background work stop (the LED service goes dark while Status LEDs is off). Nothing is deleted, so switching it on again brings your settings back. Drag a module by its handle (⋮⋮) to move it up or down the list (on a phone, hold the handle and drag; with a keyboard use the arrow keys on the handle). **The top of the list has priority**: its boxes come first, it names a box that several modules share (for example the GPIO box holds the buttons' rows, the LED row and the Wi-Fi row), and where two modules want the same thing, such as a background, the one on top wins. A fullscreen background hides the ones under it; a background that only fills a strip (a taskbar or a logo) lets the next one show too.
@@ -169,11 +169,11 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
   - **Level:** the brightness for that message. Grey means it uses the maximum brightness from Calibration; tap it to give the message its own brightness with a slider, and tap **Use global** to go back.
   - **Reset LED settings to defaults** restores the defaults in [LED messages](#led-messages) and the 8% maximum brightness (not the white balance or the wire order - those describe your LEDs, not a look to reset).
 - **Modules:** every module that can be switched, with its switch and a drag handle to move it; the top has priority (see [Modules](#modules)).
-- **System:** what acts on the Pi or the add-on.
+- **About:** read-only. The add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model, the operating system, whether a PIN is set, a link to this project on GitHub, and - once a modem has been detected - its make/model, with a note if it isn't a known-working one.
+- **System** (last): what acts on the Pi or the add-on.
   - **Wi-Fi setup** (Wi-Fi module): starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too, as rows with a name, "Secured" or "Open" and the signal strength; tap **Connect** on one, enter its password in the small box if it needs one, and connect (**Other network** is for a hidden one) - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
   - **Updates** (Reboot and Update module): checks GitHub for a newer version of this add-on and for newer DreamPi scripts, with an **Update now** button (when installed from a git checkout).
-- **Reboot DreamPi** (Reboot and Update module; below System): reboots the whole Raspberry Pi after a confirmation; a call in progress is cut. The page comes back by itself when the Pi is up again (about a minute).
-- **About** (last): read-only. The add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model, the operating system, whether a PIN is set, a link to this project on GitHub, and - once a modem has been detected - its make/model, with a note if it isn't a known-working one.
+  - **Reboot DreamPi** (Reboot and Update module; the last row): reboots the whole Raspberry Pi after a confirmation; a call in progress is cut. The page comes back by itself when the Pi is up again (about a minute).
 
 The selected network is DCNow! after every reboot (there is no default-network setting; to go back to DCNow! by phone use a **Toggle DCNow!** or **Call DCNow!** number).
 

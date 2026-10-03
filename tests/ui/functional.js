@@ -69,6 +69,8 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('select[aria-label="Button 2 function"]').selectOption({ label: 'Off' }); await settle(700);
   // ---- shared boxes: wifi, system and the update rows are one box
   ok(await page.locator('[data-box="system"]').count() === 1, 'one System box is shared by several modules');
+  const boxIds = await page.locator('#set-boxes [data-box]').evaluateAll(els => els.map(e => e.getAttribute('data-box')));
+  ok(boxIds.slice(-3).join() === 'modules,about,system', 'Settings ends with Modules, About and System (last): ' + boxIds.join(' | '));
   ok(await page.locator('[data-box="gpio"] .wform').count() >= 2, 'and one GPIO box holds the forms of the buttons and the LED');
   // ---- the module picker: drag a module by its handle, move one with the keyboard, switch one off
   const order = async () => page.locator('[data-box="modules"] .srow[data-id]').evaluateAll(els => els.map(e => e.getAttribute('data-id')));

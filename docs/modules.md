@@ -17,15 +17,14 @@ base or module Python that runs on its own. Moving each service into its module'
 
 | Module | Visible in picker | What it shows / does | Default |
 |---|---|---|---|
-| `switcher` (Network switcher) | no, always on | Dashboard: the Selected-network box (DreamPi, modem, internet, Pi, Hang up) and the two network buttons; Settings: **Network colours**; `POST /dcnow`, `/dcnet`, `/hangup`, `GET /status`; the page's primary colour follows the selected network | on |
-| `buttons` (Buttons) | no, always on | Settings > GPIO: function and pin of the two buttons, `GET`/`POST /buttonconfig` (the buttons service itself is base) | on |
+| `switcher` (Network switcher) | no, always on | Dashboard: the Selected-network box (DreamPi, modem, internet, Pi, Hang up) and the two network buttons; Settings: **Network colours** and the **GPIO** rows for the two physical network buttons (`GET`/`POST /buttonconfig`; the buttons service itself is base); `POST /dcnow`, `/dcnet`, `/hangup`, `GET /status`; the page's primary colour follows the selected network | on |
 | `system` (System) | no, always on | Settings > **About**: the versions (`GET /about`) and the GitHub link | on |
 | `players` (Online players) | yes | Dashboard: the Online players box (counts, games carousel, player list, sources, links), `GET /players` | on |
 | `numbers` (Special phone numbers) | yes | Settings: the phone numbers table, `GET`/`POST /numbers`, `numbers.json` (the hook only reads it while the module is on) | on |
 | `led` (Status LEDs) | yes | Settings: the LED row in GPIO (count, wire order, pin: `GET`/`POST /ledhardware`) and the **Status LED** box (calibration pop-up and message table, a custom widget: `GET`/`POST /ledconfig`); the LED service | on |
 | `debuglog` (Debug log) | yes | Dashboard: the Debug log bar with the live log; `GET /log`, `/dtmf`, `POST /debug`, `/clearlog`; the part inside DreamPi (`netswitch_hookdebug.py`) | **off** |
 | `wifi` (Wi-Fi setup) | yes | Settings: the Wi-Fi setup row and network list in System, the hold-button row in GPIO; `POST /wifitoggle`, `/wificonnect`, `GET`/`POST /wifibutton`; its own service `dreampi-netswitch-wifi` | **off** |
-| `rebootupdate` (Reboot and Update) | yes | Settings: the Updates rows (check, Update now, log) in System, and the Reboot box; `GET /update`, `POST /update/check`, `/update/start`, `/reboot` | on |
+| `rebootupdate` (Reboot and Update) | yes | Settings: the Updates rows (check, Update now, log) and the Reboot row, all in System; `GET /update`, `POST /update/check`, `/update/start`, `/reboot` | on |
 | `background` (Dreamcast background) | yes | A fullscreen **background**: the animated scene and the translucent box styling; `GET /background/*.js` | **off** |
 
 A module is **installed** when its folder (with a `module.json`) is there, and **enabled** when the picker has it on (`modules.json` in
@@ -88,17 +87,17 @@ warning box on the page (and in the picker).
 |---|---|---|
 | `system` | things that act on the Pi or the add-on: Wi-Fi setup, updates, reboot | wifi, rebootupdate |
 | `about` | read-only information: versions, hardware, links | system |
-| `gpio` | anything wired to a GPIO pin: button functions, the LED pin, hold buttons | buttons, led, wifi |
+| `gpio` | anything wired to a GPIO pin: button functions, the LED pin, hold buttons | switcher, led, wifi |
 | `configuration` | a module's general settings that fit no other box; a module with only a few settings adds them here instead of making its own box | (none yet) |
 | `appearance` | colours and the look of the page | (the switcher's colour picks are in `network colours` for now) |
 | `network` | (dashboard) the network selection and its status | switcher |
 
-Use the same title for the same box everywhere (`System`, `About`, `GPIO`, `Configuration`): the first module in picker order that gives one names it. Lower-case in `layout.json`, as the box id.
+The default order puts **About** and then **System** at the very bottom of Settings (the system module starts out before wifi and rebootupdate in the list, and the module picker box is inserted above About / System), and the Reboot row is the last row of System. Use the same title for the same box everywhere (`System`, `About`, `GPIO`, `Configuration`): the first module in picker order that gives one names it. Lower-case in `layout.json`, as the box id.
 
 **Boxes are shared by name.** Boxes with the same `box` name (case-insensitive) in any modules are **one box**: their items follow each
 other in picker order (the items of one module keep their order). The box's title is the first non-empty `title` in picker order, so a
-module that only adds rows leaves it out. Boxes appear in order of first appearance. Example: `buttons`, `led` and `wifi` all
-declare `gpio`; the page shows one GPIO box with Button 1/2, the LED row and the Wi-Fi button row. A settings box is a titled card
+module that only adds rows leaves it out. Boxes appear in order of first appearance. Example: `switcher`, `led` and `wifi` all
+declare `gpio`; the page shows one GPIO box with Button 1/2 (the switcher's), the LED row and the Wi-Fi button row. A settings box is a titled card
 (`<h2>` with a "Saved ✓" flash that any saving widget in it triggers); a dashboard box has no frame, its widgets stand directly on the page.
 A box whose widgets are all hidden (the LED settings while the LED count is 0) is hidden too.
 

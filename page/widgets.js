@@ -141,7 +141,7 @@ W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(
 // the pick is kept for the module (core.set_module_colour)
 function paletteOrder(){var p=(LAY.palette||[]).slice();return p.filter(function(c){return c.id.indexOf("bright-")!==0}).concat(p.filter(function(c){return c.id.indexOf("bright-")===0}))}
 W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri",text:s.label||"Colour","aria-haspopup":"dialog"}),
- grid=h("span",{"class":"swatches grid"}),pop=h("div",{},[h("div",{"class":"t",text:s.title||"Pick a colour"}),grid]),
+ grid=h("span",{"class":"swatches grid"}),pop=h("div",{"class":"colours"},[h("div",{"class":"t",text:s.title||"Pick a colour"}),grid]),
  el=h("span",{"class":"colourpick"},[btn,pop]),btns={},names={},p=ui.popup(pop);
  paletteOrder().forEach(function(c){names[c.id]=c.name;
   var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
@@ -427,7 +427,7 @@ function sortable(box,onDone){
 // ---- the module picker (the loader's own box): every module that may be switched, with its switch; drag a row by its handle to move it
 function buildPicker(cols){var saved=h("span",{"class":"saved",text:"Saved \u2713"}),card=h("div",{"class":"card"}),
  sec=h("section",{"class":"sec","data-box":"modules"},[h("h2",{},[document.createTextNode("Modules "),saved]),card]);
- var before=cols.querySelector('[data-box="system"]');cols.insertBefore(sec,before);
+ var before=cols.querySelector('[data-box="about"],[data-box="system"]');cols.insertBefore(sec,before);   // the picker sits above About / System, which end the page
  function reloadInSettings(){try{sessionStorage.setItem("netswitch-reopen","1")}catch(e){}location.reload()}
  function load(){xhrJson("GET","/modules",function(r){if(r)paint(r.modules)})}
  function paint(list){card.innerHTML="";
