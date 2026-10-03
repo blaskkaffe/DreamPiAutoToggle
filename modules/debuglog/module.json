@@ -1,2 +1,2 @@
-{"title": "Debug log", "order": 60, "default": false, "web": "netswitch_debuglog",
+{"title": "Debug log", "order": 60, "default": false, "ui": 1, "web": "netswitch_debuglog",
  "description": "Enable debug log on the main page."}

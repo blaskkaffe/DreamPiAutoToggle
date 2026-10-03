@@ -8,6 +8,42 @@ function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp
 var HOOKS={};
 function hook(name,fn){(HOOKS[name]=HOOKS[name]||[]).push(fn)}
 function fire(name,arg){var handled=false;(HOOKS[name]||[]).forEach(function(f){try{if(f(arg)===true)handled=true}catch(e){if(window.console)console.error(name,e)}});return handled}
+// ===== The page kit (docs/modules.md, "The page kit"): what modules use to build their rows and pop-ups, so the look
+// is decided here and in page.css only. =====
+//   ui.row({title, sub, subHtml, control, below, id, cls})  one Settings row as HTML: title and subtitle on the left, the control
+//                                                 (ui.btn / a checkbox / a select ...) on the right, `below` underneath
+//   ui.btn(text, {attr: value, ...})              a small round button as HTML (attributes escaped)
+//   ui.tag(text, {attr: value, ...})              a removable item (a number, say) with a x button, for a .tags list
+//   ui.popup(el)                                  turns an element (inside a card or section) into a pop-up that opens under
+//                                                 a button: p.toggle(button, event) / p.open(button) / p.close() / p.isOpen();
+//                                                 set p.onclose to be told when it closes. Esc, a click elsewhere, opening
+//                                                 another pop-up and closing Settings close it by themselves.
+var ui={version:1,_pops:[]};   // keep in step with UI_KIT in netswitch_modules.py
+ui.attrs=function(a){var s="";for(var k in a)if(a[k]!==undefined&&a[k]!==null)s+=" "+k+'="'+esc(a[k])+'"';return s};
+ui.btn=function(text,a){a=a||{};var c="pill-s"+(a["class"]?" "+a["class"]:"");var b={};for(var k in a)b[k]=a[k];b["class"]=c;b.type=b.type||"button";
+ return "<button"+ui.attrs(b)+">"+esc(text)+"</button>"};
+ui.tag=function(text,a){var b={type:"button","aria-label":"Remove "+text};for(var k in a)b[k]=a[k];
+ return '<span class="tag">'+esc(text)+"<button"+ui.attrs(b)+">&#10005;</button></span>"};
+ui.row=function(o){o=o||{};
+ return '<div class="srow'+(o.below!=null?" wrap":"")+(o.cls?" "+o.cls:"")+'"'+(o.id?' id="'+esc(o.id)+'"':"")+"><span>"+esc(o.title||"")+
+  (o.subHtml!=null?'<span class="sub">'+o.subHtml+"</span>":o.sub!=null?'<span class="sub">'+esc(o.sub)+"</span>":"")+"</span>"+(o.control||"")+(o.below!=null?'<div class="below">'+o.below+"</div>":"")+"</div>"};
+ui.closePopups=function(except){ui._pops.forEach(function(p){if(p!==except)p.close()})};
+ui.popup=function(el){
+ var par=el.parentNode,p={el:el,anchor:null,onclose:null};
+ el.classList.add("pop");el.setAttribute("role","dialog");
+ if(window.getComputedStyle(par).position==="static")par.style.position="relative";   // the pop-up is placed inside it
+ p.isOpen=function(){return el.classList.contains("open")};
+ p.open=function(anchor){ui.closePopups(p);p.anchor=anchor;el.classList.add("open");
+  var box=par.getBoundingClientRect(),r=anchor.getBoundingClientRect();
+  el.style.left=Math.max(0,Math.min(r.right-box.left-el.offsetWidth,box.width-el.offsetWidth))+"px";
+  el.style.top=(r.bottom-box.top+6)+"px"};
+ p.close=function(){if(!p.isOpen())return;el.classList.remove("open");p.anchor=null;if(p.onclose)p.onclose()};
+ p.toggle=function(anchor,e){if(e&&e.stopPropagation)e.stopPropagation();if(p.isOpen()&&p.anchor===anchor)p.close();else p.open(anchor)};
+ el.addEventListener("click",function(e){e.stopPropagation()});
+ ui._pops.push(p);return p};
+document.addEventListener("click",function(){ui.closePopups()});
+hook("escape",function(){if(ui._pops.some(function(p){return p.isOpen()})){ui.closePopups();return true}});
+hook("settingsClose",function(){ui.closePopups()});
 function ago(t,now){if(!t)return"";var s=Math.max(0,now-t);
  if(s<60)return"("+s+"s ago)";if(s<3600)return"("+Math.floor(s/60)+" min ago)";return"("+Math.floor(s/3600)+" h ago)"}
 // The page is redrawn from /api every second: only touch the DOM when something actually changed (no flicker, less work on a slow phone)
@@ -70,10 +106,10 @@ function xhrJson(method,url,cb,body){var x=new XMLHttpRequest();x.open(method,ur
 // Modules menu: every installed module with a switch. Switching reloads the page, because a module's parts are built into it.
 function loadModules(){xhrJson("GET","/modules",function(r){if(!r)return;
  $("mod-list").innerHTML=r.modules.map(function(m){
-  return '<div class="srow"><span>'+esc(m.title)+'<span class="sub">'+esc(m.description)+(m.note?'<br>'+esc(m.note):'')+
-   (m.error?'<br><b class="modbad">Could not load: '+esc(m.error)+'</b>':'')+'</span></span>'+
-   '<input type="checkbox" class="cbox dcnow" data-module="'+esc(m.name)+'" aria-label="'+esc(m.title)+'"'+(m.enabled?' checked':'')+'></div>'}).join("")||
-  '<div class="sub" style="padding:12px 0">No modules installed.</div>';
+  return ui.row({title:m.title,
+   subHtml:esc(m.description)+(m.note?'<br>'+esc(m.note):'')+(m.error?'<br><b class="modbad">Could not load: '+esc(m.error)+'</b>':''),
+   control:'<input type="checkbox" class="cbox dcnow" data-module="'+esc(m.name)+'" aria-label="'+esc(m.title)+'"'+(m.enabled?' checked':'')+'>'})}).join("")||
+  ui.row({title:"No modules installed."});
  Array.prototype.forEach.call($("mod-list").querySelectorAll("input[data-module]"),function(c){c.onchange=function(){
   c.disabled=true;
   xhrJson("POST","/modules",function(res){

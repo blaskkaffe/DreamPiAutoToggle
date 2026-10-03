@@ -25,10 +25,11 @@ A module is **installed** when its folder (with a `module.json`) is there, and *
 ```
 modules/<name>/
   module.json      {"title", "description", "order" (menu order), "default" (on/off until the menu says otherwise),
-                    "web" (Python module name of its web entry), "note" (optional hint shown in the menu)}
+                    "ui" (the page kit version it was written for, 1), "web" (Python module name of its web entry),
+                    "note" (optional hint shown in the menu)}
   netswitch_*.py   its Python: the web entry named in "web", plus anything its services use
   page.html        fragments for the page's slots:  <!--slot:NAME-->  ...markup...  <!--slot:OTHER--> ...
-  page.css         added to the page's styles
+  page.css         added to the page's styles (as little as possible: see the page kit below)
   page.js          added to the page's script (same scope, after page.js; uses hook(), fire(), $, esc ...)
   install.sh       optional, sourced by install.sh (sees $DEST $SRC $LED_COUNT $LED_GPIO $WIFI $WIFI_DEMO, ns_module_enable)
   remove.sh        optional, sourced when the folder is gone from the repo, and by uninstall.sh
@@ -61,6 +62,26 @@ POSTs pass the same security gate as every other POST (Origin / `X-Requested-Wit
 | `sections_b` | whole Settings sections after the GPIO card (Status LED, with the calibration pop-up) |
 
 Client-side hooks (`page/page.js`): a module's `page.js` calls `hook(name, fn)`, the page calls `fire(name, arg)`: `api` (d, every second), `settingsOpen`, `settingsClose`, `escape` (return `true` if handled), `buttons` (the button settings were loaded), `posted` (after a form post). Settings opening, closing and refreshing never mention a module by name.
+
+### The page kit
+
+A module does not decide how things look. The base page (`page/page.css`, the block marked "The page kit", and `ui` in `page/page.js`) provides the building blocks, and every module is written with them, so a change in the kit changes every module, current and future. `ui.version` in `page.js` and `UI_KIT` in `netswitch_modules.py` are its version (now 1); a module's `"ui"` says which version it was written for, and a module that wants a newer one than the page has is not loaded (the Modules menu says why).
+
+| You want | Use |
+|---|---|
+| A Settings section | `<section class="sec"><h2>Title</h2><div class="card">...</div></section>` (the base's own classes), put in a slot |
+| A row: title, grey subtitle, control on the right | `ui.row({title, sub, control, below, id, cls})` in JS, or `<div class="srow"><span>Title<span class="sub">...</span></span> control</div>` in `page.html`. `below` adds full-width content under the row (it makes the row wrap). |
+| A small button | `ui.btn("Text", {attr: value})` or `<button class="pill-s">`; a link that looks like one: `<a class="pill-s">`; a dangerous action: `pill-s danger` |
+| Tick box | `<input type="checkbox" class="cbox dcnow">` (or `neutral`) |
+| Drop-down, number box | `<select class="ord">`, `<input type="number">`: both are 36 px high |
+| Removable items (numbers, say) | `<div class="tags">` with `ui.tag("text", {attr: value})` for each; `<span class="empty">` when there are none |
+| A pop-up under a button | an element in a card or section (`<div id="x"><div class="t">Title</div> ... <div class="msg"></div></div>`; `fld` puts an input and a button on one line, `bar` / `bar end` / `bar center` lay out buttons, `big` makes it wider) and `var p = ui.popup($("x"))`; then `button.onclick = function(e){ p.toggle(this, e) }`, `p.close()`, `p.onclose`. Esc, a click elsewhere, opening another pop-up and closing Settings close it. |
+| A slider row | `<div class="range"><span>Label</span><input type="range"><span>value</span></div>`; `range grid` lines several of them up |
+| A log / console | `<div class="console">` (add `nowrap` for one entry per line); line classes `l-err l-ok l-dim l-hd l-info l-warn l-mod l-b` |
+| An error line | `<div class="msg">` (empty = hidden) |
+| Colours | the CSS variables in `:root` (`--card --line --muted --ctl --ctl-line --pop --sel --sel-line --dim --txt2 --console --dcnow --dcnet` ...), never a colour written out |
+
+Rules (`tests/test_ui_kit.py` checks them): a module's `page.css` does not style a base class on its own (`.srow{...}` would change every row; `#my-list .srow{...}` and the module's own class names are fine), does not write colours as `#hex` (except white and black), and its `page.js` builds rows with `ui.row()` and pop-ups with `ui.popup()`. A module whose look has nothing in the kit (the LED message table, the players box) keeps that CSS in its own `page.css`, scoped to its own ids and classes. A theme such as the Dreamcast background restyles base classes on purpose and is the one exception. To add something new that two modules could use, add it to the kit (CSS, helper, this table, a test) instead of to a module.
 
 ### The loader (`netswitch_modules.py`)
 

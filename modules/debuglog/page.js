@@ -6,12 +6,12 @@ $("show-debug").onclick=function(){debugOpen=!debugOpen;
  this.classList.toggle("open",debugOpen);
  if(debugOpen){pollLog();var el=$("log");el.scrollTop=el.scrollHeight}};
 function cls(line){
- if(/modem: DTMF/.test(line))return"dtmf";
- if(/netswitch:|add-on:/.test(line))return"route";
- if(/web page:/.test(line))return"web";
- if(/underrun/.test(line))return"dim";
- if(/fail|error|Couldn't|Unable|No carrier|NO CARRIER/i.test(line))return"err";
- if(/modem/.test(line))return"modem";
+ if(/modem: DTMF/.test(line))return"l-ok l-b";
+ if(/netswitch:|add-on:/.test(line))return"l-info";
+ if(/web page:/.test(line))return"l-warn";
+ if(/underrun/.test(line))return"l-dim";
+ if(/fail|error|Couldn't|Unable|No carrier|NO CARRIER/i.test(line))return"l-err";
+ if(/modem/.test(line))return"l-mod";
  return"";
 }
 function pollLog(){

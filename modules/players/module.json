@@ -1,2 +1,2 @@
-{"title": "Online players", "order": 30, "default": true, "web": "netswitch_players",
+{"title": "Online players", "order": 30, "default": true, "ui": 1, "web": "netswitch_players",
  "description": "Shows DCNow! and DCNET players on the main page."}

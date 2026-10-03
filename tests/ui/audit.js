@@ -30,7 +30,7 @@ const AUDIT = () => {
     if (el.tagName === 'BUTTON' && !(el.textContent || '').trim() && !el.getAttribute('aria-label') && !el.getAttribute('title')) out.push(['unlabelled-button', sel(el)]);
     const fs = parseFloat(cs.fontSize);
     if (fs < 11.5 && el.childNodes.length && Array.from(el.childNodes).some(n => n.nodeType === 3 && n.textContent.trim())) out.push(['tiny-text', sel(el) + ' ' + fs + 'px "' + el.textContent.trim().slice(0, 20) + '"']);
-    if (el.classList.contains('pill-s') && el.closest('.srow, .nadd, .bar') && r.width > 240 && !el.closest('.pop, #wifi-networks, .now')) out.push(['pill-stretched', sel(el) + ' w=' + Math.round(r.width) + ' "' + el.textContent.trim().slice(0, 20) + '"']);
+    if (el.classList.contains('pill-s') && el.closest('.srow, .fld, .bar') && r.width > 240 && !el.closest('.pop, #wifi-networks, .now')) out.push(['pill-stretched', sel(el) + ' w=' + Math.round(r.width) + ' "' + el.textContent.trim().slice(0, 20) + '"']);
     // wrapped single-word buttons (a pill whose label breaks onto 2 lines)
     if (/^(BUTTON|A)$/.test(el.tagName) && el.classList.contains('pill-s') && r.height > 46) out.push(['pill-wraps', sel(el) + ' h=' + Math.round(r.height) + ' "' + el.textContent.trim() + '"']);
   });
@@ -64,6 +64,10 @@ const AUDIT = () => {
     await page.click('#wifi-b'); await page.waitForTimeout(1500);
     // popups
     await page.evaluate(() => { const b = document.querySelector('#led-rows .fx'); if (b) b.click(); }); await page.waitForTimeout(300); await check('fx popup');
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => { const b = document.querySelector('#num-list button[data-add]'); if (b) b.click(); }); await page.waitForTimeout(300); await check('numbers add pop-up');
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => { const b = document.getElementById('cal-open'); if (b) b.click(); }); await page.waitForTimeout(300); await check('calibration pop-up');
     await page.keyboard.press('Escape');
     // switch button functions
     await page.selectOption('#btn1-fn', 'sw_wifi'); await page.waitForTimeout(500); await check('switch fn selected');

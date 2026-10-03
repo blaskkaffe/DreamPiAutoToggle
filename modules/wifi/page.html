@@ -3,11 +3,11 @@
   <div class="srow" id="wifi-row"><span>Wi-Fi setup<span class="sub" id="wifi-sub">Search for a Wi-Fi network to connect the Pi to</span></span>
    <button class="pill-s" id="wifi-b" type="button">Search</button></div>
   <div id="wifi-networks" style="display:none"><div id="wifi-list"></div></div>
-  <div id="wifi-pop" role="dialog" aria-label="Connect to a Wi-Fi network"><div class="t" id="wifi-pop-t"></div>
+  <div id="wifi-pop"><div class="t" id="wifi-pop-t"></div>
    <input type="text" id="wifi-ssid" placeholder="Network name" aria-label="Network name">
    <input type="password" id="wifi-pass" placeholder="Password" aria-label="Wi-Fi password" autocomplete="off">
-   <div class="wmsg" id="wifi-msg"></div>
-   <div class="bar" style="justify-content:flex-end;margin:0"><button type="button" class="pill-s" id="wifi-connect-b">Connect</button></div></div>
+   <div class="msg" id="wifi-msg"></div>
+   <div class="bar end"><button type="button" class="pill-s" id="wifi-connect-b">Connect</button></div></div>
  </div>
 <!--slot:buttons_rows-->
  <div class="srow" id="gpio-wifi-row"><span>Wi-Fi setup<span class="sub" id="wifi-btn-sub"></span></span>

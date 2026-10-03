@@ -1,2 +1,2 @@
-{"title": "Status LEDs", "order": 50, "default": true, "web": "netswitch_led_web",
+{"title": "Status LEDs", "order": 50, "default": true, "ui": 1, "web": "netswitch_led_web",
  "description": "Enable and configure NeoPixel status lights."}

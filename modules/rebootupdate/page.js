@@ -10,9 +10,9 @@ function renderUpdLog(r){
  lg.style.display=(lines.length&&r.state!="idle")?"block":"none";
  var stick=lg.scrollTop+lg.clientHeight>=lg.scrollHeight-8;
  lg.innerHTML=lines.map(function(l,i){
-  var c=/\b(fail|failed|error|fatal|denied|cannot|could not|not found)\b/i.test(l)?"lerr":
-   /^(ok|done|updated|installed|.*\b(already up to date|fast-forward)\b)/i.test(l)?"lok":
-   /^(updating|running)\b/i.test(l)?"lhd":/^(from|remote:|\s*\d+ file|\s*create mode|\s*delete mode)/i.test(l)?"ldim":"";
+  var c=/\b(fail|failed|error|fatal|denied|cannot|could not|not found)\b/i.test(l)?"l-err":
+   /^(ok|done|updated|installed|.*\b(already up to date|fast-forward)\b)/i.test(l)?"l-ok":
+   /^(updating|running)\b/i.test(l)?"l-hd":/^(from|remote:|\s*\d+ file|\s*create mode|\s*delete mode)/i.test(l)?"l-dim":"";
   return '<div'+(c?' class="'+c+'"':'')+'>'+esc(l.slice(0,300))+'</div>'}).join("");
  if(stick)lg.scrollTop=lg.scrollHeight}
 function renderUpdate(r){var a=r.addon,d=r.dreampi,msg;

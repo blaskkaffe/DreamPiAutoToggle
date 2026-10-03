@@ -53,21 +53,18 @@ function showFx(st){var el=$("f-"+st);if(!el)return;var c=msgOf(st);
  el.innerHTML=esc(effectName(c.effect))+(sub.length?"<small>"+sub.join(" \u00b7 ")+"</small>":"")}
 function showLvl(st){var el=$("l-"+st);if(!el)return;var b=msgOf(st).brightness,own=b!==null&&b!==undefined;
  el.className="chip lvl"+(own?" on":"");el.textContent=pct(own?b:led.max_brightness)}
-function placePop(pop,el){var box=pop.parentNode.getBoundingClientRect(),r=el.getBoundingClientRect();
- pop.classList.add("open");
- pop.style.left=Math.min(Math.max(r.right-box.left-pop.offsetWidth,0),box.width-pop.offsetWidth)+"px";
- pop.style.top=(r.bottom-box.top+6)+"px"}
+// The three pop-ups (the effect menu, the level slider, the calibration) are page-kit pop-ups: opening one closes the others
+// and Esc, a click elsewhere or leaving Settings closes it. Each tells us when it closes so the state it edited is let go.
 var lvlCur=null,fxCur=null;
-function closePops(){$("lvl-pop").classList.remove("open");$("fx-pop").classList.remove("open");
- if(calOpen)closeCal();lvlCur=fxCur=null}
-// the calibration pop-up (white balance sliders, preview and the maximum brightness), opened from the Status LED card
-var calOpen=false;
-function closeCal(){calOpen=false;$("cal-pop").classList.remove("open");if(wbPreviewOn)setWbPreview(false)}   // the test hold ends with the pop-up
-$("cal-open").onclick=function(e){e.stopPropagation();if(calOpen){closePops();return}
- closePops();calOpen=true;showWb();placePop($("cal-pop"),this)};
+var fxPop=ui.popup($("fx-pop")),lvlPop=ui.popup($("lvl-pop")),calPop=ui.popup($("cal-pop"));
+fxPop.onclose=function(){fxCur=null};
+lvlPop.onclose=function(){lvlCur=null};
+calPop.onclose=function(){if(wbPreviewOn)setWbPreview(false)};   // the white test ends with the pop-up
+function closePops(){ui.closePopups()}
+$("cal-open").onclick=function(e){if(!calPop.isOpen())showWb();calPop.toggle(this,e)};
 $("cal-done").onclick=closePops;
 var secMode="all";   // what the LEDs buttons of the open effect popup show: all | one | range
-function openFx(el){closePops();var st=el.dataset.state,c=msgOf(st);fxCur=st;
+function openFx(el){var st=el.dataset.state,c=msgOf(st);fxCur=st;
  $("fx-t").textContent=el.dataset.label;
  $("fx-opts").innerHTML=ledEffects.filter(function(e){return !e[2]||ledCount>1||e[0]==c.effect}).map(function(e){
   return '<button type="button" class="pill-s" data-fx="'+e[0]+'">'+esc(e[1])+'</button>'}).join("");
@@ -75,7 +72,7 @@ function openFx(el){closePops();var st=el.dataset.state,c=msgOf(st);fxCur=st;
  $("fx-sec").style.display=$("fx-sec-in").style.display=ledCount>1?"flex":"none";
  $("sec-a").max=$("sec-b").max=ledCount;
  secMode=!c.leds?"all":c.leds[0]==c.leds[1]?"one":"range";
- fxMark();placePop($("fx-pop"),el)}
+ fxMark();fxPop.open(el)}
 function fxMark(){if(!fxCur)return;var c=msgOf(fxCur),fixed=c.effect=="solid";
  Array.prototype.forEach.call($("fx-opts").querySelectorAll("button"),function(b){b.className="pill-s"+(b.dataset.fx==c.effect?" sel":"")});
  Array.prototype.forEach.call($("fx-speed").querySelectorAll("button"),function(b){b.disabled=fixed;
@@ -102,18 +99,16 @@ $("sec-a").onchange=$("sec-b").onchange=secInput;
 Array.prototype.forEach.call($("fx-speed").querySelectorAll("button"),function(b){b.onclick=function(){
  if(!fxCur)return;msgOf(fxCur).speed=b.dataset.speed;fxMark();saveLed()}});
 $("fx-done").onclick=closePops;
-function openLvl(el){closePops();var st=el.dataset.state,c=msgOf(st);
+function openLvl(el){var st=el.dataset.state,c=msgOf(st);
  if(c.brightness===null||c.brightness===undefined){c.brightness=led.max_brightness;showLvl(st);saveLed()}
  lvlCur=st;
  $("lvl-t").textContent=el.dataset.label;
  $("lvl-r").style.accentColor=c.color;$("lvl-r").value=brightToSlider(c.brightness);$("lvl-v").textContent=pct(c.brightness);
- placePop($("lvl-pop"),el)}
+ lvlPop.open(el)}
 $("lvl-r").oninput=function(){if(!lvlCur)return;var b=Math.round(sliderToBright(this.value)*1000)/1000;
  msgOf(lvlCur).brightness=b;$("lvl-v").textContent=pct(b);showLvl(lvlCur);saveLed()};
 $("lvl-base").onclick=function(){if(!lvlCur)return;msgOf(lvlCur).brightness=null;showLvl(lvlCur);saveLed();closePops()};
 $("lvl-done").onclick=closePops;
-$("lvl-pop").onclick=$("fx-pop").onclick=$("cal-pop").onclick=function(e){e.stopPropagation()};
-$("settings").addEventListener("click",function(){if(lvlCur||fxCur||calOpen)closePops()});
 ["r","g","b"].forEach(function(c){$("wb-"+c).oninput=function(){
  led.white_balance[c]=Math.round(this.value)/255;$("wb-"+c+"-v").textContent=Math.round(this.value);saveLed()}});
 function setWbPreview(on){wbPreviewOn=on;$("wb-preview").classList.toggle("on",on);
@@ -147,5 +142,4 @@ $("led-gpio").onchange=function(){ledGpio=parseInt(this.value,10);saveLed(true)}
 $("led-order").onchange=function(){led.order=this.value;saveLed(true)};
 // hooks of the base page
 hook("settingsOpen",loadLed);                                                // Settings opened
-hook("settingsClose",function(){closePops();if(wbPreviewOn)setWbPreview(false)});   // Settings closed
-hook("escape",function(){if(lvlCur||fxCur||calOpen){closePops();return true}});       // Escape closes an open pop-up first
+hook("settingsClose",function(){if(wbPreviewOn)setWbPreview(false)});   // Settings closed (the pop-ups close themselves)

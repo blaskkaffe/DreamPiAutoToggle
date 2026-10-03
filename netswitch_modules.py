@@ -11,6 +11,7 @@
 #                                                                    POST function returns True once it has answered
 #   api(d, warnings)                add to the /api answer (d is its dict) and to the warning boxes
 #   PROTECTED = ("/path", ...)      POST paths that need the PIN when one is set (they run as root)
+# module.json "ui": N is the page kit version the module was written for (see UI_KIT); a newer one is not loaded.
 # Nothing outside this file and the web service knows which modules exist. A module whose folder is missing,
 # that is switched off, or whose Python fails to import is simply absent. Works on Python 3 and 2.7.
 import importlib
@@ -22,6 +23,7 @@ import threading
 
 import netswitch_core as core
 
+UI_KIT = 1       # the version of the page kit (ui in page/page.js, the kit block in page.css); a module may ask for an older one
 SLOTS = ("main", "about_top", "about_bottom", "system_after", "sections_a", "buttons_rows", "sections_b")   # the @@SLOT:name@@ markers in index.html
 _PAGE_FILES = ("page.html", "page.css", "page.js")
 _lock = threading.Lock()
@@ -77,6 +79,10 @@ def refresh(force=False):
             if not core.module_enabled(name, state):
                 continue
             manifest = core.module_manifest(name)
+            need = manifest.get("ui", 1)
+            if not isinstance(need, int) or need > UI_KIT:      # written for a newer page kit than this one has
+                errors[name] = "needs page kit %s, this page has %d" % (need, UI_KIT)
+                continue
             try:
                 web = _import_web(name, manifest)
             except Exception as e:      # a broken module must not take the page down with it
