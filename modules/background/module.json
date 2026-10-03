@@ -1,2 +1,9 @@
-{"title": "Dreamcast background", "order": 70, "default": false, "ui": 1, "web": "netswitch_background",
- "description": "Enable animated menu background (WebGL)."}
+{
+ "name": "Dreamcast background",
+ "description": "Enable animated menu background (WebGL).",
+ "enabled": false,
+ "visible": true,
+ "order": 90,
+ "ui": 1,
+ "web": "netswitch_background"
+}

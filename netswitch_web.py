@@ -85,7 +85,7 @@ def api_state():
         warnings.append("Modem: %s is known not to work reliably with DreamPi. "
                         "See the Modem row in Settings." % label)
     d = {"network": "dcnet" if os.path.exists(core.FLAG) else "dcnow",
-         "netcolours": dict((n, dict((k, v) for k, v in core.network_colour(n).items() if k != "led")) for n in ("dcnow", "dcnet")),
+         "netcolours": dict((n, dict((k, v) for k, v in core.network_colour(n).items() if k in ("id", "name", "ui", "ui_l"))) for n in ("dcnow", "dcnet")),
          "dreampi": {"state": dstate, "text": dtext, "look": _dot_look(dstate)},
          "modem": {"text": mtext, "since": msince, "plugged": plugged, "label": label, "compat": compat},
          "internet": checks["internet"],
@@ -104,6 +104,16 @@ PAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "page")
 BASE_PAGE_FILES = ("index.html", "page.css", "page.js")
 
 
+def _legacy_network_css():
+    """--dcnow / --dcnet (the network switcher's two colours) for the parts of the page that are not modules yet."""
+    out = ":root{"
+    for net in ("dcnow", "dcnet"):
+        c = core.network_colour(net)
+        rgb = lambda h: "%d,%d,%d" % (int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16))
+        out += "--%s:%s;--%s-l:%s;--%s-rgb:%s;--%s-l-rgb:%s;" % (net, c["ui"], net, c["ui_l"], net, rgb(c["ui"]), net, rgb(c["ui_l"]))
+    return out + "}\n"
+
+
 def build_page():
     """The page is one document: page/index.html with page/page.css and page/page.js put in where it says
     @@CSS@@ and @@JS@@ (one request, kept in memory as PAGE_BYTES). Edit those files, not this module. The
@@ -113,7 +123,7 @@ def build_page():
         with io.open(os.path.join(PAGE_DIR, name), encoding="utf-8", newline="") as f:
             return f.read()
     extra = modules.page_parts()
-    html = part("index.html").replace("@@CSS@@", part("page.css") + "\n" + extra["css"] + "\n" + core.network_colours_css()).replace("@@JS@@", part("page.js") + "\n" + extra["js"])
+    html = part("index.html").replace("@@CSS@@", part("page.css") + "\n" + extra["css"] + "\n" + _legacy_network_css() + core.colours_css()).replace("@@JS@@", part("page.js") + "\n" + extra["js"])
     for name, text in extra["slots"].items():
         html = html.replace("@@SLOT:%s@@" % name, text)
     return html
@@ -136,7 +146,7 @@ PAGE = PAGE_BYTES = None
 
 
 def _page_signature():
-    sig = [PAGE_DIR, core.network_colours()["dcnow"], core.network_colours()["dcnet"]]    # the colours are built into the page
+    sig = [PAGE_DIR, tuple(sorted(core.module_colours("switcher").items()))]    # the colours are built into the page
     for f in BASE_PAGE_FILES:
         try:
             sig.append(os.path.getmtime(os.path.join(PAGE_DIR, f)))
@@ -190,7 +200,9 @@ def _button_reply():
 
 
 def _colour_reply():
-    return {"options": [{"id": c[0], "name": c[1], "ui": c[2]} for c in core.NETWORK_COLOURS], "current": core.network_colours()}
+    return {"options": [{"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"]} for c in core.colours()],
+            "current": core.module_colours("switcher"),
+            "modules": dict((n, core.module_colours(n)) for n in core.module_names() if core.module_enabled(n) and core.module_colours(n))}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -348,6 +360,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
         if path == "/modules":
             return self._post_modules()
+        if path == "/modules/order":
+            return self._post_module_order()
+        if path == "/colour":
+            return self._post_colour()
         if path == "/buttonconfig":
             return self._post_buttons()
         if path == "/netcolour":
@@ -391,15 +407,40 @@ class Handler(BaseHTTPRequestHandler):
         refresh_page(force=True)
         self.send(json.dumps({"modules": modules.listing()}), "application/json")
 
+    def _post_module_order(self):
+        """The module picker: {"order": [name, ...]}, first = highest priority."""
+        try:
+            order = core.save_module_order(json.loads(self._body(4096).decode("utf-8")).get("order"))
+            if order is None:
+                raise ValueError("order must be a list of module names")
+        except (ValueError, AttributeError, IOError, OSError) as e:
+            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
+        core.debug_log("web page: module order %s" % ", ".join(order))
+        refresh_page(force=True)
+        self.send(json.dumps({"modules": modules.listing()}), "application/json")
+
+    def _post_colour(self):
+        """A module's own colour setting: {"module": name, "key": its colour key, "colour": palette id}."""
+        try:
+            data = json.loads(self._body(1024).decode("utf-8"))
+            got = core.set_module_colour(data.get("module"), data.get("key"), data.get("colour"))
+            if got is None:
+                raise ValueError("unknown module, colour key or colour")
+        except (ValueError, AttributeError, IOError, OSError) as e:
+            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
+        refresh_page(force=True)       # the colours are built into the page
+        core.debug_log("web page: %s colours %s" % (data["module"], json.dumps(got, sort_keys=True)))
+        self.send(json.dumps({"module": data["module"], "colours": got}), "application/json")
+
     def _post_netcolour(self):
         """Settings > Network colours: {"network": "dcnow"|"dcnet", "colour": id}."""
         try:
             data = json.loads(self._body(1024).decode("utf-8"))
-            core.set_network_colour(data.get("network"), data.get("colour"))
+            core.set_module_colour("switcher", data.get("network"), data.get("colour"))
         except (ValueError, IOError, OSError, AttributeError) as e:
             return self.send(str(e), "text/plain; charset=utf-8", status=400)
         refresh_page(force=True)       # the colours are built into the page
-        core.debug_log("web page: network colours %s" % json.dumps(core.network_colours(), sort_keys=True))
+        core.debug_log("web page: network colours %s" % json.dumps(core.module_colours("switcher"), sort_keys=True))
         self.send(json.dumps(_colour_reply()), "application/json")
 
     def _post_buttons(self):

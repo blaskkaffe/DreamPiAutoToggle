@@ -1,4 +1,5 @@
-"""Network colours are global: one choice for DCNow! and DCNET that the page, the dot and the LED all follow."""
+"""The global palette (16 named colours) and the colours a module picks from it. The network switcher picks one for DCNow!
+and one for DCNET; the page, the status dot and the LED follow them."""
 import json
 import threading
 import unittest
@@ -7,45 +8,68 @@ from urllib.request import urlopen, Request
 from support import web, core, ledconfig, sandbox, cleanup
 
 
-class CoreTests(unittest.TestCase):
+class PaletteTests(unittest.TestCase):
+    def test_sixteen_named_colours_in_eight_hue_groups(self):
+        pal = core.colours()
+        self.assertEqual(len(pal), 16)
+        self.assertEqual(len(set(c["id"] for c in pal)), 16)
+        self.assertEqual(sorted(set(c["group"] for c in pal)), ["blue", "cyan", "green", "orange", "pink", "purple", "red", "yellow"])
+        for g in set(c["group"] for c in pal):
+            self.assertEqual([c["id"] for c in pal if c["group"] == g], [g, "bright-" + g])      # each hue: normal, then bright
+
+    def test_the_two_original_ui_colours_are_still_there(self):
+        self.assertEqual(core.colour("orange")["ui"], "#e8761c")
+        self.assertEqual(core.colour("blue")["ui"], "#1c6fe8")
+
+    def test_an_unknown_id_is_orange(self):
+        self.assertEqual(core.colour("nope")["id"], "orange")
+
+    def test_every_colour_has_page_and_led_values(self):
+        for c in core.colours():
+            for k in ("ui", "ui_l", "led"):
+                self.assertRegex(c[k], r"^#[0-9a-f]{6}$", (c["id"], k))
+
+    def test_css_has_variables_and_a_class_per_colour(self):
+        css = core.colours_css()
+        for c in core.colours():
+            self.assertIn("--c-%s:%s;" % (c["id"], c["ui"]), css)
+            self.assertIn(".c-%s{--primary:var(--c-%s)" % (c["id"], c["id"]), css)
+
+
+class ModuleColourTests(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox()
 
     def tearDown(self):
         cleanup(self.tmp)
 
-    def test_defaults_are_orange_and_blue(self):
-        self.assertEqual(core.network_colours(), {"dcnow": "orange", "dcnet": "blue"})
+    def test_the_switcher_defaults_are_orange_and_blue(self):
+        self.assertEqual(core.module_colours("switcher"), {"dcnow": "orange", "dcnet": "blue"})
         self.assertEqual(core.network_colour("dcnow")["ui"], "#e8761c")
         self.assertEqual(core.network_colour("dcnet")["ui"], "#1c6fe8")
 
-    def test_the_list_has_the_two_ui_colours_then_red_and_green(self):
-        self.assertEqual([c[0] for c in core.NETWORK_COLOURS], ["orange", "blue", "red", "green"])
-
-    def test_choice_persists(self):
-        core.set_network_colour("dcnow", "green")
-        self.assertEqual(core.network_colours(), {"dcnow": "green", "dcnet": "blue"})
+    def test_choice_persists_and_any_palette_colour_works(self):
+        core.set_module_colour("switcher", "dcnow", "bright-pink")
+        self.assertEqual(core.module_colours("switcher"), {"dcnow": "bright-pink", "dcnet": "blue"})
+        self.assertEqual(core.network_colour("dcnow")["id"], "bright-pink")
 
     def test_picking_the_others_colour_swaps(self):
-        core.set_network_colour("dcnow", "blue")
-        self.assertEqual(core.network_colours(), {"dcnow": "blue", "dcnet": "orange"})
+        core.set_module_colour("switcher", "dcnow", "blue")
+        self.assertEqual(core.module_colours("switcher"), {"dcnow": "blue", "dcnet": "orange"})
 
     def test_invalid_input_is_ignored(self):
-        core.set_network_colour("dcnow", "pink")
-        core.set_network_colour("other", "red")
-        self.assertEqual(core.network_colours(), {"dcnow": "orange", "dcnet": "blue"})
+        self.assertIsNone(core.set_module_colour("switcher", "dcnow", "chartreuse"))
+        self.assertIsNone(core.set_module_colour("switcher", "other", "red"))
+        self.assertIsNone(core.set_module_colour("nosuchmodule", "dcnow", "red"))
+        self.assertEqual(core.module_colours("switcher"), {"dcnow": "orange", "dcnet": "blue"})
 
     def test_a_broken_file_gives_the_defaults(self):
-        with open(core.NET_COLOURS, "w") as f:
+        with open(core.MODULE_COLOURS, "w") as f:
             f.write("{nonsense")
-        self.assertEqual(core.network_colours(), {"dcnow": "orange", "dcnet": "blue"})
+        self.assertEqual(core.module_colours("switcher"), {"dcnow": "orange", "dcnet": "blue"})
 
-    def test_css_variables_follow_the_choice(self):
-        core.set_network_colour("dcnet", "red")
-        css = core.network_colours_css()
-        self.assertIn("--dcnet:#d9363e", css)
-        self.assertIn("--dcnet-rgb:217,54,62", css)
-        self.assertIn("--dcnow:#e8761c", css)
+    def test_a_module_without_colours_has_none(self):
+        self.assertEqual(core.module_colours("numbers"), {})
 
 
 class LedTests(unittest.TestCase):
@@ -60,7 +84,7 @@ class LedTests(unittest.TestCase):
 
     def test_led_messages_follow_the_network_colour(self):
         self.assertEqual(self.colour_of("ready-dcnow"), core.network_colour("dcnow")["led"])
-        core.set_network_colour("dcnow", "green")
+        core.set_module_colour("switcher", "dcnow", "green")
         self.assertEqual(self.colour_of("ready-dcnow"), "#00ff00")
 
     def test_a_colour_saved_for_a_net_bound_message_is_ignored(self):
@@ -84,22 +108,27 @@ class HttpTests(unittest.TestCase):
         cls.srv.server_close()
         cleanup(cls.tmp)
 
-    def post(self, body):
-        req = Request(self.base + "/netcolour", data=json.dumps(body).encode(), method="POST",
+    def post(self, path, body):
+        req = Request(self.base + path, data=json.dumps(body).encode(), method="POST",
                       headers={"X-Requested-With": "netswitch", "Content-Type": "application/json"})
-        return urlopen(req, timeout=10).status
+        return urlopen(req, timeout=10)
 
     def test_round_trip(self):
         got = json.loads(urlopen(self.base + "/colours", timeout=10).read())
-        self.assertEqual([o["id"] for o in got["options"]], ["orange", "blue", "red", "green"])
-        self.post({"network": "dcnet", "colour": "green"})
-        got = json.loads(urlopen(self.base + "/colours", timeout=10).read())
-        self.assertEqual(got["current"]["dcnet"], "green")
+        self.assertEqual(len(got["options"]), 16)
+        r = json.loads(self.post("/colour", {"module": "switcher", "key": "dcnet", "colour": "bright-green"}).read())
+        self.assertEqual(r["colours"]["dcnet"], "bright-green")
         api = json.loads(urlopen(self.base + "/api", timeout=10).read())
-        self.assertEqual(api["netcolours"]["dcnet"]["id"], "green")
+        self.assertEqual(api["netcolours"]["dcnet"]["id"], "bright-green")
         page = urlopen(self.base + "/", timeout=10).read().decode()
-        self.assertIn("--dcnet:#2fa84f", page)
-        self.post({"network": "dcnet", "colour": "blue"})
+        self.assertIn("--dcnet:#4cd964", page)
+        self.post("/colour", {"module": "switcher", "key": "dcnet", "colour": "blue"})
+
+    def test_a_bad_colour_is_refused(self):
+        from urllib.error import HTTPError
+        with self.assertRaises(HTTPError) as e:
+            self.post("/colour", {"module": "switcher", "key": "dcnet", "colour": "nope"})
+        self.assertEqual(e.exception.code, 400)
 
 
 if __name__ == "__main__":

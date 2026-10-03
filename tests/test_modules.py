@@ -14,7 +14,9 @@ from urllib.request import Request, urlopen
 from support import ROOT, web, core, sandbox, cleanup
 
 REAL_MODULES = os.path.join(ROOT, "modules")
-NAMES = ["background", "debuglog", "led", "numbers", "players", "rebootupdate", "wifi"]
+NAMES = ["background", "debuglog", "led", "numbers", "players", "rebootupdate", "wifi"]      # the modules the picker can switch
+HIDDEN = ["switcher"]                                                                   # always on, not in the picker
+ALL = sorted(NAMES + HIDDEN)
 # something in the page that only that module provides
 MARKER = {"background": "body.dcbg", "numbers": 'id="num-card"', "players": 'id="pl-games"', "debuglog": 'id="debug-bar"',
           "led": 'id="led-section"', "wifi": 'id="wifi-row"', "rebootupdate": 'id="reboot-b"'}
@@ -87,18 +89,22 @@ class Base(unittest.TestCase):
 
 class RepoModules(unittest.TestCase):
     def test_the_modules_are_there_and_well_formed(self):
-        self.assertEqual(sorted(n for n in os.listdir(REAL_MODULES) if os.path.isdir(os.path.join(REAL_MODULES, n)) and n != "__pycache__"), NAMES)
-        for n in NAMES:
+        self.assertEqual(sorted(n for n in os.listdir(REAL_MODULES) if os.path.isdir(os.path.join(REAL_MODULES, n)) and n != "__pycache__"), ALL)
+        for n in ALL:
             with open(os.path.join(REAL_MODULES, n, "module.json")) as f:
                 m = json.load(f)
-            for key in ("title", "description", "order", "default", "web"):
+            for key in ("name", "description", "enabled", "visible"):
                 self.assertIn(key, m, (n, key))
-            self.assertTrue(os.path.exists(os.path.join(REAL_MODULES, n, m["web"] + ".py")), n)
-            self.assertTrue(os.path.exists(os.path.join(REAL_MODULES, n, "page.js")), n)
+            self.assertNotIn("title", m)                  # the older spelling of "name" and "default" of "enabled" are only read, not written
+            self.assertNotIn("default", m)
+            if "web" in m:
+                self.assertTrue(os.path.exists(os.path.join(REAL_MODULES, n, m["web"] + ".py")), n)
 
     def test_defaults(self):
-        on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["default"]) for n in NAMES)
-        self.assertEqual(on, {"background": False, "debuglog": False, "led": True, "numbers": True, "players": True, "rebootupdate": True, "wifi": False})
+        on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["enabled"]) for n in ALL)
+        self.assertEqual(on, {"background": False, "debuglog": False, "led": True, "numbers": True, "players": True, "rebootupdate": True, "switcher": True, "wifi": False})
+        hidden = [n for n in ALL if json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["visible"] is False]
+        self.assertEqual(hidden, ["switcher"])             # the network switcher can't be switched off
 
 
 class WithEverything(Base):
@@ -132,7 +138,7 @@ class WithEverything(Base):
 
     def test_modules_menu_lists_them_all(self):
         got = self.json("/modules")["modules"]
-        self.assertEqual([m["name"] for m in got], ["numbers", "players", "wifi", "led", "debuglog", "background", "rebootupdate"])   # menu order
+        self.assertEqual([m["name"] for m in got], ["players", "numbers", "led", "debuglog", "wifi", "rebootupdate", "background"])   # picker order; the switcher is not in it
         self.assertTrue(all(m["enabled"] for m in got))
         self.assertTrue(all(m["title"] and m["description"] for m in got))
 

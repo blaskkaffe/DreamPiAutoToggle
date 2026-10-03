@@ -1,2 +1,9 @@
-{"title": "Wi-Fi setup", "order": 40, "default": false, "ui": 1, "web": "netswitch_wifi_web",
- "description": "Join and change Wi-Fi networks."}
+{
+ "name": "Wi-Fi setup",
+ "description": "Join and change Wi-Fi networks.",
+ "enabled": false,
+ "visible": true,
+ "order": 60,
+ "ui": 1,
+ "web": "netswitch_wifi_web"
+}

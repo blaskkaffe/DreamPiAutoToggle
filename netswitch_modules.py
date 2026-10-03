@@ -127,14 +127,16 @@ def apply_api(d, warnings):
 
 
 def listing():
-    """What the Modules menu shows: every installed module, on or off."""
+    """What the module picker shows: every installed module that is visible there, on or off, in priority order."""
     state = core.modules_state()
     out = []
     for name in core.module_names():
         m = core.module_manifest(name)
-        out.append({"name": name, "title": m.get("title", name), "description": m.get("description", ""),
+        if not core.module_visible(name, m):
+            continue
+        out.append({"name": name, "title": core.module_title(name, m), "description": m.get("description", ""),
                     "note": m.get("note", ""), "enabled": core.module_enabled(name, state),
-                    "default": bool(m.get("default", True)), "error": _state["errors"].get(name)})
+                    "default": core.module_default_enabled(m), "error": _state["errors"].get(name)})
     return out
 
 

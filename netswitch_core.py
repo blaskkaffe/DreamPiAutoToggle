@@ -10,7 +10,8 @@ import time
 
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
-NET_COLOURS = os.path.join(BASE_DIR, "network_colours.json")   # which colour DCNow! and DCNET have, everywhere (page and LEDs)
+MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"switcher": {"dcnow": "orange", ...}}: the global-palette colours each module uses
+MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["switcher", "numbers", ...]: the order set in the module picker (top = first, wins)
 BOOT_ID = os.path.join(BASE_DIR, "boot_id")              # the kernel's id of the boot the selection was last reset for
 KERNEL_BOOT_ID = "/proc/sys/kernel/random/boot_id"
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
@@ -49,12 +50,20 @@ NET_STALE = 20        # ignore NET_STATE when older than this (web service down)
 
 
 # ------------------------------------------------------------------ modules
-# The optional features (LED, Wi-Fi setup, phone numbers, online players, debug log) are folders in
-# modules/, each with a module.json. A module is *installed* when its folder is there and *enabled*
-# when the Modules menu has it on (modules.json; a module without an entry uses the "default" in its
-# manifest). Everything that has to know - the web page, the LED service, the buttons service - asks here.
+# Everything the page shows is a module: a folder in modules/ with a module.json (and a layout.json, see
+# netswitch_modules.py). module.json holds
+#   "name"         the title in the module picker                 (older files: "title")
+#   "description"  the text under it in the picker
+#   "enabled"      on by default when it is first loaded           (older files: "default"); the picker's own choice
+#                  (modules.json) overrides it
+#   "visible"      false = not in the picker and always on (the network switcher, say)   (default true)
+#   optional: "web" (Python entry for the web service), "ui" (page kit version), "order" (where it starts out in the
+#   list), "colours" / "primary" (see the colour section below)
+# A module is *installed* when its folder is there and *enabled* when it is on in the picker. Its place in the picker
+# (module_order.json) is its priority: the first one shows first and wins where two modules want the same thing.
+# Everything that has to know - the web page, the LED service, the buttons service - asks here.
 MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules")
-MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"led": true, "wifi": false, ...} set from the Modules menu
+MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"led": true, "wifi": false, ...} set from the module picker
 
 
 def module_manifest(name):
@@ -69,13 +78,55 @@ def module_manifest(name):
         return None
 
 
+def module_title(name, manifest=None):
+    m = manifest if manifest is not None else (module_manifest(name) or {})
+    return str(m.get("name") or m.get("title") or name)
+
+
+def module_visible(name, manifest=None):
+    """False for a module that is not in the picker (and so can't be switched off)."""
+    m = manifest if manifest is not None else (module_manifest(name) or {})
+    return m.get("visible", True) is not False
+
+
+def module_default_enabled(manifest):
+    return bool(manifest.get("enabled", manifest.get("default", True)))
+
+
+def saved_module_order():
+    try:
+        with open(MODULE_ORDER) as f:
+            data = json.load(f)
+        return [n for n in data if isinstance(n, type(u""))] if isinstance(data, list) else []
+    except (IOError, OSError, ValueError):
+        return []
+
+
 def module_names():
-    """Names of the installed modules (folders with a readable module.json), in menu order."""
+    """Names of the installed modules (folders with a readable module.json), in picker order: the order the user set
+    (module_order.json) first, then any module not in it by its manifest's "order" hint and name."""
     try:
         names = [n for n in os.listdir(MODULES_DIR) if module_manifest(n)]
     except OSError:
         return []
-    return sorted(names, key=lambda n: (module_manifest(n).get("order", 100), n))
+    saved = [n for n in saved_module_order() if n in names]
+    rest = sorted((n for n in names if n not in saved), key=lambda n: (module_manifest(n).get("order", 100), n))
+    return saved + rest
+
+
+def save_module_order(order):
+    """Remember the picker order: a list of module names (unknown ones are dropped, missing ones keep their place at
+    the end). Returns the new order, or None when the input is not a list of names."""
+    if not isinstance(order, list) or not all(isinstance(n, type(u"")) for n in order):
+        return None
+    names = module_names()
+    new = [n for n in order if n in names]
+    new += [n for n in names if n not in new]
+    tmp = MODULE_ORDER + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(new, f)
+    os.rename(tmp, MODULE_ORDER)
+    return new
 
 
 def modules_state():
@@ -88,17 +139,21 @@ def modules_state():
 
 
 def module_enabled(name, state=None):
-    """Installed and switched on. state: modules_state() already read (saves a file read per module)."""
+    """Installed and switched on (a module that is not visible in the picker is always on).
+    state: modules_state() already read (saves a file read per module)."""
     manifest = module_manifest(name)
     if manifest is None:
         return False
+    if not module_visible(name, manifest):
+        return True
     state = modules_state() if state is None else state
-    return state.get(name, bool(manifest.get("default", True)))
+    return state.get(name, module_default_enabled(manifest))
 
 
 def save_module_enabled(name, on):
-    """Switch a module on or off from the Modules menu. False when it isn't installed."""
-    if module_manifest(name) is None:
+    """Switch a module on or off from the module picker. False when it isn't installed or can't be switched."""
+    manifest = module_manifest(name)
+    if manifest is None or not module_visible(name, manifest):
         return False
     state = modules_state()
     state[name] = bool(on)
@@ -139,71 +194,115 @@ def reset_network_after_boot():
     return before is not None
 
 
-# ---------------------------------------------------------------- network colours
-# DCNow! and DCNET each have one colour, used everywhere: the page (buttons, boxes, the players counts) and the status LEDs.
-# The user picks it from this list in Settings. id, name, page colour, its lighter variant (borders, text), LED colour (the
-# LED's own tuning: a screen colour looks different lit on a NeoPixel).
-NETWORK_COLOURS = (
-    ("orange", "Orange", "#e8761c", "#f6b27a", "#ff8c00"),
-    ("blue", "Blue", "#1c6fe8", "#80b1f6", "#0046ff"),
-    ("red", "Red", "#d9363e", "#ef8a8f", "#ff0000"),
-    ("green", "Green", "#2fa84f", "#8ed9a4", "#00ff00"),
+# ---------------------------------------------------------------- colours
+# The page's colours: one global palette of 16 named colours (8 hues, each normal and bright, like a terminal's 16),
+# defined only here. A module never writes a colour of its own; it names one from the palette by its id ("orange",
+# "bright-blue" ...), either in module.json  "colours": {"dcnow": "orange", ...}  (the user can change these in the
+# module's own settings, see module_colour()) or as its  "primary"  colour, the one used on its borders and buttons.
+# id, name, hue group, page colour, its lighter variant (borders, text), LED colour (the LED's own tuning: a screen
+# colour looks different lit on a NeoPixel).
+PALETTE = (
+    ("red", "Red", "red", "#d9363e", "#ef8a8f", "#ff0000"),
+    ("bright-red", "Bright red", "red", "#ff5a5f", "#ffa6a9", "#ff5050"),
+    ("orange", "Orange", "orange", "#e8761c", "#f6b27a", "#ff8c00"),
+    ("bright-orange", "Bright orange", "orange", "#ff9a3d", "#ffc896", "#ffa040"),
+    ("yellow", "Yellow", "yellow", "#d9a900", "#f0d36a", "#ffd000"),
+    ("bright-yellow", "Bright yellow", "yellow", "#ffd633", "#ffe88f", "#ffe860"),
+    ("green", "Green", "green", "#2fa84f", "#8ed9a4", "#00ff00"),
+    ("bright-green", "Bright green", "green", "#4cd964", "#a6efb6", "#50ff70"),
+    ("cyan", "Cyan", "cyan", "#1fb5c9", "#7fdbe6", "#00c8ff"),
+    ("bright-cyan", "Bright cyan", "cyan", "#3de0f5", "#9aeefa", "#70e0ff"),
+    ("blue", "Blue", "blue", "#1c6fe8", "#80b1f6", "#0046ff"),
+    ("bright-blue", "Bright blue", "blue", "#4a90ff", "#9fc4ff", "#5080ff"),
+    ("purple", "Purple", "purple", "#8a4fd6", "#bf9ae8", "#aa00ff"),
+    ("bright-purple", "Bright purple", "purple", "#b070ff", "#d3b0ff", "#cc66ff"),
+    ("pink", "Pink", "pink", "#d6459a", "#ec9bc9", "#ff2a8a"),
+    ("bright-pink", "Bright pink", "pink", "#ff6ab8", "#ffaad6", "#ff70b0"),
 )
-DEFAULT_NETWORK_COLOURS = {"dcnow": "orange", "dcnet": "blue"}
-_NETWORK_COLOUR_IDS = tuple(c[0] for c in NETWORK_COLOURS)
+PALETTE_IDS = tuple(c[0] for c in PALETTE)
+DEFAULT_COLOUR = "orange"
 
 
-def network_colours():
-    """{"dcnow": id, "dcnet": id}: the two colour ids in use (always different, always from NETWORK_COLOURS)."""
-    out = dict(DEFAULT_NETWORK_COLOURS)
+def colours():
+    """The palette as dicts: id, name, group, ui, ui_l, led."""
+    return [{"id": c[0], "name": c[1], "group": c[2], "ui": c[3], "ui_l": c[4], "led": c[5]} for c in PALETTE]
+
+
+def colour(ident):
+    """One palette entry as a dict (orange when the id is unknown)."""
+    for c in colours():
+        if c["id"] == ident:
+            return c
+    return colour(DEFAULT_COLOUR)
+
+
+def colours_css():
+    """CSS for the palette: --c-<id>, --c-<id>-l and their -rgb triples on :root, and a class  .c-<id>  that makes
+    an element (and what is inside it) use that colour as its --primary. The page's own :root has the defaults."""
+    def rgb(h):
+        return "%d,%d,%d" % (int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16))
+    root, classes = ":root{", ""
+    for c in colours():
+        i = c["id"]
+        root += "--c-%s:%s;--c-%s-l:%s;--c-%s-rgb:%s;--c-%s-l-rgb:%s;" % (i, c["ui"], i, c["ui_l"], i, rgb(c["ui"]), i, rgb(c["ui_l"]))
+        classes += ".c-%s{--primary:var(--c-%s);--primary-l:var(--c-%s-l);--primary-rgb:var(--c-%s-rgb);--primary-l-rgb:var(--c-%s-l-rgb)}\n" % (i, i, i, i, i)
+    return root + "}\n" + classes
+
+
+def _saved_module_colours():
     try:
-        with open(NET_COLOURS) as f:
+        with open(MODULE_COLOURS) as f:
             data = json.load(f)
-        for net in out:
-            if data.get(net) in _NETWORK_COLOUR_IDS:
-                out[net] = str(data[net])
-    except (IOError, OSError, ValueError, AttributeError):
-        pass
-    if out["dcnow"] == out["dcnet"]:
-        out = dict(DEFAULT_NETWORK_COLOURS)
+        return data if isinstance(data, dict) else {}
+    except (IOError, OSError, ValueError):
+        return {}
+
+
+def module_colours(name):
+    """{key: palette id} for a module: the defaults from its manifest "colours", with the user's picks over them.
+    A module that asks for unique colours (manifest "colours_unique": true) never gets two keys with one colour."""
+    manifest = module_manifest(name) or {}
+    wanted = manifest.get("colours")
+    if not isinstance(wanted, dict):
+        return {}
+    out = dict((k, v if v in PALETTE_IDS else DEFAULT_COLOUR) for k, v in wanted.items())
+    mine = _saved_module_colours().get(name)
+    if isinstance(mine, dict):
+        for k in out:
+            if mine.get(k) in PALETTE_IDS:
+                out[k] = mine[k]
+    if manifest.get("colours_unique") and len(set(out.values())) < len(out):
+        out = dict((k, v if v in PALETTE_IDS else DEFAULT_COLOUR) for k, v in wanted.items())
     return out
 
 
-def network_colour(net):
-    """The palette entry (dict: id, name, ui, ui_l, led) for "dcnow" or "dcnet"."""
-    ident = network_colours().get(net, DEFAULT_NETWORK_COLOURS.get(net, "orange"))
-    for c in NETWORK_COLOURS:
-        if c[0] == ident:
-            return {"id": c[0], "name": c[1], "ui": c[2], "ui_l": c[3], "led": c[4]}
-    return {"id": "orange", "name": "Orange", "ui": "#e8761c", "ui_l": "#f6b27a", "led": "#ff8c00"}
-
-
-def set_network_colour(net, ident):
-    """Give DCNow! or DCNET a colour. If the other network has it, the two swap, so they never share one.
-    Returns the new {"dcnow": id, "dcnet": id}."""
-    cur = network_colours()
-    if net not in cur or ident not in _NETWORK_COLOUR_IDS:
-        return cur
-    other = "dcnet" if net == "dcnow" else "dcnow"
-    if cur[other] == ident:
-        cur[other] = cur[net]
-    cur[net] = ident
-    tmp = NET_COLOURS + ".tmp"
+def set_module_colour(name, key, ident):
+    """The user gives one of the module's colour keys a palette colour. With "colours_unique", the key that had that
+    colour gets the old one (a swap), so they never match. Returns the module's new {key: id}, or None when the
+    module, key or colour is unknown."""
+    cur = module_colours(name)
+    if key not in cur or ident not in PALETTE_IDS:
+        return None
+    if (module_manifest(name) or {}).get("colours_unique"):
+        for k, v in list(cur.items()):
+            if k != key and v == ident:
+                cur[k] = cur[key]
+    cur[key] = ident
+    data = _saved_module_colours()
+    data[name] = cur
+    tmp = MODULE_COLOURS + ".tmp"
     with open(tmp, "w") as f:
-        json.dump(cur, f)
-    os.rename(tmp, NET_COLOURS)
+        json.dump(data, f, sort_keys=True)
+    os.rename(tmp, MODULE_COLOURS)
     return cur
 
 
-def network_colours_css():
-    """:root rules that give the page's network colour variables the chosen colours (the page's own :root has the defaults)."""
-    def rgb(h):
-        return "%d,%d,%d" % (int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16))
-    out = ":root{"
-    for net in ("dcnow", "dcnet"):
-        c = network_colour(net)
-        out += "--%s:%s;--%s-l:%s;--%s-rgb:%s;--%s-l-rgb:%s;" % (net, c["ui"], net, c["ui_l"], net, rgb(c["ui"]), net, rgb(c["ui_l"]))
-    return out + "}"
+def network_colour(net):
+    """The palette entry (dict: id, name, group, ui, ui_l, led) the network switcher gave "dcnow" or "dcnet". The LED
+    service and the page's status dot ask for the network colours here; without the switcher module they are orange
+    and blue."""
+    ident = module_colours("switcher").get(net) or {"dcnow": "orange", "dcnet": "blue"}.get(net, DEFAULT_COLOUR)
+    return colour(ident)
 
 
 # ---------------------------------------------------------------- file state
