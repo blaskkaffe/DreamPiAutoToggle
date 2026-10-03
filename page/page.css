@@ -97,7 +97,7 @@
  .now.open .carousel{white-space:normal;overflow:visible} .now.open .carousel .trk{animation:none;display:inline} .now.open .carousel .dup,.now.open .carousel .sp{display:none}
  @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
  @media(prefers-reduced-motion:reduce){.carousel.sc .trk{animation:none}.carousel.sc .dup,.carousel.sc .sp{display:none}}
- .now .row.main .v.fill.scrolling{flex:1;min-width:0;overflow:hidden} .carousel .cn{color:rgba(255,255,255,.65)} .carousel{text-align:center} .carousel.sc,.now.open .carousel{text-align:left}
+ .now .row.main .v.fill.scrolling{flex:1;min-width:0;overflow:hidden} .carousel{min-height:1.35em} .carousel .cn{color:rgba(255,255,255,.65)} .carousel{text-align:center} .carousel.sc,.now.open .carousel{text-align:left}
  .now .status{display:flex;align-items:baseline;min-width:0} .now .status > .dot{flex:none} .now .status > span:last-child{min-width:0}
  .now .pln{white-space:nowrap} .now .pln+.pln{margin-left:.6em}
  .now .wlist.compact{display:block;width:100%;max-height:40vh;overflow-y:auto;overscroll-behavior:contain}
@@ -108,8 +108,9 @@
  .now .st{display:block;overflow-wrap:anywhere}
  .pop .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0} .pop .frow > span{color:var(--txt2);font-size:.9em}
  .btns{display:flex;gap:8px;flex:none} .srow.foot{padding:12px 0 8px}
- .srow.lk .pill-s,.srow.lk .tag{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgba(var(--primary-l-rgb),.82);text-shadow:0 1px 2px rgba(0,0,0,.55)} .srow.lk .tag button{color:#fff}
- .srow.lk-blink .pill-s,.srow.lk-blink .tag{animation:blink 1s steps(1) infinite} .srow.lk-blink.lk-fast .pill-s,.srow.lk-blink.lk-fast .tag{animation-duration:.4s}   /* a row that shows an LED look: coloured buttons and tags, blinking as the LED does */
+ .srow.lk .pill-s,.srow.lk .tag{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgba(var(--primary-l-rgb),.82);text-shadow:0 1px 2px rgba(0,0,0,.55);color:#fff} .srow.lk .tag button{color:#fff}
+ @keyframes lkblink{50%{background:rgba(42,42,42,.82);border-color:rgba(80,80,80,.85)}}   /* the LED is "off": the default dark grey of a button; the text keeps its colour */
+ .srow.lk-blink .pill-s,.srow.lk-blink .tag{animation:lkblink 1s steps(1) infinite} .srow.lk-blink.lk-fast .pill-s,.srow.lk-blink.lk-fast .tag{animation-duration:.4s}   /* a row that shows an LED look: coloured buttons and tags, blinking between the colour and the grey as the LED does (any later effect, such as breathing, also runs between the two) */
  @media(prefers-reduced-motion:reduce){.srow.lk-blink .pill-s,.srow.lk-blink .tag{animation:none}}
  .infobtn{flex:none;width:34px;height:34px;padding:0;border-radius:50%;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#ddd;font:italic 600 1.05em Georgia,serif;line-height:1}
  .pop .infotext{font-size:.9em;color:var(--txt2);margin-bottom:10px}

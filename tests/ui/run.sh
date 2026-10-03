@@ -12,4 +12,10 @@ NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node audit.js
 RESULT=$?
 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node functional.js || RESULT=1
 kill $SERVER 2>/dev/null
+# the clock module has its own demo server (it is off in the one above so that the box counts stay as they are)
+CLOCK=1 PORT=8735 python3 demo_server.py > /tmp/dpns-demo-clock.log 2>&1 &
+SERVER=$!
+sleep 3
+PORT=8735 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node clock.js || RESULT=1
+kill $SERVER 2>/dev/null
 exit $RESULT

@@ -78,7 +78,7 @@ The add-on is a small **base** plus **modules**. The base is the web page's fram
 |---|---|---|---|
 | *Network switcher, About* | `modules/switcher/`, `system/` | always on (they can be moved in the picker, not switched off); the network box and buttons, Network colours and the GPIO settings of the two physical buttons (switcher); the About box with versions and the GitHub link (About) | yes |
 | **Special phone numbers** | `modules/numbers/` | Settings > Special phone numbers, to edit the numbers the Dreamcast dials. Without it the built-in default numbers are used | yes |
-| **Clock** | `modules/clock/` | a clock on the main page, and Settings > Clock to show it as 24-hour, 12-hour or .beat (Swatch Internet Time) | yes |
+| **Clock** | `modules/clock/` | the time on the main page in an info box like the network and players boxes: the middle line is the time in 24-hour or 12-hour (AM/PM) form, the top line is empty or the .beat time (Swatch Internet Time), the bottom line is empty or a scrolling list of world times; with world time on, tapping the box opens a time zone map. Settings > Clock: the format (12 or 24-hour), a switch for .beat and one for world time; the clock's colour is in Settings > Appearance | yes |
 | **Online players** | `modules/players/` | the Online players box on the main page | yes |
 | **Wi-Fi setup** | `modules/wifi/` | joining a Wi-Fi network without a keyboard (a temporary access point), and the Wi-Fi rows in Settings | no |
 | **Status LEDs** | `modules/led/` | the NeoPixel service, the Status LED settings (including the calibration pop-up), and the LED count / GPIO pin / wire order | yes |
@@ -211,7 +211,7 @@ Each row in **Settings > Status LED** is a look (colour, animation, level) and t
 
 - **Priority** (highest first, roughly): about to reboot, Wi-Fi setup, update result, errors, no IP / no network / no internet, warnings, starting up, in a call, update available, ready for calls, then the plain status messages (selected network, Ethernet, Wi-Fi, internet OK, modem OK, everything OK, state unknown last).
 - **Updates:** nothing checks for updates by itself. *Update available* on the LED is the result of the last **Check now** in Settings > System, kept until the Pi restarts.
-- **Effects:** Solid and Blink for now. A blink starts lit and runs 50 % on, 50 % off.
+- **Effects:** Solid and Blink for now. A blink starts lit and runs 50 % on, 50 % off. In Settings the row's buttons and tags blink the same way: between the row's colour and the default dark grey (the LED "off"), and the text stays white and equally bright all the time. Any later effect (breathing, say) will run between the colour and that grey in the same way.
 - **No network** means the Pi has no route to your router, for example an unplugged cable; you can't open the web page then, so the LED is the only thing that can tell you.
 - **Checking speed:** cables, Wi-Fi and the route are checked every 2 seconds. The internet is checked every 30 seconds while it works, every 5 seconds while it doesn't, and straight away when a connection changes.
 - **Changed from earlier versions:** the old one-look-per-message settings are replaced by the default rows above (your earlier LED looks are reset once), and the optional messages, such as no network or no internet, show nothing until you add them to a row.

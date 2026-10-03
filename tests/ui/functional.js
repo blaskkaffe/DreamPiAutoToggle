@@ -105,7 +105,11 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   const lookOf = i => ledRows.nth(i).evaluate(e => { const b = e.querySelector('button.pill-s'), t = e.querySelector('.tag'), cs = getComputedStyle(b); return { bg: cs.backgroundColor, border: cs.borderTopColor, tag: t ? getComputedStyle(t).backgroundColor : '', blink: cs.animationName, dot: !!e.querySelector('.gdot') }; });
   const l0 = await lookOf(0), l4 = await lookOf(4), l5 = await lookOf(5);
   ok(!l0.dot && l0.bg !== l0.border && l0.bg === l0.tag, 'a row has no dot: its buttons and tags take the colour, with a lighter border (' + l0.bg + ' / ' + l0.border + ')');
-  ok(l4.blink === 'blink' && l0.blink === 'none', 'a blinking look makes the row blink like the LED (Starting up blinks, DCNow! does not)');
+  ok(l4.blink === 'lkblink' && l0.blink === 'none', 'a blinking look makes the row blink like the LED (Starting up blinks, DCNow! does not)');
+  const samples = await ledRows.nth(4).evaluate(async e => { const b = e.querySelector('button.pill-s'), out = []; for (let i = 0; i < 30; i++) { const cs = getComputedStyle(b); out.push([cs.backgroundColor, cs.color, cs.opacity]); await new Promise(r => setTimeout(r, 70)); } return out; });
+  const bgs = Array.from(new Set(samples.map(x => x[0])));
+  ok(bgs.length === 2 && bgs.includes('rgba(42, 42, 42, 0.82)'), 'a blinking button goes between its colour and the default dark grey (' + bgs.join(' / ') + ')');
+  ok(new Set(samples.map(x => x[1])).size === 1 && samples.every(x => x[2] === '1'), 'and its text keeps the same colour and brightness all the time');
   ok(l0.bg !== l5.bg, 'rows with different colours look different');
   await led.locator('button', { hasText: 'Add colour' }).click(); await settle(900);
   ok(await ledRows.count() === rows0 + 1, 'Add colour adds a row');

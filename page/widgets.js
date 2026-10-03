@@ -175,7 +175,7 @@ W.status=function(s){var d=h("span",{"class":"dot"}),t=h("span",{"class":"nw"}),
 W.infobox=function(s,ctx){
  var el=h("div",{"class":"now rows",title:"Show or hide details",role:"button",tabindex:"0","aria-expanded":"false"}),
   head=h("b");
- if(s.label)el.appendChild(h("div",{"class":"nlabel",text:s.label}));
+ if(s.label!==undefined){var lab=h("div",{"class":"nlabel"});el.appendChild(lab);bind(s.label,function(t){setText(lab,t==null||t===""?"\u00a0":t)})}   // the top line: a text or a binding; empty keeps its height
  el.appendChild(head);
  if(s.parts!==undefined)bind(s.parts,function(ps){var html=(ps||[]).map(function(p){return '<span class="pln" data-c="'+esc(p.colour||"")+'">'+esc(p.text)+'</span>'}).join("");
   if(head._html!==html){setHtml(head,html);Array.prototype.forEach.call(head.querySelectorAll(".pln"),function(x){var c=colourId(x.getAttribute("data-c"),s.mod);if(c)x.style.color="var(--c-"+c+"-l)"})}});
