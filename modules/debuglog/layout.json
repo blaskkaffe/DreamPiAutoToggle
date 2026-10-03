@@ -17,6 +17,6 @@
  ],
  "settings": [
   {"box": "appearance", "title": "Appearance", "items": [
-   {"type": "row", "title": "Debug log colour", "control": {"type": "swatches", "key": "debuglog", "tint": true, "title": "Colour of the debug log"}}]}
+   {"type": "row", "title": "Debug log colour", "sub": "Module", "control": {"type": "swatches", "key": "debuglog", "tint": true, "title": "Colour of the debug log"}}]}
  ]
 }

@@ -10,9 +10,9 @@ KEYS = [m[0] for m in ledconfig.MESSAGES]
 DEFAULT_ON = {"busy", "ready-dcnow", "ready-dcnet", "notrunning", "call-dcnow", "call-dcnet", "call-other", "sel-dcnow", "sel-dcnet"}
 
 
-def ctx(state="ok", selected="dcnow", net=None, wifi="idle", update="idle", info=None, reboot=False, dcnet_problem=False):
+def ctx(state="ok", selected="dcnow", net=None, wifi="idle", update="idle", info=None, reboot=False, dcnet_problem=False, players=None):
     return {"state": state, "selected": selected, "net": net or {}, "wifi": wifi, "update": update,
-            "update_info": info or {}, "reboot": reboot, "dcnet_problem": dcnet_problem}
+            "update_info": info or {}, "reboot": reboot, "dcnet_problem": dcnet_problem, "players": players or {}}
 
 
 GOOD = {"network": True, "internet": True, "modem": True}          # a healthy Pi, as the web service reports it
@@ -79,8 +79,8 @@ class CatalogueTests(Base):
         for g in by.values():
             self.assertIn(g["colour"], ledconfig.TOKEN_IDS + core.PALETTE_IDS)
 
-    def test_only_two_messages_are_not_detected_yet(self):
-        self.assertEqual(sorted(m[0] for m in ledconfig.MESSAGES if not m[4]), ["players-friend", "players-game"])
+    def test_every_message_is_detected(self):
+        self.assertEqual(sorted(m[0] for m in ledconfig.MESSAGES if not m[4]), [])
 
     def test_the_effects(self):
         self.assertEqual([e[0] for e in ledconfig.EFFECTS], ["solid", "blink", "fade", "breathe", "blink1", "blink2", "blink3", "rainbow"])
@@ -288,9 +288,13 @@ class LookTests(Base):
         self.assertEqual(self.looks(ctx(state="off"))[-1]["brightness"], 0.5)
         self.assertEqual(ledconfig.led_config()["max_brightness"], 0.2)           # editing groups never touches the global level
 
-    def test_a_not_yet_detected_message_never_shows(self):
+    def test_favourites_light_their_messages_only_when_online(self):
         self.groups(group("g1", "red", ["players-game", "players-friend"]))
         self.assertEqual(self.looks(ctx(net=GOOD)), [])
+        self.assertIn("players-game", ledconfig.active_keys(ctx(players={"games": ["Outtrigger"], "friends": []})))
+        self.assertNotIn("players-friend", ledconfig.active_keys(ctx(players={"games": ["Outtrigger"], "friends": []})))
+        self.assertIn("players-friend", ledconfig.active_keys(ctx(players={"games": [], "friends": ["Ana"]})))
+        self.assertEqual([l["messages"] for l in self.looks(ctx(net=GOOD, players={"games": [], "friends": ["Ana"]}))], [["players-friend"]])
 
     def test_the_dot_previews_what_dreampi_is_doing(self):
         with open(core.STATE, "w") as f:

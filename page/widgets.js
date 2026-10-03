@@ -294,8 +294,8 @@ function footRow(buttons){var info=h("button",{type:"button","class":"infobtn",t
 // ---- a table to pick values for: groups of short items (phone numbers) with an Add pop-up per group (reply of GET source)
 W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null,addKey=null,
  list=h("div"),restore=h("button",{type:"button","class":"pill-s"}),foot=footRow([restore]),
- pop=h("div"),popT=h("div",{"class":"t"}),inp=h("input",{type:"text","aria-label":"Value to add"}),addB=h("button",{type:"button","class":"pill-s",text:"Add"}),msg=h("div",{"class":"msg"});
- pop.appendChild(popT);pop.appendChild(h("div",{"class":"fld"},[inp,addB]));pop.appendChild(msg);
+ pop=h("div"),popT=h("div",{"class":"t"}),inp=h("input",{type:"text","aria-label":"Value to add"}),addB=h("button",{type:"button","class":"pill-s",text:"Add"}),msg=h("div",{"class":"msg"}),choices=h("div",{"class":"choices"});
+ pop.appendChild(popT);pop.appendChild(h("div",{"class":"fld"},[inp,addB]));pop.appendChild(choices);pop.appendChild(msg);
  el.appendChild(list);el.appendChild(foot.el);el.appendChild(pop);
  var p=ui.popup(pop);p.onclose=function(){addKey=null};
  function rules(){return cfg.rules||{}}
@@ -303,13 +303,22 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
   list.innerHTML="";
   cfg.groups.forEach(function(g){
    var r=editRow({title:g.label,button:R.add_label||"Add",aria:(R.add_label||"Add")+" to "+g.label});
-   r.setSub(g.sub||"");r.setList(g.items,function(i){g.items.splice(i,1);save()});
+   r.setSub(g.sub||"");r.setList(g.items.map(function(n){return g.notes&&g.notes[n]?n+" ("+g.notes[n]+")":n}),function(i){g.items.splice(i,1);save()});
    r.btn.onclick=function(e){openAdd(g,r.btn,e)};list.appendChild(r.el)});
   foot.setInfo(R.help||"");
   sh(restore,!!R.restore);if(R.restore){setText(restore,R.restore);restore.onclick=function(){cfg.groups.forEach(function(g){g.items=(cfg.defaults[g.key]||[]).slice()});save()}}
   sh(foot.el,!!(R.restore||R.help))}
  function openAdd(g,b,e){if(p.isOpen()&&addKey===g.key){p.toggle(b,e);return}addKey=g.key;var R=rules();
-  setText(popT,(R.add_title||"Add to {group}").replace("{group}",g.label));inp.value="";inp.maxLength=R.max||40;setText(msg,"");p.toggle(b,e);inp.focus()}
+  setText(popT,(R.add_title||"Add to {group}").replace("{group}",g.label));inp.value="";inp.maxLength=R.max||40;setText(msg,"");
+  inp.placeholder=g.choices?(g.free?"Type a name or pick one":"Search"):"";sh(addB,!g.choices||!!g.free);paintChoices(g);p.toggle(b,e);inp.focus()}
+ // a group with "choices" ([{value,label,sub,disabled}]) lets the user pick from the list; the input filters it ("free": it may also add a typed value)
+ function paintChoices(g){choices.innerHTML="";sh(choices,!!g.choices);if(!g.choices)return;
+  var q=inp.value.toLowerCase(),shown=0;
+  g.choices.forEach(function(c){if(g.items.indexOf(c.value)>=0||(q&&(c.label+" "+c.value).toLowerCase().indexOf(q)<0))return;shown++;
+   var b=h("button",{type:"button","class":"choice",disabled:c.disabled?"disabled":null},[document.createTextNode(c.label||c.value)]);
+   if(c.sub)b.appendChild(h("span",{"class":"sub",text:c.sub}));
+   b.onclick=function(){g.items.push(c.value);p.close();save()};choices.appendChild(b)});
+  if(!shown)choices.appendChild(h("div",{"class":"sub",text:g.empty||"Nothing to pick"}))}
  function addItem(){if(!addKey)return;var R=rules(),allowed=new RegExp("[^"+(R.allowed||"\\s\\S")+"]","g"),n=inp.value.replace(allowed,""),say=function(t){setText(msg,t)},g=null;
   cfg.groups.forEach(function(x){if(x.key===addKey)g=x});
   if(n.length<(R.min||1))return say(R.min_msg||"Too short");
@@ -317,6 +326,7 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
   if(R.per_group&&g.items.length>=R.per_group)return say("At most "+R.per_group);
   g.items.push(n);p.close();save()}
  addB.onclick=addItem;inp.onkeydown=function(e){if(e.key=="Enter"){e.preventDefault();addItem()}};
+ inp.oninput=function(){var g=null;cfg.groups.forEach(function(x){if(x.key===addKey)g=x});if(g)paintChoices(g)};
  function load(){xhrJson("GET",s.source,function(r){if(r){cfg=r;paint()}})}
  function save(){clearTimeout(timer);paint();timer=setTimeout(function(){var body={};cfg.groups.forEach(function(g){body[g.key]=g.items});
   post(s.source,body,function(r){if(r){cfg=r;paint();ctx.saved()}})},100)}

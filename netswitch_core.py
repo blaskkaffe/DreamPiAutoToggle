@@ -28,6 +28,7 @@ UPDATE_LOG = "/tmp/dreampi-netswitch.update.log"
 UPDATE_INFO = "/tmp/dreampi-netswitch.updateinfo"        # {"addon": bool|None, "dreampi": bool, "time"}: the latest check, written by the update module for the LEDs
 REBOOT_MARK = "/tmp/dreampi-netswitch.reboot"            # unix time a reboot was asked for (the LEDs show "about to reboot")
 PLAYERS_SOURCES = os.path.join(BASE_DIR, "players_sources.json")   # JSON addresses for the optional online-players list
+PLAYERS_FAVORITES = os.path.join(BASE_DIR, "players_favorites.json")   # {"games": [names], "players": [names]} the user watches
 NUMBERS = os.path.join(BASE_DIR, "numbers.json")     # phone numbers per action, edited on the page, read by the hook
 CLOCK_MODE = os.path.join(BASE_DIR, "clock_mode")    # older versions: "24h", "12h" or "beat" (read once to carry the choice over to clock.json)
 CLOCK_CONFIG = os.path.join(BASE_DIR, "clock.json")  # {"format": "24h"|"12h", "beat": bool, "world": bool}: the clock module's settings
@@ -53,6 +54,8 @@ WIFI_STALE = 30       # ignore WIFI_STATE when older than this (the service is d
 WIFI_AP_SSID = "DreamPi WiFi Config"
 NET_STATE = "/tmp/dreampi-netswitch.net"   # shared with the LED service
 NET_STALE = 20        # ignore NET_STATE when older than this (web service down)
+PLAYERS_WATCH = "/tmp/dreampi-netswitch.players"   # {"time", "games": [favourite games being played], "friends": [favourite players online]}, written by the players module for the LEDs
+PLAYERS_WATCH_STALE = 300     # ignore it when older than this (web service down / list not reachable)
 
 
 # ------------------------------------------------------------------ modules
@@ -564,6 +567,18 @@ def network_state():
         return data
     except (IOError, OSError, ValueError):
         return None
+
+
+def players_watch():
+    """{"games": [...], "friends": [...]} of favourites that are online now, written by the players module; empty when stale."""
+    try:
+        with open(PLAYERS_WATCH) as f:
+            data = json.load(f)
+        if time.time() - data.get("time", 0) > PLAYERS_WATCH_STALE:
+            return {"games": [], "friends": []}
+        return {"games": list(data.get("games") or []), "friends": list(data.get("friends") or [])}
+    except (IOError, OSError, ValueError, AttributeError, TypeError):
+        return {"games": [], "friends": []}
 
 
 def wifi_state():

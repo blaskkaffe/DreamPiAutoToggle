@@ -67,23 +67,35 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await page.evaluate(() => document.body.classList.contains('c-pink')), 'and so does the page primary while DCNow! is selected');
   await colourBtn.click(); await settle(300); await page.locator('.pop.open .swatches .swatch').nth(1).click(); await settle(1200);   // back to orange
   // ---- the picker table (phone numbers)
-  const group = page.locator('.wpicker .srow').first();
+  const group = page.locator('[data-box="special phone numbers"] .wpicker .srow').first();
   await group.locator('button').first().click();
   const gp2 = await popGeo();
   ok(Math.abs(gp1.w - gp2.w) <= 1, 'and every pop-up has the same width (' + gp1.w + ' and ' + gp2.w + ')');
   ok(Math.abs(gp2.left) <= 1 && Math.abs(gp2.right) <= 1, 'the add-number pop-up does too');
   await page.fill('.pop.open input', '5551234'); await page.click('.pop.open .pill-s'); await settle(900);
-  ok(await page.locator('.wpicker .tag', { hasText: '5551234' }).count() === 1, 'a number is added to its group');
-  await page.locator('.wpicker .tag', { hasText: '5551234' }).locator('button').click(); await settle(900);
-  ok(await page.locator('.wpicker .tag', { hasText: '5551234' }).count() === 0, 'and removed again');
+  ok(await page.locator('[data-box="special phone numbers"] .wpicker .tag', { hasText: '5551234' }).count() === 1, 'a number is added to its group');
+  await page.locator('[data-box="special phone numbers"] .wpicker .tag', { hasText: '5551234' }).locator('button').click(); await settle(900);
+  ok(await page.locator('[data-box="special phone numbers"] .wpicker .tag', { hasText: '5551234' }).count() === 0, 'and removed again');
   ok(await page.locator('text=No number').count() === 0, 'a group with no numbers shows no "No number" text');
-  const hNum = await page.locator('.wpicker .srow').first().evaluate(e => e.getBoundingClientRect().height);
+  const hNum = await page.locator('[data-box="special phone numbers"] .wpicker .srow').first().evaluate(e => e.getBoundingClientRect().height);
   const hGpio = await page.locator('[data-box="gpio"] .srow', { hasText: 'Button 1' }).first().evaluate(e => e.getBoundingClientRect().height);
   ok(Math.abs(hNum - hGpio) <= 6, 'a phone number row is as high as a GPIO row (' + Math.round(hNum) + ' and ' + Math.round(hGpio) + ')');
-  await page.locator('.wpicker .infobtn').click(); await settle(300);
+  await page.locator('[data-box="special phone numbers"] .wpicker .infobtn').click(); await settle(300);
   ok(/numbers ending in the listed numbers/.test(await page.locator('.pop.open .infotext').textContent()), 'the (i) button opens the pop-up with the information text');
   ok(await page.locator('.pop.open button', { hasText: 'Done' }).count() === 0, 'the information pop-up has no Done button (nothing to save)');
   await page.keyboard.press('Escape'); await settle(200);
+  // ---- favorite players and games: pick from the lists (not-online games can't be picked, work in progress is marked)
+  const fav = page.locator('[data-box="favorites"] .wpicker');
+  await fav.locator('.srow').first().locator('button').first().click(); await settle(500);
+  ok(await page.locator('.pop.open .choice').count() >= 4, 'the favorite games pop-up lists the games of the list');
+  ok(await page.locator('.pop.open .choice:disabled', { hasText: 'Dead Game Online' }).count() === 1, 'a game that is not online is greyed out');
+  ok(await page.locator('.pop.open .choice', { hasText: 'work in progress' }).count() === 1, 'a work-in-progress game says so');
+  await page.fill('.pop.open input', 'outtr'); await settle(200);
+  ok(await page.locator('.pop.open .choice').count() === 1, 'typing filters the list');
+  await page.locator('.pop.open .choice', { hasText: 'Outtrigger' }).click(); await settle(900);
+  ok(await fav.locator('.tag', { hasText: 'Outtrigger (work in progress)' }).count() === 1, 'the picked game is a favorite, marked as work in progress');
+  await fav.locator('.tag', { hasText: 'Outtrigger' }).locator('button').click(); await settle(900);
+  ok(await fav.locator('.tag', { hasText: 'Outtrigger' }).count() === 0, 'and can be removed');
   // ---- Status LED: rows of colour + animation + level, each with the messages that light it
   const led = page.locator('[data-box="status led"]');
   const ledRows = led.locator('.srow:has(button[aria-label="Edit this colour"])');
