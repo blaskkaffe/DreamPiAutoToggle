@@ -81,6 +81,7 @@
     {
      "type": "row",
      "title": "DCNow! colour",
+     "sub": "Network",
      "control": {
       "type": "swatches",
       "key": "dcnow",
@@ -90,6 +91,7 @@
     {
      "type": "row",
      "title": "DCNET colour",
+     "sub": "Network",
      "control": {
       "type": "swatches",
       "key": "dcnet",

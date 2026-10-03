@@ -74,6 +74,27 @@ class KitTests(unittest.TestCase):
         for gone in ("ui.row=", "ui.btn=", "ui.tag=", "ui.swatches="):
             self.assertTrue(gone not in js, gone + " is replaced by the widgets")
 
+    def test_every_colour_pick_says_whether_it_is_a_network_or_a_module_colour(self):
+        def rows(node):
+            if isinstance(node, dict):
+                if node.get("type") == "row" and isinstance(node.get("control"), dict) and node["control"].get("type") == "swatches":
+                    yield node
+                for v in node.values():
+                    for r in rows(v):
+                        yield r
+            elif isinstance(node, list):
+                for v in node:
+                    for r in rows(v):
+                        yield r
+        found = 0
+        for name in os.listdir(os.path.join(ROOT, "modules")):
+            path = os.path.join(ROOT, "modules", name, "layout.json")
+            if os.path.exists(path):
+                for row in rows(json.loads(read(path))):
+                    found += 1
+                    self.assertIn(row.get("sub"), ("Network", "Module"), "%s: %s" % (name, row.get("title")))
+        self.assertGreaterEqual(found, 3)
+
     def test_module_css_does_not_redefine_a_base_class(self):
         """`.srow{...}` in a module would change every row in the app. Scoped rules (`#wifi-list .srow`) and a module's own
         classes are fine; so are themes."""
