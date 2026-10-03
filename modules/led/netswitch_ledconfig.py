@@ -21,6 +21,7 @@ CATEGORIES = [   # key, heading (the order the page lists them in)
     ("wifisetup", "Wi-Fi setup"),
     ("addon", "The add-on"),
     ("players", "Online players"),
+    ("events", "DC99 events"),
     ("general", "General"),
 ]
 # key, label (the short name shown as a tag), category, what it means, detected.
@@ -63,6 +64,7 @@ MESSAGES = [
     ("reboot", "About to reboot", "addon", "A reboot was requested; the Pi goes down in a moment.", True),
     ("players-game", "Your game is played", "players", "Others are playing your game. Needs a game name set up first; nothing detects it yet.", False),
     ("players-friend", "A friend came online", "players", "A watched player came online. Needs a friends list; nothing detects it yet.", False),
+    ("event-soon", "Event starting soon", "events", "A DC99 event you asked to be reminded of starts soon (from the time set in Settings > DC99 events until 10 minutes after the start, or until you dismiss it on the page).", True),
     ("ok", "Everything OK", "general", "No error and no warning: DreamPi is ready or in a call, and the network and internet work.", True),
     ("error", "Error", "general", u"Anything critical: DreamPi not running, no network, no internet, under-voltage, over 80 \u00b0C or the modem missing.", True),
     ("warning", "Warning", "general", "Any warning or important information: DNS failing, slow connection, weak Wi-Fi, no IP address yet, throttled or warm, DCNET unavailable, a failed update, a failed Wi-Fi setup, an update available.", True),
@@ -84,6 +86,7 @@ PRIORITY_ORDER = [
     "busy",
     "call-dcnow", "call-dcnet", "call-other",
     "update-addon", "update-dreampi",
+    "event-soon",
     "players-friend", "players-game",
     "ready", "sel-dcnow", "sel-dcnet",
     "ethernet", "wifi", "internet-ok", "modem-ok",
@@ -117,7 +120,8 @@ def _group(gid, colour, effect, speed, messages):
 
 def default_groups():
     """The looks the add-on starts with: the networks' colours for their selection and calls, purple for other calls, the network
-    colour while ready, yellow blinking while starting and red blinking when DreamPi is not running. Everything else is optional:
+    colour while ready, yellow blinking while starting, red blinking when DreamPi is not running and pink blinking while a DC99
+    event you asked to be reminded of starts soon. Everything else is optional:
     add it to a group on the page."""
     return [
         _group("g1", "dcnow", "solid", "slow", ["sel-dcnow", "call-dcnow"]),
@@ -126,6 +130,7 @@ def default_groups():
         _group("g4", "network", "solid", "slow", ["ready"]),
         _group("g5", "yellow", "blink", "slow", ["busy"]),
         _group("g6", "red", "blink", "slow", ["notrunning"]),
+        _group("g7", "pink", "blink", "slow", ["event-soon"]),
     ]
 
 
@@ -331,10 +336,11 @@ def gather(live=True):
     """What the messages are made from, read from the files the other services write. live=False is only what DreamPi is doing and
     which network is selected (the status dot's preview)."""
     ctx = {"state": core.dreampi_state()[0], "selected": "dcnet" if os.path.exists(core.FLAG) else "dcnow",
-           "net": {}, "wifi": "idle", "update": "idle", "update_info": {}, "reboot": False, "dcnet_problem": False}
+           "net": {}, "wifi": "idle", "update": "idle", "update_info": {}, "reboot": False, "dcnet_problem": False, "event": None}
     if live:
         ctx.update(net=core.network_state() or {}, wifi=core.wifi_state().get("state", "idle"), update=core.update_status(),
-                   update_info=core.update_info(), reboot=core.reboot_pending(), dcnet_problem=bool(core.dcnet_problem()))
+                   update_info=core.update_info(), reboot=core.reboot_pending(), dcnet_problem=bool(core.dcnet_problem()),
+                   event=core.event_reminder())
     return ctx
 
 
@@ -378,6 +384,8 @@ def active_keys(ctx):
             keys.add(key)
     if ctx.get("reboot"):
         keys.add("reboot")
+    if ctx.get("event"):
+        keys.add("event-soon")
     if any(k in keys for k in ERRORS):
         keys.add("error")
     if any(k in keys for k in WARNINGS) or ctx.get("dcnet_problem"):

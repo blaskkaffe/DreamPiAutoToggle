@@ -19,8 +19,22 @@
  @keyframes blink{50%{opacity:.12}}
  .ok{background:#2c2} .busy,.warn{background:#e0b400} .call{background:#b04cff} .bad,.off{background:#d33}
  .warnbox{background:#7a1f1f;border:var(--bw) solid #a84a4a;padding:10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.9em}
+ /* a notice: a banner that is not a warning (an event starting soon), in the page's colour, with a dismiss button */
+ .notebox{display:flex;align-items:center;gap:12px;background:rgba(var(--primary-rgb),.75);border:var(--bw) solid rgba(var(--primary-l-rgb),.9);padding:10px 12px 10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.95em}
+ .notebox span{flex:1;min-width:0} .notebox .nx{flex:none;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.28)}
  .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r);text-align:center;background:rgba(var(--primary-rgb),.62);border:var(--bw) solid rgba(var(--primary-l-rgb),.8);line-height:1.35}
  .now b{font-size:1.25em;display:block}
+ /* highlight: a module asks for one of its dashboard boxes to stand out (/api "highlight"). The look is global (Settings >
+    Appearance > Highlight, body class hl-rainbow or the colour in --hl-rgb). A grey box (the Dreamcast background) turns its own
+    colour instead: modules/background/page.css. */
+ .dbox.hl .now{border-color:rgb(var(--hl-rgb));animation:hlglow 1.6s ease-in-out infinite}
+ @keyframes hlglow{0%,100%{box-shadow:0 0 4px 0 rgba(var(--hl-rgb),.45)}50%{box-shadow:0 0 22px 4px rgba(var(--hl-rgb),.95)}}
+ body.hl-rainbow .dbox.hl .now{border-color:transparent;background:linear-gradient(rgba(var(--primary-rgb),.62),rgba(var(--primary-rgb),.62)) padding-box,
+   linear-gradient(#111,#111) padding-box,linear-gradient(90deg,#ff4d4d,#ffa133,#ffe14d,#4dd96b,#4dc3ff,#5b6bff,#c35bff,#ff4d4d,#ffa133,#ffe14d) border-box;
+   background-size:auto,auto,200% 100%;animation:hlrainbow 2.4s linear infinite,hlwhite 1.6s ease-in-out infinite}
+ @keyframes hlrainbow{from{background-position:0 0,0 0,0 0}to{background-position:0 0,0 0,-200% 0}}
+ @keyframes hlwhite{0%,100%{box-shadow:0 0 4px 0 rgba(255,255,255,.25)}50%{box-shadow:0 0 20px 3px rgba(255,255,255,.6)}}
+ @media(prefers-reduced-motion:reduce){.dbox.hl .now,body.hl-rainbow .dbox.hl .now{animation:none;box-shadow:0 0 14px 2px rgba(255,255,255,.5)}}
  /* status rows inside the network box: closed = just the DreamPi status,
     centred under the network name; open = all rows with their labels */
  .now .row{font-size:.62em;line-height:1.35;padding:9px 0;border-top:1px solid rgba(255,255,255,.18);text-align:left}

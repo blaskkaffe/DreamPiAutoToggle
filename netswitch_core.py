@@ -28,6 +28,10 @@ REBOOT_MARK = "/tmp/dreampi-netswitch.reboot"            # unix time a reboot wa
 PLAYERS_SOURCES = os.path.join(BASE_DIR, "players_sources.json")   # JSON addresses for the optional online-players list
 NUMBERS = os.path.join(BASE_DIR, "numbers.json")     # phone numbers per action, edited on the page, read by the hook
 CLOCK_MODE = os.path.join(BASE_DIR, "clock_mode")    # older versions: "24h", "12h" or "beat" (read once to carry the choice over to clock.json)
+HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id: how a highlighted box looks (Settings > Appearance)
+EVENTS_DB = os.path.join(BASE_DIR, "events.db")        # SQLite: the DC99 events imported by the events module
+EVENTS_CONFIG = os.path.join(BASE_DIR, "events.json")   # its settings: reminder lead time, time zone, sync interval, picked events, series
+EVENT_REMINDERS = os.path.join(BASE_DIR, "event_reminders.json")   # the DC99 events the user asked to be reminded of (events module, read by the LEDs)
 CLOCK_CONFIG = os.path.join(BASE_DIR, "clock.json")  # {"format": "24h"|"12h", "beat": bool, "world": bool}: the clock module's settings
 LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness, colours, wire order, white balance
 LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs, editable from the page
@@ -290,6 +294,29 @@ def module_colours(name):
     return out
 
 
+# ---- highlight: a module can ask for one of its dashboard boxes to stand out for a while (an event starts soon, say): /api
+# "highlight" {box id: why}. A grey box (the Dreamcast background) turns its own colour; a coloured box takes the highlight look
+# set here, the same for every module: an animated rainbow edge or one palette colour that glows.
+HIGHLIGHT_STYLES = ("rainbow",) + PALETTE_IDS
+DEFAULT_HIGHLIGHT = "rainbow"
+
+
+def highlight_style():
+    s = (read_file(HIGHLIGHT) or "").strip()
+    return s if s in HIGHLIGHT_STYLES else DEFAULT_HIGHLIGHT
+
+
+def save_highlight_style(value):
+    value = str(value or "").strip()
+    if value not in HIGHLIGHT_STYLES:
+        value = DEFAULT_HIGHLIGHT
+    tmp = HIGHLIGHT + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(value)
+    os.rename(tmp, HIGHLIGHT)
+    return value
+
+
 def set_module_colour(name, key, ident):
     """The user gives one of the module's colour keys a palette colour. With "colours_unique", the key that had that
     colour gets the old one (a swap), so they never match. Returns the module's new {key: id}, or None when the
@@ -505,6 +532,22 @@ def update_info():
         return data
     except (IOError, OSError, ValueError, AttributeError):
         return {}
+
+
+def event_reminder(now=None):
+    """The reminded DC99 event that is due now, or None: {"id", "title", "start"}. The events module writes EVENT_REMINDERS
+    ({"lead": minutes before, "after": minutes after the start, "items": [{"id", "title", "start"}], "dismissed": [ids]}) whenever
+    it changes, so the LEDs know without the page being open. Due = from lead minutes before the start until after minutes after it."""
+    now = time.time() if now is None else now
+    try:
+        with open(EVENT_REMINDERS) as f:
+            data = json.load(f)
+        lead, after = float(data.get("lead", 15)) * 60, float(data.get("after", 10)) * 60
+        gone = set(data.get("dismissed") or [])
+        due = [i for i in data.get("items") or [] if i.get("id") not in gone and i["start"] - lead <= now < i["start"] + after]
+    except (IOError, OSError, ValueError, AttributeError, KeyError, TypeError):
+        return None
+    return min(due, key=lambda i: i["start"]) if due else None
 
 
 def mark_reboot():

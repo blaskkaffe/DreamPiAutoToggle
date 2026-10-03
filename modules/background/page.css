@@ -4,6 +4,7 @@
 body.dcbg #dcbg{display:block} body.dcbg{background:transparent} html.dcbg{background:#4d639c linear-gradient(to bottom,#9cc3dc,#4d639c) fixed}
 body.dcbg{--card:rgba(20,20,20,.78)} body.dcbg .wide{background:rgba(20,20,20,.78)}
 body.dcbg .now{background:rgba(20,20,20,.78)}   /* grey like the Dreamcast BIOS pop-ups; the border keeps the primary colour */
+body.dcbg .dbox.hl .now,body.hl-rainbow.dcbg .dbox.hl .now{background:rgba(var(--primary-rgb),.85);border-color:rgba(var(--primary-l-rgb),.9);animation:none;box-shadow:none}   /* highlighted: a grey box takes its own colour */
 body.dcbg h1{text-shadow:0 1px 4px rgba(0,0,0,.6)}
 body.dcbg #settings{background:transparent}
 body.dcbg .note,body.dcbg h2{color:#eee;text-shadow:0 1px 3px rgba(0,0,0,.8)}

@@ -2,7 +2,8 @@
  "dashboard": [
   {"box": "clock", "items": [
    {"type": "infobox", "label": "@clock.beat", "title": "@clock.time", "rows": [
-    {"label": "World", "main": true, "value": {"type": "carousel", "items": "@clock.items"}},
+    {"label": "World", "main": true, "cls": "wcar", "value": {"type": "carousel", "items": "@clock.items"}},
+    {"label": "", "cls": "cwrow", "show": "@clock.world", "value": {"type": "custom", "name": "clock-list"}},
     {"label": "", "cls": "mapw", "show": "@clock.world", "value": {"type": "custom", "name": "clock-map"}}]}
   ]}
  ],
@@ -10,11 +11,14 @@
   {"box": "clock", "title": "Clock", "items": [
    {"type": "form", "get": "/clock", "post": "/clock", "fields": [
     {"title": "Time format", "sub_text": "clock",
-     "controls": [{"type": "select", "key": "format", "options": "formats", "label": "Format"}]}]},
+     "controls": [{"type": "select", "key": "format", "options": "formats", "label": "Format"}]},
+    {"title": "Time zone", "sub_text": "zone",
+     "controls": [{"type": "select", "key": "zone", "options": "zones", "label": "Time zone"}]}]},
    {"type": "row", "title": ".beat time", "sub": "Swatch Internet Time on the top line: the same everywhere",
     "control": {"type": "toggle", "bind": "@clock.beat_on", "post": "/clock/beat", "label": ".beat time"}},
-   {"type": "row", "title": "World time", "sub": "A scrolling list of cities on the bottom line; tap the clock to see the time zone map",
-    "control": {"type": "toggle", "bind": "@clock.world", "post": "/clock/world", "label": "World time"}}]},
+   {"type": "row", "title": "World time", "sub": "The cities below on the bottom line; tap the clock to see them with the time zone map",
+    "control": {"type": "toggle", "bind": "@clock.world_on", "post": "/clock/world", "label": "World time"}},
+   {"type": "picker", "source": "/clock/cities"}]},
   {"box": "appearance", "title": "Appearance", "items": [
    {"type": "row", "title": "Clock colour", "control": {"type": "swatches", "key": "clock", "title": "Colour of the clock"}}]}
  ]

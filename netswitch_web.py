@@ -46,7 +46,10 @@ def api_state():
     warnings = ["Module %s is not loaded: %s" % (name, why) for name, why in sorted(modules.errors().items())]
     d = {"pin": security.pin_required(),     # the page asks for it before update / restart / Wi-Fi connect
          "colours": modules.live_colours(), "primary": {}, "enabled": modules.enabled_map(),
-         "warnings": warnings, "now": int(time.time())}
+         "warnings": warnings, "now": int(time.time()),
+         "highlight": {},       # {dashboard box id: why}: a module asks for one of its boxes to stand out (an event soon, say)
+         "notices": [],         # banners over the boxes that are not warnings: {"id", "text", "post" (dismiss: POST {"id"} there)}
+         "theme": {"highlight": core.highlight_style()}}
     modules.apply_api(d, warnings)          # what the enabled modules add: network, status, debug, wifi, the dot's LED look ...
     return d
 
@@ -55,6 +58,16 @@ PAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "page")
 
 
 BASE_PAGE_FILES = ("index.html", "page.css", "page.js", "widgets.js", "boot.js")
+
+
+def _highlight_reply():
+    """The form widget's answer for the highlight look: rainbow or one of the palette colours."""
+    style = core.highlight_style()
+    opts = [{"value": "rainbow", "label": "Rainbow (animated)"}] + [
+        {"value": c["id"], "label": c["name"], "group": "Glow in one colour"} for c in core.colours()]
+    label = "Rainbow edge, animated" if style == "rainbow" else "Glows %s" % core.colour(style)["name"].lower()
+    return {"values": {"style": style}, "options": {"styles": opts},
+            "texts": {"highlight": label + ". A box stands out like this when a module wants your attention (an event starting soon); a grey box turns its own colour instead"}}
 
 
 def _layout_script():
@@ -261,6 +274,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(json.dumps({"modules": modules.listing()}), "application/json")
         elif path == "/colours":
             self.send(json.dumps(_colour_reply()), "application/json")
+        elif path == "/highlight":
+            self.send(json.dumps(_highlight_reply()), "application/json")
         elif modules.route("GET", path):
             modules.route("GET", path)(self)         # an enabled module's own endpoint
         elif path == "/":
@@ -289,6 +304,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_module_order()
         if path == "/colour":
             return self._post_colour()
+        if path == "/highlight":
+            return self._post_highlight()
         if modules.route("POST", path):
             if modules.route("POST", path)(self) is True:    # an enabled module's own endpoint; True = it has answered
                 return
@@ -343,6 +360,15 @@ class Handler(BaseHTTPRequestHandler):
         refresh_page(force=True)       # the colours are built into the page
         core.debug_log("web page: %s colours %s" % (data["module"], json.dumps(got, sort_keys=True)))
         self.send(json.dumps({"module": data["module"], "colours": got}), "application/json")
+
+    def _post_highlight(self):
+        """Settings > Appearance > Highlight: {"values": {"style": "rainbow" | palette id}} (the form widget's format)."""
+        try:
+            values = json.loads(self._body(1024).decode("utf-8")).get("values") or {}
+            core.save_highlight_style(values.get("style"))
+        except (ValueError, AttributeError, IOError, OSError) as e:
+            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
+        self.send(json.dumps(_highlight_reply()), "application/json")
 
     def log_message(self, *args):
         pass

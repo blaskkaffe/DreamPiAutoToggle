@@ -1,0 +1,11 @@
+zones.json - the time zone areas of the clock's world map
+
+Made by tools/build_clock_zones.py from timezone-boundary-builder by Evan Siroky
+(https://github.com/evansiroky/timezone-boundary-builder), release 2026b, the "timezones-now" set
+(areas that keep the same clock time from now on). The areas are simplified to about a third of a degree, cut to
+latitudes 60 S to 78 N, and small islands are left out.
+
+The data is (c) OpenStreetMap contributors (https://www.openstreetmap.org/copyright) and is made available under the
+Open Database License (ODbL) 1.0: https://opendatacommons.org/licenses/odbl/1-0/
+zones.json is a derived database and is made available under the same licence, ODbL 1.0. You may copy, share and
+adapt it as long as you credit OpenStreetMap contributors and keep derived databases under the ODbL.

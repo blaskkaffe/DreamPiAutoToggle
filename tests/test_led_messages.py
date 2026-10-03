@@ -7,7 +7,7 @@ from support import ledconfig, core, sandbox, cleanup
 import netswitch_led as led
 
 KEYS = [m[0] for m in ledconfig.MESSAGES]
-DEFAULT_ON = {"busy", "ready", "notrunning", "call-dcnow", "call-dcnet", "call-other", "sel-dcnow", "sel-dcnet"}
+DEFAULT_ON = {"busy", "ready", "notrunning", "call-dcnow", "call-dcnet", "call-other", "sel-dcnow", "sel-dcnet", "event-soon"}
 
 
 def ctx(state="ok", selected="dcnow", net=None, wifi="idle", update="idle", info=None, reboot=False, dcnet_problem=False):
@@ -74,7 +74,7 @@ class CatalogueTests(Base):
     def test_the_default_looks(self):
         by = dict((g["id"], g) for g in ledconfig.default_groups())
         self.assertEqual([(g["colour"], g["effect"]) for g in ledconfig.default_groups()],
-                         [("dcnow", "solid"), ("dcnet", "solid"), ("purple", "solid"), ("network", "solid"), ("yellow", "blink"), ("red", "blink")])
+                         [("dcnow", "solid"), ("dcnet", "solid"), ("purple", "solid"), ("network", "solid"), ("yellow", "blink"), ("red", "blink"), ("pink", "blink")])
         self.assertEqual(by["g1"]["messages"], ["sel-dcnow", "call-dcnow"])
         for g in by.values():
             self.assertIn(g["colour"], ledconfig.TOKEN_IDS + core.PALETTE_IDS)

@@ -1,0 +1,13 @@
+{
+ "name": "DC99 events",
+ "description": "Upcoming community events from dc99.net on the main page, with reminders (banner, highlight, Status LED) and a JSON API.",
+ "enabled": true,
+ "visible": true,
+ "order": 16,
+ "ui": 2,
+ "colours": {
+  "events": "purple"
+ },
+ "primary": "events",
+ "web": "netswitch_events"
+}

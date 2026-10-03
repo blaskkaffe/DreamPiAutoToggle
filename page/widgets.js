@@ -66,7 +66,15 @@ function renderLayout(){
  (LAY.settings||[]).forEach(function(b){cols.appendChild(box("settings",b))});
  buildPicker(cols);
  AFTER.forEach(function(f){f()});AFTER=[]}
-function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});applyTheme();hideEmptyBoxes()}
+function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});applyTheme();applyHighlight();hideEmptyBoxes()}
+// ---- highlight (/api "highlight": {box id: why}): those dashboard boxes get the class "hl" (page.css draws it) and the reason as a
+// tooltip; the look is global (/api theme.highlight: "rainbow" or a palette id)
+var hlKey="";
+function applyHighlight(){var hl=S.highlight||{},st=(S.theme&&S.theme.highlight)||"rainbow",key=st+JSON.stringify(hl);if(key===hlKey)return;hlKey=key;
+ document.body.classList.toggle("hl-rainbow",st==="rainbow");
+ document.body.style.setProperty("--hl-rgb",st==="rainbow"?"255,255,255":"var(--c-"+st+"-rgb)");
+ Array.prototype.forEach.call(document.querySelectorAll("#dash [data-box]"),function(b){var why=hl[b.getAttribute("data-box")];
+  b.classList.toggle("hl",!!why);if(why)b.setAttribute("title",String(why));else b.removeAttribute("title")})}
 // a box whose widgets are all hidden (the LED settings while the LED count is 0) is hidden too
 function hideEmptyBoxes(){var bs=document.querySelectorAll("[data-box]"),i,j;
  for(i=0;i<bs.length;i++){var b=bs[i],host=b.querySelector(":scope > .card")||b,any=false;
@@ -284,8 +292,9 @@ function footRow(buttons){var info=h("button",{type:"button","class":"infobtn",t
 // ---- a table to pick values for: groups of short items (phone numbers) with an Add pop-up per group (reply of GET source)
 W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null,addKey=null,
  list=h("div"),restore=h("button",{type:"button","class":"pill-s"}),foot=footRow([restore]),
- pop=h("div"),popT=h("div",{"class":"t"}),inp=h("input",{type:"text","aria-label":"Value to add"}),addB=h("button",{type:"button","class":"pill-s",text:"Add"}),msg=h("div",{"class":"msg"});
- pop.appendChild(popT);pop.appendChild(h("div",{"class":"fld"},[inp,addB]));pop.appendChild(msg);
+ pop=h("div"),popT=h("div",{"class":"t"}),inp=h("input",{type:"text","aria-label":"Value to add"}),addB=h("button",{type:"button","class":"pill-s",text:"Add"}),msg=h("div",{"class":"msg"}),
+ sel=h("select",{"class":"ord","aria-label":"Value to add"});   // rules.choices: pick from a list instead of typing
+ pop.appendChild(popT);pop.appendChild(h("div",{"class":"fld"},[inp,sel,addB]));pop.appendChild(msg);
  el.appendChild(list);el.appendChild(foot.el);el.appendChild(pop);
  var p=ui.popup(pop);p.onclose=function(){addKey=null};
  function rules(){return cfg.rules||{}}
@@ -299,8 +308,15 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
   sh(restore,!!R.restore);if(R.restore){setText(restore,R.restore);restore.onclick=function(){cfg.groups.forEach(function(g){g.items=(cfg.defaults[g.key]||[]).slice()});save()}}
   sh(foot.el,!!(R.restore||R.help))}
  function openAdd(g,b,e){if(p.isOpen()&&addKey===g.key){p.toggle(b,e);return}addKey=g.key;var R=rules();
-  setText(popT,(R.add_title||"Add to {group}").replace("{group}",g.label));inp.value="";inp.maxLength=R.max||40;setText(msg,"");p.toggle(b,e);inp.focus()}
- function addItem(){if(!addKey)return;var R=rules(),allowed=new RegExp("[^"+(R.allowed||"\\s\\S")+"]","g"),n=inp.value.replace(allowed,""),say=function(t){setText(msg,t)},g=null;
+  setText(popT,(R.add_title||"Add to {group}").replace("{group}",g.label));inp.value="";inp.maxLength=R.max||40;setText(msg,"");
+  var pick=!!R.choices;sh(inp,!pick);sh(sel,pick);
+  if(pick){var used={},groups={},order=[];cfg.groups.forEach(function(x){if(R.unique||x.key===g.key)x.items.forEach(function(v){used[v]=1})});
+   R.choices.forEach(function(o){if(used[o.value])return;var k=o.group||"";if(!groups[k]){groups[k]=[];order.push(k)}groups[k].push('<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>')});
+   sel.innerHTML=order.map(function(k){return k?'<optgroup label="'+esc(k)+'">'+groups[k].join("")+'</optgroup>':groups[k].join("")}).join("");sh(addB,order.length>0);
+   if(!order.length)setText(msg,"Everything is in the list already")}
+  else sh(addB,true);
+  p.toggle(b,e);(pick?sel:inp).focus()}
+ function addItem(){if(!addKey)return;var R=rules(),allowed=new RegExp("[^"+(R.allowed||"\\s\\S")+"]","g"),n=R.choices?sel.value:inp.value.replace(allowed,""),say=function(t){setText(msg,t)},g=null;
   cfg.groups.forEach(function(x){if(x.key===addKey)g=x});
   if(n.length<(R.min||1))return say(R.min_msg||"Too short");
   if(R.unique)for(var i=0;i<cfg.groups.length;i++)if(cfg.groups[i].items.indexOf(n)>=0)return say(n+" is already used by "+cfg.groups[i].label);

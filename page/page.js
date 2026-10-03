@@ -54,11 +54,17 @@ function lookDot(el,look){setClass(el,"dot");if(!look){setStyle(el,"background",
 function render(d){
  pinNeeded=!!d.pin;
  for(var k in d)S[k]=d[k];       // S keeps the data sources' answers and the page's own state between /api answers
- setHtml($("warnings"),d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join(""));
+ NOTICES=d.notices||[];
+ setHtml($("warnings"),d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("")+
+  NOTICES.map(function(n,i){return '<div class="notebox" role="status"><span>'+esc(n.text)+'</span>'+(n.post?'<button type="button" class="nx" data-n="'+i+'" title="Dismiss" aria-label="Dismiss">&#10005;</button>':'')+'</div>'}).join(""));
  window.lastDreampiState=d.dreampi&&d.dreampi.state;
  engineUpdate();
  fire("api",d);
 }
+// notices (/api "notices"): banners a module shows above the boxes; the cross POSTs {"id"} to the notice's "post" path
+var NOTICES=[];
+$("warnings").addEventListener("click",function(e){var b=e.target.closest&&e.target.closest(".nx");if(!b)return;var n=NOTICES[+b.getAttribute("data-n")];
+ if(n&&n.post){b.disabled=true;xhrJson("POST",n.post,function(){refresh()},{id:n.id})}});
 function showSettings(open){$("settings").classList.toggle("open",open);
  if(!open)fire("settingsClose");
  document.body.classList.toggle("settings-open",open);

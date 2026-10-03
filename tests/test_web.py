@@ -30,7 +30,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(cfg["gamma"], ledconfig.GAMMA)
         self.assertIn(cfg["order"], ledconfig.LED_ORDERS)
         self.assertNotIn("colours", cfg)              # one entry per group, not per selected network
-        self.assertEqual([g["id"] for g in cfg["groups"]], ["g1", "g2", "g3", "g4", "g5", "g6"])
+        self.assertEqual([g["id"] for g in cfg["groups"]], ["g1", "g2", "g3", "g4", "g5", "g6", "g7"])
 
     def test_led_round_trip_and_clamping(self):
         cfg = ledconfig.led_config()
@@ -133,6 +133,32 @@ class HttpTests(unittest.TestCase):
         self.assertIn("debug", d)               # added by the debug log module (switched on in setUpClass; off by default)
         self.assertNotIn("wifi", d)             # the Wi-Fi setup module is off by default
         self.assertIn(d["network"], ("dcnow", "dcnet"))
+
+    def test_highlight_and_notices_are_always_in_the_api(self):
+        d = json.loads(self.get("/api")[2].decode())
+        self.assertIsInstance(d["highlight"], dict)        # always sent, so a box stops standing out when a module stops asking
+        self.assertIsInstance(d["notices"], list)
+        self.assertEqual(d["theme"], {"highlight": "rainbow"})
+
+    def test_the_highlight_look_is_a_global_setting(self):
+        r = json.loads(self.get("/highlight")[2].decode())
+        self.assertEqual(r["values"], {"style": "rainbow"})
+        self.assertEqual(len(r["options"]["styles"]), 1 + len(core.PALETTE_IDS))
+        st, body = self.post("/highlight", {"values": {"style": "bright-green"}})
+        self.assertEqual(json.loads(body.decode())["values"], {"style": "bright-green"})
+        self.assertEqual(json.loads(self.get("/api")[2].decode())["theme"]["highlight"], "bright-green")
+        self.post("/highlight", {"values": {"style": "plaid"}})          # not a look: back to the rainbow
+        self.assertEqual(core.highlight_style(), "rainbow")
+
+    def test_a_module_prefix_route(self):
+        st, hdr, body = self.get("/api/status")              # the events module's API (on by default)
+        self.assertEqual(json.loads(body.decode())["source"], "dc99")
+        try:
+            urlopen(self.base + "/api/events/12345", timeout=10)
+            self.fail("an unknown event must be a 404")
+        except HTTPError as e:
+            self.assertEqual(e.code, 404)
+            self.assertIn(b"no such event", e.read())
 
     def test_select_network(self):
         self.post("/dcnet")

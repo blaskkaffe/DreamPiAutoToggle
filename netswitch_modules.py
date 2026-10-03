@@ -11,6 +11,7 @@
 #                                                                    POST function returns True once it has answered
 #   api(d, warnings)                add to the /api answer (d is its dict) and to the warning boxes
 #   PROTECTED = ("/path", ...)      POST paths that need the PIN when one is set (they run as root)
+#   GET_PREFIX / POST_PREFIX        {"/api/events/": fn}: a path that starts with it (and goes on) and no exact path matched
 #   start()                         called once, when the web service itself starts (start_background()) or when the module is
 #                                   switched on later: for background work that should run without anyone viewing the page
 # module.json "ui": N is the page kit version the module was written for (see UI_KIT); a newer one is not loaded.
@@ -116,6 +117,10 @@ def refresh(force=False):
             if web is not None:
                 get.update(getattr(web, "GET", None) or {})
                 post.update(getattr(web, "POST", None) or {})
+                for k, fn in (getattr(web, "GET_PREFIX", None) or {}).items():     # "/api/events/" answers /api/events/<anything>
+                    get["prefix:" + k] = fn
+                for k, fn in (getattr(web, "POST_PREFIX", None) or {}).items():
+                    post["prefix:" + k] = fn
                 protected.update(getattr(web, "PROTECTED", None) or ())
                 if callable(getattr(web, "api", None)):
                     api.append(web.api)
@@ -331,7 +336,16 @@ def get(name):
 
 
 def route(method, path):
-    return (_state["get"] if method == "GET" else _state["post"]).get(path)
+    """The function of an enabled module that answers this path: an exact path (GET / POST) first, else the longest prefix
+    (GET_PREFIX / POST_PREFIX; the function reads the rest of handler.path itself)."""
+    table = _state["get"] if method == "GET" else _state["post"]
+    fn = table.get(path)
+    if fn is None:
+        best = ""
+        for k in table:
+            if k.startswith("prefix:") and path.startswith(k[7:]) and len(path) > len(k) - 7 and len(k) - 7 > len(best):
+                best, fn = k[7:], table[k]
+    return fn
 
 
 def protected(path):

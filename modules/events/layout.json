@@ -1,0 +1,25 @@
+{
+ "data": {"events": {"url": "/events/view", "every": 60, "retry": 3, "retry_if": "syncing"}},
+ "dashboard": [
+  {"box": "events", "items": [
+   {"type": "infobox", "label": "Next DC99 event", "title": "@events.next.title", "rows": [
+    {"label": "When", "main": true, "value": {"type": "text", "text": "@events.next.when"}},
+    {"label": "", "cls": "evl", "value": {"type": "custom", "name": "events-list"}},
+    {"label": "", "cls": "evs", "value": {"type": "text", "text": "@events.status", "muted": true}}],
+    "actions": [
+     {"type": "button", "label": "Sync now", "post": "/api/sync"},
+     {"type": "link", "label": "DC99 calendar", "href": "https://dc99.net/community/"}]}
+  ]}
+ ],
+ "settings": [
+  {"box": "events", "title": "DC99 events", "items": [
+   {"type": "form", "get": "/events/settings", "post": "/events/settings", "fields": [
+    {"title": "Reminder", "sub_text": "lead", "controls": [{"type": "select", "key": "lead", "options": "leads", "label": "Start"}]},
+    {"title": "Time zone", "sub_text": "zone", "controls": [{"type": "select", "key": "zone", "options": "zones", "label": "Show times for"}]},
+    {"title": "Sync with DC99", "sub_text": "interval", "controls": [{"type": "select", "key": "interval", "options": "intervals", "label": "Sync"}]}]},
+   {"type": "picker", "source": "/events/series"},
+   {"type": "row", "title": "Sync now", "sub": "@events.status", "control": {"type": "button", "label": "Sync", "post": "/api/sync"}}]},
+  {"box": "appearance", "title": "Appearance", "items": [
+   {"type": "row", "title": "DC99 events colour", "control": {"type": "swatches", "key": "events", "title": "Colour of the events box"}}]}
+ ]
+}

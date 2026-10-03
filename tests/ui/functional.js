@@ -88,7 +88,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   const led = page.locator('[data-box="status led"]');
   const ledRows = led.locator('.srow:has(button[aria-label="Edit this colour"])');
   const rows0 = await ledRows.count();
-  ok(rows0 === 6, 'the LED box starts with the six default colour rows (' + rows0 + ')');
+  ok(rows0 === 7, 'the LED box starts with the seven default colour rows (' + rows0 + ')');
   ok(await ledRows.first().locator('.tag', { hasText: 'DCNow! selected' }).count() === 1, 'the first row holds DCNow! selected');
   const lookOf = i => ledRows.nth(i).evaluate(e => { const b = e.querySelector('button.pill-s'), t = e.querySelector('.tag'), cs = getComputedStyle(b); return { bg: cs.backgroundColor, border: cs.borderTopColor, tag: t ? getComputedStyle(t).backgroundColor : '', blink: cs.animationName, dot: !!e.querySelector('.gdot') }; });
   const l0 = await lookOf(0), l4 = await lookOf(4), l5 = await lookOf(5);

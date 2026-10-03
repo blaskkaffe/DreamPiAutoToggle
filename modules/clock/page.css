@@ -1,8 +1,19 @@
-/* Clock module: the time zone map in the clock box (opens when the box is tapped and world time is on) */
-.mapw .k{display:none} .mapw.row .v{flex:1;display:block;width:100%}
+/* Clock module: the city list and the time zone map in the open clock box (with world time on).
+   On a coloured box (the usual look) the highlighted areas are white and the cities white dots; on a grey box (the Dreamcast
+   background makes the boxes grey) the highlighted areas and the dots take the clock's colour. */
+[data-mod="clock"] .now.open .row.wcar{display:none}
+.cwrow .k,.mapw .k{display:none} .cwrow.row .v,.mapw.row .v{flex:1;display:block;width:100%}
+.cwl{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:3px 18px;font-size:1.05em}
+.cwc{display:flex;justify-content:space-between;gap:8px;white-space:nowrap;min-width:0}
+.cwc .cwn{overflow:hidden;text-overflow:ellipsis;color:rgba(255,255,255,.8)} .cwc .cwt{font-weight:700;font-variant-numeric:tabular-nums}
 .cmap{display:block;width:100%;height:auto}
-.cmap .band{fill:rgba(255,255,255,.04)} .cmap .band.alt{fill:rgba(255,255,255,.09)} .cmap .band.here{fill:rgba(var(--primary-rgb),.28)}
-.cmap .land{fill:rgba(255,255,255,.34);stroke:rgba(255,255,255,.5);stroke-width:.4}
-.cmap .hr{fill:rgba(255,255,255,.75);font-size:8px;text-anchor:middle}
-.cmap .city{fill:var(--primary-l);stroke:#000;stroke-width:.6}
+.cmap .sea{fill:rgba(255,255,255,.03)} .cmap .sea.alt{fill:rgba(255,255,255,.08)}
+.cmap .ofs{fill:rgba(255,255,255,.7);font-size:6px;text-anchor:middle}
+.cmap .z polygon{stroke:rgba(0,0,0,.35);stroke-width:.3;stroke-linejoin:round}
+.cmap .z{fill:rgba(255,255,255,.3)} .cmap .z.odd{fill:rgba(255,255,255,.42)} .cmap .z.frac{fill:rgba(255,255,255,.55)} .cmap .z.none{fill:rgba(255,255,255,.15)}
+.cmap .z.here{fill:rgba(255,255,255,.9)}
+.cmap .zl{fill:#fff;font-size:5.5px;font-weight:700;text-anchor:middle;paint-order:stroke;stroke:rgba(0,0,0,.7);stroke-width:1.3px;pointer-events:none}
+.cmap .city{fill:#fff;stroke:#000;stroke-width:.8}
+body.dcbg .dbox:not(.hl) .cmap .z.here{fill:var(--primary)}
+body.dcbg .dbox:not(.hl) .cmap .city{fill:var(--primary-l)}
 .cmapnote{margin:6px 0 0;color:rgba(255,255,255,.65);font-size:.95em;text-align:center}

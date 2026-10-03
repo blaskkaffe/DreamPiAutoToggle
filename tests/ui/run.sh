@@ -18,4 +18,10 @@ SERVER=$!
 sleep 3
 PORT=8735 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node clock.js || RESULT=1
 kill $SERVER 2>/dev/null
+# the DC99 events module and the highlight: the sample events and one reminded event 5 minutes ahead
+CLOCK=1 EVENTS=1 EVENTSOON=1 PORT=8736 python3 demo_server.py > /tmp/dpns-demo-events.log 2>&1 &
+SERVER=$!
+sleep 3
+PORT=8736 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node events.js || RESULT=1
+kill $SERVER 2>/dev/null
 exit $RESULT
