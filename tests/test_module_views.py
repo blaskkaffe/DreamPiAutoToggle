@@ -228,5 +228,20 @@ class SwitcherView(unittest.TestCase):
                 probes._checks.update(old)
 
 
+class ModemCompat(unittest.TestCase):
+    def usb(self, manufacturer, product):
+        return {"vendor": "0572", "product": "1340", "manufacturer": manufacturer, "product_name": product, "serial": ""}
+
+    def test_the_conexant_usb_modem_is_known_to_work(self):
+        self.assertEqual(probes.modem_compat(self.usb("Conexant", "USB Modem")), (True, "Conexant USB Modem"))
+
+    def test_the_others_are_unchanged(self):
+        self.assertTrue(probes.modem_compat(self.usb("USRobotics", "5637"))[0])
+        self.assertFalse(probes.modem_compat(self.usb("Conceptronic", "C56U"))[0])         # the original, not the -v2
+        self.assertTrue(probes.modem_compat(self.usb("Conceptronic", "C56U-V2"))[0])
+        self.assertIsNone(probes.modem_compat(self.usb("Acme", "Fax Thing"))[0])
+        self.assertEqual(probes.modem_compat(None), (None, None))
+
+
 if __name__ == "__main__":
     unittest.main()

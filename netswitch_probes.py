@@ -380,6 +380,7 @@ KNOWN_MODEMS = (
     "startech usb56kemh",
     "conceptronic bvrp se", "conceptronic c56u-v2", "c56u-v2",
     "v.top um02", "vtop um02",
+    "conexant usb modem",   # the plain descriptor of Conexant-chip modems with no brand of their own; confirmed working on a real DreamPi + Pi
 )
 # Reported NOT to work: same case as the good ones above, but an older/
 # different chip inside.
