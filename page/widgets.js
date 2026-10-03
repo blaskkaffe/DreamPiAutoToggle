@@ -93,10 +93,11 @@ function applyTheme(){var p={},pk={},k;for(k in (LAY.primary||{}))p[k]=LAY.prima
 var DATA={};
 function reloadData(){for(var ns in DATA)DATA[ns]()}
 function startData(){var ns;for(ns in (LAY.data||{}))(function(ns,spec){
- var timer=null,every=(spec.every||60)*1000,retry=(spec.retry||2)*1000,onlyInSettings=spec.when==="settings";
+ var timer=null,seq=0,every=(spec.every||60)*1000,retry=(spec.retry||2)*1000,onlyInSettings=spec.when==="settings";
  function wanted(){return !document.hidden&&(!onlyInSettings||$("settings").classList.contains("open"))}
- function load(){clearTimeout(timer);if(!wanted())return;
+ function load(){clearTimeout(timer);if(!wanted())return;var mine=++seq;
   xhrJson("GET",spec.url,function(r){var again=every;
+   if(mine!==seq)return;                      // a newer question was asked meanwhile: its answer counts, this older one must not overwrite it
    if(r){S[ns]=r;engineUpdate();if(spec.retry_if&&getPath(r,spec.retry_if))again=retry}else again=retry;
    timer=setTimeout(load,again)})}
  DATA[ns]=load;

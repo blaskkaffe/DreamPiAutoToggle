@@ -85,6 +85,25 @@ class CheckTests(unittest.TestCase):
         self.assertTrue(up._info["time"])
         self.assertFalse(up._info["checking"])
 
+    def test_pressing_check_says_checking_at_once_and_never_runs_two(self):
+        gate, started = threading.Event(), []
+        def slow(url):
+            started.append(url)
+            gate.wait(5)
+            raise IOError("down")
+        up.fetch = slow
+        up.check_in_background()
+        self.assertTrue(up.status()["checking"])          # no gap before the thread runs: the page's next question already sees it
+        up.check_in_background()                           # a second press while one runs starts nothing
+        gate.set()
+        for _ in range(100):
+            if not up._info["checking"]:
+                break
+            time.sleep(0.05)
+        self.assertFalse(up._info["checking"])
+        self.assertTrue(up._info["time"])
+        self.assertEqual(len([u for u in started if "api.github.com" in u]), 1)
+
     def test_dreampi_versions(self):
         dp = os.path.join(self.tmp, "dreampi")
         os.mkdir(dp)

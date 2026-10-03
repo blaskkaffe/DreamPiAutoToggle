@@ -124,12 +124,23 @@ def check_dreampi():
     return {"files": files, "newer": newer, "auto_updates": not os.path.exists("/boot/noautoupdates.txt")}
 
 
-def check():
-    """Run both checks now (network). Fills the cache the page reads."""
+def _begin():
+    """Mark a check as running; False when one already is. Done before the thread starts so that the page's very next
+    question already says "checking" (a refresh that came in between used to show the old result: the button seemed dead)."""
     with _lock:
         if _info["checking"]:
-            return
+            return False
         _info["checking"] = True
+        return True
+
+
+def check():
+    """Run both checks now (network). Fills the cache the page reads."""
+    if _begin():
+        _run()
+
+
+def _run():
     result = {"time": int(time.time()), "addon": None, "dreampi": None, "error": None}
     try:
         try:
@@ -149,9 +160,10 @@ def check():
 
 
 def check_in_background():
-    t = threading.Thread(target=check)
-    t.daemon = True
-    t.start()
+    if _begin():
+        t = threading.Thread(target=_run)
+        t.daemon = True
+        t.start()
 
 
 def update_state():
