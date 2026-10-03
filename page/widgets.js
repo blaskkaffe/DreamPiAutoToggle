@@ -155,7 +155,7 @@ W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(
 function paletteOrder(){var p=(LAY.palette||[]).slice();return p.filter(function(c){return c.id.indexOf("bright-")!==0}).concat(p.filter(function(c){return c.id.indexOf("bright-")===0}))}
 W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri",text:s.label||"Colour","aria-haspopup":"dialog"}),
  grid=h("span",{"class":"swatches grid"}),pop=h("div",{"class":"colours"},[h("div",{"class":"t",text:s.title||"Pick a colour"}),grid]),
- tint=s.tint?h("input",{type:"checkbox","class":"cbox pri",title:"Coloured background (off = neutral)","aria-label":(s.title||"Colour")+": coloured background"}):null,
+ tint=s.tint?h("input",{type:"checkbox","class":"cbox pri",title:"Highlight: a coloured background (off = a neutral one)","aria-label":(s.title||"Colour")+": highlight with a coloured background"}):null,
  el=h("span",{"class":"colourpick"},[tint,btn,pop]),btns={},names={},p=ui.popup(pop);
  if(tint)colourClass(tint,s.key,s.mod);          // the tick box has the colour of its pick
  if(tint)tint.onchange=function(){var want=tint.checked;post("/colour",{module:s.mod,key:s.key,tint:want},function(r){if(r){refresh();ctx.saved()}else tint.checked=!want})};
