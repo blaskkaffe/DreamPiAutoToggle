@@ -28,7 +28,6 @@ PIN_MIN, PIN_MAX = 4, 64
 ITERATIONS = 50000
 FAIL_LIMIT = 5          # wrong PINs in a row ...
 LOCKOUT = 60            # ... block every PIN-protected action for this many seconds
-PROTECTED = ("/reboot", "/update/start", "/wificonnect")   # need the header, and the PIN when one is set
 PRIVATE_SUFFIXES = (".local", ".lan", ".home", ".home.arpa", ".internal", ".localdomain", ".localhost",
                     ".fritz.box", ".intranet", ".private")
 

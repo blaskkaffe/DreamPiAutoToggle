@@ -10,6 +10,7 @@
 #   GET = {"/path": fn(handler)}    POST = {"/path": fn(handler)}   answer a request itself (handler.send(...)); a
 #                                                                    POST function returns True once it has answered
 #   api(d, warnings)                add to the /api answer (d is its dict) and to the warning boxes
+#   PROTECTED = ("/path", ...)      POST paths that need the PIN when one is set (they run as root)
 # Nothing outside this file and the web service knows which modules exist. A module whose folder is missing,
 # that is switched off, or whose Python fails to import is simply absent. Works on Python 3 and 2.7.
 import importlib
@@ -21,10 +22,10 @@ import threading
 
 import netswitch_core as core
 
-SLOTS = ("main", "about_top", "sections_a", "buttons_rows", "sections_b")   # the @@SLOT:name@@ markers in index.html
+SLOTS = ("main", "about_top", "about_bottom", "system_after", "sections_a", "buttons_rows", "sections_b")   # the @@SLOT:name@@ markers in index.html
 _PAGE_FILES = ("page.html", "page.css", "page.js")
 _lock = threading.Lock()
-_state = {"sig": None, "loaded": [], "errors": {}, "get": {}, "post": {}, "api": []}
+_state = {"sig": None, "loaded": [], "errors": {}, "get": {}, "post": {}, "api": [], "protected": set()}
 
 
 def _read(path):
@@ -70,7 +71,7 @@ def refresh(force=False):
         sig = signature()
         if sig == _state["sig"] and not force:
             return False
-        loaded, errors, get, post, api = [], {}, {}, {}, []
+        loaded, errors, get, post, api, protected = [], {}, {}, {}, [], set()
         state = core.modules_state()
         for name in core.module_names():
             if not core.module_enabled(name, state):
@@ -86,9 +87,10 @@ def refresh(force=False):
             if web is not None:
                 get.update(getattr(web, "GET", None) or {})
                 post.update(getattr(web, "POST", None) or {})
+                protected.update(getattr(web, "PROTECTED", None) or ())
                 if callable(getattr(web, "api", None)):
                     api.append(web.api)
-        _state.update(sig=sig, loaded=loaded, errors=errors, get=get, post=post, api=api)
+        _state.update(sig=sig, loaded=loaded, errors=errors, get=get, post=post, api=api, protected=protected)
         return True
 
 
@@ -102,6 +104,12 @@ def get(name):
 
 def route(method, path):
     return (_state["get"] if method == "GET" else _state["post"]).get(path)
+
+
+def protected(path):
+    """True for a POST path that an enabled module marked PROTECTED: it needs the page's own header and, when one is
+    set, the PIN (rebooting, updating, joining a Wi-Fi network)."""
+    return path in _state["protected"]
 
 
 def apply_api(d, warnings):

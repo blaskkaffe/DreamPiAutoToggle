@@ -54,19 +54,9 @@
  <table class="about" id="about"></table>
  <div class="srow" id="github-row"><span>GitHub<span class="sub">Source, instructions and updates</span></span>
   <a class="pill-s" href="https://github.com/blaskkaffe/DreamPiAutoToggle" target="_blank" rel="noopener noreferrer" aria-label="Open the project on GitHub">Open</a></div>
- <div class="srow" id="upd-row"><span>Updates<span class="sub" id="upd-text">Not checked yet</span></span>
-  <button class="pill-s" id="upd-check" type="button">Check</button></div>
- <div id="upd-dreampi" class="sub" style="display:none;padding:0 0 12px"></div>
- <div class="srow" id="upd-do-row" style="display:none"><span>Update the add-on<span class="sub" id="upd-do-sub"></span></span>
-  <button class="pill-s" id="upd-do" type="button">Update now</button></div>
- <div id="upd-log" class="updlog" role="log" aria-label="Update log" style="display:none"></div>
+@@SLOT:about_bottom@@
 </div>
-<section class="sec">
-<div class="card">
- <div class="srow"><span>Reboot DreamPi<span class="sub" id="reboot-sub">Restarts the Raspberry Pi<br>A call in progress is cut</span></span>
-  <button class="pill-s danger" id="reboot-b" type="button">Reboot</button></div>
-</div>
-</section>
+@@SLOT:system_after@@
 </section>
 </div>
 </div></div>

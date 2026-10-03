@@ -77,13 +77,13 @@ if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
-cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_modules.py" "$SRC/netswitch_update.py" "$SRC/netswitch_security.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" \
+cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_modules.py" "$SRC/netswitch_security.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" \
    "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/static"
 cp "$SRC"/page/index.html "$SRC"/page/page.css "$SRC"/page/page.js "$DEST/page/"
 cp "$SRC"/static/*.png "$DEST/static/"
 # Files an older layout kept next to the base (the features are folders in modules/ now)
-rm -f "$DEST/static/three.min.js" "$DEST/static/dc-background.js" "$DEST/static/LICENSES.txt" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" \
+rm -f "$DEST/netswitch_update.py" "$DEST/static/three.min.js" "$DEST/static/dc-background.js" "$DEST/static/LICENSES.txt" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" \
       "$DEST/netswitch_players.py" "$DEST/netswitch_wifi_setup.py" "$DEST/page/led.html" "$DEST/page/led.js" "$DEST/page/led.css" "$DEST/page/players.js"
 
 # >>> sync_modules
@@ -205,7 +205,7 @@ Restart=always
 RestartSec=3
 Nice=-5
 # The page runs as root, so it is fenced in: no setuid tricks, no writes to /usr, /boot or /etc,
-# no cgroup or kernel-module changes. (The update runs in its own transient unit, see netswitch_update.py.)
+# no cgroup or kernel-module changes. (The update runs in its own transient unit, see modules/rebootupdate/netswitch_update.py.)
 NoNewPrivileges=yes
 ProtectSystem=full
 ProtectControlGroups=yes

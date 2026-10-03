@@ -37,6 +37,7 @@ def _connect(h):
         core.debug_log("web page: Wi-Fi connect requested for %s" % ssid)
 
 
+PROTECTED = ("/wificonnect",)      # joins a network as root: the PIN is asked for when one is set
 POST = {"/wifitoggle": _toggle, "/wificonnect": _connect}
 
 

@@ -6,7 +6,8 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import urlopen, Request
 
-from support import core, probes, web, sandbox, cleanup
+from support import core, web, sandbox, cleanup
+import netswitch_rebootupdate as ru
 
 
 class TagTests(unittest.TestCase):
@@ -52,12 +53,12 @@ class HttpTests(unittest.TestCase):
         cls.base = "http://127.0.0.1:%d" % cls.srv.server_address[1]
         threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
         cls.spawned = []
-        cls._spawn = probes._spawn_reboot
-        probes._spawn_reboot = lambda: cls.spawned.append(1)
+        cls._spawn = ru._spawn_reboot
+        ru._spawn_reboot = lambda: cls.spawned.append(1)
 
     @classmethod
     def tearDownClass(cls):
-        probes._spawn_reboot = cls._spawn
+        ru._spawn_reboot = cls._spawn
         core.hook_problem, core.dcnet_problem = cls._hp, cls._dp
         cls.srv.shutdown()
         cls.srv.server_close()
@@ -98,12 +99,12 @@ class HttpTests(unittest.TestCase):
     def test_reboot_failure_is_reported(self):
         def boom():
             raise OSError("no sh")
-        saved, probes._spawn_reboot = probes._spawn_reboot, boom
+        saved, ru._spawn_reboot = ru._spawn_reboot, boom
         try:
             req = Request(self.base + "/reboot", data=b"", method="POST", headers={"X-Requested-With": "netswitch"})
             out = json.loads(urlopen(req, timeout=10).read().decode())
         finally:
-            probes._spawn_reboot = saved
+            ru._spawn_reboot = saved
         self.assertFalse(out["started"])
 
 

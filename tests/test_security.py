@@ -7,7 +7,8 @@ import threading
 import time
 import unittest
 
-from support import sandbox, cleanup, core, probes, web
+from support import sandbox, cleanup, core, web
+import netswitch_rebootupdate as ru
 import netswitch_security as sec
 import netswitch_update as up
 
@@ -93,16 +94,17 @@ class HttpSecurityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = sandbox(up)
+        core.save_module_enabled("wifi", True)      # off by default: /wificonnect only exists (and is protected) while it is on
         cls.srv = web.Server(("127.0.0.1", 0), web.Handler)
         cls.port = cls.srv.server_address[1]
         threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
         cls.spawned = []
-        cls._spawn = probes._spawn_reboot
-        probes._spawn_reboot = lambda: cls.spawned.append(1)
+        cls._spawn = ru._spawn_reboot
+        ru._spawn_reboot = lambda: cls.spawned.append(1)
 
     @classmethod
     def tearDownClass(cls):
-        probes._spawn_reboot = cls._spawn
+        ru._spawn_reboot = cls._spawn
         cls.srv.shutdown()
         cls.srv.server_close()
         cleanup(cls.tmp)

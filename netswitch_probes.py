@@ -299,26 +299,6 @@ def start_hangup():
     return True
 
 
-# ------------------------------------------------------------------ reboot
-
-def _spawn_reboot():
-    """Reboot the Pi a couple of seconds from now, so the HTTP answer gets out
-    first. Detached from this service (which the reboot stops). Replaced by the tests."""
-    subprocess.Popen(["sh", "-c", "sleep 2; systemctl reboot || reboot"],
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-
-def start_reboot():
-    """Reboot the whole Raspberry Pi (DreamPi starts again with it). Returns (started, message)."""
-    in_call = core.dreampi_state()[0].startswith("call")
-    try:
-        _spawn_reboot()
-    except OSError as e:
-        return False, "Could not reboot (%s)" % e
-    core.debug_log("web page: reboot requested%s" % (" (a call was in progress)" if in_call else ""))
-    return True, "Rebooting"
-
-
 # --------------------------------------------------------------- versions
 
 DREAMPI_DIR = "/home/pi/dreampi"

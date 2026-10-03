@@ -26,7 +26,6 @@ import netswitch_core as core
 import netswitch_modules as modules
 import netswitch_probes as probes
 import netswitch_security as security
-import netswitch_update as updater
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 STATIC_FILES = {   # only these are served from /static/
@@ -315,8 +314,6 @@ class Handler(BaseHTTPRequestHandler):
             self.send(body, STATIC_FILES[name], cache=86400, fixed=True)
         elif path == "/modules":
             self.send(json.dumps({"modules": modules.listing()}), "application/json")
-        elif path == "/update":
-            self.send(json.dumps(updater.status()), "application/json")
         elif path == "/buttonconfig":
             self.send(json.dumps(_button_reply()), "application/json")
         elif modules.route("GET", path):
@@ -330,31 +327,17 @@ class Handler(BaseHTTPRequestHandler):
         refresh_page()
         path = self.path.split("?")[0]
         # Everything here changes something, and some of it runs as root: only the page itself may ask
-        # (not another site's form or script), and the actions that reboot, update or change Wi-Fi
-        # also need the PIN when one is set.
-        if not security.post_allowed(self.headers, strict=path in security.PROTECTED):
+        # (not another site's form or script), and the paths a module marks PROTECTED (reboot, update, Wi-Fi
+        # connect) also need the PIN when one is set.
+        if not security.post_allowed(self.headers, strict=modules.protected(path)):
             return self._refuse(403, "Refused: this request did not come from the page")
-        if path in security.PROTECTED:
+        if modules.protected(path):
             ok, message = security.check_pin(self.headers.get("X-Netswitch-Pin") or "")
             if not ok:
                 core.debug_log("web page: %s refused (%s)" % (path, message))
                 self.send(json.dumps({"started": False, "message": message}), "application/json",
                           status=429 if message.startswith("Too many") else 401)
                 return
-        if path == "/reboot":
-            started, message = probes.start_reboot()
-            self.send(json.dumps({"started": started, "message": message}), "application/json")
-            return
-        if path in ("/update/check", "/update/start"):
-            if not self.headers.get("X-Requested-With"):   # the check is harmless but still only for the page
-                return self._refuse(403, "Refused: this request did not come from the page")
-            message = ""
-            if path == "/update/check":
-                updater.check_in_background()
-            else:
-                started, message = updater.start_update()
-            self.send(json.dumps({"message": message, "status": updater.status()}), "application/json")
-            return
         if path == "/modules":
             return self._post_modules()
         if path == "/buttonconfig":

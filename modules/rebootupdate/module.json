@@ -1,0 +1,2 @@
+{"title": "Reboot and Update", "order": 80, "default": true, "web": "netswitch_rebootupdate",
+ "description": "Update the add-on from GitHub and reboot the Pi."}

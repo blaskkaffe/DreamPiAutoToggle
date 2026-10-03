@@ -75,10 +75,5 @@
              background:#1a1a1a url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23ccc' stroke-width='1.6'/></svg>") no-repeat right 9px center}   /* one height on every device: phones draw native selects at their own size */
  .in{position:relative}
  input[type=password],input[type=text]{width:100%;padding:10px 12px;margin:0 0 10px;border-radius:12px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.9em}
- /* update log: a small console that scrolls inside the card, so long lines never push the rows around */
- .updlog{margin:2px 0 12px;padding:8px 10px;background:#0b0b0b;border:1px solid var(--line);border-radius:12px;font:.72em/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#bbb;max-height:11.5em;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
- .updlog div{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;padding:1px 0 1px 12px;text-indent:-12px}
- .updlog div.lerr{color:#f08a8a} .updlog div.lok{color:#8fe09a} .updlog div.ldim{color:#777} .updlog div.lhd{color:#eee}
- #upd-row,#upd-do-row{font-size:.88em;padding:10px 3px}   /* the update rows read like the About table above them */
  .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
  body.settings-open > :not(#settings):not(.keep-visible){visibility:hidden}

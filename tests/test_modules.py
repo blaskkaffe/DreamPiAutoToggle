@@ -14,15 +14,15 @@ from urllib.request import Request, urlopen
 from support import ROOT, web, core, sandbox, cleanup
 
 REAL_MODULES = os.path.join(ROOT, "modules")
-NAMES = ["background", "debuglog", "led", "numbers", "players", "wifi"]
+NAMES = ["background", "debuglog", "led", "numbers", "players", "rebootupdate", "wifi"]
 # something in the page that only that module provides
 MARKER = {"background": "body.dcbg", "numbers": 'id="num-card"', "players": 'id="pl-games"', "debuglog": 'id="debug-bar"',
-          "led": 'id="led-section"', "wifi": 'id="wifi-row"'}
+          "led": 'id="led-section"', "wifi": 'id="wifi-row"', "rebootupdate": 'id="reboot-b"'}
 # a path only that module answers (GET, or POST when None)
 ENDPOINT = {"background": ("GET", "/background/dc-background.js"), "numbers": ("GET", "/numbers"), "players": ("GET", "/players"), "debuglog": ("GET", "/dtmf"),
-            "led": ("GET", "/ledconfig"), "wifi": ("POST", "/wifitoggle")}
-BASE_IDS = ('id="net"', 'class="pill dcnow-b"', 'class="pill dcnet-b"', 'id="about"', 'id="reboot-b"',
-            'id="gpio-section"', 'id="mod-list"', 'id="upd-check"')
+            "led": ("GET", "/ledconfig"), "wifi": ("POST", "/wifitoggle"), "rebootupdate": ("GET", "/update")}
+BASE_IDS = ('id="net"', 'class="pill dcnow-b"', 'class="pill dcnet-b"', 'id="about"',
+            'id="gpio-section"', 'id="mod-list"', 'id="github-row"')
 
 
 def inline_script(html):
@@ -98,7 +98,7 @@ class RepoModules(unittest.TestCase):
 
     def test_defaults(self):
         on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["default"]) for n in NAMES)
-        self.assertEqual(on, {"background": False, "debuglog": False, "led": True, "numbers": True, "players": True, "wifi": False})
+        self.assertEqual(on, {"background": False, "debuglog": False, "led": True, "numbers": True, "players": True, "rebootupdate": True, "wifi": False})
 
 
 class WithEverything(Base):
@@ -124,9 +124,15 @@ class WithEverything(Base):
         section = html[html.index('id="led-section"'):]
         self.assertNotIn('id="led-count-i"', section)
 
+    def test_protected_paths_are_the_modules_own_post_routes(self):
+        import netswitch_modules as mods
+        self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/wificonnect"})
+        for path in mods._state["protected"]:
+            self.assertTrue(mods.route("POST", path), path)
+
     def test_modules_menu_lists_them_all(self):
         got = self.json("/modules")["modules"]
-        self.assertEqual([m["name"] for m in got], ["numbers", "players", "wifi", "led", "debuglog", "background"])   # menu order
+        self.assertEqual([m["name"] for m in got], ["numbers", "players", "wifi", "led", "debuglog", "background", "rebootupdate"])   # menu order
         self.assertTrue(all(m["enabled"] for m in got))
         self.assertTrue(all(m["title"] and m["description"] for m in got))
 
@@ -165,7 +171,6 @@ class WithNothing(Base):
         self.assertEqual(self.status("GET", "/status"), 200)
         self.assertEqual(self.status("GET", "/buttonconfig"), 200)
         self.assertEqual(self.status("GET", "/about"), 200)
-        self.assertEqual(self.status("GET", "/update"), 200)
         self.assertEqual(self.json("/modules"), {"modules": []})
 
     def test_the_dreampi_dot_still_has_a_look(self):

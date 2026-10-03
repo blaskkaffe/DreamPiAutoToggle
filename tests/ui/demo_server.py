@@ -58,7 +58,7 @@ if os.environ.get("OFF"):         # modules switched off, as from the Modules me
 if os.environ.get("PIN"):
     import netswitch_security
     netswitch_security.set_pin(os.environ["PIN"])
-    netswitch_probes = __import__("netswitch_probes"); netswitch_probes._spawn_reboot = lambda: None
+    __import__("netswitch_rebootupdate")._spawn_reboot = lambda: None
 if os.environ.get("FAKEPLAYERS"):
     import json
     import netswitch_players as pl

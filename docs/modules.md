@@ -4,7 +4,7 @@ Read before adding, removing or restructuring a feature. Back to [CLAUDE.md](../
 
 ## What is base and what is a module
 
-**Base** (always there): the web page with the Selected-network box (DreamPi, modem, internet and Pi status, Hang up), the two network buttons (`POST /dcnow`, `/dcnet`), Settings with the buttons' GPIO config, **Modules**, System (with updates) and Reboot; the hook inside DreamPi (routing, state files, the fixed openMenu number), the buttons service, `GET /tag`, security (Host/Origin checks, PIN) and the updater.
+**Base** (always there): the web page with the Selected-network box (DreamPi, modem, internet and Pi status, Hang up), the two network buttons (`POST /dcnow`, `/dcnet`), Settings with the buttons' GPIO config, **Modules**, and System (the versions, a GitHub link); the hook inside DreamPi (routing, state files, the fixed openMenu number), the buttons service, `GET /tag` and security (Host/Origin checks, PIN).
 
 **Modules** (`modules/<name>/`, one folder each, all optional):
 
@@ -15,6 +15,7 @@ Read before adding, removing or restructuring a feature. Back to [CLAUDE.md](../
 | `wifi` | `modules/wifi/` | Wi-Fi setup: the Wi-Fi rows in Settings, `POST /wifitoggle` and `/wificonnect`, its own service `dreampi-netswitch-wifi` (`netswitch_wifi_service.py` + `netswitch_wifi_setup.py`) | **off** |
 | `led` | `modules/led/` | the status LEDs: the service (`netswitch_led.py`, `netswitch_led_drivers.py`), `netswitch_ledconfig.py`, the Status LED settings (with the calibration pop-up) **including the LED count / GPIO pin / wire order row**, `GET`/`POST /ledconfig` | on |
 | `background` | `modules/background/` | the animated Dreamcast background: `GET /background/*.js` (its own script files), the `#dcbg` layer and the translucent box styling | **off** |
+| `rebootupdate` | `modules/rebootupdate/` | the Updates rows (check, Update now, log) at the end of the System card, the Reboot card, `GET /update`, `POST /update/check`, `/update/start`, `/reboot`, and `netswitch_update.py` | on |
 | `debuglog` | `modules/debuglog/` | the Debug log bar and live log on the main page, `GET /log`, `/dtmf`, `POST /debug`, `/clearlog`, and the part that runs inside DreamPi (`netswitch_hookdebug.py`) | **off** |
 
 A module is **installed** when its folder (with a `module.json`) is there, and **enabled** when the Modules menu has it on (`modules.json` in `/opt/dreampi-netswitch`: `{"led": true, ...}`; a module without an entry uses `default` from its manifest). Not installed or not enabled = absent: no page parts, no endpoints (404), no service work. `core.module_manifest()`, `module_names()`, `module_enabled()`, `save_module_enabled()` read and write that state; the web service, the LED service, the buttons service and the hook (own Python 2 copy, `_module_active()`) all ask it.
@@ -41,8 +42,9 @@ The module named in `"web"` may define:
 
 - `GET = {"/path": fn(handler)}` and `POST = {...}`: exact paths. `fn` answers with `handler.send(body, ctype, status=200)`; a POST function returns `True` once it has answered (else the web service sends the usual 204 / 303). `handler._body(limit)` reads the request body.
 - `api(d, warnings)`: called for every `GET /api`; add keys to the answer dict `d` and lines to `warnings` (the warning boxes).
+- `PROTECTED = ("/path", ...)`: POST paths of this module that run as root (reboot, update, joining a network): they need the PIN when one is set.
 
-POSTs pass the same security gate as every other POST (Origin / `X-Requested-With`); only `security.PROTECTED` paths need the PIN. Unknown paths answer 404, so a module's endpoints disappear with the module.
+POSTs pass the same security gate as every other POST (Origin / `X-Requested-With`); only paths a module lists in its web entry's `PROTECTED = (...)` tuple need the PIN (and the page's header, never a plain form post): `/reboot`, `/update/start` (Reboot and Update) and `/wificonnect` (Wi-Fi setup). A module that is off has no protected paths at all, because it has no routes. Unknown paths answer 404, so a module's endpoints disappear with the module.
 
 ### Page slots
 
@@ -52,6 +54,8 @@ POSTs pass the same security gate as every other POST (Origin / `X-Requested-Wit
 |---|---|
 | `main` | `#main-slot`, under the two network buttons (Online players box, Debug log bar) |
 | `about_top` | extra rows at the top of the System card (the Wi-Fi setup row) |
+| `about_bottom` | extra rows at the end of the System card (the Updates rows) |
+| `system_after` | whole cards after the System card (the Reboot card) |
 | `sections_a` | whole Settings sections before the GPIO card (Special phone numbers) |
 | `buttons_rows` | extra rows in the buttons' GPIO card (the Wi-Fi hold button) |
 | `sections_b` | whole Settings sections after the GPIO card (Status LED, with the calibration pop-up) |

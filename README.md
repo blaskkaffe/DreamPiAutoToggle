@@ -51,7 +51,7 @@ Options can be combined, for example `sudo ./install.sh --leds=8 --no-https`.
 
 ### Update
 
-The page can do it for you: **Settings > System** (the last rows of the System card) checks GitHub for a newer version of this add-on (and tells you if DreamPi has newer scripts), and **Update now** fetches and installs it from the checkout you installed from (settings and ports are kept; the page is gone for a few seconds). By hand, which is what the rest of this section describes:
+The page can do it for you while the **Reboot and Update** module is on (see [Modules](#modules)): **Settings > System** (the last rows of the System card) checks GitHub for a newer version of this add-on (and tells you if DreamPi has newer scripts), and **Update now** fetches and installs it from the checkout you installed from (settings and ports are kept; the page is gone for a few seconds). By hand, which is what the rest of this section describes:
 
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
@@ -72,7 +72,7 @@ The web page runs on the Pi as root, because it has to restart DreamPi, reboot t
 
 ### Modules
 
-The add-on is a small **base** plus **modules**. The base is the web page with the Selected-network box, the two network buttons, the buttons' GPIO settings, Modules, System (with updates) and Reboot, and the hook inside DreamPi that does the routing. Everything else is a module, a folder in `modules/`:
+The add-on is a small **base** plus **modules**. The base is the web page with the Selected-network box, the two network buttons, the buttons' GPIO settings, Modules and System, and the hook inside DreamPi that does the routing. Everything else is a module, a folder in `modules/`:
 
 | Module | Folder | Adds | On by default |
 |---|---|---|---|
@@ -81,6 +81,7 @@ The add-on is a small **base** plus **modules**. The base is the web page with t
 | **Wi-Fi setup** | `modules/wifi/` | joining a Wi-Fi network without a keyboard (a temporary access point), and the Wi-Fi rows in Settings | no |
 | **Status LEDs** | `modules/led/` | the NeoPixel service, the Status LED settings (including the calibration pop-up), and the LED count / GPIO pin / wire order | yes |
 | **Dreamcast background** | `modules/background/` | the animated Dreamcast menu background behind the page (see [Credits](#credits)) | no |
+| **Reboot and Update** | `modules/rebootupdate/` | the Updates rows (check GitHub, **Update now**) in the System card and the Reboot card | yes |
 | **Debug log** | `modules/debuglog/` | the Debug log bar and live log on the main page, and its recording inside DreamPi | no |
 
 - **Switch one on or off:** Settings > **Modules**. It takes effect at once: the page reloads without the module's parts, and its endpoints and background work stop (the LED service goes dark while Status LEDs is off). Nothing is deleted, so switching it on again brings your settings back.
@@ -169,8 +170,8 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
 - **System:**
   - **Wi-Fi setup** (Wi-Fi module): at the top. Starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too, as rows with a name, "Secured" or "Open" and the signal strength; tap **Connect** on one, enter its password in the small box if it needs one, and connect (**Other network** is for a hidden one) - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
   - The add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model, the operating system, whether a PIN is set, a link to this project on GitHub, and - once a modem has been detected - its make/model, with a note if it isn't a known-working one.
-  - **Updates:** checks GitHub for a newer version of this add-on and for newer DreamPi scripts, with an **Update now** button (when installed from a git checkout).
-- **Reboot DreamPi** (last card): reboots the whole Raspberry Pi after a confirmation; a call in progress is cut. The page comes back by itself when the Pi is up again (about a minute).
+  - **Updates** (Reboot and Update module): checks GitHub for a newer version of this add-on and for newer DreamPi scripts, with an **Update now** button (when installed from a git checkout).
+- **Reboot DreamPi** (Reboot and Update module; last card): reboots the whole Raspberry Pi after a confirmation; a call in progress is cut. The page comes back by itself when the Pi is up again (about a minute).
 
 The selected network is DCNow! after every reboot (there is no default-network setting; to go back to DCNow! by phone use a **Toggle DCNow!** or **Call DCNow!** number).
 

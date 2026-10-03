@@ -1,0 +1,4 @@
+/* update log: a small console that scrolls inside the card, so long lines never push the rows around */
+.updlog{margin:2px 0 12px;padding:8px 10px;background:#0b0b0b;border:1px solid var(--line);border-radius:12px;font:.72em/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#bbb;max-height:11.5em;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
+.updlog div{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;padding:1px 0 1px 12px;text-indent:-12px}
+.updlog div.lerr{color:#f08a8a} .updlog div.lok{color:#8fe09a} .updlog div.ldim{color:#777} .updlog div.lhd{color:#eee}
