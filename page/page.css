@@ -66,6 +66,9 @@
  .pop .t{font-size:.85em;color:var(--txt2);margin-bottom:8px;overflow-wrap:anywhere}
  .pop .fld{display:flex;gap:8px;align-items:center} .pop .fld input{flex:1;min-width:0;margin:0}
  .pop input[type=text],.pop input[type=password]{margin:0 0 8px;padding:7px 12px} .pop .fld input[type=text]{margin:0}
+ .pop .choices{display:flex;flex-direction:column;gap:2px;max-height:40vh;overflow-y:auto;margin-top:8px} .pop .choices:empty{display:none}
+ .pop .choice{display:flex;justify-content:space-between;gap:10px;align-items:baseline;width:100%;box-sizing:border-box;padding:8px 10px;border:0;border-radius:var(--r);background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+ .pop .choice:hover:not(:disabled){background:var(--sel)} .pop .choice:disabled{opacity:.45;cursor:default} .pop .choice .sub{font-size:.8em;color:var(--txt2);white-space:nowrap}
  .pop .msg{margin:6px 0 8px} .pop .bar{margin:0;justify-content:space-between} .pop .bar.end{justify-content:flex-end}
  .pop .bar.center{justify-content:center;margin:6px 0 8px}
  .pop .pill-s{white-space:nowrap}

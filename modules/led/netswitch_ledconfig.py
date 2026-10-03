@@ -61,8 +61,8 @@ MESSAGES = [
     ("update-ok", "Update done", "addon", "The add-on was updated (for 10 minutes afterwards).", True),
     ("update-failed", "Update failed", "addon", "The update of the add-on failed (for 10 minutes afterwards).", True),
     ("reboot", "About to reboot", "addon", "A reboot was requested; the Pi goes down in a moment.", True),
-    ("players-game", "Your game is played", "players", "Others are playing your game. Needs a game name set up first; nothing detects it yet.", False),
-    ("players-friend", "A friend came online", "players", "A watched player came online. Needs a friends list; nothing detects it yet.", False),
+    ("players-game", "Your game is played", "players", "Someone is playing one of your favourite games (Settings > Online players).", True),
+    ("players-friend", "A friend came online", "players", "One of your favourite players is online (Settings > Online players).", True),
     ("ok", "Everything OK", "general", "No error and no warning: DreamPi is ready or in a call, and the network and internet work.", True),
     ("error", "Error", "general", u"Anything critical: DreamPi not running, no network, no internet, under-voltage, over 80 \u00b0C or the modem missing.", True),
     ("warning", "Warning", "general", "Any warning or important information: DNS failing, slow connection, weak Wi-Fi, no IP address yet, throttled or warm, DCNET unavailable, a failed update, a failed Wi-Fi setup, an update available.", True),
@@ -331,10 +331,10 @@ def gather(live=True):
     """What the messages are made from, read from the files the other services write. live=False is only what DreamPi is doing and
     which network is selected (the status dot's preview)."""
     ctx = {"state": core.dreampi_state()[0], "selected": "dcnet" if os.path.exists(core.FLAG) else "dcnow",
-           "net": {}, "wifi": "idle", "update": "idle", "update_info": {}, "reboot": False, "dcnet_problem": False}
+           "net": {}, "players": {}, "wifi": "idle", "update": "idle", "update_info": {}, "reboot": False, "dcnet_problem": False}
     if live:
         ctx.update(net=core.network_state() or {}, wifi=core.wifi_state().get("state", "idle"), update=core.update_status(),
-                   update_info=core.update_info(), reboot=core.reboot_pending(), dcnet_problem=bool(core.dcnet_problem()))
+                   update_info=core.update_info(), reboot=core.reboot_pending(), players=core.players_watch(), dcnet_problem=bool(core.dcnet_problem()))
     return ctx
 
 
@@ -378,6 +378,11 @@ def active_keys(ctx):
             keys.add(key)
     if ctx.get("reboot"):
         keys.add("reboot")
+    watch = ctx.get("players") or {}
+    if watch.get("games"):
+        keys.add("players-game")
+    if watch.get("friends"):
+        keys.add("players-friend")
     if any(k in keys for k in ERRORS):
         keys.add("error")
     if any(k in keys for k in WARNINGS) or ctx.get("dcnet_problem"):

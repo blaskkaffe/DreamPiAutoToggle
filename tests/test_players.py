@@ -127,9 +127,10 @@ class SourceTests(unittest.TestCase):
             return json.dumps(DC99)
         pl.fetch = fetch
         pl.refresh()
-        self.assertEqual(calls, ["https://dc99.test/p", "http://dc99.test/p"])
-        self.assertTrue(pl.status()["sources"][0]["ok"])
-        self.assertEqual(len(pl.status()["sources"][0]["sections"]), 2)
+        self.assertEqual([c for c in calls if "dc99.test" in c], ["https://dc99.test/p", "http://dc99.test/p"])
+        src = [x for x in pl.status()["sources"] if x["name"] == "DC99"][0]
+        self.assertTrue(src["ok"])
+        self.assertEqual(len(src["sections"]), 2)
 
     def test_an_empty_file_switches_the_list_off(self):
         self.write_sources([])
@@ -229,3 +230,92 @@ class IntegrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FavoritesTests(unittest.TestCase):
+    GAMES = [{"name": "Phantasy Star Online", "status": "green"}, {"name": "Quake III Arena", "status": "work in progress"},
+             {"title": "Dead Game", "colour": "red"}, {"name": "Mystery"}]
+
+    def setUp(self):
+        self.tmp = sandbox()
+        self._fetch = pl.fetch
+        pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": [], "games": []})
+
+    def tearDown(self):
+        pl.fetch = self._fetch
+        cleanup(self.tmp)
+
+    def test_game_status_words(self):
+        for text, want in (("green", "online"), ("Fully online", "online"), (True, "online"), ("WIP", "wip"), ("Work in progress", "wip"),
+                           ("yellow", "wip"), ("red", "offline"), ("Not online", "offline"), (False, "offline"), ("", "unknown"), ("?", "unknown")):
+            self.assertEqual(pl.game_status(text), want, text)
+
+    def test_parse_games_shapes(self):
+        got = dict((g["name"], g["status"]) for g in pl.parse_games({"games": self.GAMES}))
+        self.assertEqual(got, {"Phantasy Star Online": "online", "Quake III Arena": "wip", "Dead Game": "offline", "Mystery": "unknown"})
+        self.assertEqual(pl.parse_games({"Sonic": "green", "Dee Dee": "wip"}),
+                         [{"name": "Sonic", "status": "online"}, {"name": "Dee Dee", "status": "wip"}])
+        for bad in (None, 5, "x", {}, [], [1, None]):
+            self.assertEqual(pl.parse_games(bad), [])
+
+    def test_favorites_are_cleaned_and_saved(self):
+        got = pl.save_favorites({"games": [" Sonic  Adventure ", "sonic adventure", "", 5], "players": ["Ana", "ana", "Bo"]})
+        self.assertEqual(got, {"games": ["Sonic Adventure", "5"], "players": ["Ana", "Bo"]})
+        self.assertEqual(pl.favorites(), got)
+        self.assertEqual(pl.favorites.__name__, "favorites")
+
+    def test_missing_or_broken_file_means_no_favorites(self):
+        self.assertEqual(pl.favorites(), {"games": [], "players": []})
+        with open(core.PLAYERS_FAVORITES, "w") as f:
+            f.write("{broken")
+        self.assertEqual(pl.favorites(), {"games": [], "players": []})
+
+    def test_watch_matches_games_and_players(self):
+        online = [{"player": "Ana", "game": "Phantasy Star Online Ver.2", "network": "DCNET"}, {"player": "Bo", "game": "", "network": "DCNow!"}]
+        favs = {"games": ["Phantasy Star Online", "Quake III Arena"], "players": ["ANA", "Cy"]}
+        self.assertEqual(pl.watch_result(online, favs), {"games": ["Phantasy Star Online"], "friends": ["ANA"]})
+        self.assertFalse(pl.same_game("Sonic", "Sonic Adventure 2"))      # too short to count as "inside"
+
+    def test_refresh_writes_the_watch_file_the_leds_read(self):
+        pl.save_favorites({"games": ["Phantasy Star Online"], "players": ["Ana"]})
+        self.assertEqual(core.players_watch(), {"games": [], "friends": []})     # nothing loaded yet
+        pl.fetch = lambda url: json.dumps(self.GAMES if "games" in url else DC99)
+        pl.refresh()
+        self.assertEqual(core.players_watch(), {"games": ["Phantasy Star Online"], "friends": ["Ana"]})
+        pl.save_favorites({"games": ["Quake III Arena"], "players": []})
+        self.assertEqual(core.players_watch(), {"games": [], "friends": []})
+
+    def test_stale_watch_file_is_ignored(self):
+        with open(core.PLAYERS_WATCH, "w") as f:
+            json.dump({"time": 1, "games": ["x"], "friends": ["y"]}, f)
+        self.assertEqual(core.players_watch(), {"games": [], "friends": []})
+
+    def test_choices_mark_what_is_not_fully_online(self):
+        pl._cache.update({"time": 1, "games": pl.parse_games(self.GAMES),
+                          "players": [{"player": "Ana", "game": "Outtrigger", "network": "DCNET"}]})
+        by = dict((c["value"], c) for c in pl.game_choices())
+        self.assertFalse(by["Phantasy Star Online"]["disabled"])
+        self.assertEqual(by["Phantasy Star Online"]["sub"], "")
+        self.assertFalse(by["Quake III Arena"]["disabled"])
+        self.assertEqual(by["Quake III Arena"]["sub"], "work in progress")
+        self.assertTrue(by["Dead Game"]["disabled"])
+        self.assertEqual(by["Outtrigger"]["sub"], "playing now")
+        order = [c["value"] for c in pl.game_choices()]
+        self.assertTrue(order.index("Phantasy Star Online") < order.index("Quake III Arena") < order.index("Dead Game"))
+
+    def test_http_round_trip(self):
+        web.start_background = getattr(web, "start_background", None)
+        pl._cache.update({"time": 1, "games": pl.parse_games(self.GAMES), "players": []})
+        class H(object):
+            sent = None
+            def send(self, body, ctype, status=200):
+                self.sent = (json.loads(body) if ctype == "application/json" else body, status)
+            def _body(self, limit):
+                return json.dumps({"games": ["Quake III Arena"], "players": ["Ana"]}).encode()
+        h = H()
+        pl._post_favorites(h)
+        groups = dict((g["key"], g) for g in h.sent[0]["groups"])
+        self.assertEqual(groups["games"]["items"], ["Quake III Arena"])
+        self.assertEqual(groups["games"]["notes"], {"Quake III Arena": "work in progress", "Dead Game": "not online yet"})
+        self.assertEqual(groups["players"]["items"], ["Ana"])
+        self.assertTrue(groups["players"]["free"] and not groups["games"]["free"])

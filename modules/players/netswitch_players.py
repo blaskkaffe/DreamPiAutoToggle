@@ -5,6 +5,7 @@
 # web service and the installer cope with both being gone).
 # Works on Python 3 and 2.7.
 import json
+import os
 import threading
 import time
 
@@ -22,7 +23,12 @@ import netswitch_core as core
 # DCNow! feed. Players found in both are listed once.
 DEFAULT_SOURCES = [{"name": "DC99", "url": "https://dc99.net/online/dcnet_status.php"},
                    {"name": "Dreamcast.online", "url": "https://dreamcast.online/now/api/users.json"}]
+# Game lists (sources with "kind": "games" in players_sources.json): which online games exist and how far each one works.
+# UNVERIFIED: the address and the field names are a guess, the host could not be reached from the development sandbox.
+DEFAULT_GAME_SOURCES = [{"name": "Dreamcast Live", "url": "https://dreamcastlive.net/games.json", "kind": "games"}]
 CACHE_SECONDS = 60
+WATCH_EVERY = 60          # the background check for favourites (only while there are favourites)
+MAX_FAVORITES = 30
 TIMEOUT = 8
 MAX_BYTES = 1000000
 MAX_PLAYERS = 300
@@ -47,7 +53,7 @@ except NameError:
     _TEXT = str
 
 _lock = threading.Lock()
-_cache = {"time": 0, "refreshing": False, "players": [], "sources": []}
+_cache = {"time": 0, "refreshing": False, "players": [], "sources": [], "games": []}
 
 
 def fetch(url):
@@ -210,14 +216,138 @@ def parse_players(data, default_network=""):
     return out
 
 
-def sources():
+def _all_sources():
     try:
         with open(core.PLAYERS_SOURCES) as f:
             data = json.load(f)
-        found = [s for s in data if isinstance(s, dict) and str(s.get("url", "")).startswith(("http://", "https://"))]
-        return found
+        return [s for s in data if isinstance(s, dict) and str(s.get("url", "")).startswith(("http://", "https://"))]
     except (IOError, OSError, ValueError, TypeError):
-        return list(DEFAULT_SOURCES)
+        return None
+
+
+def sources():
+    """The player feeds (everything that is not a game list)."""
+    found = _all_sources()
+    return list(DEFAULT_SOURCES) if found is None else [s for s in found if s.get("kind") != "games"]
+
+
+def game_sources():
+    """The game lists: the "kind": "games" entries of players_sources.json, else the default."""
+    found = [s for s in (_all_sources() or []) if s.get("kind") == "games"]
+    return found or list(DEFAULT_GAME_SOURCES)
+
+
+# ---------------------------------------------------------------- the game list and the favourites
+_STATUS_KEYS = ("status", "state", "colour", "color", "online", "working", "playable")
+_GAME_LIST_KEYS = ("games", "data", "items", "list", "results")
+
+
+def game_status(value):
+    """'online' (green: fully online), 'wip' (work in progress), 'offline' (not online) or 'unknown'."""
+    if value is True:
+        return "online"
+    if value is False:
+        return "offline"
+    t = str(value or "").strip().lower()
+    if not t:
+        return "unknown"
+    if any(w in t for w in ("wip", "progress", "yellow", "orange", "partial", "beta", "limited")):
+        return "wip"
+    if any(w in t for w in ("not", "offline", "red", "down", "no", "false", "dead", "closed")):
+        return "offline"
+    if any(w in t for w in ("green", "online", "work", "full", "yes", "true", "up", "ok", "live")):
+        return "online"
+    return "unknown"
+
+
+def parse_games(data):
+    """[{"name", "status"}] from a game list: a list of objects (name/title + a status/colour field), an object holding
+    such a list, or a {"Game": "status"} mapping. Unknown shapes give an empty list."""
+    out = []
+    if isinstance(data, dict):
+        for key in _GAME_LIST_KEYS:
+            if isinstance(data.get(key), list):
+                return parse_games(data[key])
+        for name, v in data.items():
+            if isinstance(v, (_TEXT, bool)):
+                out.append({"name": str(name)[:60], "status": game_status(v)})
+            elif isinstance(v, dict) and not isinstance(v.get("name"), _TEXT):
+                out.append({"name": str(name)[:60], "status": game_status(_first(v, _STATUS_KEYS) or v.get("online"))})
+        return out
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, _TEXT) and item.strip():
+                out.append({"name": item.strip()[:60], "status": "unknown"})
+            elif isinstance(item, dict):
+                name = _first(item, ("name", "title", "game", "game_name"))
+                if name:
+                    raw = next((item[k] for k in _STATUS_KEYS if k in item and item[k] not in (None, "")), "")
+                    out.append({"name": name[:60], "status": game_status(raw)})
+    return out
+
+
+def _norm(text):
+    return " ".join(str(text or "").lower().split())
+
+
+def same_game(a, b):
+    """Two spellings of a game: equal, or one inside the other (Phantasy Star Online / Phantasy Star Online Ver.2)."""
+    a, b = _norm(a), _norm(b)
+    if not a or not b:
+        return False
+    return a == b or (min(len(a), len(b)) >= 6 and (a in b or b in a))
+
+
+def clean_names(raw):
+    out, seen = [], set()
+    for item in raw if isinstance(raw, list) else []:
+        n = " ".join(str(item).split())[:60]
+        if n and n.lower() not in seen and len(out) < MAX_FAVORITES:
+            seen.add(n.lower())
+            out.append(n)
+    return out
+
+
+def favorites():
+    try:
+        with open(core.PLAYERS_FAVORITES) as f:
+            data = json.load(f)
+        return {"games": clean_names(data.get("games")), "players": clean_names(data.get("players"))}
+    except (IOError, OSError, ValueError, AttributeError):
+        return {"games": [], "players": []}
+
+
+def save_favorites(data):
+    data = data if isinstance(data, dict) else {}
+    cleaned = {"games": clean_names(data.get("games")), "players": clean_names(data.get("players"))}
+    tmp = core.PLAYERS_FAVORITES + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cleaned, f)
+    os.rename(tmp, core.PLAYERS_FAVORITES)
+    write_watch()
+    return cleaned
+
+
+def watch_result(players, favs):
+    """Which favourites are online: games = the favourite games somebody plays, friends = the favourite players that are online."""
+    games = [g for g in favs["games"] if any(same_game(g, p.get("game")) for p in players)]
+    friends = [n for n in favs["players"] if any(_norm(n) == _norm(p["player"]) for p in players)]
+    return {"games": games, "friends": friends}
+
+
+def write_watch():
+    """Tell the LED service (a file, no socket) which favourites are online, from the cached list."""
+    with _lock:
+        have, players = _cache["time"], list(_cache["players"])
+    result = watch_result(players, favorites()) if have else {"games": [], "friends": []}
+    result["time"] = int(time.time())
+    tmp = core.PLAYERS_WATCH + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump(result, f)
+        os.rename(tmp, core.PLAYERS_WATCH)
+    except (IOError, OSError):
+        pass
 
 
 def refresh():
@@ -226,8 +356,22 @@ def refresh():
         if _cache["refreshing"]:
             return
         _cache["refreshing"] = True
-    players, report = [], []
+    players, report, games = [], [], []
     try:
+        for s in game_sources():
+            name = str(s.get("name") or s["url"])[:30]
+            try:
+                try:
+                    text = fetch(s["url"])
+                except Exception:
+                    if not s["url"].startswith("https://"):
+                        raise
+                    text = fetch("http://" + s["url"][len("https://"):])
+                found = parse_games(json.loads(text))
+                games += found
+                report.append({"name": name, "ok": True, "count": len(found), "error": None, "kind": "games"})
+            except Exception as e:
+                report.append({"name": name, "ok": False, "count": 0, "error": str(getattr(e, "reason", None) or e)[:80], "kind": "games"})
         for s in sources():
             name = str(s.get("name") or s["url"])[:30]
             try:
@@ -260,7 +404,8 @@ def refresh():
         players.sort(key=lambda p: (order.get(p["network"], 2), p["network"], p["game"].lower(), p["player"].lower()))
     finally:
         with _lock:
-            _cache.update({"time": int(time.time()), "players": players[:MAX_PLAYERS], "sources": report, "refreshing": False})
+            _cache.update({"time": int(time.time()), "players": players[:MAX_PLAYERS], "sources": report, "games": games, "refreshing": False})
+        write_watch()
 
 
 def status():
@@ -327,8 +472,107 @@ def view():
     return out
 
 
+STATUS_NOTE = {"wip": "work in progress", "offline": "not online yet", "unknown": ""}
+
+
+def game_choices(favs=None):
+    """The games to pick from: the game list (green = fully online, work in progress; the others are shown greyed out so it is
+    clear they are not online) plus games somebody is playing right now that the list doesn't have."""
+    with _lock:
+        listed, players = list(_cache["games"]), list(_cache["players"])
+    seen, out = set(), []
+    for g in listed:
+        if g["name"].lower() in seen:
+            continue
+        seen.add(g["name"].lower())
+        out.append({"value": g["name"], "label": g["name"], "status": g["status"]})
+    for p in players:
+        g = p.get("game")
+        if g and g.lower() not in seen and not any(same_game(g, x["value"]) for x in out):
+            seen.add(g.lower())
+            out.append({"value": g, "label": g, "status": "playing"})
+    rank = {"online": 0, "playing": 0, "unknown": 1, "wip": 2, "offline": 3}
+    out.sort(key=lambda c: (rank.get(c["status"], 1), c["label"].lower()))
+    for c in out:
+        note = "playing now" if c["status"] == "playing" else STATUS_NOTE.get(c["status"], "")
+        c["sub"] = note
+        c["disabled"] = c.pop("status") == "offline"
+    return out
+
+
+def _favorites_reply():
+    """The standard "picker" answer: two groups, the games with a choice list, the players with the names online now."""
+    favs = favorites()
+    choices = game_choices()
+    notes = dict((c["value"], c["sub"]) for c in choices if c["sub"] and c["sub"] != "playing now")
+    with _lock:
+        players = list(_cache["players"])
+    names = sorted(set(p["player"] for p in players), key=lambda n: n.lower())
+    return {"groups": [{"key": "games", "label": "Favorite games", "sub": "The LEDs show when someone plays one of them",
+                        "items": favs["games"], "choices": choices, "notes": notes, "free": False,
+                        "empty": "The game list is not loaded yet"},
+                       {"key": "players", "label": "Favorite players", "sub": "The LEDs show when one of them comes online",
+                        "items": favs["players"], "free": True,
+                        "choices": [{"value": n, "label": n} for n in names], "empty": "Nobody is online; type a name"}],
+            "defaults": {"games": [], "players": []},
+            "rules": {"min": 1, "max": 40, "per_group": MAX_FAVORITES, "unique": False, "add_label": "Add",
+                      "add_title": "Add to {group}", "min_msg": "Type a name",
+                      "help": "Pick games from the list (green = fully online, work in progress is marked; games that are not online yet "
+                              "can't be picked) or players who are online now, or type a player's name. The LED messages "
+                              "'Your game is played' and 'A friend came online' use this list.",
+                      "restore": "Remove all"}}
+
+
+def _get_favorites(h):
+    with _lock:
+        stale = time.time() - _cache["time"] > CACHE_SECONDS and not _cache["refreshing"]
+    if stale:
+        t = threading.Thread(target=refresh)
+        t.daemon = True
+        t.start()
+    h.send(json.dumps(_favorites_reply()), "application/json")
+
+
+def _post_favorites(h):
+    try:
+        save_favorites(json.loads(h._body(16384).decode("utf-8")))
+    except (ValueError, IOError, OSError) as e:
+        h.send(str(e), "text/plain; charset=utf-8", status=400)
+        return True
+    h.send(json.dumps(_favorites_reply()), "application/json")
+    return True
+
+
+_watcher = {"on": False}
+
+
+def _watch_loop():
+    while True:
+        try:
+            favs = favorites()
+            if favs["games"] or favs["players"]:
+                with _lock:
+                    stale = time.time() - _cache["time"] > WATCH_EVERY
+                if stale:
+                    refresh()
+        except Exception:
+            pass
+        time.sleep(WATCH_EVERY / 2)
+
+
+def start():
+    """Called once by the web service: keeps the list fresh while there are favourites, so the LEDs work with no page open."""
+    if _watcher["on"]:
+        return
+    _watcher["on"] = True
+    t = threading.Thread(target=_watch_loop)
+    t.daemon = True
+    t.start()
+
+
 def _get(h):
     h.send(json.dumps(view()), "application/json")
 
 
-GET = {"/players": _get}
+GET = {"/players": _get, "/players/favorites": _get_favorites}
+POST = {"/players/favorites": _post_favorites}

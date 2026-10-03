@@ -1,4 +1,8 @@
 {
+ "settings": [
+  {"box": "favorites", "title": "Favorite players and games", "items": [
+   {"type": "picker", "source": "/players/favorites"}]}
+ ],
  "dashboard": [
   {"box": "players", "items": [
    {"type": "infobox", "label": "Online players:", "parts": "@players.parts", "rows": [
