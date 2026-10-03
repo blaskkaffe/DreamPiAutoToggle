@@ -83,6 +83,7 @@
  .mlist .srow:first-child{border-top:0} .pop .mlist{margin:0 0 8px} .srow[data-id] > span:nth-child(2){flex:1} .srow[data-id] > .fixed{flex:none;white-space:nowrap}
  .dragging,.dragging *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none} .dragging .grip{cursor:grabbing}
  .srow.drag{position:relative;z-index:5;will-change:transform;background:var(--card);border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.65);border-top-color:transparent}
+ .pop .srow.drag{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}   /* in a pop-up the lifted row is as wide as the pop-up itself */
  .xpand > .bar{margin:20px 0 0} .xbody{margin:0}
  .wtext{margin:6px 0}
  .carousel{display:block;min-width:0} .carousel .dup,.carousel .sp{display:none}

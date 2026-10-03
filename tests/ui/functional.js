@@ -118,6 +118,8 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   const before0 = await order();
   await drag(1, 3);
   ok(JSON.stringify(await order()) !== JSON.stringify(before0) && await page.locator('.pop.open .srow.drag').count() === 1, 'dragging a row moves it while the others make room');
+  const wd = await page.evaluate(() => ({ row: Math.round(document.querySelector('.pop.open .srow.drag').getBoundingClientRect().width), pop: Math.round(document.querySelector('.pop.open').getBoundingClientRect().width) }));
+  ok(Math.abs(wd.row - wd.pop) <= 1, 'the dragged row is as wide as the pop-up (' + wd.row + ' of ' + wd.pop + ')');
   await page.mouse.up(); await settle(1500);
   const moved = await order();
   ok(moved[3] === before0[1] && await page.evaluate(() => window.__still === true) && await page.locator('.pop.open').count() === 1, 'dropping only moves it: the page is not redrawn and the pop-up stays open');
