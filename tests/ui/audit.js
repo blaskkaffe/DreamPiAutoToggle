@@ -70,8 +70,11 @@ const AUDIT = () => {
     await page.evaluate(() => { const b = document.getElementById('cal-open'); if (b) b.click(); }); await page.waitForTimeout(300); await check('calibration pop-up');
     await page.keyboard.press('Escape');
     // switch button functions
-    await page.selectOption('select[aria-label="Button 1 function"]', { label: 'On = Wi-Fi setup' }); await page.waitForTimeout(600); await check('switch fn selected');
-    await page.selectOption('select[aria-label="Button 1 function"]', { label: 'Toggle network' }); await page.waitForTimeout(500);
+    await page.click('[data-box="gpio"] .srow:has-text("Button 1") > button'); await page.waitForTimeout(400); await check('GPIO edit pop-up');
+    await page.selectOption('select[aria-label="Button 1: Function"]', { label: 'On = Wi-Fi setup' }); await page.waitForTimeout(700); await check('switch fn selected');
+    await page.selectOption('select[aria-label="Button 1: Function"]', { label: 'Toggle network' }); await page.waitForTimeout(500);
+    await page.keyboard.press('Escape');
+    await page.click('[data-box="gpio"] .srow:has-text("LED") > button'); await page.waitForTimeout(400); await check('LED edit pop-up'); await page.keyboard.press('Escape');
     summary[w] = problems;
     await page.close();
   }

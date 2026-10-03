@@ -1,19 +1,92 @@
 {
  "settings": [
-  {"box": "system", "title": "System", "items": [
-   {"type": "row", "title": "Wi-Fi setup", "sub": "@wifi.sub",
-    "control": {"type": "button", "label": "@wifi.button", "post": "/wifitoggle", "disabled": "@wifi.disabled"}},
-   {"type": "list", "items": "@wifi.list", "when": "@wifi.show_list", "empty": "No networks found",
-    "row": {"title": "ssid", "sub": "info", "button": "Connect"},
-    "extra": [{"title": "Other network", "sub": "For a hidden network: enter its name", "button": "Enter",
-               "item": {"ssid": "", "secured": true, "other": true}}],
-    "popup": {"title": "Connect to {ssid}", "title_other": "Connect to another network", "submit": "Connect", "busy": "Connecting...",
-              "post": "/wificonnect",
-              "fields": [{"key": "ssid", "label": "Network name", "show_if": "other", "required": true, "required_msg": "Enter the network name"},
-                         {"key": "password", "label": "Password", "type": "password", "show_if": "secured", "blank": true}]}}]},
-  {"box": "gpio", "title": "GPIO", "items": [
-   {"type": "form", "get": "/wifibutton", "post": "/wifibutton", "fields": [
-    {"title": "Wi-Fi setup", "sub_of": "wifi_button", "controls": [
-     {"type": "select", "key": "wifi_button", "options": "choices", "label": "Wi-Fi setup button"}]}]}]}
+  {
+   "box": "system",
+   "title": "System",
+   "items": [
+    {
+     "type": "row",
+     "title": "Wi-Fi setup",
+     "sub": "@wifi.sub",
+     "control": {
+      "type": "button",
+      "label": "@wifi.button",
+      "post": "/wifitoggle",
+      "disabled": "@wifi.disabled"
+     }
+    },
+    {
+     "type": "list",
+     "items": "@wifi.list",
+     "when": "@wifi.show_list",
+     "empty": "No networks found",
+     "row": {
+      "title": "ssid",
+      "sub": "info",
+      "button": "Connect"
+     },
+     "extra": [
+      {
+       "title": "Other network",
+       "sub": "For a hidden network: enter its name",
+       "button": "Enter",
+       "item": {
+        "ssid": "",
+        "secured": true,
+        "other": true
+       }
+      }
+     ],
+     "popup": {
+      "title": "Connect to {ssid}",
+      "title_other": "Connect to another network",
+      "submit": "Connect",
+      "busy": "Connecting...",
+      "post": "/wificonnect",
+      "fields": [
+       {
+        "key": "ssid",
+        "label": "Network name",
+        "show_if": "other",
+        "required": true,
+        "required_msg": "Enter the network name"
+       },
+       {
+        "key": "password",
+        "label": "Password",
+        "type": "password",
+        "show_if": "secured",
+        "blank": true
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "box": "gpio",
+   "title": "GPIO",
+   "items": [
+    {
+     "type": "form",
+     "get": "/wifibutton",
+     "post": "/wifibutton",
+     "fields": [
+      {
+       "title": "Wi-Fi setup",
+       "sub_text": "wifi_button",
+       "controls": [
+        {
+         "type": "select",
+         "key": "wifi_button",
+         "options": "choices",
+         "label": "Hold button"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
  ]
 }

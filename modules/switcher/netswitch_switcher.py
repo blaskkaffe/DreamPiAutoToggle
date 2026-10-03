@@ -118,6 +118,15 @@ def _values():
             "button2_function": core.button_function(2), "button2_gpio": core.button_gpio(2)}
 
 
+def button_texts(values):
+    """The line under each button's row: what its function does, with its pin ("GPIO17 toggles DCNow! and DCNET")."""
+    texts = {}
+    for n in (1, 2):
+        template = [f[4] for f in core.BUTTON_FUNCTIONS if f[0] == values["button%d_function" % n]]
+        texts["button%d" % n] = (template[0] if template else "{pin} is not used").replace("{pin}", "GPIO%d" % values["button%d_gpio" % n])
+    return texts
+
+
 def _reply():
     values = _values()
     functions = []
@@ -125,9 +134,9 @@ def _reply():
         # the Wi-Fi switch functions only while the Wi-Fi module is on (or while one is already chosen)
         if needs_wifi and not core.wifi_enabled() and name not in (values["button1_function"], values["button2_function"]):
             continue
-        functions.append({"value": name, "label": label, "group": group, "sub": sub})
-    return {"values": values, "options": {"functions": functions,
-                                          "gpios": [{"value": g, "label": "GPIO%d" % g} for g in core.BUTTON_GPIO_PINS]}}
+        functions.append({"value": name, "label": label, "group": group})
+    return {"values": values, "texts": button_texts(values),
+            "options": {"functions": functions, "gpios": [{"value": g, "label": "GPIO%d" % g} for g in core.BUTTON_GPIO_PINS]}}
 
 
 def _get_buttons(h):

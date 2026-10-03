@@ -39,9 +39,10 @@ def _connect(h):
 
 
 def _wifi_button_reply():
-    return {"values": {"wifi_button": core.wifi_button()},
-            "options": {"choices": [{"value": c[0], "label": c[1], "sub": "Hold button %s for 3 s to start Wi-Fi setup" % ("1 + 2" if c[0] == "12" else c[0])}
-                                    for c in core.WIFI_BUTTON_CHOICES]}}
+    choice = core.wifi_button()
+    return {"values": {"wifi_button": choice},
+            "texts": {"wifi_button": "Hold button %s for 3 s to start Wi-Fi setup" % ("1 + 2" if choice == "12" else choice)},
+            "options": {"choices": [{"value": c[0], "label": c[1]} for c in core.WIFI_BUTTON_CHOICES]}}
 
 
 def _get_button(h):

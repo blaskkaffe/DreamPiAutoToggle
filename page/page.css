@@ -78,7 +78,7 @@
  .console .l-info{color:#8bf} .console .l-warn{color:#e0b400} .console .l-mod{color:#aaa} .console .l-b{font-weight:bold}
  .dbox{margin:0} .dbox > h2{margin-top:6px}
  .ctls{display:flex;gap:8px;align-items:center}
- .srow.wrap > .ctls{margin-left:auto} .fsub{flex-basis:100%;margin:-6px 0 2px}
+ .srow.wrap > .ctls{margin-left:auto}
  .grip{flex:none;width:40px;height:44px;margin:-6px 0 -6px -10px;padding:0;background:none;color:#777;font-size:1.2em;letter-spacing:-.15em;line-height:1;cursor:grab;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none} .grip:hover,.grip:focus-visible{color:#ccc}
  .mlist .srow:first-child{border-top:0} .pop .mlist{margin:0 0 8px} .srow[data-id] > span:nth-child(2){flex:1} .srow[data-id] > .fixed{flex:none;white-space:nowrap}
  .dragging,.dragging *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none} .dragging .grip{cursor:grabbing}
@@ -101,6 +101,9 @@
  .now .wlist .pw{flex:none;font-weight:bold;white-space:nowrap}
  .now .links{display:flex;flex-wrap:wrap;gap:6px} .now .links a{color:#fff;opacity:.9;padding:6px 0}
  .now .st{display:block;overflow-wrap:anywhere}
+ .pop .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0} .pop .frow > span{color:var(--txt2);font-size:.9em}
+ .infobtn{flex:none;width:34px;height:34px;padding:0;border-radius:50%;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#ddd;font:italic 600 1.05em Georgia,serif;line-height:1}
+ .pop .infotext{font-size:.9em;color:var(--txt2);margin-bottom:10px}
  .tgl{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:4px}
  .bar .bar{margin:0}
  .bgpart.part{position:fixed;left:0;right:0;z-index:-1;pointer-events:none} .bgpart.part.top{top:0} .bgpart.part.bottom{bottom:0}   /* a background that fills only an area: its module sets the height */

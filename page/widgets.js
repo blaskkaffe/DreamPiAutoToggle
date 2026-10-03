@@ -249,27 +249,42 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
   (s.extra||[]).forEach(function(x,i){inner.appendChild(rowFor(x,i,true))})}
  UPD.push(function(){var shown=s.when===undefined||!!val(s.when);if(!shown){if(key!==""){key="";inner.innerHTML="";p.close()}return}paint()});
  hook("settingsClose",function(){p.close()});return el};
+// ---- the standard "edit row": the title and a grey line on the left, a small button on the right (Edit, Add ...), and - once there is
+// something to show - a list of tags underneath. Forms, the phone number table and the colour picks all use this one look.
+//   r.el the row   r.btn the button   r.setSub(text)   r.setList(items, onRemove(i))   (an empty or missing list takes no room)
+function editRow(o){var sub=h("span",{"class":"sub"}),btn=h("button",{type:"button","class":"pill-s",text:o.button||"Edit"}),below=h("div",{"class":"below"}),
+ row=h("div",{"class":"srow wrap"},[h("span",{},[document.createTextNode(o.title||""),sub]),btn,below]);
+ if(o.aria)btn.setAttribute("aria-label",o.aria);sh(below,false);sh(sub,false);
+ return {el:row,btn:btn,
+  setSub:function(t){setLines(sub,t);sh(sub,!!t)},
+  setList:function(items,onRemove){below.innerHTML="";items=items||[];sh(below,items.length>0);if(!items.length)return;
+   var tags=h("div",{"class":"tags"});
+   items.forEach(function(it,i){var t=h("span",{"class":"tag"},[document.createTextNode(it)]);
+    if(onRemove){var x=h("button",{type:"button","aria-label":"Remove "+it,html:"&#10005;"});x.onclick=function(e){e.stopPropagation();onRemove(i)};t.appendChild(x)}
+    else t.style.paddingRight="12px";
+    tags.appendChild(t)});below.appendChild(tags)}}}
 // ---- a table to pick values for: groups of short items (phone numbers) with an Add pop-up per group (reply of GET source)
 W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null,addKey=null,
- list=h("div"),help=h("div",{"class":"srow"}),def=h("div",{"class":"srow"}),
- pop=h("div"),popT=h("div",{"class":"t"}),inp=h("input",{type:"text","aria-label":"Value to add"}),addB=h("button",{type:"button","class":"pill-s",text:"Add"}),msg=h("div",{"class":"msg"});
+ list=h("div"),
+ restore=h("button",{type:"button","class":"pill-s"}),info=h("button",{type:"button","class":"infobtn",text:"i",title:"Information","aria-label":"Information"}),
+ foot=h("div",{"class":"srow"},[restore,info]),
+ pop=h("div"),popT=h("div",{"class":"t"}),inp=h("input",{type:"text","aria-label":"Value to add"}),addB=h("button",{type:"button","class":"pill-s",text:"Add"}),msg=h("div",{"class":"msg"}),
+ infoPop=h("div"),infoText=h("div",{"class":"infotext"}),infoDone=h("button",{type:"button","class":"pill-s",text:"Done"});
  pop.appendChild(popT);pop.appendChild(h("div",{"class":"fld"},[inp,addB]));pop.appendChild(msg);
- el.appendChild(list);el.appendChild(help);el.appendChild(def);el.appendChild(pop);
- var p=ui.popup(pop);p.onclose=function(){addKey=null};
+ infoPop.appendChild(infoText);infoPop.appendChild(h("div",{"class":"bar end"},[infoDone]));
+ el.appendChild(list);el.appendChild(foot);el.appendChild(pop);el.appendChild(infoPop);
+ var p=ui.popup(pop),ip=ui.popup(infoPop);p.onclose=function(){addKey=null};
+ info.onclick=function(e){ip.toggle(info,e)};infoDone.onclick=function(){ip.close()};
  function rules(){return cfg.rules||{}}
  function paint(){if(!cfg)return;var R=rules();
   list.innerHTML="";
   cfg.groups.forEach(function(g){
-   var tags=h("div",{"class":"tags"});
-   if(g.items.length)g.items.forEach(function(it,i){var t=h("span",{"class":"tag"},[document.createTextNode(it)]),x=h("button",{type:"button","aria-label":"Remove "+it,html:"&#10005;"});
-    x.onclick=function(e){e.stopPropagation();g.items.splice(i,1);save()};t.appendChild(x);tags.appendChild(t)});
-   else tags.appendChild(h("span",{"class":"empty",text:R.empty||"Nothing yet"}));
-   var add=h("button",{type:"button","class":"pill-s",text:R.add_label||"Add","aria-label":(R.add_label||"Add")+" to "+g.label});
-   add.onclick=function(e){openAdd(g,add,e)};
-   var row=h("div",{"class":"srow wrap"},[h("span",{},[document.createTextNode(g.label),g.sub?h("span",{"class":"sub",text:g.sub}):null]),add,h("div",{"class":"below"},[tags])]);
-   list.appendChild(row)});
-  setLines(help.firstChild||help.appendChild(h("span",{"class":"sub"})),R.help||"");
-  def.innerHTML="";if(R.restore){var b=h("button",{type:"button","class":"pill-s",text:R.restore});b.onclick=function(){cfg.groups.forEach(function(g){g.items=(cfg.defaults[g.key]||[]).slice()});save()};def.appendChild(b)}}
+   var r=editRow({title:g.label,button:R.add_label||"Add",aria:(R.add_label||"Add")+" to "+g.label});
+   r.setSub(g.sub||"");r.setList(g.items,function(i){g.items.splice(i,1);save()});
+   r.btn.onclick=function(e){openAdd(g,r.btn,e)};list.appendChild(r.el)});
+  setLines(infoText,R.help||"");sh(info,!!R.help);
+  sh(restore,!!R.restore);if(R.restore){setText(restore,R.restore);restore.onclick=function(){cfg.groups.forEach(function(g){g.items=(cfg.defaults[g.key]||[]).slice()});save()}}
+  sh(foot,!!(R.restore||R.help))}
  function openAdd(g,b,e){if(p.isOpen()&&addKey===g.key){p.toggle(b,e);return}addKey=g.key;var R=rules();
   setText(popT,(R.add_title||"Add to {group}").replace("{group}",g.label));inp.value="";inp.maxLength=R.max||40;setText(msg,"");p.toggle(b,e);inp.focus()}
  function addItem(){if(!addKey)return;var R=rules(),allowed=new RegExp("[^"+(R.allowed||"\\s\\S")+"]","g"),n=inp.value.replace(allowed,""),say=function(t){setText(msg,t)},g=null;
@@ -282,7 +297,7 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
  function load(){xhrJson("GET",s.source,function(r){if(r){cfg=r;paint()}})}
  function save(){clearTimeout(timer);paint();timer=setTimeout(function(){var body={};cfg.groups.forEach(function(g){body[g.key]=g.items});
   post(s.source,body,function(r){if(r){cfg=r;paint();ctx.saved()}})},100)}
- hook("settingsOpen",load);hook("settingsClose",function(){p.close()});return el};
+ hook("settingsOpen",load);hook("settingsClose",function(){p.close();ip.close()});return el};
 // ---- a console: lines of text in a box. "lines": "@path" replaces them all; "tail": "/url" adds what is new (GET url?from=N -> {text, size, reset})
 W.console=function(s,ctx){var el=h("div",{"class":"console"+(s.nowrap?" nowrap":""),role:"log","aria-label":s.label||"Log"}),size=0,busy=false,rules=(s.rules||[]).map(function(r){return[new RegExp(r[0],"i"),r[1]]}),
  follow=s.follow?val(s.follow):true;
@@ -314,7 +329,7 @@ W.custom=function(s,ctx){var host=h("div",{"class":"wcustom"+(s.cls?" "+s.cls:""
 // ---- controls that make up a form: select, number, text, slider (bound to one key of the form's values)
 function optionList(spec,F){var o=spec.options;if(typeof o==="string")o=isBind(o)?val(o):(F.options||{})[o];return o||[]}
 function control(spec,F,change){var key=spec.key,el,paint;
- if(spec.type==="select"){el=h("select",{"class":"ord","aria-label":spec.label||key});var last="";
+ if(spec.type==="select"){el=h("select",{"class":"ord","aria-label":spec.aria||spec.label||key});var last="";
   paint=function(){var opts=optionList(spec,F),k=JSON.stringify(opts);
    if(k!==last){last=k;var groups={},order=[],html="";
     opts.forEach(function(o,i){var g=o.group||"";if(!groups[g]){groups[g]=[];order.push(g)}groups[g].push('<option value="'+i+'">'+esc(o.label)+'</option>')});
@@ -322,29 +337,33 @@ function control(spec,F,change){var key=spec.key,el,paint;
    var cur=F.values[key];opts.forEach(function(o,i){if(String(o.value)===String(cur))el.value=String(i)})};
   el.onchange=function(){var o=optionList(spec,F)[+el.value];if(o){F.values[key]=o.value;change()}};
   el._paint=paint;return el}
- if(spec.type==="number"){el=h("input",{type:"number",min:spec.min,max:spec.max,"aria-label":spec.label||key});
+ if(spec.type==="number"){el=h("input",{type:"number",min:spec.min,max:spec.max,"aria-label":spec.aria||spec.label||key});
   paint=function(){if(document.activeElement!==el)el.value=F.values[key]==null?"":F.values[key]};
   el.onchange=function(){var n=parseInt(el.value,10);if(!isNaN(n)){F.values[key]=Math.max(spec.min!=null?spec.min:n,Math.min(spec.max!=null?spec.max:n,n));change()}};
   el._paint=paint;return el}
- if(spec.type==="toggle"){el=h("input",{type:"checkbox","class":"cbox neutral","aria-label":spec.label||key});
+ if(spec.type==="toggle"){el=h("input",{type:"checkbox","class":"cbox neutral","aria-label":spec.aria||spec.label||key});
   paint=function(){el.checked=!!F.values[key]};el.onchange=function(){F.values[key]=el.checked;change()};el._paint=paint;return el}
- el=h("input",{type:"text","aria-label":spec.label||key});
+ el=h("input",{type:"text","aria-label":spec.aria||spec.label||key});
  paint=function(){if(document.activeElement!==el)el.value=F.values[key]==null?"":F.values[key]};
  el.onchange=function(){F.values[key]=el.value;change()};el._paint=paint;return el}
 // ---- a form: rows of controls kept in one JSON object on the server (GET returns {values, options}, POST takes {values} and returns the same)
-W.form=function(s,ctx){var el=h("div",{"class":"wform"}),F={values:{},options:{}},timer=null,ctls=[],subs=[];
- (s.fields||[]).forEach(function(f){var left=h("span",{},[document.createTextNode(f.title||"")]),box=h("div",{"class":"ctls"}),
-  sub=h("div",{"class":"sub fsub"}),row=h("div",{"class":"srow wrap"},[left,box,sub]);
-  (f.controls||[]).forEach(function(c){var e=control(c,F,save);ctls.push(e);box.appendChild(e)});
-  if(f.sub_of)subs.push(function(){var c=null;(f.controls||[]).forEach(function(x){if(x.key===f.sub_of)c=x});
-   var txt="";if(c)optionList(c,F).forEach(function(o){if(String(o.value)===String(F.values[c.key]))txt=o.sub||""});setLines(sub,txt);sh(sub,!!txt)});
-  else if(f.sub){setLines(sub,f.sub)}else sh(sub,false);
-  if(f.show!==undefined)bind(f.show,function(v){sh(row,!!v)});
-  el.appendChild(row)});
+W.form=function(s,ctx){var el=h("div",{"class":"wform"}),F={values:{},options:{},texts:{},lists:{}},timer=null,ctls=[],subs=[];
+ // one edit row per field; its controls are in a pop-up that opens under the row's Edit button (changes save as they are made)
+ (s.fields||[]).forEach(function(f){
+  var r=editRow({title:f.title,button:f.button||"Edit",aria:"Edit "+(f.title||"")}),done=h("button",{type:"button","class":"pill-s",text:"Done"}),pop=h("div"),p;
+  pop.appendChild(h("div",{"class":"t",text:f.popup_title||f.title||""}));
+  (f.controls||[]).forEach(function(c){var e=control(Object.assign({},c,{aria:(f.title||"")+": "+(c.label||c.key)}),F,save);ctls.push(e);
+   pop.appendChild(h("div",{"class":"frow"},[h("span",{text:c.label||c.key}),e]))});
+  pop.appendChild(h("div",{"class":"bar end"},[done]));
+  el.appendChild(r.el);el.appendChild(pop);p=ui.popup(pop);
+  r.btn.onclick=function(e){p.toggle(r.btn,e)};done.onclick=function(){p.close()};hook("settingsClose",function(){p.close()});
+  subs.push(function(){r.setSub(f.sub_text?(F.texts||{})[f.sub_text]:f.sub);if(f.list)r.setList((F.lists||{})[f.list])});
+  if(f.show!==undefined)bind(f.show,function(v){sh(r.el,!!v)})});
  function paint(){ctls.forEach(function(c){c._paint()});subs.forEach(function(f){f()})}
- function load(){xhrJson("GET",s.get,function(r){if(!r)return;F.values=r.values||{};F.options=r.options||{};paint()})}
+ function take(r){F.values=r.values||F.values;F.options=r.options||F.options;F.texts=r.texts||F.texts;F.lists=r.lists||F.lists}
+ function load(){xhrJson("GET",s.get,function(r){if(!r)return;take(r);paint()})}
  function save(){clearTimeout(timer);paint();timer=setTimeout(function(){post(s.post||s.get,{values:F.values},function(r){
-  if(r){F.values=r.values||F.values;F.options=r.options||F.options;paint();ctx.saved()}})},250)}
+  if(r){take(r);paint();ctx.saved()}})},250)}
  hook("settingsOpen",load);load();return el};
 // ---- drag and drop ordering: rows of a container, each with a ".grip" handle. Grab the handle (mouse, finger or pen) and move the row;
 // the others make room as it passes them and onDone(names) gets the new order of the rows' data-id values when it is dropped.

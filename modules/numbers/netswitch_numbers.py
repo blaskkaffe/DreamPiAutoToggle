@@ -79,7 +79,7 @@ def _reply():
     return {"groups": [{"key": a[0], "label": a[1], "sub": a[2], "items": nums.get(a[0], [])} for a in ACTIONS],
             "defaults": default_numbers(),
             "rules": {"min": MIN_LEN, "max": MAX_LEN, "per_group": MAX_PER_ACTION, "allowed": "0-9*#", "unique": True,
-                      "add_label": "Add", "add_title": "Add a number to {group}", "empty": "No number: this action is off",
+                      "add_label": "Add", "add_title": "Add a number to {group}",
                       "min_msg": "Needs at least %d digits, * or #" % MIN_LEN,
                       "help": "Functions are triggered by numbers ending in the listed numbers.\nUse 3 - %d digits, numbers 0-9, * and # are allowed." % MAX_LEN,
                       "restore": "Restore default numbers"}}

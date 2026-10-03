@@ -109,37 +109,37 @@
      "fields": [
       {
        "title": "Button 1",
-       "sub_of": "button1_function",
+       "sub_text": "button1",
        "controls": [
         {
          "type": "select",
          "key": "button1_function",
          "options": "functions",
-         "label": "Button 1 function"
+         "label": "Function"
         },
         {
          "type": "select",
          "key": "button1_gpio",
          "options": "gpios",
-         "label": "Button 1 pin"
+         "label": "Pin"
         }
        ]
       },
       {
        "title": "Button 2",
-       "sub_of": "button2_function",
+       "sub_text": "button2",
        "controls": [
         {
          "type": "select",
          "key": "button2_function",
          "options": "functions",
-         "label": "Button 2 function"
+         "label": "Function"
         },
         {
          "type": "select",
          "key": "button2_gpio",
          "options": "gpios",
-         "label": "Button 2 pin"
+         "label": "Pin"
         }
        ]
       }

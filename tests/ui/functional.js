@@ -74,13 +74,27 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await page.locator('.wpicker .tag', { hasText: '5551234' }).count() === 1, 'a number is added to its group');
   await page.locator('.wpicker .tag', { hasText: '5551234' }).locator('button').click(); await settle(900);
   ok(await page.locator('.wpicker .tag', { hasText: '5551234' }).count() === 0, 'and removed again');
-  // ---- a form that saves to the server (GPIO)
-  const sel = page.locator('select[aria-label="Button 2 function"]');
-  await sel.selectOption({ label: 'Select DCNET' }); await settle(900);
-  ok(/DCNET/.test(await page.locator('[data-box="gpio"] .fsub').nth(1).textContent()), 'the description under Button 2 follows its function');
+  ok(await page.locator('text=No number').count() === 0, 'a group with no numbers shows no "No number" text');
+  const hNum = await page.locator('.wpicker .srow').first().evaluate(e => e.getBoundingClientRect().height);
+  const hGpio = await page.locator('[data-box="gpio"] .srow', { hasText: 'Button 1' }).first().evaluate(e => e.getBoundingClientRect().height);
+  ok(Math.abs(hNum - hGpio) <= 6, 'a phone number row is as high as a GPIO row (' + Math.round(hNum) + ' and ' + Math.round(hGpio) + ')');
+  await page.locator('.wpicker .infobtn').click(); await settle(300);
+  ok(/numbers ending in the listed numbers/.test(await page.locator('.pop.open .infotext').textContent()), 'the (i) button opens the pop-up with the information text');
+  await page.keyboard.press('Escape'); await settle(200);
+  // ---- GPIO: every row is a title, a line that says what it does, and an Edit button with the dropdowns in a pop-up; it saves to the server
+  const gpioRow = t => page.locator('[data-box="gpio"] .srow', { hasText: t }).first();
+  ok(/^GPIO\d+ /.test((await gpioRow('Button 1').locator('.sub').textContent()).trim()), 'the line under Button 1 starts with its pin: ' + (await gpioRow('Button 1').locator('.sub').textContent()).trim());
+  ok(/^\d+ [A-Z]{3} LEDs? connected to GPIO\d+$/.test((await gpioRow('LED').locator('.sub').textContent()).trim()), 'the LED line counts LEDs, order and pin: ' + (await gpioRow('LED').locator('.sub').textContent()).trim());
+  ok(await page.locator('[data-box="gpio"] select').evaluateAll(els => els.every(e => !e.offsetParent)), 'the dropdowns are not in the rows, only in the pop-ups');
+  await gpioRow('Button 2').locator('button').click(); await settle(400);
+  await page.locator('.pop.open select[aria-label="Button 2: Function"]').selectOption({ label: 'Select DCNET' }); await settle(1000);
+  ok(/GPIO\d+ selects DCNET/.test(await gpioRow('Button 2').locator('.sub').textContent()), 'the line under Button 2 follows its function');
+  await page.locator('.pop.open button', { hasText: 'Done' }).click(); await settle(300);
   await page.reload({ waitUntil: 'networkidle' }); await settle(800); await openSettings();
-  ok((await page.locator('select[aria-label="Button 2 function"] option:checked').textContent()) === 'Select DCNET', 'the form value was saved');
-  await page.locator('select[aria-label="Button 2 function"]').selectOption({ label: 'Off' }); await settle(700);
+  await gpioRow('Button 2').locator('button').click(); await settle(400);
+  ok((await page.locator('.pop.open select[aria-label="Button 2: Function"] option:checked').textContent()) === 'Select DCNET', 'the value was saved');
+  await page.locator('.pop.open select[aria-label="Button 2: Function"]').selectOption({ label: 'Off' }); await settle(900);
+  await page.locator('.pop.open button', { hasText: 'Done' }).click(); await settle(300);
   // ---- shared boxes: wifi, system and the update rows are one box
   ok(await page.locator('[data-box="system"]').count() === 1, 'one System box is shared by several modules');
   const boxIds = await page.locator('#set-boxes [data-box]').evaluateAll(els => els.map(e => e.getAttribute('data-box')));

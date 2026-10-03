@@ -224,8 +224,26 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(sorted(r["values"]), ["button1_function", "button1_gpio", "button2_function", "button2_gpio"])
         self.assertEqual([o["value"] for o in r["options"]["gpios"]], list(core.BUTTON_GPIO_PINS))
         functions = r["options"]["functions"]
-        self.assertTrue(all(f["label"] and f["group"] and f["sub"] for f in functions))
+        self.assertTrue(all(f["label"] and f["group"] for f in functions))
         self.assertNotIn("sw_wifi", [f["value"] for f in functions])         # the Wi-Fi switch functions wait for the Wi-Fi module
+
+    def test_the_line_under_each_button_names_its_pin_and_what_it_does(self):
+        self.post("/buttonconfig", {"values": {"button1_gpio": 17, "button2_gpio": 4, "button1_function": "toggle", "button2_function": "sw_dcnet"}})
+        t = self.buttons()["texts"]
+        self.assertEqual(t["button1"], "GPIO17 toggles DCNow! and DCNET")
+        self.assertEqual(t["button2"], "GPIO4 closed: DCNET, open: DCNow!")
+        self.post("/buttonconfig", {"values": {"button1_gpio": 22, "button1_function": "dcnow", "button2_gpio": 4, "button2_function": "off"}})
+        t = self.buttons()["texts"]
+        self.assertEqual((t["button1"], t["button2"]), ("GPIO22 selects DCNow!", "GPIO4 is not used"))
+        self.assertNotIn("{pin}", " ".join(t.values()))
+        for f in core.BUTTON_FUNCTIONS:                                   # every function has a line that starts with its pin
+            self.assertTrue(f[4].startswith("{pin} "), f[0])
+
+    def test_the_led_line_counts_the_leds_with_order_and_pin(self):
+        self.post("/ledhardware", {"values": {"led_count": 10, "led_order": "GRB", "led_gpio": 18}})
+        self.assertEqual(json.loads(self.get("/ledhardware")[2].decode())["texts"]["led"], "10 GRB LEDs connected to GPIO18")
+        self.post("/ledhardware", {"values": {"led_count": 1, "led_order": "RGB", "led_gpio": 12}})
+        self.assertEqual(json.loads(self.get("/ledhardware")[2].decode())["texts"]["led"], "1 RGB LED connected to GPIO12")
 
     def test_buttonconfig_rejects_shared_pin(self):
         before = self.buttons()["values"]
@@ -243,7 +261,7 @@ class HttpTests(unittest.TestCase):
             self.assertIn("sw_wifi", [f["value"] for f in self.buttons()["options"]["functions"]])
             out = json.loads(self.post("/wifibutton", {"values": {"wifi_button": "2"}})[1].decode())
             self.assertEqual(out["values"]["wifi_button"], "2")
-            self.assertEqual([o["sub"] for o in out["options"]["choices"]][0], "Hold button 1 for 3 s to start Wi-Fi setup")
+            self.assertEqual(out["texts"]["wifi_button"], "Hold button 2 for 3 s to start Wi-Fi setup")
             self.assertEqual(core.wifi_button(), "2")
             self.post("/wifibutton", {"values": {"wifi_button": "nope"}})
             self.assertEqual(core.wifi_button(), "2")

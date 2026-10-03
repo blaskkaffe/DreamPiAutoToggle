@@ -35,7 +35,9 @@ def _post_config(h):
 
 
 def _hardware_reply():
-    return {"values": {"led_count": ledconfig.led_count(), "led_order": ledconfig.led_config()["order"], "led_gpio": ledconfig.led_gpio()},
+    count, order, gpio = ledconfig.led_count(), ledconfig.led_config()["order"], ledconfig.led_gpio()
+    return {"values": {"led_count": count, "led_order": order, "led_gpio": gpio},
+            "texts": {"led": "%d %s LED%s connected to GPIO%d" % (count, order, "" if count == 1 else "s", gpio)},
             "options": {"orders": [{"value": o, "label": o} for o in ledconfig.LED_ORDERS],
                         "gpios": [{"value": g, "label": "GPIO%d" % g} for g in ledconfig.GPIO_PINS]}}
 

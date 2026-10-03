@@ -495,16 +495,16 @@ BUTTON_DEFAULT_GPIO2 = 4
 # What a button does. Push buttons act on a short press. A toggle switch is wired
 # between the pin and GND and acts on its position: closed (pin low) = "on",
 # open = "off"; the position is also applied once at start.
-# (name, label, group, needs Wi-Fi setup installed, description shown on the page)
+# (name, label, group, needs Wi-Fi setup installed, the line under the button's row on the page; "{pin}" becomes "GPIO17" for its pin)
 BUTTON_FUNCTIONS = (
-    ("off", "Off", "Push button", False, "Not mapped to a function"),
-    ("toggle", "Toggle network", "Push button", False, "Push button to switch DCNow! and DCNET"),
-    ("dcnow", "Select DCNow!", "Push button", False, "Push button to select DCNow!"),
-    ("dcnet", "Select DCNET", "Push button", False, "Push button to select DCNET"),
-    ("sw_dcnet", "On = DCNET", "Toggle switch", False, "Toggle switch closed: DCNET, open: DCNow!"),
-    ("sw_dcnow", "On = DCNow!", "Toggle switch", False, "Toggle switch closed: DCNow!, open: DCNET"),
-    ("sw_wifi", "On = Wi-Fi setup", "Toggle switch", True, "Toggle switch closed: Wi-Fi setup, open: Normal mode"),
-    ("sw_wifi_off", "Off = Wi-Fi setup", "Toggle switch", True, "Toggle switch open: Wi-Fi setup, closed: Normal mode"),
+    ("off", "Off", "Push button", False, "{pin} is not used"),
+    ("toggle", "Toggle network", "Push button", False, "{pin} toggles DCNow! and DCNET"),
+    ("dcnow", "Select DCNow!", "Push button", False, "{pin} selects DCNow!"),
+    ("dcnet", "Select DCNET", "Push button", False, "{pin} selects DCNET"),
+    ("sw_dcnet", "On = DCNET", "Toggle switch", False, "{pin} closed: DCNET, open: DCNow!"),
+    ("sw_dcnow", "On = DCNow!", "Toggle switch", False, "{pin} closed: DCNow!, open: DCNET"),
+    ("sw_wifi", "On = Wi-Fi setup", "Toggle switch", True, "{pin} closed: Wi-Fi setup, open: normal mode"),
+    ("sw_wifi_off", "Off = Wi-Fi setup", "Toggle switch", True, "{pin} open: Wi-Fi setup, closed: normal mode"),
 )
 _BUTTON_FUNCTION_NAMES = tuple(f[0] for f in BUTTON_FUNCTIONS)
 BUTTON_DEFAULT_FUNCTION1 = "toggle"
