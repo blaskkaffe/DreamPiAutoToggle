@@ -113,6 +113,39 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('.xpand .xbody button', { hasText: 'Recording' }).click(); await settle(1500);
   ok(/Recording$/.test((await page.locator('.xpand .xbody button').first().textContent()).trim()) && /●/.test(await page.locator('.xpand .xbody button').first().textContent()), 'Recording switches on');
   await page.locator('.xpand .xbody button', { hasText: 'Recording' }).click(); await settle(900);
+  // ---- the same drag with a finger (touch events through the browser's protocol, in a phone-sized touch context)
+  const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const tp = await ctx2.newPage();
+  tp.on('pageerror', e => errors.push('touch page: ' + String(e)));
+  tp.on('dialog', d => d.accept());
+  await tp.goto(URL, { waitUntil: 'networkidle' }); await tp.waitForTimeout(1200);
+  await tp.tap('#cog'); await tp.waitForTimeout(900);
+  const cdp = await ctx2.newCDPSession(tp);
+  const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+  const rowsT = tp.locator('[data-box="modules"] .srow[data-id]');
+  const orderT = () => rowsT.evaluateAll(els => els.map(e => e.getAttribute('data-id')));
+  const startT = await orderT();
+  await rowsT.nth(0).scrollIntoViewIfNeeded();
+  await tp.evaluate(() => { window.__removed = 0;
+    new MutationObserver(ms => ms.forEach(m => m.removedNodes.forEach(n => { if (n.classList && n.classList.contains('drag')) window.__removed++; }))).observe(document.querySelector('[data-box="modules"] .card'), { childList: true });
+    document.getElementById('settings').addEventListener('scroll', () => window.__scrolled++); });
+  const g = await tp.locator('[data-box="modules"] .srow[data-id] .grip').nth(0).boundingBox();
+  const r1 = await rowsT.nth(2).boundingBox();
+  await touch('touchStart', g.x + g.width / 2, g.y + g.height / 2);
+  for (let i = 1; i <= 14; i++) { await touch('touchMove', g.x + g.width / 2, g.y + g.height / 2 + (r1.y + r1.height - g.y - g.height / 2) * i / 14); await tp.waitForTimeout(20); }
+  const mid = await orderT();
+  ok(await tp.locator('[data-box="modules"] .srow.drag').count() === 1 && mid[2] === startT[0], 'a finger drags a row two places down while the others make room');
+  ok(await tp.evaluate(() => window.__removed) === 0, 'the grabbed row is never taken out of the document (iOS ends a touch whose element is re-inserted)');
+  await touch('touchEnd'); await tp.waitForLoadState('networkidle'); await tp.waitForTimeout(1500);
+  const endT = await orderT();
+  ok(endT[2] === startT[0], 'lifting the finger saves the new order');
+  await rowsT.nth(2).scrollIntoViewIfNeeded();
+  const g2 = await tp.locator('[data-box="modules"] .srow[data-id] .grip').nth(2).boundingBox(), r0 = await rowsT.nth(0).boundingBox();
+  await touch('touchStart', g2.x + g2.width / 2, g2.y + g2.height / 2);
+  for (let i = 1; i <= 14; i++) { await touch('touchMove', g2.x + g2.width / 2, g2.y + g2.height / 2 - (g2.y + g2.height / 2 - r0.y - 6) * i / 14); await tp.waitForTimeout(20); }
+  await touch('touchEnd'); await tp.waitForLoadState('networkidle'); await tp.waitForTimeout(1500);
+  ok(JSON.stringify(await orderT()) === JSON.stringify(startT), 'and a drag up with a finger puts it back');
+  await ctx2.close();
   // ---- no errors anywhere
   ok(errors.length === 0, 'no JavaScript or console errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await browser.close();

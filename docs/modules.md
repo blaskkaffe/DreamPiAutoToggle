@@ -63,7 +63,7 @@ modules/<name>/
 | `note` | an optional second line in the picker |
 
 The picker (**Settings > Modules**) lists the visible modules with a switch each and a **drag handle** (⋮⋮): drag a row to move it (mouse, finger or pen; the other rows make room, Esc cancels, and near the edge Settings scrolls along), or focus the handle and use the up / down arrow keys (`POST /modules/order`,
-stored in `module_order.json`). The drag is the standard `sortable()` in `page/widgets.js`. **The order is the priority**: the module at the top comes first inside shared boxes, names a box
+stored in `module_order.json`). The drag is the standard `sortable()` in `page/widgets.js`: it uses pointer events with `touch-action: none` on the handle, and it never takes the grabbed row out of the page (the neighbours move instead), because iOS Safari ends a touch whose element is re-inserted. **The order is the priority**: the module at the top comes first inside shared boxes, names a box
 first, sets the page's primary colour and wins when two backgrounds compete. Switching or moving a module reloads the page.
 A folder that is new to the picker starts at its `order` hint among the ones not yet placed.
 

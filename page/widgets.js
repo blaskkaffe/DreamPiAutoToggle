@@ -343,6 +343,52 @@ W.form=function(s,ctx){var el=h("div",{"class":"wform"}),F={values:{},options:{}
 // the others make room as it passes them and onDone(names) gets the new order of the rows' data-id values when it is dropped.
 // The handle also takes the arrow keys (up / down move the row, then onDone), so it works without a pointer. Esc while dragging cancels.
 function sortable(box,onDone){
+ function hasId(el){return !!el&&el.hasAttribute&&el.hasAttribute("data-id")}
+ function rows(){return Array.prototype.filter.call(box.children,hasId)}
+ function names(){return rows().map(function(r){return r.getAttribute("data-id")})}
+ function same(a,b){return a.join("\n")===b.join("\n")}
+ function mid(el){var r=el.getBoundingClientRect();return r.top+r.height/2}
+ rows().forEach(function(row){var grip=row.querySelector(".grip");if(!grip)return;
+  grip.addEventListener("pointerdown",function(e){
+   if(e.pointerType==="mouse"&&e.button!==0)return;
+   e.preventDefault();var start=names(),grab=e.clientY-row.getBoundingClientRect().top,y=e.clientY,tx=0,done=false,pid=e.pointerId,scroller=$("settings");
+   try{grip.setPointerCapture(pid)}catch(x){}
+   row.classList.add("drag");box.classList.add("dragging");
+   // The grabbed row itself is never taken out of the document and put back (iOS Safari ends a touch whose element is re-inserted):
+   // when it passes a neighbour, the NEIGHBOUR moves to the other side of it.
+   function place(){for(var guard=0;guard<30;guard++){
+     var r=row.getBoundingClientRect(),nat=r.top-tx,want=y-grab;
+     tx=want-nat;row.style.transform="translateY("+tx+"px)";
+     var c=want+r.height/2,prev=row.previousElementSibling,next=row.nextElementSibling;
+     if(hasId(prev)&&c<mid(prev))box.insertBefore(prev,row.nextSibling);
+     else if(hasId(next)&&c>mid(next))box.insertBefore(next,row);
+     else break}}
+   function move(ev){if(ev.pointerId!==pid)return;y=ev.clientY;place()}
+   var scroll=setInterval(function(){var hh=window.innerHeight;                        // near the top / bottom edge: scroll Settings along
+    if(y<70)scroller.scrollTop-=14;else if(y>hh-70)scroller.scrollTop+=14;else return;place()},16);
+   function finish(cancel){if(done)return;done=true;clearInterval(scroll);
+    grip.removeEventListener("pointermove",move);grip.removeEventListener("pointerup",up);grip.removeEventListener("pointercancel",lost);
+    grip.removeEventListener("lostpointercapture",lost);document.removeEventListener("keydown",esc,true);
+    try{grip.releasePointerCapture(pid)}catch(x){}
+    row.classList.remove("drag");box.classList.remove("dragging");row.style.transform="";
+    if(cancel){start.forEach(function(n){box.appendChild(rows().filter(function(r){return r.getAttribute("data-id")===n})[0])});return}
+    var now=names();if(!same(start,now))onDone(now)}
+   function up(ev){if(ev.pointerId===pid)finish(false)}
+   function lost(ev){if(ev.pointerId===pid)finish(false)}            // the system took the pointer (a call, a gesture): keep what was dropped so far
+   function esc(ev){if(ev.key==="Escape"){ev.stopPropagation();finish(true)}}
+   grip.addEventListener("pointermove",move);grip.addEventListener("pointerup",up);grip.addEventListener("pointercancel",lost);
+   grip.addEventListener("lostpointercapture",lost);document.addEventListener("keydown",esc,true)});
+  var keyTimer=null;
+  grip.addEventListener("keydown",function(e){if(e.key!=="ArrowUp"&&e.key!=="ArrowDown")return;e.preventDefault();
+   var other=e.key==="ArrowUp"?row.previousElementSibling:row.nextElementSibling;
+   if(!hasId(other))return;
+   if(e.key==="ArrowUp")box.insertBefore(row,other);else box.insertBefore(other,row);
+   grip.focus();clearTimeout(keyTimer);keyTimer=setTimeout(function(){onDone(names())},900)})})}
+// ---- the module picker (the loader's own box): every module that may be switched, with its switch and a way to move it up or down
+// ---- drag and drop ordering: rows of a container, each with a ".grip" handle. Grab the handle (mouse, finger or pen) and move the row;
+// the others make room as it passes them and onDone(names) gets the new order of the rows' data-id values when it is dropped.
+// The handle also takes the arrow keys (up / down move the row, then onDone), so it works without a pointer. Esc while dragging cancels.
+function sortable(box,onDone){
  function rows(){return Array.prototype.filter.call(box.children,function(r){return r.hasAttribute("data-id")})}
  function names(){return rows().map(function(r){return r.getAttribute("data-id")})}
  function same(a,b){return a.join("\n")===b.join("\n")}
