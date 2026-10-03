@@ -9,13 +9,44 @@ from support import web, core, ledconfig, sandbox, cleanup
 
 
 class PaletteTests(unittest.TestCase):
-    def test_sixteen_named_colours_in_eight_hue_groups(self):
+    def setUp(self):
+        self.tmp = sandbox()
+
+    def tearDown(self):
+        cleanup(self.tmp)
+
+    def test_sixteen_colours_in_the_order_of_the_grid(self):
         pal = core.colours()
-        self.assertEqual(len(pal), 16)
+        self.assertEqual([c["id"] for c in pal], ["global", "red", "orange", "yellow", "green", "cyan", "blue", "purple",
+                                                  "network", "white", "bright-red", "bright-green", "bright-cyan", "bright-blue",
+                                                  "bright-purple", "bright-pink"])       # Global main and Selected network start the two rows
         self.assertEqual(len(set(c["id"] for c in pal)), 16)
-        self.assertEqual(sorted(set(c["group"] for c in pal)), ["blue", "cyan", "green", "orange", "pink", "purple", "red", "yellow"])
-        for g in set(c["group"] for c in pal):
-            self.assertEqual([c["id"] for c in pal if c["group"] == g], [g, "bright-" + g])      # each hue: normal, then bright
+        self.assertNotIn("pink", core.PALETTE_IDS)                                       # the dark pink, bright orange and bright yellow are gone
+        self.assertNotIn("bright-orange", core.PALETTE_IDS)
+        self.assertNotIn("bright-yellow", core.PALETTE_IDS)
+
+    def test_a_saved_choice_of_a_removed_colour_becomes_its_nearest(self):
+        with open(core.MODULE_COLOURS, "w") as f:
+            json.dump({"switcher": {"dcnow": "bright-orange", "dcnet": "pink"}}, f)
+        self.assertEqual(core.module_colours("switcher"), {"dcnow": "orange", "dcnet": "bright-pink"})
+        self.assertEqual(core.colour("bright-yellow")["id"], "yellow")
+
+    def test_selected_network_is_the_colour_the_selected_network_has(self):
+        self.assertEqual(core.colour("network")["ui"], core.colour("orange")["ui"])          # DCNow! is selected, and orange
+        open(core.FLAG, "w").close()
+        self.assertEqual(core.colour("network")["ui"], core.colour("blue")["ui"])            # DCNET: blue
+        core.set_module_colour("switcher", "dcnet", "green")
+        self.assertEqual(core.colour("network")["led"], core.colour("green")["led"])
+        self.assertEqual(core.colour("network")["id"], "network")
+
+    def test_the_network_buttons_cannot_be_the_selected_network(self):
+        self.assertIsNone(core.set_module_colour("switcher", "dcnow", "network"))
+        self.assertEqual(core.set_module_colour("clock", "clock", "network"), {"clock": "network"})    # a box can
+
+    def test_global_main_is_a_colour_the_user_picks(self):
+        self.assertTrue(core.set_palette_colour("global", ui="#112233"))
+        self.assertEqual(core.colour("global")["ui"], "#112233")
+        self.assertFalse(core.set_palette_colour("network", ui="#112233"))                   # that one follows the switch
 
     def test_the_two_original_ui_colours_are_still_there(self):
         self.assertEqual(core.colour("orange")["ui"], "#e8761c")
@@ -79,7 +110,15 @@ class TintTests(unittest.TestCase):
     def tearDown(self):
         cleanup(self.tmp)
 
-    def test_every_colour_has_a_coloured_background_until_the_user_says_otherwise(self):
+    def test_the_boxes_start_neutral_and_the_network_buttons_highlighted(self):
+        for name in ("clock", "players", "debuglog"):
+            self.assertEqual(core.module_tints(name), {name: False}, name)
+        self.assertEqual(core.module_tints("switcher"), {"dcnow": True, "dcnet": True})
+        self.assertEqual(core.set_module_tint("players", "players", True), {"players": True})       # and the user can highlight one
+        self.assertEqual(core.set_module_tint("players", "players", False), {"players": False})
+        self.assertEqual(json.load(open(core.MODULE_TINTS)).get("players"), {})                   # a value that is the default is not kept
+
+    def test_a_network_colour_can_be_switched_off_and_on(self):
         self.assertEqual(core.module_tints("switcher"), {"dcnow": True, "dcnet": True})
         self.assertEqual(core.set_module_tint("switcher", "dcnet", False), {"dcnow": True, "dcnet": False})
         self.assertEqual(core.module_tints("switcher")["dcnet"], False)
@@ -158,9 +197,9 @@ class HttpTests(unittest.TestCase):
         self.post("/colour", {"module": "switcher", "key": "dcnet", "colour": "blue"})
 
     def test_the_primary_colour_follows_the_selected_network(self):
-        self.post("/colour", {"module": "switcher", "key": "dcnow", "colour": "bright-orange"})
+        self.post("/colour", {"module": "switcher", "key": "dcnow", "colour": "bright-green"})
         api = json.loads(urlopen(self.base + "/api", timeout=10).read())
-        self.assertEqual(api["primary"]["switcher"], "bright-orange")                # DCNow! is selected: its colour is the primary
+        self.assertEqual(api["primary"]["switcher"], "bright-green")                # DCNow! is selected: its colour is the primary
         self.post("/dcnet", {})
         api = json.loads(urlopen(self.base + "/api", timeout=10).read())
         self.assertEqual(api["primary"]["switcher"], "blue")

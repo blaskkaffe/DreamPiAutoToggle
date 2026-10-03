@@ -9,5 +9,8 @@
  "colours": {
   "debuglog": "green"
  },
- "primary": "debuglog"
+ "primary": "debuglog",
+ "tints": {
+  "debuglog": false
+ }
 }

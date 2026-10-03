@@ -289,6 +289,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_module_order()
         if path == "/colour":
             return self._post_colour()
+        if path == "/palette":
+            return self._post_palette()
         if modules.route("POST", path):
             if modules.route("POST", path)(self) is True:    # an enabled module's own endpoint; True = it has answered
                 return
@@ -349,6 +351,17 @@ class Handler(BaseHTTPRequestHandler):
         refresh_page(force=True)       # the colours are built into the page
         core.debug_log("web page: %s colours %s" % (data["module"], json.dumps(got, sort_keys=True)))
         self.send(json.dumps({"module": data["module"], "colours": got, "tints": core.module_tints(data["module"])}), "application/json")
+
+    def _post_palette(self):
+        """The Global main colour picker: {"id": palette id, "ui": "#rrggbb"} changes how a palette colour looks on the page."""
+        try:
+            data = json.loads(self._body(1024).decode("utf-8"))
+            if not core.set_palette_colour(data.get("id"), ui=data.get("ui")):
+                raise ValueError("not a palette colour that can be changed, or not #rrggbb")
+        except (ValueError, AttributeError, IOError, OSError) as e:
+            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
+        refresh_page(force=True)       # the palette is built into the page
+        self.send(json.dumps({"palette": core.colours()}), "application/json")
 
     def log_message(self, *args):
         pass

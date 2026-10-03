@@ -78,7 +78,7 @@
  .pop .bar.center{justify-content:center;margin:6px 0 8px}
  .pop .pill-s{white-space:nowrap}
  .cbox.neutral:checked,.cbox.neutral.on{background-color:var(--sel);border-color:var(--sel)}   /* a tick box in the neutral grey-blue instead of the network colour */
- input[type=color]{-webkit-appearance:none;appearance:none;width:34px;height:34px;padding:0;border:var(--bw) solid var(--ctl-line);border-radius:7px;background:none;vertical-align:middle;cursor:pointer}
+ input[type=color]{-webkit-appearance:none;appearance:none;flex:none;width:34px;height:34px;padding:0;border:var(--bw) solid var(--ctl-line);border-radius:7px;background:none;vertical-align:middle;cursor:pointer}
  input[type=color]::-webkit-color-swatch-wrapper{padding:0} input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
  input[type=color]::-moz-color-swatch{border:0;border-radius:4px}
  .console{margin:2px 0 12px;padding:8px 10px;background:var(--console);border:1px solid var(--line);border-radius:12px;font:.72em/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#bbb;max-height:11.5em;overflow:auto;overscroll-behavior:contain}

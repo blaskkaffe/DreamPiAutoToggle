@@ -98,7 +98,7 @@ PRIORITY = dict((k, len(PRIORITY_ORDER) - i) for i, k in enumerate(PRIORITY_ORDE
 # -------------------------------------------------------------------- the looks (groups)
 # A group's colour is a palette id (core.PALETTE, the LED value of it), or a token that follows the networks' global colours:
 # "dcnow", "dcnet" (what the network switcher gave them) or "network" (the colour of whichever network is selected).
-COLOUR_TOKENS = [("dcnow", "DCNow!"), ("dcnet", "DCNET"), ("network", "Selected network")]
+COLOUR_TOKENS = [("dcnow", "DCNow!"), ("dcnet", "DCNET")]      # ("network" and "global" are palette entries now)
 TOKEN_IDS = tuple(t[0] for t in COLOUR_TOKENS)
 # LED effects (the engine, with the timings, is in netswitch_led.py): name, label, whether it takes a speed.
 EFFECTS = [
@@ -206,7 +206,7 @@ def default_led_config():
 
 
 def _valid_colour(c):
-    return isinstance(c, _TEXT) and (c in TOKEN_IDS or c in core.PALETTE_IDS)
+    return isinstance(c, _TEXT) and (c in TOKEN_IDS or c in core.PALETTE_IDS or c in core.LEGACY_COLOURS)
 
 
 def clean_groups(data):
@@ -225,7 +225,7 @@ def clean_groups(data):
                 n += 1
             gid = "g%d" % n
         seen_ids.add(gid)
-        group = _group(str(gid), str(g["colour"]) if _valid_colour(g.get("colour")) else "orange",
+        group = _group(str(gid), core.LEGACY_COLOURS.get(str(g["colour"]), str(g["colour"])) if _valid_colour(g.get("colour")) else "orange",
                        str(g["effect"]) if g.get("effect") in EFFECT_NAMES else "solid",
                        str(g["speed"]) if g.get("speed") in SPEEDS else "slow", [])
         level = g.get("brightness")                      # None = use the global brightness

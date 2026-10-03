@@ -83,7 +83,7 @@ def _post_wbtest_done(h):
 
 def _colours_reply():
     return {"colours": [{"id": c["id"], "name": c["name"], "ui": c["ui"], "led": c["led"], "ui_default": c["ui_default"],
-                         "led_default": c["led_default"]} for c in core.colours()]}
+                         "led_default": c["led_default"], "fixed": c["id"] == "network"} for c in core.colours()]}
 
 
 def _get_colours(h):

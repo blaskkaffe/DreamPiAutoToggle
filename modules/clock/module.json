@@ -9,5 +9,8 @@
   "clock": "cyan"
  },
  "primary": "clock",
- "web": "netswitch_clock"
+ "web": "netswitch_clock",
+ "tints": {
+  "clock": false
+ }
 }

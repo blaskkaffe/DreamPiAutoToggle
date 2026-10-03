@@ -97,6 +97,12 @@
       "key": "dcnet",
       "title": "Colour for DCNET"
      }
+    },
+    {
+     "type": "row",
+     "title": "Global main colour",
+     "sub": "Pick Global main for a box or a row of the LEDs to give them this colour",
+     "control": {"type": "colourpick", "id": "global", "label": "Global main colour"}
     }
    ]
   },

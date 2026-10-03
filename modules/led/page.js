@@ -23,9 +23,10 @@ function load(){xhrJson("GET","/ledconfig",function(r){if(!r)return;
 function save(){clearTimeout(timer);timer=setTimeout(function(){
  post("/ledconfig",cfg,function(r){if(r)ctx.saved();refresh()})},250)}
 // ---- the rows
-function isToken(id){return colours.tokens.some(function(t){return t.id===id})}
+function isToken(id){return id==="network"||colours.tokens.some(function(t){return t.id===id})}      // colours that follow the networks
 function tokenColours(){return (S.led&&S.led.tokens)||tokenUi}      // the networks' colours as they are now (they follow the switch)
-function colourOf(g){for(var i=0;i<colours.palette.length;i++)if(colours.palette[i].id===g.colour)return colours.palette[i];
+function colourOf(g){if(g.colour==="network"){var nw=tokenColours().network;return {id:"network",name:"Selected network",ui:nw.ui,ui_l:nw.ui_l}}
+ for(var i=0;i<colours.palette.length;i++)if(colours.palette[i].id===g.colour)return colours.palette[i];
  for(var j=0;j<colours.tokens.length;j++)if(colours.tokens[j].id===g.colour){var tk=tokenColours()[g.colour];return {id:g.colour,name:colours.tokens[j].name,ui:tk.ui,ui_l:tk.ui_l}}
  return {id:g.colour,name:g.colour,ui:"#888888",ui_l:"#aaaaaa"}}
 function effectName(g){var n=g.effect;effects.forEach(function(e){if(e[0]===g.effect)n=e[1]});return g.effect==="solid"?n.toLowerCase():g.speed+" "+n.toLowerCase()}
@@ -57,8 +58,9 @@ function fillEdit(g){editPop.innerHTML="";var c=colourOf(g);
  editPop.appendChild(h("div",{"class":"t",text:"Colour, animation and level"}));
  // colour: the palette, then the colours that follow the networks
  var grid=h("span",{"class":"swatches grid"});
- colours.palette.filter(function(x){return x.id.indexOf("bright-")!==0}).concat(colours.palette.filter(function(x){return x.id.indexOf("bright-")===0})).forEach(function(x){
-  var b=h("button",{type:"button","class":"swatch"+(g.colour===x.id?" sel":""),style:"--c:"+x.ui+";--cl:"+x.ui_l,"aria-label":x.name});
+ colours.palette.forEach(function(x){var ui=x.ui,ul=x.ui_l;
+  if(x.id==="network"){var tk=tokenColours().network;ui=tk.ui;ul=tk.ui_l}      // Selected network: the ball shows the network's colour now
+  var b=h("button",{type:"button","class":"swatch"+(g.colour===x.id?" sel":""),style:"--c:"+ui+";--cl:"+ul,"aria-label":x.name});
   b.onclick=function(){g.colour=x.id;paintAll();save()};grid.appendChild(b)});
  editPop.appendChild(h("div",{"class":"frow wrapcol"},[h("span",{text:"Colour: "+c.name}),grid]));
  editPop.appendChild(h("div",{"class":"frow"},[h("span",{text:"Or a network colour"}),
@@ -126,23 +128,20 @@ $("led-bright").oninput=function(){cfg.max_brightness=Math.round(sliderToBright(
 var colRow=editRow({title:"Colours",button:"Adjust",aria:"Adjust the colours"}),colPop=h("div",{"class":"gpop"}),pCol=ui.popup(colPop),colSel=null,colPreview=null,colChanged=false,colTimer=null,pal=[];
 colRow.setSub("How each colour looks on screen and on the LED");
 host.insertBefore(colRow.el,list);host.appendChild(colPop);
-function mixWhite(hex){var n=[1,3,5].map(function(i){var v=parseInt(hex.substr(i,2),16);return Math.round(v+(255-v)*0.45)});return "#"+n.map(function(v){return (v<16?"0":"")+v.toString(16)}).join("")}
-function rgbOf(hex){return parseInt(hex.substr(1,2),16)+","+parseInt(hex.substr(3,2),16)+","+parseInt(hex.substr(5,2),16)}
-function applyVars(c){var s=document.documentElement.style,l=mixWhite(c.ui);   // the page follows at once; the next page load has it from the server
- s.setProperty("--c-"+c.id,c.ui);s.setProperty("--c-"+c.id+"-l",l);s.setProperty("--c-"+c.id+"-rgb",rgbOf(c.ui));s.setProperty("--c-"+c.id+"-l-rgb",rgbOf(l));
- (LAY.palette||[]).forEach(function(p){if(p.id===c.id){p.ui=c.ui;p.ui_l=l}});
- colours.palette.forEach(function(p){if(p.id===c.id){p.ui=c.ui;p.ui_l=l}})}
+function applyVars(c){applyPaletteVars(c);colours.palette.forEach(function(p){if(p.id===c.id){p.ui=c.ui;p.ui_l=mixWhite(c.ui)}})}      // the page follows at once (applyPaletteVars is the base's)
 function colSave(body,after){post("/ledcolours",body,function(r){if(r&&r.colours){pal=r.colours;if(after)after()}})}
 function openCol(btn,e){if(pCol.isOpen()){pCol.toggle(btn,e);return}
  xhrJson("GET","/ledcolours",function(r){if(!r)return;pal=r.colours;colChanged=false;fillCol();pCol.toggle(btn,e)})}
 function fillCol(){colPop.innerHTML="";var cur=null;pal.forEach(function(c){if(c.id===colSel)cur=c});if(!cur&&pal.length){cur=pal[0];colSel=cur.id}
  colPop.appendChild(h("div",{"class":"t",text:"Colours: the left half of a ball is how it looks on screen, the right half how it is sent to the LED"}));
  var grid=h("span",{"class":"swatches grid"});
- pal.filter(function(c){return c.id.indexOf("bright-")!==0}).concat(pal.filter(function(c){return c.id.indexOf("bright-")===0})).forEach(function(c){
+ pal.forEach(function(c){
   var b=h("button",{type:"button","class":"swatch"+(c.id===colSel?" sel":""),style:"--c:linear-gradient(90deg,"+c.ui+" 50%,"+c.led+" 50%);--cl:"+mixWhite(c.ui),"aria-label":c.name});
   b.onclick=function(){colSel=c.id;stopHold();fillCol()};grid.appendChild(b)});
  colPop.appendChild(grid);
  if(!cur)return;
+ if(cur.fixed){colPop.appendChild(h("div",{"class":"sub",text:cur.name+" is the colour of the selected network, DCNow! or DCNET: it follows the switch and has no value of its own (set the network colours in Appearance)."}));
+  var d0=h("button",{type:"button","class":"pill-s",text:"Done"});d0.onclick=function(){pCol.close()};colPop.appendChild(h("div",{"class":"bar end"},[d0]));return}
  var uiIn=h("input",{type:"color",value:cur.ui,"aria-label":cur.name+" on screen"}),ledIn=h("input",{type:"color",value:cur.led,"aria-label":cur.name+" on the LED"}),
   changed=cur.ui!==cur.ui_default||cur.led!==cur.led_default;
  colPreview=h("button",{type:"button","class":"pill-s"+(wbOn&&holdColour===cur.led?" on":""),text:wbOn&&holdColour===cur.led?"Stop preview":"Preview on LED"});

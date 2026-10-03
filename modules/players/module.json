@@ -9,5 +9,8 @@
  "colours": {
   "players": "purple"
  },
- "primary": "players"
+ "primary": "players",
+ "tints": {
+  "players": false
+ }
 }
