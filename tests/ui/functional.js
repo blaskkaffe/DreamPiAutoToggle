@@ -23,6 +23,13 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   const pillColour = async n => page.locator('.pill').nth(n).evaluate(e => getComputedStyle(e).backgroundColor);
   const orange = await pillColour(0), blue = await pillColour(1);
   ok(orange !== blue, 'the two network buttons have different colours');
+  // ---- the games carousel: centred while it fits (like the status row above it), scrolling when it doesn't
+  ok(await page.locator('.carousel.sc').count() === 1, 'a long games line scrolls');
+  await page.evaluate(() => { S.players = Object.assign({}, S.players, { games: ['Quake III (1)'] }); engineUpdate(); }); await settle(300);
+  const geo = await page.evaluate(() => { const t = document.querySelector('.carousel .t').getBoundingClientRect(), b = document.querySelector('.now:nth-of-type(2), .dbox:nth-child(2) .now').getBoundingClientRect();
+    return { off: Math.abs((t.left + t.right) / 2 - (b.left + b.right) / 2), sc: !!document.querySelector('.carousel.sc'), w: b.width }; });
+  ok(!geo.sc && geo.off < 24, 'a short games line stands still and is centred in the box (off by ' + Math.round(geo.off) + 'px of ' + Math.round(geo.w) + ')');
+  await page.evaluate(() => reloadData()); await settle(1200);
   // ---- choosing a network moves the primary colour with it
   const boxBg = () => page.locator('.now').first().evaluate(e => getComputedStyle(e).borderTopColor);
   const before = await boxBg();
@@ -34,12 +41,18 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await page.evaluate(() => document.body.classList.contains('c-orange')), 'and back to orange for DCNow!');
   // ---- the module's own colour choice (swatches from the global palette)
   await openSettings();
-  const swatches = page.locator('[data-box="network colours"] .swatches').first().locator('.swatch');
-  ok(await swatches.count() === 16, 'the palette has 16 colours');
+  const colourBtn = page.locator('[data-box="network colours"] .colourpick > button').first();     // the DCNow! row
+  ok(await colourBtn.evaluate(e => e.classList.contains('c-orange') && getComputedStyle(e).backgroundColor !== getComputedStyle(document.querySelector('.pill-s:not(.pri)')).backgroundColor), 'the Colour button shows the chosen colour (orange)');
+  await colourBtn.click(); await settle(400);
+  const swatches = page.locator('.pop.open .swatches .swatch');
+  ok(await swatches.count() === 16, 'it opens a pop-up with the 16 palette colours');
+  ok(await page.locator('.pop.open .swatch.sel').count() === 1 && await page.locator('.pop.open .swatch.sel').getAttribute('data-id') === 'orange', 'the current colour is marked');
   await swatches.nth(7).click(); await settle(1500);                       // pink (the 8 normal colours come first, then the bright ones)
+  ok(await page.locator('.pop.open').count() === 0, 'picking a colour closes the pop-up');
+  ok(await colourBtn.evaluate(e => e.classList.contains('c-pink')), 'and the Colour button takes it');
   ok(await page.locator('.pill').nth(0).evaluate(e => e.classList.contains('c-pink')), 'DCNow! button follows the picked colour');
   ok(await page.evaluate(() => document.body.classList.contains('c-pink')), 'and so does the page primary while DCNow! is selected');
-  await swatches.nth(1).click(); await settle(1200);                       // back to orange
+  await colourBtn.click(); await settle(300); await page.locator('.pop.open .swatches .swatch').nth(1).click(); await settle(1200);   // back to orange
   // ---- the picker table (phone numbers)
   const group = page.locator('.wpicker .srow').first();
   await group.locator('button').first().click();

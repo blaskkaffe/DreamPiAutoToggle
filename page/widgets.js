@@ -137,13 +137,21 @@ W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.l
  box.onchange=function(){var want=box.checked;post(s.post,s.body?Object.assign({value:want},s.body):{value:want},function(){refresh();ctx.saved()})};return el};
 // a row of widgets side by side (wraps)
 W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx))};
-// ---- the module's own colour choice: a row of the palette's colours; the pick is kept for the module (core.set_module_colour)
+// ---- the module's own colour choice: a "Colour" button in the chosen colour that opens a pop-up with the palette's colours;
+// the pick is kept for the module (core.set_module_colour)
 function paletteOrder(){var p=(LAY.palette||[]).slice();return p.filter(function(c){return c.id.indexOf("bright-")!==0}).concat(p.filter(function(c){return c.id.indexOf("bright-")===0}))}
-W.swatches=function(s,ctx){var el=h("span",{"class":"swatches grid"}),btns={};
- paletteOrder().forEach(function(c){var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
-  b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){refresh();ctx.saved()}})};el.appendChild(b)});
- UPD.push(function(){var cur=(((S.colours||{})[s.mod])||{})[s.key];for(var id in btns){var on=id===cur;btns[id].classList.toggle("sel",on);btns[id].setAttribute("aria-pressed",on?"true":"false")}});
- return el};
+W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri",text:s.label||"Colour","aria-haspopup":"dialog"}),
+ grid=h("span",{"class":"swatches grid"}),pop=h("div",{},[h("div",{"class":"t",text:s.title||"Pick a colour"}),grid]),
+ el=h("span",{"class":"colourpick"},[btn,pop]),btns={},names={},p=ui.popup(pop);
+ paletteOrder().forEach(function(c){names[c.id]=c.name;
+  var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
+  b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){p.close();refresh();ctx.saved()}})};grid.appendChild(b)});
+ btn.onclick=function(e){p.toggle(btn,e)};
+ function paint(){var cur=(((S.colours||{})[s.mod])||{})[s.key]||"";
+  if(btn._cc!==cur){if(btn._cc)btn.classList.remove("c-"+btn._cc);if(cur)btn.classList.add("c-"+cur);btn._cc=cur;
+   btn.setAttribute("aria-label",(s.label||"Colour")+": "+(names[cur]||cur||"not set"))}
+  for(var id in btns){var on=id===cur;btns[id].classList.toggle("sel",on);btns[id].setAttribute("aria-pressed",on?"true":"false")}}
+ UPD.push(paint);paint();hook("settingsClose",function(){p.close()});return el};
 // ---- a block that opens and closes (the debug log bar)
 W.expander=function(s,ctx){var open=false,body=h("div",{"class":"xbody"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx)),
  b=h("button",{type:"button","class":"wide"},[h("span",{text:s.label}),h("span",{"class":"arrow",html:"&#9656;"})]),
@@ -180,12 +188,16 @@ W.infobox=function(s,ctx){
  return el};
 // ---- carousel: one line of text that scrolls round (like a news ticker) only when it does not fit
 W.carousel=function(s){var el=h("span",{"class":"carousel"}),trk=h("span",{"class":"trk"}),cur=null;el.appendChild(trk);
- function text(){var v=val(s.items!==undefined?s.items:s.text);return Array.isArray(v)?v.join("  •  "):(v==null?"":String(v))}
- function fit(){var t=trk.querySelector(".t"),scroll=false,par=el.parentNode;
-  if(t&&cur&&par&&!(el.closest&&el.closest(".now.open")))scroll=t.offsetWidth>par.clientWidth-2;
-  if(scroll!==el.classList.contains("sc")){el.classList.toggle("sc",scroll);if(scroll)el.style.setProperty("--d",Math.max(12,Math.round(cur.length*0.28))+"s")}}
+ function text(){var v=val(s.items!==undefined?s.items:s.text);return Array.isArray(v)?v.join("  \u2022  "):(v==null?"":String(v))}
+ // Scrolls only when the line is wider than its row (minus the arrow). While it fits it is centred like the status row above it;
+ // when it scrolls its holder (.v.fill) takes the whole row so the line can run past the edges, and the arrow stays at the end.
+ function fit(){var t=trk.querySelector(".t"),scroll=false,par=el.parentNode,row=el.closest&&el.closest(".row");
+  if(t&&cur&&par&&row&&!(el.closest(".now.open"))){var arrow=row.querySelector(".arrow");
+   scroll=t.offsetWidth>row.clientWidth-(arrow?arrow.offsetWidth+8:0)-12}
+  if(scroll!==el.classList.contains("sc")){el.classList.toggle("sc",scroll);if(scroll)el.style.setProperty("--d",Math.max(12,Math.round(cur.length*0.28))+"s")}
+  if(par)par.classList.toggle("scrolling",scroll)}
  function set(t){if(t===cur&&trk.firstChild){fit();return}cur=t;
-  var half='<span class="t">'+esc(t)+'<span class="sp">  •  </span></span>';
+  var half='<span class="t">'+esc(t)+'<span class="sp">\u00a0\u00a0\u2022\u00a0\u00a0</span></span>';
   setHtml(trk,t?half+half.replace('class="t"','class="t dup" aria-hidden="true"'):"");el.classList.remove("sc");fit()}
  UPD.push(function(){set(text())});set(text());
  hook("layout",function(){fit()});window.addEventListener("resize",fit);return el};

@@ -15,7 +15,7 @@
  ],
  "settings": [
   {"box": "network colours", "title": "Network colours", "items": [
-   {"type": "row", "title": "DCNow!", "below": [{"type": "swatches", "key": "dcnow"}]},
-   {"type": "row", "title": "DCNET", "below": [{"type": "swatches", "key": "dcnet"}]}]}
+   {"type": "row", "title": "DCNow!", "control": {"type": "swatches", "key": "dcnow", "title": "Colour for DCNow!"}},
+   {"type": "row", "title": "DCNET", "control": {"type": "swatches", "key": "dcnet", "title": "Colour for DCNET"}}]}
  ]
 }

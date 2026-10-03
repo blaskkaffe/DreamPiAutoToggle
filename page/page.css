@@ -35,6 +35,7 @@
  .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.18)}
  .now.open .row.main .k{display:block} .now.open .row.main .v{flex:1}
  .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r);font-size:1.1em;font-weight:600;letter-spacing:.02em}
+ .pill-s.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgba(var(--primary-l-rgb),.82);text-shadow:0 1px 2px rgba(0,0,0,.55)}   /* a small button in a palette colour (c-<id>), like the colour pick's */
  .pill.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgba(var(--primary-l-rgb),.82)}
  .pill:active{filter:brightness(1.1)}
  .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
@@ -55,7 +56,7 @@
  .tag button{background:none;color:#aaa;font-size:1.05em;line-height:1;min-width:36px;min-height:32px;padding:0;margin:-6px 0} .tag button:hover{color:#fff}
  .empty{color:var(--muted);font-size:.85em;margin:8px 0 0}
  .swatches{display:flex;gap:8px;flex:none} .swatch{width:34px;height:34px;padding:0;border-radius:50%;border:var(--bw) solid transparent;background:var(--c);box-shadow:0 0 0 1px rgba(255,255,255,.25) inset}
- .swatches.grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;width:100%;margin-top:6px} .swatches.grid .swatch{width:100%;height:auto;aspect-ratio:1/1;max-width:36px;justify-self:center}
+ .swatches.grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;width:100%;margin-top:6px} .pop .swatches.grid{margin-top:0} .swatches.grid .swatch{width:100%;height:auto;aspect-ratio:1/1;max-width:36px;justify-self:center}
  .swatch.sel{border-color:#fff} .swatch:focus-visible{outline-offset:3px}
  .msg{color:#f99;font-size:.82em} .msg:empty{display:none}
  .pop{display:none;position:absolute;z-index:20;width:290px;max-width:calc(100% - 16px);padding:12px 16px;border-radius:var(--r);background:var(--pop);box-shadow:0 6px 24px rgba(0,0,0,.6)}
@@ -90,7 +91,7 @@
  .now.open .carousel{white-space:normal;overflow:visible} .now.open .carousel .trk{animation:none;display:inline} .now.open .carousel .dup,.now.open .carousel .sp{display:none}
  @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
  @media(prefers-reduced-motion:reduce){.carousel.sc .trk{animation:none}.carousel.sc .dup,.carousel.sc .sp{display:none}}
- .now .row.main .v.fill{flex:1;min-width:0;overflow:hidden} .carousel{text-align:center} .carousel.sc,.now.open .carousel{text-align:left}
+ .now .row.main .v.fill.scrolling{flex:1;min-width:0;overflow:hidden} .carousel{text-align:center} .carousel.sc,.now.open .carousel{text-align:left}
  .now .status{display:flex;align-items:baseline;min-width:0} .now .status > .dot{flex:none} .now .status > span:last-child{min-width:0}
  .now .pln{white-space:nowrap} .now .pln+.pln{margin-left:.6em}
  .now .wlist.compact{display:block;width:100%;max-height:40vh;overflow-y:auto;overscroll-behavior:contain}
