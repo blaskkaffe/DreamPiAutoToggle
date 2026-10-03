@@ -1,0 +1,8 @@
+/* Clock module: the time zone map in the clock box (opens when the box is tapped and world time is on) */
+.mapw .k{display:none} .mapw.row .v{flex:1;display:block;width:100%}
+.cmap{display:block;width:100%;height:auto}
+.cmap .band{fill:rgba(255,255,255,.04)} .cmap .band.alt{fill:rgba(255,255,255,.09)} .cmap .band.here{fill:rgba(var(--primary-rgb),.28)}
+.cmap .land{fill:rgba(255,255,255,.34);stroke:rgba(255,255,255,.5);stroke-width:.4}
+.cmap .hr{fill:rgba(255,255,255,.75);font-size:8px;text-anchor:middle}
+.cmap .city{fill:var(--primary-l);stroke:#000;stroke-width:.6}
+.cmapnote{margin:6px 0 0;color:rgba(255,255,255,.65);font-size:.95em;text-align:center}

@@ -1,9 +1,13 @@
 {
  "name": "Clock",
- "description": "Current time on the dashboard, with 24h, 12h or .beat viewing.",
+ "description": "The time on the main page in 12 or 24-hour form, with .beat time and world times if you like.",
  "enabled": true,
  "visible": true,
  "order": 15,
  "ui": 2,
+ "colours": {
+  "clock": "cyan"
+ },
+ "primary": "clock",
  "web": "netswitch_clock"
 }

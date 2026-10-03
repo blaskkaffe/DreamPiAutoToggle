@@ -259,14 +259,22 @@ class ClockView(unittest.TestCase):
         time.tzset()
         cleanup(self.tmp)
 
-    def test_the_mode_file_is_a_core_path_and_defaults_to_24h(self):
-        # the module once read core.CLOCK_MODE before core had it, so /api and /clock both failed
-        self.assertTrue(core.CLOCK_MODE.startswith(self.tmp))
-        self.assertEqual(clock.read_format(), "24h")
-        self.assertEqual(clock.save_format(" 12H "), "12h")
-        self.assertEqual(clock.read_format(), "12h")
-        self.assertEqual(clock.save_format("nonsense"), "24h")
-        self.assertEqual(clock.save_format(None), "24h")
+    def test_the_settings_are_a_core_path_and_default_to_24h_only(self):
+        self.assertTrue(core.CLOCK_CONFIG.startswith(self.tmp))
+        self.assertEqual(clock.read_config(), {"format": "24h", "beat": False, "world": False})
+        self.assertEqual(clock.save_config({"format": " 12H "})["format"], "12h")
+        self.assertEqual(clock.save_config({"format": "nonsense"})["format"], "24h")
+        self.assertEqual(clock.save_config({"format": "beat"})["format"], "24h")           # .beat is a switch of its own now
+        self.assertEqual(clock.save_config({"beat": "true", "world": 1}), {"format": "24h", "beat": True, "world": True})
+        self.assertEqual(clock.save_config({"beat": False})["world"], True)               # a key that is not given stays as it was
+
+    def test_an_older_mode_file_is_carried_over(self):
+        with open(core.CLOCK_MODE, "w") as f:
+            f.write("beat")
+        self.assertEqual(clock.read_config(), {"format": "24h", "beat": True, "world": False})
+        with open(core.CLOCK_MODE, "w") as f:
+            f.write("12h")
+        self.assertEqual(clock.read_config(), {"format": "12h", "beat": False, "world": False})
 
     def test_beat_is_biel_mean_time_not_the_pi_time_zone(self):
         self.assertEqual(clock.format_time("beat", 0), "@041")             # 00:00 UTC = 01:00 BMT
@@ -282,16 +290,39 @@ class ClockView(unittest.TestCase):
         self.assertEqual(clock.format_time("12h", t), "1:05:09 PM")
         self.assertEqual(clock.format_time("12h", 0), "12:00:00 AM")
 
+    def test_the_three_lines_are_empty_unless_switched_on(self):
+        t = 13 * 3600 + 5 * 60 + 9
+        v = clock.view(t)
+        self.assertEqual((v["time"], v["beat"], v["items"], v["map"]), ("13:05:09", "", [], None))     # top and bottom empty
+        clock.save_config({"beat": True, "world": True, "format": "12h"})
+        v = clock.view(t)
+        self.assertEqual((v["time"], v["beat"]), ("1:05:09 PM", ".beat @%03d" % clock.beats(t)))
+        self.assertEqual(len(v["items"]), len(clock.CITIES))
+        self.assertEqual(v["map"]["utc"], t)
+
+    def test_world_times_follow_the_offsets(self):
+        jan = 1767268800                                                    # 2026-01-01 12:00 UTC: winter on the north side
+        got = dict((c["name"], c["text"]) for c in clock.world("24h", jan))
+        self.assertEqual((got["London"], got["Berlin"], got["Tokyo"], got["Mumbai"]), ("12:00", "13:00", "21:00", "17:30"))
+        self.assertEqual(dict((c["name"], c["text"]) for c in clock.world("12h", jan))["Tokyo"], "9:00 PM")
+
+    def test_offsets_fall_back_without_a_tz_database(self):
+        saved = clock.ZoneInfo
+        clock.ZoneInfo = None
+        try:
+            self.assertEqual(clock.zone_offset("Europe/Berlin", 1, 0), 1.0)
+        finally:
+            clock.ZoneInfo = saved
+
     def test_api_and_form_answer(self):
-        clock.save_format("beat")
+        clock.save_config({"beat": True})
         d = {}
         clock.api(d, [])
-        self.assertEqual((d["clock"]["mode"], d["clock"]["label"]), ("beat", ".beat"))
-        self.assertRegex(d["clock"]["text"], r"^@\d{3}$")
+        self.assertRegex(d["clock"]["beat"], r"^\.beat @\d{3}$")
         r = clock._reply()
-        self.assertEqual(r["values"], {"format": "beat"})
-        self.assertEqual([o["value"] for o in r["options"]["formats"]], ["24h", "12h", "beat"])
-        self.assertEqual(r["texts"]["clock"], "Shown as .beat")
+        self.assertEqual(r["values"], {"format": "24h"})
+        self.assertEqual([o["value"] for o in r["options"]["formats"]], ["24h", "12h"])
+        self.assertEqual(r["texts"]["clock"], "Shown as 24-hour")
 
 
 if __name__ == "__main__":
