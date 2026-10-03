@@ -1,32 +1,34 @@
 # DreamPi Netswitch add-on - a simple dashboard clock.
 # Works on Python 3 and 2.7.
-import datetime
 import json
 import os
+import time
 
 import netswitch_core as core
 
 FORMATS = ("24h", "12h", "beat")
+LABELS = {"24h": "24-hour", "12h": "12-hour", "beat": ".beat"}
 DEFAULT_FORMAT = "24h"
+
+
+def _clean(value):
+    """A known format name, or the default."""
+    value = str(value or "").strip().lower()
+    return value if value in FORMATS else DEFAULT_FORMAT
 
 
 def read_format():
     """Which time style the dashboard should use."""
     try:
         with open(core.CLOCK_MODE) as f:
-            mode = f.read().strip().lower()
+            return _clean(f.read())
     except (IOError, OSError):
         return DEFAULT_FORMAT
-    return mode if mode in FORMATS else DEFAULT_FORMAT
 
 
 def save_format(value):
     """Save the selected clock mode and return it."""
-    if value is None:
-        value = DEFAULT_FORMAT
-    value = str(value).strip().lower()
-    if value not in FORMATS:
-        value = DEFAULT_FORMAT
+    value = _clean(value)
     tmp = core.CLOCK_MODE + ".tmp"
     with open(tmp, "w") as f:
         f.write(value)
@@ -34,26 +36,30 @@ def save_format(value):
     return value
 
 
-def _seconds(dt):
-    return dt.hour * 3600 + dt.minute * 60 + dt.second + dt.microsecond / 1000000.0
+def beats(now=None):
+    """Swatch Internet Time: the day in BMT (Biel Mean Time = UTC+1, no summer time) cut into 1000 beats of 86.4 s.
+    It is the same everywhere, so it ignores the Pi's own time zone."""
+    now = time.time() if now is None else now
+    return int(((now + 3600) % 86400) / 86.4) % 1000
 
 
-def format_time(mode, dt=None):
-    """What the dashboard should show for a given mode."""
-    dt = dt or datetime.datetime.now()
-    mode = (mode or DEFAULT_FORMAT).lower()
-    if mode == "12h":
-        return dt.strftime("%I:%M:%S %p")
+def format_time(mode, now=None):
+    """What the dashboard should show for a given mode at unix time now (default: this moment)."""
+    now = time.time() if now is None else now
+    mode = _clean(mode)
     if mode == "beat":
-        return "@%03d" % int((( _seconds(dt) + 1.0) / 86.4))
-    return dt.strftime("%H:%M:%S")
+        return "@%03d" % beats(now)
+    local = time.localtime(now)
+    if mode == "12h":
+        return "%d:%s" % (int(time.strftime("%I", local)), time.strftime("%M:%S %p", local))
+    return time.strftime("%H:%M:%S", local)
 
 
 def _reply():
     mode = read_format()
     return {"values": {"format": mode},
-            "texts": {"clock": "Dashboard clock format"},
-            "options": {"formats": [{"value": f, "label": {"24h": "24-hour", "12h": "12-hour", "beat": ".beat"}[f]} for f in FORMATS]}}
+            "texts": {"clock": "Shown as %s" % LABELS[mode]},
+            "options": {"formats": [{"value": f, "label": LABELS[f]} for f in FORMATS]}}
 
 
 def _get(h):
@@ -65,7 +71,7 @@ def _post(h):
         body = json.loads(h._body(4096).decode("utf-8"))
     except (ValueError, IOError, OSError, AttributeError) as e:
         return h.send(str(e), "text/plain; charset=utf-8", status=400)
-    values = body.get("values") if isinstance(body, dict) else {}
+    values = body.get("values") if isinstance(body, dict) else None
     if not isinstance(values, dict):
         values = {}
     save_format(values.get("format"))
@@ -79,4 +85,4 @@ POST = {"/clock": _post}
 
 def api(d, warnings):
     mode = read_format()
-    d["clock"] = {"text": format_time(mode), "mode": mode, "label": {"24h": "24-hour", "12h": "12-hour", "beat": ".beat"}[mode]}
+    d["clock"] = {"text": format_time(mode), "mode": mode, "label": LABELS[mode]}

@@ -78,6 +78,7 @@ The add-on is a small **base** plus **modules**. The base is the web page's fram
 |---|---|---|---|
 | *Network switcher, System* | `modules/switcher/`, `system/` | always on; the network box and buttons, Network colours and the GPIO settings of the two physical buttons (switcher); the About box with versions and the GitHub link (system) | yes (not in the picker) |
 | **Special phone numbers** | `modules/numbers/` | Settings > Special phone numbers, to edit the numbers the Dreamcast dials. Without it the built-in default numbers are used | yes |
+| **Clock** | `modules/clock/` | a clock on the main page, and Settings > Clock to show it as 24-hour, 12-hour or .beat (Swatch Internet Time) | yes |
 | **Online players** | `modules/players/` | the Online players box on the main page | yes |
 | **Wi-Fi setup** | `modules/wifi/` | joining a Wi-Fi network without a keyboard (a temporary access point), and the Wi-Fi rows in Settings | no |
 | **Status LEDs** | `modules/led/` | the NeoPixel service, the Status LED settings (including the calibration pop-up), and the LED count / GPIO pin / wire order | yes |
