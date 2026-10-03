@@ -9,6 +9,7 @@
 # errors outrank information and "State unknown" is only a fallback, see
 # netswitch_ledconfig.active_messages().
 # The number of LEDs is in /opt/dreampi-netswitch/led_count (install.sh).
+import colorsys
 import math
 import os
 import signal
@@ -29,12 +30,28 @@ KEEPALIVE = 3.0    # an unchanged frame is sent again this often, which repairs 
 
 
 # ---------------------------------------------------------------- effects
-# An effect says, for a message, whether its LEDs are lit t seconds after the message started (or last changed).
-# It does not touch colours: the colour is always the message's own, at full strength, and brightness is applied
-# afterwards, in one place (to_bytes), so no effect can ever change a colour's hue. Only "solid" and "blink"
-# exist for now. To add an effect, give it a name in ledconfig.EFFECTS and a function here that returns a
-# brightness factor 0..1 (1 = on, 0 = off) for the time t; a factor between 0 and 1 is a fade.
-BLINK_PERIOD = {"slow": 1.0, "fast": 0.4}     # seconds for one blink (lit for the first half, dark for the second)
+# An effect says, for a message, how lit its LEDs are t seconds after the message started (or last changed): a level 0..1
+# (1 = on, 0 = off, in between = a fade). Brightness is applied afterwards, in one place (to_bytes), so no effect can change a
+# colour's hue. Only the rainbow also decides the colour (effect_colour). To add an effect, give it a name in ledconfig.EFFECTS,
+# a period in PERIOD and a function here; the page's CSS (page.css, "lk" rules) needs a matching animation for the preview.
+# Every effect starts at its brightest, so a change shows straight away.
+PERIOD = {                       # seconds for one round: (slow, fast)
+    "blink": (1.0, 0.4),         # lit for the first half, dark for the second
+    "fade": (3.0, 1.2),          # smoothly up and down, all the way to off
+    "breathe": (4.0, 1.6),       # smoothly up and down, never fully off
+    "blink1": (1.6, 0.8),        # o---    one short flash, then dark
+    "blink2": (1.6, 0.8),        # oo---   two
+    "blink3": (1.6, 0.8),        # ooo-    three
+    "rainbow": (6.0, 2.0),       # round the colour wheel
+}
+BREATHE_LOW = 0.12               # the dimmest a breath gets (as a level, before gamma); the LED is never turned fully off
+NEVER_OFF = ("breathe",)
+PULSE = 0.09                     # a flash and the gap after it, as a share of the period
+
+
+def _period(effect, speed):
+    slow, fast = PERIOD[effect]
+    return fast if speed == "fast" else slow
 
 
 def _solid(t, speed):
@@ -42,16 +59,50 @@ def _solid(t, speed):
 
 
 def _blink(t, speed):
-    period = BLINK_PERIOD.get(speed, BLINK_PERIOD["slow"])
+    period = _period("blink", speed)
     return 1.0 if (t % period) < period / 2.0 else 0.0     # starts lit when the message appears
 
 
-EFFECT_LEVEL = {"solid": _solid, "blink": _blink}
+def _wave(t, period):
+    return (1.0 + math.cos(2 * math.pi * t / period)) / 2.0     # 1 at the start, 0 half a period later
+
+
+def _fade(t, speed):
+    return _wave(t, _period("fade", speed))
+
+
+def _breathe(t, speed):
+    return BREATHE_LOW + (1.0 - BREATHE_LOW) * _wave(t, _period("breathe", speed))
+
+
+def _flashes(effect, n):
+    def level(t, speed):
+        period = _period(effect, speed)
+        t = t % period
+        unit = period * PULSE
+        return 1.0 if t < n * 2 * unit - unit and (t % (2 * unit)) < unit else 0.0
+    return level
+
+
+def _rainbow(t, speed):
+    return 1.0
+
+
+EFFECT_LEVEL = {"solid": _solid, "blink": _blink, "fade": _fade, "breathe": _breathe,
+                "blink1": _flashes("blink1", 1), "blink2": _flashes("blink2", 2), "blink3": _flashes("blink3", 3),
+                "rainbow": _rainbow}
 
 
 def effect_level(effect, speed, t):
     """0..1: how lit a message with this effect is t seconds after it started."""
     return EFFECT_LEVEL.get(effect, _solid)(t, speed)
+
+
+def effect_colour(effect, speed, t, colour):
+    """The colour (r, g, b floats 0..1) a message shows: its own, except for the rainbow, which goes round the colour wheel."""
+    if effect == "rainbow":
+        return colorsys.hsv_to_rgb((t / _period("rainbow", speed)) % 1.0, 1.0, 1.0)
+    return colour
 
 
 def hex_rgb(colour):
@@ -126,9 +177,13 @@ def render(messages, now, count, clocks=None, white_balance=None, gamma=ledconfi
         first, last = (1, count) if not leds else (max(1, leds[0]), min(count, leds[1]))
         if first > last:
             continue          # section lies beyond the end of this strip
-        level = effect_level(m.get("effect", "solid"), m.get("speed", "slow"), now - clocks[key][1])
-        colour = hex_rgb(m.get("color", "#3c3c3c"))
-        pixel = to_bytes([tuple(c * level for c in colour)], m.get("brightness", 0.08), white_balance, gamma)[0]
+        effect, speed, age = m.get("effect", "solid"), m.get("speed", "slow"), now - clocks[key][1]
+        level = effect_level(effect, speed, age)
+        colour = effect_colour(effect, speed, age, hex_rgb(m.get("color", "#3c3c3c")))
+        brightness = m.get("brightness", 0.08)
+        pixel = to_bytes([tuple(c * level for c in colour)], brightness, white_balance, gamma)[0]
+        if pixel == (0, 0, 0) and effect in NEVER_OFF and brightness > 0 and max(colour) > 0:
+            pixel = quantize([c / max(colour) for c in colour])      # one step on the strongest channel: dim, not off
         frame[first - 1:last] = [pixel] * (last - first + 1)
     for key in list(clocks):
         if key not in seen:
@@ -256,7 +311,7 @@ def main():
     _realtime()
     messages = []
     steady = Steady()
-    wb_test = False
+    wb_test, wb_colour = False, "#ffffff"
     clocks = {}
     last_frame, last_sent = None, 0.0
     next_read = 0.0
@@ -265,6 +320,7 @@ def main():
         if now >= next_read:
             try:
                 wb_test = ledconfig.wb_test_active()
+                wb_colour = ledconfig.wb_test_colour()
                 messages = steady.feed(ledconfig.active_messages(), now)
                 cfg = ledconfig.led_config()
                 order = drivers.ORDERS.get(cfg.get("order"), drivers.DEFAULT_ORDER)
@@ -286,7 +342,7 @@ def main():
         # everything else, so what's previewed is exactly what's being
         # calibrated - see ledconfig.wb_test_active().
         if wb_test:
-            frame = to_bytes([(1.0, 1.0, 1.0)] * count, cfg.get("max_brightness", 0.08), white_balance, gamma)
+            frame = to_bytes([hex_rgb(wb_colour)] * count, cfg.get("max_brightness", 0.08), white_balance, gamma)
         else:
             frame = render(messages, now, count, clocks, white_balance, gamma)
         # A frame is sent when it changed, and an unchanged one now and then (KEEPALIVE), which repairs a garbled frame.

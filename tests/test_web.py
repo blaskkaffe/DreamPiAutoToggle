@@ -30,7 +30,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(cfg["gamma"], ledconfig.GAMMA)
         self.assertIn(cfg["order"], ledconfig.LED_ORDERS)
         self.assertNotIn("colours", cfg)              # one entry per group, not per selected network
-        self.assertEqual([g["id"] for g in cfg["groups"]], ["g1", "g2", "g3", "g4", "g5", "g6"])
+        self.assertEqual([g["id"] for g in cfg["groups"]], ["g1", "g2", "g3", "g4", "g5"])
 
     def test_led_round_trip_and_clamping(self):
         cfg = ledconfig.led_config()
@@ -49,7 +49,7 @@ class ConfigTests(unittest.TestCase):
         d = ledconfig.default_led_config()
         self.assertEqual(got["order"], d["order"])
         g = got["groups"][0]
-        self.assertEqual((g["colour"], g["effect"], g["speed"], g["messages"]), ("orange", "solid", "slow", ["ready"]))
+        self.assertEqual((g["colour"], g["effect"], g["speed"], g["messages"]), ("orange", "solid", "slow", ["ready-dcnow", "ready-dcnet"]))
         self.assertTrue(0.5 <= got["gamma"] <= 4.0)
 
     def test_an_old_per_message_config_gets_the_default_groups(self):

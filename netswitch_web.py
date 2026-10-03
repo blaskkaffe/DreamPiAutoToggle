@@ -45,7 +45,7 @@ def api_state():
     else is added by the enabled modules' api() hooks (the network switcher adds the network and the status rows)."""
     warnings = ["Module %s is not loaded: %s" % (name, why) for name, why in sorted(modules.errors().items())]
     d = {"pin": security.pin_required(),     # the page asks for it before update / restart / Wi-Fi connect
-         "colours": modules.live_colours(), "primary": {}, "enabled": modules.enabled_map(),
+         "colours": modules.live_colours(), "tints": modules.live_tints(), "primary": {}, "primary_key": {}, "enabled": modules.enabled_map(),
          "warnings": warnings, "now": int(time.time())}
     modules.apply_api(d, warnings)          # what the enabled modules add: network, status, debug, wifi, the dot's LED look ...
     return d
@@ -335,14 +335,20 @@ class Handler(BaseHTTPRequestHandler):
         """A module's own colour setting: {"module": name, "key": its colour key, "colour": palette id}."""
         try:
             data = json.loads(self._body(1024).decode("utf-8"))
-            got = core.set_module_colour(data.get("module"), data.get("key"), data.get("colour"))
-            if got is None:
-                raise ValueError("unknown module, colour key or colour")
+            got = None
+            if "colour" in data:
+                got = core.set_module_colour(data.get("module"), data.get("key"), data.get("colour"))
+                if got is None:
+                    raise ValueError("unknown module, colour key or colour")
+            if "tint" in data:
+                if core.set_module_tint(data.get("module"), data.get("key"), data.get("tint")) is None:
+                    raise ValueError("unknown module or colour key, or tint is not true or false")
+                got = got or core.module_colours(data.get("module"))
         except (ValueError, AttributeError, IOError, OSError) as e:
             return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
         refresh_page(force=True)       # the colours are built into the page
         core.debug_log("web page: %s colours %s" % (data["module"], json.dumps(got, sort_keys=True)))
-        self.send(json.dumps({"module": data["module"], "colours": got}), "application/json")
+        self.send(json.dumps({"module": data["module"], "colours": got, "tints": core.module_tints(data["module"])}), "application/json")
 
     def log_message(self, *args):
         pass

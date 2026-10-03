@@ -30,6 +30,10 @@ class PickerBase(unittest.TestCase):
         with open(os.path.join(self.modules, name, "module.json"), "w") as f:
             json.dump(manifest, f)
 
+    def layout(self, name, lay):
+        with open(os.path.join(self.modules, name, "layout.json"), "w") as f:
+            json.dump(lay, f)
+
 
 class ManifestTests(PickerBase):
     def test_new_and_old_keys_both_work(self):
@@ -51,6 +55,7 @@ class ManifestTests(PickerBase):
     def test_the_picker_lists_the_always_on_modules_too_so_they_can_be_moved(self):
         import netswitch_modules as mods
         self.add("fixed", {"name": "Fixed", "description": "d", "enabled": True, "visible": False})
+        self.layout("fixed", {"settings": [{"box": "x", "items": [{"type": "text", "text": "a"}]}]})
         got = dict((m["name"], m) for m in mods.listing())
         self.assertIs(got["fixed"]["visible"], False)                    # the page shows it without a switch
         self.assertIs(got["switcher"]["visible"], False)
@@ -58,6 +63,28 @@ class ManifestTests(PickerBase):
         self.assertTrue(got["fixed"]["enabled"])
         core.save_module_order(["fixed", "numbers"])
         self.assertEqual([m["name"] for m in mods.listing()][:2], ["fixed", "numbers"])     # and it can be placed anywhere in the order
+
+
+class ShownInThePickerTests(PickerBase):
+    def names(self):
+        import netswitch_modules as mods
+        return [m["name"] for m in mods.listing()]
+
+    def test_a_module_with_a_dashboard_box_a_settings_box_or_a_background_is_always_listed(self):
+        for name, lay in (("dash", {"dashboard": [{"box": "a", "items": []}]}), ("sett", {"settings": [{"box": "b", "items": []}]}),
+                          ("back", {"background": {"type": "fullscreen"}})):
+            self.add(name, {"name": name, "description": "d", "enabled": False, "visible": False})      # off, and not switchable
+            self.layout(name, lay)
+            self.assertIn(name, self.names(), name)
+
+    def test_a_plain_service_without_any_of_them_has_nothing_to_move(self):
+        self.add("service", {"name": "Service", "description": "d", "enabled": True, "visible": False})
+        self.add("empty", {"name": "Empty", "description": "d", "enabled": True, "visible": False})
+        self.layout("empty", {"dashboard": [], "settings": []})
+        self.assertNotIn("service", self.names())
+        self.assertNotIn("empty", self.names())
+        self.add("shown", {"name": "Shown", "description": "d", "enabled": True, "visible": True})      # a visible one is listed whatever it has
+        self.assertIn("shown", self.names())
 
 
 class OrderTests(PickerBase):

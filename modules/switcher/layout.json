@@ -82,7 +82,7 @@
      "type": "row",
      "title": "DCNow! colour",
      "control": {
-      "type": "swatches",
+      "type": "swatches", "tint": true,
       "key": "dcnow",
       "title": "Colour for DCNow!"
      }
@@ -91,7 +91,7 @@
      "type": "row",
      "title": "DCNET colour",
      "control": {
-      "type": "swatches",
+      "type": "swatches", "tint": true,
       "key": "dcnet",
       "title": "Colour for DCNET"
      }

@@ -5,6 +5,7 @@
 # are true right now, finds their groups and gives the looks the LED service draws.
 # Also: LED count / output pin and the white-balance test flag. Shared by the web page and the LED service. Works on Python 3 and 2.7.
 import json
+import re
 import os
 import time
 
@@ -27,7 +28,8 @@ CATEGORIES = [   # key, heading (the order the page lists them in)
 # detected False = the page can offer it, but nothing tells the add-on yet when it happens, so it never lights (not faked).
 MESSAGES = [
     ("busy", "Starting up", "dreampi", "DreamPi is starting and does not answer calls yet.", True),
-    ("ready", "Ready for calls", "dreampi", "DreamPi is waiting for the Dreamcast to dial.", True),
+    ("ready-dcnow", "Ready for calls, DCNow!", "dreampi", "DreamPi is waiting for the Dreamcast to dial and DCNow! is the selected network.", True),
+    ("ready-dcnet", "Ready for calls, DCNET", "dreampi", "DreamPi is waiting for the Dreamcast to dial and DCNET is the selected network.", True),
     ("notrunning", "DreamPi not running", "dreampi", "DreamPi has stopped or crashed.", True),
     ("unknown", "State unknown", "dreampi", "The add-on cannot tell what DreamPi is doing: its state file is missing or out of date, for example just after DreamPi restarted or while the add-on is not loaded in it. Best used as a last resort (a dim colour, say).", True),
     ("call-dcnow", "In a call, DCNow!", "calls", "A call is connected through DCNow!.", True),
@@ -85,10 +87,12 @@ PRIORITY_ORDER = [
     "call-dcnow", "call-dcnet", "call-other",
     "update-addon", "update-dreampi",
     "players-friend", "players-game",
-    "ready", "sel-dcnow", "sel-dcnet",
+    "ready-dcnow", "ready-dcnet", "sel-dcnow", "sel-dcnet",
     "ethernet", "wifi", "internet-ok", "modem-ok",
     "ok", "unknown",
 ]
+# a message an older led.json has, as the messages that replaced it
+OLD_KEYS = {"ready": ["ready-dcnow", "ready-dcnet"]}
 PRIORITY = dict((k, len(PRIORITY_ORDER) - i) for i, k in enumerate(PRIORITY_ORDER))   # higher = more important
 
 # -------------------------------------------------------------------- the looks (groups)
@@ -96,11 +100,16 @@ PRIORITY = dict((k, len(PRIORITY_ORDER) - i) for i, k in enumerate(PRIORITY_ORDE
 # "dcnow", "dcnet" (what the network switcher gave them) or "network" (the colour of whichever network is selected).
 COLOUR_TOKENS = [("dcnow", "DCNow!"), ("dcnet", "DCNET"), ("network", "Selected network")]
 TOKEN_IDS = tuple(t[0] for t in COLOUR_TOKENS)
-# LED effects: "solid" (on) and "blink" (on and off, half the time each; slow = a second per blink, fast = 0.4 s).
-# More are planned (the engine in netswitch_led.py is built so one can be added next to them).
+# LED effects (the engine, with the timings, is in netswitch_led.py): name, label, whether it takes a speed.
 EFFECTS = [
     ("solid", "Solid", False),
     ("blink", "Blink", False),
+    ("fade", "Fade", False),
+    ("breathe", "Breathe", False),
+    ("blink1", "Short blink", False),
+    ("blink2", "Double blink", False),
+    ("blink3", "Triple blink", False),
+    ("rainbow", "Rainbow", False),
 ]
 EFFECT_NAMES = set(e[0] for e in EFFECTS)
 SPEEDS = ("slow", "fast")
@@ -117,15 +126,14 @@ def _group(gid, colour, effect, speed, messages):
 
 def default_groups():
     """The looks the add-on starts with: the networks' colours for their selection and calls, purple for other calls, the network
-    colour while ready, yellow blinking while starting and red blinking when DreamPi is not running. Everything else is optional:
+    colour while ready (each network has its own message), yellow blinking while starting and red blinking when DreamPi is not running. Everything else is optional:
     add it to a group on the page."""
     return [
-        _group("g1", "dcnow", "solid", "slow", ["sel-dcnow", "call-dcnow"]),
-        _group("g2", "dcnet", "solid", "slow", ["sel-dcnet", "call-dcnet"]),
+        _group("g1", "dcnow", "solid", "slow", ["sel-dcnow", "ready-dcnow", "call-dcnow"]),
+        _group("g2", "dcnet", "solid", "slow", ["sel-dcnet", "ready-dcnet", "call-dcnet"]),
         _group("g3", "purple", "solid", "slow", ["call-other"]),
-        _group("g4", "network", "solid", "slow", ["ready"]),
-        _group("g5", "yellow", "blink", "slow", ["busy"]),
-        _group("g6", "red", "blink", "slow", ["notrunning"]),
+        _group("g4", "yellow", "blink", "slow", ["busy"]),
+        _group("g5", "red", "blink", "slow", ["notrunning"]),
     ]
 
 
@@ -226,8 +234,11 @@ def clean_groups(data):
         leds = g.get("leds")                             # None = all LEDs, else [first, last], 1-based (one LED = [n, n])
         if isinstance(leds, list) and len(leds) == 2 and all(isinstance(x, int) and not isinstance(x, bool) and 1 <= x <= 300 for x in leds):
             group["leds"] = [min(leds), max(leds)]
+        wanted = []
         for key in g.get("messages") if isinstance(g.get("messages"), list) else []:
-            if isinstance(key, _TEXT) and key in MESSAGE and key not in seen_msgs:
+            wanted.extend(OLD_KEYS.get(key, [key]) if isinstance(key, _TEXT) else [])
+        for key in wanted:
+            if key in MESSAGE and key not in seen_msgs:
                 seen_msgs.add(key)
                 group["messages"].append(str(key))
         out.append(group)
@@ -298,24 +309,36 @@ def resolve_colour(colour, selected="dcnow"):
 WB_TEST_STALE = 3   # seconds; a closed/crashed tab stops driving the LED after this
 
 
-def wb_test_active():
-    """True while the settings page wants the LED held at solid white (run
-    through the normal calibration pipeline) for white-balance adjustment,
-    instead of its usual status effects; False once the page stops saying
-    so (closed, or went quiet - stale past WB_TEST_STALE)."""
-    raw = core.read_file(core.WB_TEST)
+def _wb_test_file():
+    """(time, colour) written by the page while a test is open: white for the white balance, or the colour being calibrated."""
+    raw = (core.read_file(core.WB_TEST) or "").split()
     if not raw:
-        return False
+        return None, None
     try:
-        return time.time() - float(raw) <= WB_TEST_STALE
+        when = float(raw[0])
     except ValueError:
-        return False
+        return None, None
+    colour = raw[1] if len(raw) > 1 and re.match(r"^#[0-9a-fA-F]{6}$", raw[1]) else "#ffffff"
+    return when, colour.lower()
 
 
-def touch_wb_test():
+def wb_test_active():
+    """True while the settings page wants the LED held at one solid colour (white for the white balance, or the colour being
+    calibrated), run through the normal calibration pipeline, instead of its usual status effects; False once the page stops
+    saying so (closed, or went quiet - stale past WB_TEST_STALE)."""
+    when, _colour = _wb_test_file()
+    return when is not None and time.time() - when <= WB_TEST_STALE
+
+
+def wb_test_colour():
+    """The colour of the test that is open ("#ffffff" for the white balance)."""
+    return _wb_test_file()[1] or "#ffffff"
+
+
+def touch_wb_test(colour=None):
     tmp = core.WB_TEST + ".tmp"
     with open(tmp, "w") as f:
-        f.write("%f" % time.time())
+        f.write("%f %s" % (time.time(), colour if isinstance(colour, _TEXT) and re.match(r"^#[0-9a-fA-F]{6}$", colour) else "#ffffff"))
     os.rename(tmp, core.WB_TEST)
 
 
@@ -341,7 +364,7 @@ def gather(live=True):
 def active_keys(ctx):
     """The set of message keys that are true for this ctx (see gather()). "off" is never in it: it is the fallback."""
     state, net, keys = ctx["state"], ctx.get("net") or {}, set()
-    keys.add({"busy": "busy", "ok": "ready", "off": "notrunning", "unknown": "unknown", "call-dcnow": "call-dcnow",
+    keys.add({"busy": "busy", "ok": "ready-" + ctx["selected"], "off": "notrunning", "unknown": "unknown", "call-dcnow": "call-dcnow",
               "call-dcnet": "call-dcnet", "call": "call-other"}.get(state, "unknown"))
     keys.add("sel-" + ctx["selected"])
     if net:                                              # only while the web service's measurements are fresh

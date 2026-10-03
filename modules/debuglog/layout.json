@@ -14,5 +14,9 @@
     {"type": "console", "tail": "/log", "nowrap": true, "height": "55vh", "label": "Debug log", "active": "@debug", "follow": "@_local.follow",
      "rules": [["modem: DTMF", "l-ok l-b"], ["netswitch:|add-on:", "l-info"], ["web page:", "l-warn"], ["underrun", "l-dim"],
                ["fail|error|Couldn't|Unable|No carrier|NO CARRIER", "l-err"], ["modem", "l-mod"]]}]}]}
+ ],
+ "settings": [
+  {"box": "appearance", "title": "Appearance", "items": [
+   {"type": "row", "title": "Debug log colour", "control": {"type": "swatches", "key": "debuglog", "tint": true, "title": "Colour of the debug log"}}]}
  ]
 }

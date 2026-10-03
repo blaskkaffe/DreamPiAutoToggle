@@ -7,7 +7,7 @@ from support import ledconfig, core, sandbox, cleanup
 import netswitch_led as led
 
 KEYS = [m[0] for m in ledconfig.MESSAGES]
-DEFAULT_ON = {"busy", "ready", "notrunning", "call-dcnow", "call-dcnet", "call-other", "sel-dcnow", "sel-dcnet"}
+DEFAULT_ON = {"busy", "ready-dcnow", "ready-dcnet", "notrunning", "call-dcnow", "call-dcnet", "call-other", "sel-dcnow", "sel-dcnet"}
 
 
 def ctx(state="ok", selected="dcnow", net=None, wifi="idle", update="idle", info=None, reboot=False, dcnet_problem=False):
@@ -54,7 +54,7 @@ class CatalogueTests(Base):
             self.assertTrue([m for m in ledconfig.MESSAGES if m[2] == c], c)
 
     def test_the_requested_messages_are_there(self):
-        for key in ("busy", "ready", "notrunning", "unknown", "call-dcnow", "call-dcnet", "call-other", "sel-dcnow", "sel-dcnet", "no-ip",
+        for key in ("busy", "ready-dcnow", "ready-dcnet", "notrunning", "unknown", "call-dcnow", "call-dcnet", "call-other", "sel-dcnow", "sel-dcnet", "no-ip",
                     "no-network", "no-internet", "internet-ok", "dns-fail", "ethernet", "wifi", "wifi-weak", "net-slow", "modem-ok", "modem-missing",
                     "undervoltage", "throttled", "hot", "warm", "wifisetup-scan", "wifisetup-choose", "wifisetup-connecting", "wifisetup-ok",
                     "wifisetup-failed", "update-addon", "update-dreampi", "update-running", "update-ok", "update-failed", "reboot", "players-game",
@@ -74,16 +74,16 @@ class CatalogueTests(Base):
     def test_the_default_looks(self):
         by = dict((g["id"], g) for g in ledconfig.default_groups())
         self.assertEqual([(g["colour"], g["effect"]) for g in ledconfig.default_groups()],
-                         [("dcnow", "solid"), ("dcnet", "solid"), ("purple", "solid"), ("network", "solid"), ("yellow", "blink"), ("red", "blink")])
-        self.assertEqual(by["g1"]["messages"], ["sel-dcnow", "call-dcnow"])
+                         [("dcnow", "solid"), ("dcnet", "solid"), ("purple", "solid"), ("yellow", "blink"), ("red", "blink")])
+        self.assertEqual(by["g1"]["messages"], ["sel-dcnow", "ready-dcnow", "call-dcnow"])
         for g in by.values():
             self.assertIn(g["colour"], ledconfig.TOKEN_IDS + core.PALETTE_IDS)
 
     def test_only_two_messages_are_not_detected_yet(self):
         self.assertEqual(sorted(m[0] for m in ledconfig.MESSAGES if not m[4]), ["players-friend", "players-game"])
 
-    def test_only_solid_and_blink_exist(self):
-        self.assertEqual([e[0] for e in ledconfig.EFFECTS], ["solid", "blink"])
+    def test_the_effects(self):
+        self.assertEqual([e[0] for e in ledconfig.EFFECTS], ["solid", "blink", "fade", "breathe", "blink1", "blink2", "blink3", "rainbow"])
 
 
 class ConfigTests(Base):
@@ -104,7 +104,7 @@ class ConfigTests(Base):
 
     def test_a_message_can_be_in_one_group_only_and_unknown_ones_are_dropped(self):
         got = ledconfig.clean_groups([group("a", "red", ["ready", "nonsense", "busy"]), group("b", "blue", ["busy", "error"])])
-        self.assertEqual([g["messages"] for g in got], [["ready", "busy"], ["error"]])
+        self.assertEqual([g["messages"] for g in got], [["ready-dcnow", "ready-dcnet", "busy"], ["error"]])      # "ready" of an older file is the two that replaced it
 
     def test_ids_are_made_unique(self):
         got = ledconfig.clean_groups([group("a", "red", []), group("a", "blue", []), {"colour": "green"}])
@@ -135,7 +135,9 @@ class ConditionTests(Base):
         return ledconfig.active_keys(ctx(**kw))
 
     def test_what_dreampi_is_doing(self):
-        self.assertLessEqual({"ready", "sel-dcnow"}, self.keys(state="ok"))
+        self.assertLessEqual({"ready-dcnow", "sel-dcnow"}, self.keys(state="ok"))
+        self.assertLessEqual({"ready-dcnet", "sel-dcnet"}, self.keys(state="ok", selected="dcnet"))
+        self.assertNotIn("ready-dcnet", self.keys(state="ok"))
         self.assertIn("busy", self.keys(state="busy"))
         self.assertIn("notrunning", self.keys(state="off"))
         self.assertIn("unknown", self.keys(state="unknown"))
@@ -222,7 +224,7 @@ class ConditionTests(Base):
 class LookTests(Base):
     def test_idle_with_the_defaults_shows_the_selected_networks_colour(self):
         looks = self.looks(ctx(net=GOOD))
-        self.assertEqual([m["messages"] for m in looks], [["sel-dcnow"], ["ready"]])        # both apply, the more important is last = on top
+        self.assertEqual([m["messages"] for m in looks], [["sel-dcnow", "ready-dcnow"]])        # both apply and share the look
         self.assertEqual(looks[-1]["color"], core.network_colour("dcnow")["led"])
         open(core.FLAG, "w").close()
         looks = self.looks(ctx(selected="dcnet", net=GOOD))
@@ -346,6 +348,62 @@ class TargetingTests(Base):
         self.assertEqual(led.render([low, top], 0.7, 2, clocks), [(0, 0, 0), (0, 255, 0)])
 
 
+class ReadyFollowsTheNetworkTests(Base):
+    def test_each_network_has_its_own_ready_look(self):
+        self.groups(group("g1", "green", ["ready-dcnow"]), group("g2", "blue", ["ready-dcnet"]))
+        self.assertEqual([m["color"] for m in self.looks(ctx(net=GOOD))], [core.colour("green")["led"]])
+        self.assertEqual([m["color"] for m in self.looks(ctx(selected="dcnet", net=GOOD))], [core.colour("blue")["led"]])
+
+    def test_the_selection_decides_which_ready_look_shows_when_the_network_is_switched_later(self):
+        self.groups(group("g1", "network", ["ready-dcnow", "ready-dcnet"]))
+        self.assertEqual(self.looks(ctx(net=GOOD))[0]["color"], core.network_colour("dcnow")["led"])
+        self.assertEqual(self.looks(ctx(selected="dcnet", net=GOOD))[0]["color"], core.network_colour("dcnet")["led"])
+
+
+class PaletteCalibrationTests(Base):
+    def test_a_colour_can_look_different_on_the_led(self):
+        self.groups(group("g1", "red", ["ready-dcnow"]))
+        self.assertEqual(self.looks(ctx(net=GOOD))[0]["color"], "#ff0000")
+        self.assertTrue(core.set_palette_colour("red", led="#e01000"))
+        self.assertEqual(self.looks(ctx(net=GOOD))[0]["color"], "#e01000")              # the LED follows
+        self.assertEqual(core.colour("red")["ui"], core.colour("red")["ui_default"])    # the page's red is untouched
+
+    def test_a_colour_can_be_changed_on_screen_and_gets_its_lighter_border(self):
+        self.assertTrue(core.set_palette_colour("blue", ui="#0000ff"))
+        c = core.colour("blue")
+        self.assertEqual((c["ui"], c["ui_l"]), ("#0000ff", core.lighter("#0000ff")))
+        self.assertIn("--c-blue:#0000ff", core.colours_css())
+
+    def test_the_default_value_is_not_kept_and_a_reset_puts_it_back(self):
+        core.set_palette_colour("green", led="#00aa00")
+        self.assertIn("green", core.palette_overrides())
+        core.set_palette_colour("green", led=core.colour("green")["led_default"])
+        self.assertNotIn("green", core.palette_overrides())
+        core.set_palette_colour("green", ui="#123456", led="#00aa00")
+        core.set_palette_colour("pink", led="#ff00ff")
+        core.reset_palette("green")
+        self.assertEqual(list(core.palette_overrides()), ["pink"])
+        core.reset_palette()
+        self.assertEqual(core.palette_overrides(), {})
+
+    def test_bad_values_are_refused(self):
+        self.assertFalse(core.set_palette_colour("nonsense", led="#ff0000"))
+        self.assertFalse(core.set_palette_colour("red", led="red"))
+        with open(core.PALETTE_FILE, "w") as f:
+            f.write('{"red": {"led": "oops", "ui": "#112233"}, "nonsense": {"led": "#ffffff"}}')
+        self.assertEqual(core.palette_overrides(), {"red": {"ui": "#112233"}})
+
+    def test_the_colour_test_holds_a_colour_for_a_few_seconds(self):
+        self.assertFalse(ledconfig.wb_test_active())
+        ledconfig.touch_wb_test("#336699")
+        self.assertTrue(ledconfig.wb_test_active())
+        self.assertEqual(ledconfig.wb_test_colour(), "#336699")
+        ledconfig.touch_wb_test("not a colour")
+        self.assertEqual(ledconfig.wb_test_colour(), "#ffffff")                          # the white balance test
+        ledconfig.clear_wb_test()
+        self.assertFalse(ledconfig.wb_test_active())
+
+
 class WebTests(Base):
     def setUp(self):
         Base.setUp(self)
@@ -371,7 +429,7 @@ class WebTests(Base):
 
     def test_the_endpoint_has_everything_the_page_needs(self):
         r = self.get()
-        self.assertEqual([e[0] for e in r["effects"]], ["solid", "blink"])
+        self.assertEqual([e[0] for e in r["effects"]], [e[0] for e in ledconfig.EFFECTS])
         self.assertEqual([m["key"] for m in r["messages"]], KEYS)
         self.assertEqual([c[0] for c in r["categories"]], [c[0] for c in ledconfig.CATEGORIES])
         self.assertEqual(len(r["colours"]["palette"]), 16)

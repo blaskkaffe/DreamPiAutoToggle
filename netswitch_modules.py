@@ -55,7 +55,7 @@ def _read(path):
 def signature():
     """Changes whenever a module is added, removed, switched or edited."""
     parts = [core.MODULES_DIR]
-    for path in (core.MODULES_STATE, core.MODULE_ORDER, core.MODULE_COLOURS):       # what the picker and the colour pickers write
+    for path in (core.MODULES_STATE, core.MODULE_ORDER, core.MODULE_COLOURS, core.MODULE_TINTS, core.PALETTE_FILE):       # what the picker, the colour pickers and the palette editor write
         try:
             parts.append(os.path.getmtime(path))
         except OSError:
@@ -248,7 +248,7 @@ def layout():
     box = {"id": lower-case name, "title", "mods": [names], "items": [widget + "mod"]}.
     A module whose module.json has "toggle_box": "appearance" also gets a row with its on/off switch in that Settings box,
     even while it is off (a switched-off module has no layout of its own to put one in): the Dreamcast background does."""
-    out = {"modules": [], "dashboard": [], "settings": [], "backgrounds": [], "data": {}, "primary": {}, "colours": {}}
+    out = {"modules": [], "dashboard": [], "settings": [], "backgrounds": [], "data": {}, "primary": {}, "primary_key": {}, "colours": {}, "tints": {}}
     boxes = dict((sec, {}) for sec in SECTIONS)
     covered = False                       # a fullscreen background above hides every one below it
     loaded = dict((m["name"], m) for m in _state["loaded"])
@@ -267,9 +267,12 @@ def layout():
         prim = _primary_of(name, m["manifest"])
         if prim:
             out["primary"][name] = prim
+            if m["manifest"].get("primary") in core.module_colours(name):
+                out["primary_key"][name] = m["manifest"]["primary"]        # which of its colours it is: that one's background setting counts
         cols = core.module_colours(name)
         if cols:
             out["colours"][name] = cols
+            out["tints"][name] = core.module_tints(name)
         if "background" in lay:
             if not covered:
                 out["backgrounds"].append(dict(lay["background"], mod=name))
@@ -297,6 +300,11 @@ def enabled_map():
     """{module: on or off} for every installed module (in every /api answer: the picker's switches and the toggle rows follow it)."""
     state = core.modules_state()
     return dict((n, core.module_enabled(n, state)) for n in core.module_names())
+
+
+def live_tints():
+    """{module: {key: bool}} like live_colours(): whether the background of each colour is coloured (True) or neutral."""
+    return dict((m["name"], core.module_tints(m["name"])) for m in _state["loaded"] if m["manifest"].get("colours"))
 
 
 def live_colours():
@@ -348,6 +356,16 @@ def apply_api(d, warnings):
             sys.stderr.write("module api hook failed: %s\n" % e)
 
 
+def shows_something(name):
+    """True when the module's layout.json has a dashboard box, a settings box or a background (also while it is switched off):
+    such a module is always in the picker, so it can be put in its place."""
+    try:
+        lay = json.loads(_read(os.path.join(core.MODULES_DIR, name, "layout.json")))
+    except (IOError, OSError, ValueError):
+        return False
+    return isinstance(lay, dict) and bool(lay.get("dashboard") or lay.get("settings") or lay.get("background"))
+
+
 def listing():
     """What the module picker shows: every installed module in priority order, on or off. One that can't be switched
     (visible false in its module.json, like the network switcher) is listed too, with "visible": false and no switch on the
@@ -356,6 +374,8 @@ def listing():
     out = []
     for name in core.module_names():
         m = core.module_manifest(name)
+        if not core.module_visible(name, m) and not shows_something(name):
+            continue                       # a module with no box and no background (a plain service) has nothing to move
         out.append({"name": name, "visible": core.module_visible(name, m), "title": core.module_title(name, m), "description": m.get("description", ""),
                     "note": m.get("note", ""), "enabled": core.module_enabled(name, state),
                     "default": core.module_default_enabled(m), "error": _state["errors"].get(name)})
