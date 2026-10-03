@@ -88,9 +88,12 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   const fav = page.locator('[data-box="favorites"] .wpicker');
   await fav.locator('.srow').first().locator('button').first().click(); await settle(500);
   ok(await page.locator('.pop.open .choice').count() >= 4, 'the favorite games pop-up lists the games of the list');
-  ok(await page.locator('.pop.open .choice:disabled', { hasText: 'Dead Game Online' }).count() === 1, 'a game that is not online is greyed out');
-  ok(await page.locator('.pop.open .choice', { hasText: 'work in progress' }).count() === 1, 'a work-in-progress game says so');
+  ok(await page.locator('.pop.open .choice', { hasText: 'Dead Game Online' }).count() === 0, 'only games being played now are listed at first');
+  ok(await page.locator('.pop.open .choice', { hasText: 'playing now' }).count() >= 4, 'and say that they are played now');
+  await page.fill('.pop.open input', 'dead'); await settle(200);
+  ok(await page.locator('.pop.open .choice:disabled', { hasText: 'Dead Game Online' }).count() === 1, 'searching finds the whole list; a game that is not online is greyed out');
   await page.fill('.pop.open input', 'outtr'); await settle(200);
+  ok(await page.locator('.pop.open .choice', { hasText: 'work in progress' }).count() === 1, 'a work-in-progress game says so');
   ok(await page.locator('.pop.open .choice').count() === 1, 'typing filters the list');
   await page.locator('.pop.open .choice', { hasText: 'Outtrigger' }).click(); await settle(900);
   ok(await fav.locator('.tag', { hasText: 'Outtrigger (work in progress)' }).count() === 1, 'the picked game is a favorite, marked as work in progress');

@@ -567,10 +567,12 @@ def game_choices(favs=None):
             seen.add(g.lower())
             out.append({"value": g, "label": g, "status": "playing"})
     rank = {"online": 0, "playing": 0, "unknown": 1, "wip": 2, "offline": 3}
-    out.sort(key=lambda c: (rank.get(c["status"], 1), c["label"].lower()))
     for c in out:
-        note = "playing now" if c["status"] == "playing" else STATUS_NOTE.get(c["status"], "")
-        c["sub"] = note
+        c["now"] = any(same_game(c["value"], p.get("game")) for p in players)
+    out.sort(key=lambda c: (not c["now"], rank.get(c["status"], 1), c["label"].lower()))
+    for c in out:
+        note = [STATUS_NOTE.get(c["status"], "")] if c["status"] != "playing" else []
+        c["sub"] = " \u00b7 ".join(note + (["playing now"] if c["now"] else [])).strip(" \u00b7")
         c["disabled"] = c.pop("status") == "offline"
     return out
 
@@ -579,13 +581,14 @@ def _favorites_reply():
     """The standard "picker" answer: two groups, the games with a choice list, the players with the names online now."""
     favs = favorites()
     choices = game_choices()
-    notes = dict((c["value"], c["sub"]) for c in choices if c["sub"] and c["sub"] != "playing now")
+    notes = dict((c["value"], STATUS_NOTE[w]) for c in choices for w in ("wip", "offline") if STATUS_NOTE[w] in c["sub"])
     with _lock:
         players = list(_cache["players"])
     names = sorted(set(p["player"] for p in players), key=lambda n: n.lower())
     return {"groups": [{"key": "games", "label": "Favorite games", "sub": "The LEDs show when someone plays one of them",
                         "items": favs["games"], "choices": choices, "notes": notes, "free": False,
-                        "empty": "The game list is not loaded yet"},
+                        "initial": "Nobody is playing right now. Type to search all games.",
+                        "empty": "No game matches"},
                        {"key": "players", "label": "Favorite players", "sub": "The LEDs show when one of them comes online",
                         "items": favs["players"], "free": True,
                         "choices": [{"value": n, "label": n} for n in names], "empty": "Nobody is online; type a name"}],
