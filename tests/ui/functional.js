@@ -80,7 +80,15 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(Math.abs(hNum - hGpio) <= 6, 'a phone number row is as high as a GPIO row (' + Math.round(hNum) + ' and ' + Math.round(hGpio) + ')');
   await page.locator('.wpicker .infobtn').click(); await settle(300);
   ok(/numbers ending in the listed numbers/.test(await page.locator('.pop.open .infotext').textContent()), 'the (i) button opens the pop-up with the information text');
+  ok(await page.locator('.pop.open button', { hasText: 'Done' }).count() === 0, 'the information pop-up has no Done button (nothing to save)');
   await page.keyboard.press('Escape'); await settle(200);
+  // dividers: every row of a box has a line above it except the first, whichever module or widget it comes from
+  const dividers = await page.evaluate(() => Array.from(document.querySelectorAll('#set-boxes .card')).filter(c => c.offsetParent).map(c => {
+    const rows = Array.from(c.querySelectorAll('.srow')).filter(r => r.offsetParent && !r.closest('.pop') && !r.closest('.wlist.compact'));
+    const atTop = rows.length && (c.firstElementChild === rows[0] || (c.firstElementChild.contains(rows[0]) && c.firstElementChild.querySelector('.srow') === rows[0]));   // a row below a table has a line above it
+    return { box: c.parentNode.getAttribute('data-box'), bad: rows.map((r, i) => [i, parseFloat(getComputedStyle(r).borderTopWidth) > 0]).filter(x => ((x[0] === 0 && atTop) === x[1])).map(x => x[0]) };
+  }));
+  ok(dividers.every(d => d.bad.length === 0), 'every settings box has a divider above each row but the first' + JSON.stringify(dividers.filter(d => d.bad.length)));
   // ---- GPIO: every row is a title, a line that says what it does, and an Edit button with the dropdowns in a pop-up; it saves to the server
   const gpioRow = t => page.locator('[data-box="gpio"] .srow', { hasText: t }).first();
   ok(/^GPIO\d+ /.test((await gpioRow('Button 1').locator('.sub').textContent()).trim()), 'the line under Button 1 starts with its pin: ' + (await gpioRow('Button 1').locator('.sub').textContent()).trim());

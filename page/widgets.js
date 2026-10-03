@@ -269,12 +269,12 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
  restore=h("button",{type:"button","class":"pill-s"}),info=h("button",{type:"button","class":"infobtn",text:"i",title:"Information","aria-label":"Information"}),
  foot=h("div",{"class":"srow"},[restore,info]),
  pop=h("div"),popT=h("div",{"class":"t"}),inp=h("input",{type:"text","aria-label":"Value to add"}),addB=h("button",{type:"button","class":"pill-s",text:"Add"}),msg=h("div",{"class":"msg"}),
- infoPop=h("div"),infoText=h("div",{"class":"infotext"}),infoDone=h("button",{type:"button","class":"pill-s",text:"Done"});
+ infoPop=h("div"),infoText=h("div",{"class":"infotext"});
  pop.appendChild(popT);pop.appendChild(h("div",{"class":"fld"},[inp,addB]));pop.appendChild(msg);
- infoPop.appendChild(infoText);infoPop.appendChild(h("div",{"class":"bar end"},[infoDone]));
+ infoPop.appendChild(infoText);                         // read only: no Done button, a click elsewhere or Esc closes it
  el.appendChild(list);el.appendChild(foot);el.appendChild(pop);el.appendChild(infoPop);
  var p=ui.popup(pop),ip=ui.popup(infoPop);p.onclose=function(){addKey=null};
- info.onclick=function(e){ip.toggle(info,e)};infoDone.onclick=function(){ip.close()};
+ info.onclick=function(e){ip.toggle(info,e)};
  function rules(){return cfg.rules||{}}
  function paint(){if(!cfg)return;var R=rules();
   list.innerHTML="";
