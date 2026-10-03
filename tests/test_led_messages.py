@@ -1,4 +1,4 @@
-"""Independent LED messages: defaults, priority, fallback, targeting, the Ping effect, migration."""
+"""Independent LED messages: defaults, priority, fallback, targeting, the global network colours, migration."""
 import colorsys
 import json
 import os
@@ -23,7 +23,6 @@ def hue_after_gamma(colour, gamma=ledconfig.GAMMA):
 class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox()
-        led.reset_dither()
 
     def tearDown(self):
         cleanup(self.tmp)
@@ -70,8 +69,8 @@ class MessageListTests(Base):
     def test_default_looks(self):
         m = ledconfig.default_led_config()["messages"]
         look = lambda k: (m[k]["color"], m[k]["effect"], m[k]["speed"])
-        R, A, O, B, P = ledconfig.RED, ledconfig.AMBER, ledconfig.ORANGE, ledconfig.BLUE, ledconfig.PURPLE
-        self.assertEqual(look("busy"), (A, "breathe", "slow"))
+        R, A, P = ledconfig.RED, ledconfig.AMBER, ledconfig.PURPLE
+        self.assertEqual(look("busy"), (A, "blink", "slow"))
         self.assertEqual(look("off"), (R, "blink", "slow"))
         self.assertEqual(look("pi"), (R, "blink", "fast"))
         self.assertEqual(look("unknown")[1:], ("solid", "slow"))
@@ -79,34 +78,34 @@ class MessageListTests(Base):
         self.assertEqual(look("no-internet"), (A, "blink", "slow"))
         self.assertEqual(look("ethernet")[1:], ("solid", "slow"))
         self.assertEqual(look("wifi")[1:], ("solid", "slow"))
-        for net, c in (("dcnow", O), ("dcnet", B), ("netlink", P)):
-            self.assertEqual(look("ready-" + net), (c, "breathe", "slow"))
+        for net, c in (("dcnow", "dcnow"), ("dcnet", "dcnet"), ("netlink", P)):      # the networks' colours are tokens: global
+            self.assertEqual(look("ready-" + net), (c, "solid", "slow"))
             self.assertEqual(look("connecting-" + net), (c, "blink", "slow"))
             self.assertEqual(look("call-" + net), (c, "solid", "slow"))
             self.assertEqual(look("failed-" + net), (R, "blink", "fast"))
+
+    def test_only_solid_and_blink_exist(self):
+        self.assertEqual([e[0] for e in ledconfig.EFFECTS], ["solid", "blink"])
+        for st, m in ledconfig.default_led_config()["messages"].items():
+            self.assertIn(m["effect"], ("solid", "blink"), st)
 
     def test_errors_are_red_and_not_mistakable_for_network_colours(self):
         m = ledconfig.default_led_config()["messages"]
         errors = ["off", "pi", "no-network"] + ["failed-" + n for n in ("dcnow", "dcnet", "netlink")]
         for k in errors:
             self.assertEqual(m[k]["color"], ledconfig.RED, k)
-        network_colours = {ledconfig.ORANGE, ledconfig.BLUE, ledconfig.PURPLE}
-        for k, v in m.items():
-            if k in errors:
-                self.assertNotIn(v["color"], network_colours, k)
-        # what the LED really shows (after gamma): orange is clearly away from red and from amber
-        red, orange = hue_after_gamma(ledconfig.RED), hue_after_gamma(ledconfig.ORANGE)
-        amber = hue_after_gamma(ledconfig.AMBER)
-        self.assertGreaterEqual(orange - red, 12)
-        self.assertGreaterEqual(amber - orange, 12)
-        for c in (ledconfig.BLUE, ledconfig.PURPLE):
-            self.assertGreater(abs(hue_after_gamma(c) - red), 60)
+        for k in errors:
+            self.assertNotIn(m[k]["color"], ("dcnow", "dcnet", ledconfig.PURPLE), k)
+        red = hue_after_gamma(ledconfig.RED)
+        self.assertGreater(abs(hue_after_gamma(ledconfig.PURPLE) - red), 60)
 
     def test_identical_defaults_are_fine_and_each_message_is_independent(self):
-        cfg = self.configure(call_dcnow={"color": "#123456", "leds": [3, 3]})
+        cfg = self.configure(call_dcnow={"color": "#123456", "leds": [3, 3]}, no_internet={"color": "#123456"})
         got = ledconfig.led_config()["messages"]
-        self.assertEqual(got["call-dcnow"]["color"], "#123456")
-        self.assertEqual(got["call-dcnet"]["color"], ledconfig.BLUE)      # untouched
+        self.assertEqual(got["call-dcnow"]["color"], "dcnow")             # a network message's colour is the network's, not its own
+        self.assertEqual(got["call-dcnow"]["leds"], [3, 3])
+        self.assertEqual(got["no-internet"]["color"], "#123456")          # any other message can have its own colour
+        self.assertEqual(got["call-dcnet"]["color"], "dcnet")      # untouched
         self.assertIsNone(got["call-dcnet"]["leds"])
 
 
@@ -181,13 +180,13 @@ class RuntimeTests(Base):
         self.assertFalse(every & undetected, every & undetected)
 
     def test_dcnow_and_dcnet_can_differ_completely(self):
-        self.configure(ready_dcnow={"color": "#112233", "effect": "blink", "leds": [1, 1]},
-                       ready_dcnet={"color": "#334455", "effect": "ping", "leds": [4, 4], "speed": "fast"})
+        self.configure(ready_dcnow={"effect": "blink", "leds": [1, 1]},
+                       ready_dcnet={"effect": "solid", "leds": [4, 4], "speed": "fast"})
         a = ledconfig.active_messages("ok", {"network": True}, wifi=False)[0]
         self.set_dcnet(True)
         b = ledconfig.active_messages("ok", {"network": True}, wifi=False)[0]
-        self.assertEqual((a["key"], a["color"], a["effect"], a["leds"]), ("ready-dcnow", "#112233", "blink", [1, 1]))
-        self.assertEqual((b["key"], b["color"], b["effect"], b["leds"], b["speed"]), ("ready-dcnet", "#334455", "ping", [4, 4], "fast"))
+        self.assertEqual((a["key"], a["color"], a["effect"], a["leds"]), ("ready-dcnow", "#ff8c00", "blink", [1, 1]))      # orange
+        self.assertEqual((b["key"], b["color"], b["effect"], b["leds"], b["speed"]), ("ready-dcnet", "#0046ff", "solid", [4, 4], "fast"))   # blue
 
     def test_global_brightness_is_separate(self):
         cfg = self.configure(ready_dcnow={"brightness": 0.5})
@@ -224,7 +223,7 @@ class TargetingTests(Base):
 
     def test_several_messages_on_different_leds_at_the_same_time(self):
         frame = led.render([self.msg("eth", [1, 1], "#00ff00"), self.msg("wifi", [2, 2], "#00c8ff"),
-                            self.msg("dcnow", [3, 3], ledconfig.ORANGE), self.msg("dcnet", [4, 4], ledconfig.BLUE)], 0.0, 5)
+                            self.msg("dcnow", [3, 3], "#ff8c00"), self.msg("dcnet", [4, 4], "#0046ff")], 0.0, 5)
         self.assertEqual(self.lit(frame), [1, 2, 3, 4])
         self.assertGreater(frame[0][1], frame[0][0])                      # green
         self.assertGreater(frame[3][2], frame[3][0])                      # blue
@@ -247,103 +246,6 @@ class TargetingTests(Base):
         self.assertIsNone(got["off"]["leds"])
 
 
-class PingTests(Base):
-    STEP = 0.001
-
-    def edges(self, speed):
-        """[(start, end)] of every lit stretch in two periods, in seconds."""
-        runs, start = [], None
-        t = 0.0
-        total = sum(led.PING[speed]) * 2
-        while t < total:
-            on = led.ping_level(t, speed) > 0
-            if on and start is None:
-                start = t
-            if not on and start is not None:
-                runs.append((start, t))
-                start = None
-            t += self.STEP
-        return runs
-
-    def test_two_short_pulses_then_a_longer_pause(self):
-        for speed in ("slow", "fast"):
-            runs = self.edges(speed)
-            self.assertEqual(len(runs), 4, speed)                         # two periods = four pulses
-            first, second = runs[0], runs[1]
-            self.assertTrue(0.095 <= first[1] - first[0] <= 0.15, (speed, first))
-            self.assertTrue(0.095 <= second[1] - second[0] <= 0.15, (speed, second))
-            gap = second[0] - first[1]
-            pause = runs[2][0] - second[1]
-            self.assertTrue(0.075 <= gap <= 0.15, (speed, gap))
-            self.assertGreaterEqual(pause, 0.69, speed)                   # clearly longer than the gap
-            self.assertGreater(pause, 4 * gap)
-
-    def test_pulse_rises_quickly_and_fades(self):
-        peak = max((led.ping_level(i * 0.001), i * 0.001) for i in range(0, 140))
-        self.assertAlmostEqual(peak[0], 1.0, places=1)
-        self.assertLess(peak[1], 0.07)                                     # peak in the first third of the pulse
-        self.assertEqual(led.ping_level(0.0), 0.0)
-        self.assertEqual(led.ping_level(0.5), 0.0)
-
-    def test_effect_is_registered_next_to_the_others(self):
-        names = [e[0] for e in ledconfig.EFFECTS]
-        for old in ("solid", "blink", "breathe", "rgb", "rainbow", "scanner", "comet", "chase", "twinkle"):
-            self.assertIn(old, names)
-        self.assertIn("ping", names)
-        self.assertFalse(dict((e[0], e[2]) for e in ledconfig.EFFECTS)["ping"])      # works on one LED
-        self.assertIn("ping", ledconfig.clean_led_config({"messages": {"busy": {"effect": "ping"}}})["messages"]["busy"]["effect"])
-
-    def test_single_led_pulses(self):
-        peak = led.effect_frame("ping", "slow", "#ff0000", 0.042, 1)
-        self.assertEqual(len(peak), 1)
-        self.assertGreater(peak[0][0], 0.9)
-        self.assertEqual(led.effect_frame("ping", "slow", "#ff0000", 0.6, 1), [(0.0, 0.0, 0.0)])
-
-    def test_strip_range_and_single_led_of_a_strip(self):
-        def lit(msg, t):
-            return [i + 1 for i, px in enumerate(led.render([msg], t, 6, {})) if px != (0, 0, 0)]
-        base = {"key": "p", "effect": "ping", "speed": "slow", "color": "#ffffff", "brightness": 1.0}
-        t_peak = 0.042
-        # clocks start when the message appears, so render at time 0 first and then at the peak
-        for leds, want in ((None, [1, 2, 3, 4, 5, 6]), ([2, 4], [2, 3, 4]), ([5, 5], [5])):
-            clocks = {}
-            msg = dict(base, leds=leds)
-            led.render([msg], 0.0, 6, clocks)
-            frame = led.render([msg], t_peak, 6, clocks)
-            self.assertEqual([i + 1 for i, px in enumerate(frame) if px != (0, 0, 0)], want, leds)
-            self.assertEqual(led.render([msg], 0.6, 6, clocks), [(0, 0, 0)] * 6)       # in the pause
-
-    def test_ping_follows_the_message_brightness(self):
-        def peak(brightness):
-            clocks = {}
-            msg = {"key": "p", "effect": "ping", "speed": "slow", "color": "#ffffff", "brightness": brightness, "leds": [1, 1]}
-            led.render([msg], 0.0, 3, clocks)
-            led.reset_dither()
-            return led.render([msg], 0.042, 3, clocks)[0][0]
-        self.assertGreater(peak(1.0), peak(0.5))
-        self.assertGreater(peak(0.5), peak(0.1))
-
-
-class ExistingEffectsTests(Base):
-    def test_every_effect_still_draws(self):
-        for e in ledconfig.EFFECTS:
-            for n in (1, 7):
-                for speed in ("slow", "fast"):
-                    for t in (0.0, 0.3, 1.7):
-                        frame = led.effect_frame(e[0], speed, "#ff8800", t, n)
-                        self.assertEqual(len(frame), n, (e[0], n))
-                        for px in frame:
-                            self.assertTrue(all(0.0 <= c <= 1.0 for c in px), (e[0], px))
-
-    def test_basic_effects_behave(self):
-        self.assertEqual(led.effect_frame("solid", "slow", "#ff0000", 9.9, 2), [(1, 0, 0)] * 2)
-        self.assertEqual(led.effect_frame("blink", "slow", "#ff0000", 0.0, 1), [(1, 0, 0)])
-        self.assertEqual(led.effect_frame("blink", "slow", "#ff0000", 0.6, 1), [(0, 0, 0)])
-        self.assertEqual(led.effect_frame("breathe", "slow", "#ff0000", 0.0, 1), [(1, 0, 0)])
-        hues = led.effect_frame("rgb", "slow", "#000000", 3.0, 1)[0]
-        self.assertGreater(max(hues), 0)
-
-
 class MigrationTests(Base):
     def write_legacy(self, colours):
         with open(core.LED_CONFIG, "w") as f:
@@ -357,8 +259,8 @@ class MigrationTests(Base):
         cfg = ledconfig.led_config()
         self.assertEqual(cfg["max_brightness"], 0.25)
         self.assertEqual(cfg["order"], "RGB")
-        self.assertEqual(cfg["messages"]["ready-dcnow"]["color"], ledconfig.ORANGE)
-        self.assertEqual(cfg["messages"]["ready-dcnet"]["color"], ledconfig.BLUE)
+        self.assertEqual(cfg["messages"]["ready-dcnow"]["color"], "dcnow")
+        self.assertEqual(cfg["messages"]["ready-dcnet"]["color"], "dcnet")
         self.assertEqual(cfg["messages"]["no-internet"]["color"], ledconfig.AMBER)
 
     def test_customised_old_entries_are_kept(self):
@@ -370,21 +272,21 @@ class MigrationTests(Base):
                                      "call": {"color": "#aa00ff", "effect": "solid", "speed": "slow", "enabled": False}}})
         m = ledconfig.led_config()["messages"]
         self.assertEqual((m["ready-dcnow"]["color"], m["ready-dcnow"]["effect"], m["ready-dcnow"]["enabled"],
-                          m["ready-dcnow"]["leds"], m["ready-dcnow"]["brightness"]), ("#112233", "blink", False, [2, 3], 0.4))
-        self.assertEqual(m["ready-dcnet"]["color"], "#445566")                # the DCNET table's own Ready
-        self.assertEqual(m["call-dcnet"]["effect"], "breathe")
+                          m["ready-dcnow"]["leds"], m["ready-dcnow"]["brightness"]), ("dcnow", "blink", False, [2, 3], 0.4))   # the colour is the network's now
+        self.assertEqual(m["ready-dcnet"]["color"], "dcnet")
+        self.assertEqual(m["call-dcnet"]["effect"], "solid")                   # "breathe" no longer exists: the message's default
         self.assertFalse(m["call-netlink"]["enabled"])                         # old "call" = Netlink
         self.assertTrue(m["ethernet"]["enabled"])                              # switched on by the user
         self.assertEqual(m["ethernet"]["color"], "#ffffff")
 
     def test_saving_writes_only_messages(self):
-        self.write_legacy({"dcnow": {"ok": {"color": "#112233"}}})
+        self.write_legacy({"dcnow": {"no-internet": {"color": "#112233"}}})
         ledconfig.save_led_config(ledconfig.led_config())
         with open(core.LED_CONFIG) as f:
             saved = json.load(f)
         self.assertNotIn("colours", saved)
-        self.assertEqual(saved["messages"]["ready-dcnow"]["color"], "#112233")
-        self.assertEqual(ledconfig.led_config()["messages"]["ready-dcnow"]["color"], "#112233")
+        self.assertEqual(saved["messages"]["no-internet"]["color"], "#112233")
+        self.assertEqual(ledconfig.led_config()["messages"]["no-internet"]["color"], "#112233")
 
     def test_old_blink_flag_and_garbage_do_not_break(self):
         self.write_legacy({"dcnow": {"off": {"color": "#ff0000", "blink": False}, "pi": "nonsense"}, "dcnet": 5})
@@ -394,7 +296,7 @@ class MigrationTests(Base):
 
 
 class WebTests(Base):
-    def test_ledconfig_endpoint_lists_groups_and_ping(self):
+    def test_ledconfig_endpoint_lists_groups_and_effects(self):
         import threading
         from urllib.request import Request, urlopen
         from support import web
@@ -404,16 +306,18 @@ class WebTests(Base):
         try:
             r = json.loads(urlopen(base + "/ledconfig", timeout=10).read().decode())
             self.assertEqual([g[0] for g in r["groups"]], [g[0] for g in ledconfig.GROUPS])
-            self.assertIn("ping", [e[0] for e in r["effects"]])
+            self.assertEqual([e[0] for e in r["effects"]], ["solid", "blink"])
+            self.assertEqual(r["net_led"], {"dcnow": "#ff8c00", "dcnet": "#0046ff"})
+            self.assertEqual(set(r["net_bound"]), {"ready-dcnow", "connecting-dcnow", "call-dcnow", "ready-dcnet", "connecting-dcnet", "call-dcnet"})
             self.assertEqual(len(r["states"]), len(ledconfig.LED_STATES))
             self.assertEqual(set(r["config"]["messages"]), set(KEYS))
             cfg = r["config"]
-            cfg["messages"]["ethernet"].update(enabled=True, effect="ping", leds=[1, 1])
+            cfg["messages"]["ethernet"].update(enabled=True, effect="blink", leds=[1, 1])
             req = Request(base + "/ledconfig", data=json.dumps(cfg).encode(), method="POST",
                           headers={"X-Requested-With": "x", "Content-Type": "application/json"})
             out = json.loads(urlopen(req, timeout=10).read().decode())
             self.assertEqual(out["config"]["messages"]["ethernet"]["leds"], [1, 1])
-            self.assertEqual(ledconfig.led_config()["messages"]["ethernet"]["effect"], "ping")
+            self.assertEqual(ledconfig.led_config()["messages"]["ethernet"]["effect"], "blink")
         finally:
             srv.shutdown()
             srv.server_close()

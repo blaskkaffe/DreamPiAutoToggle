@@ -5,6 +5,7 @@ var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledGroups=[],ledEffects
 var wbPreviewOn=false,wbHeartbeat=null;
 function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
  x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
+  netLed=r.net_led;netBound=r.net_bound;
   led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledGroups=r.groups;ledEffects=r.effects;ledCount=r.count||1;ledGpio=r.gpio||18;
   $("led-section").style.display=r.installed?"block":"none";   // hidden while the LED count is 0 (install.sh --leds=0)
   $("gpio-led-row").style.display=r.installed?"flex":"none";   // the LED row of the GPIO card goes with it
@@ -16,6 +17,9 @@ function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
    return '<option value="'+g+'">GPIO'+g+'</option>'}).join("");
   $("led-count-i").value=ledCount;$("led-gpio").value=ledGpio;$("led-order").value=led.order;
   buildLed()};x.send()}
+// The DCNow! / DCNET messages show the networks' global colour (Settings > Network colours): the server gives its LED value.
+var netLed={},netBound={};
+function colourOf(st){return netBound[st]?netLed[netBound[st]]:msgOf(st).color}
 // Every message is one row of led.messages[key]: on/off, colour, effect + speed, level, LEDs.
 function msgOf(st){return led.messages[st]}
 function shortLabel(l){return l.split(" \u2014 ")[0]}   // the group heading already says DCNow! / DCNET / Netlink
@@ -23,7 +27,7 @@ function buildLed(){
  var html="";
  ledGroups.forEach(function(g){
   var items=ledStates.filter(function(s){return s[2]==g[0]});if(!items.length)return;
-  var net=g[0].indexOf("call-")==0&&ledDefaults.messages[g[0]]?ledDefaults.messages[g[0]].color:"";
+  var net=g[0]=="call-dcnow"?netLed.dcnow:g[0]=="call-dcnet"?netLed.dcnet:"";
   html+='<tr class="grp"><td colspan="4">'+(net?'<span class="gdot" style="background:'+net+'"></span>':"")+esc(g[1])+'</td></tr>';
   items.forEach(function(s){var st=s[0];
    html+='<tr id="r-'+st+'"><td class="name"><input type="checkbox" class="cbox neutral" id="e-'+st+'" title="Show this message" aria-label="Show '+esc(s[1])+'"><span class="lbl-t">'+esc(shortLabel(s[1]))+
@@ -33,7 +37,7 @@ function buildLed(){
    '<td class="c"><button type="button" class="chip lvl" id="l-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'" aria-label="Level: '+esc(s[1])+'"></button></td></tr>'})});
  $("led-rows").innerHTML=html;
  ledStates.forEach(function(s){var st=s[0];
-  $("c-"+st).addEventListener("input",function(){msgOf(st).color=this.value;showFx(st);saveLed()});
+  $("c-"+st).addEventListener("input",function(){if(netBound[st])return;msgOf(st).color=this.value;showFx(st);saveLed()});
   $("e-"+st).onchange=function(){msgOf(st).enabled=this.checked;showRow(st);saveLed()};
   $("f-"+st).onclick=function(e){e.stopPropagation();openFx(this)};
   $("l-"+st).onclick=function(e){e.stopPropagation();openLvl(this)}});
@@ -43,7 +47,7 @@ function showLed(){$("led-bright").value=brightToSlider(led.max_brightness);$("l
  $("led-order").value=led.order;
  showWb();
  ledStates.forEach(function(s){var st=s[0],c=msgOf(st);
-  $("c-"+st).value=c.color;$("e-"+st).checked=c.enabled!==false;showRow(st);showFx(st);showLvl(st)})}
+  $("c-"+st).value=colourOf(st);$("c-"+st).disabled=!!netBound[st];$("c-"+st).title=netBound[st]?"The network's colour: change it in Settings > Network colours":"";$("e-"+st).checked=c.enabled!==false;showRow(st);showFx(st);showLvl(st)})}
 function showWb(){["r","g","b"].forEach(function(c){var v=Math.round(led.white_balance[c]*255);
  $("wb-"+c).value=v;$("wb-"+c+"-v").textContent=v})}
 function showRow(st){$("r-"+st).className=msgOf(st).enabled===false?"dis":""}
@@ -103,7 +107,7 @@ function openLvl(el){var st=el.dataset.state,c=msgOf(st);
  if(c.brightness===null||c.brightness===undefined){c.brightness=led.max_brightness;showLvl(st);saveLed()}
  lvlCur=st;
  $("lvl-t").textContent=el.dataset.label;
- $("lvl-r").style.accentColor=c.color;$("lvl-r").value=brightToSlider(c.brightness);$("lvl-v").textContent=pct(c.brightness);
+ $("lvl-r").style.accentColor=colourOf(st);$("lvl-r").value=brightToSlider(c.brightness);$("lvl-v").textContent=pct(c.brightness);
  lvlPop.open(el)}
 $("lvl-r").oninput=function(){if(!lvlCur)return;var b=Math.round(sliderToBright(this.value)*1000)/1000;
  msgOf(lvlCur).brightness=b;$("lvl-v").textContent=pct(b);showLvl(lvlCur);saveLed()};

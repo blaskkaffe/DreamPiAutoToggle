@@ -10,6 +10,7 @@ import time
 
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
+NET_COLOURS = os.path.join(BASE_DIR, "network_colours.json")   # which colour DCNow! and DCNET have, everywhere (page and LEDs)
 BOOT_ID = os.path.join(BASE_DIR, "boot_id")              # the kernel's id of the boot the selection was last reset for
 KERNEL_BOOT_ID = "/proc/sys/kernel/random/boot_id"
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
@@ -136,6 +137,73 @@ def reset_network_after_boot():
     if before is not None:
         debug_log("new boot: DCNow! selected")
     return before is not None
+
+
+# ---------------------------------------------------------------- network colours
+# DCNow! and DCNET each have one colour, used everywhere: the page (buttons, boxes, the players counts) and the status LEDs.
+# The user picks it from this list in Settings. id, name, page colour, its lighter variant (borders, text), LED colour (the
+# LED's own tuning: a screen colour looks different lit on a NeoPixel).
+NETWORK_COLOURS = (
+    ("orange", "Orange", "#e8761c", "#f6b27a", "#ff8c00"),
+    ("blue", "Blue", "#1c6fe8", "#80b1f6", "#0046ff"),
+    ("red", "Red", "#d9363e", "#ef8a8f", "#ff0000"),
+    ("green", "Green", "#2fa84f", "#8ed9a4", "#00ff00"),
+)
+DEFAULT_NETWORK_COLOURS = {"dcnow": "orange", "dcnet": "blue"}
+_NETWORK_COLOUR_IDS = tuple(c[0] for c in NETWORK_COLOURS)
+
+
+def network_colours():
+    """{"dcnow": id, "dcnet": id}: the two colour ids in use (always different, always from NETWORK_COLOURS)."""
+    out = dict(DEFAULT_NETWORK_COLOURS)
+    try:
+        with open(NET_COLOURS) as f:
+            data = json.load(f)
+        for net in out:
+            if data.get(net) in _NETWORK_COLOUR_IDS:
+                out[net] = str(data[net])
+    except (IOError, OSError, ValueError, AttributeError):
+        pass
+    if out["dcnow"] == out["dcnet"]:
+        out = dict(DEFAULT_NETWORK_COLOURS)
+    return out
+
+
+def network_colour(net):
+    """The palette entry (dict: id, name, ui, ui_l, led) for "dcnow" or "dcnet"."""
+    ident = network_colours().get(net, DEFAULT_NETWORK_COLOURS.get(net, "orange"))
+    for c in NETWORK_COLOURS:
+        if c[0] == ident:
+            return {"id": c[0], "name": c[1], "ui": c[2], "ui_l": c[3], "led": c[4]}
+    return {"id": "orange", "name": "Orange", "ui": "#e8761c", "ui_l": "#f6b27a", "led": "#ff8c00"}
+
+
+def set_network_colour(net, ident):
+    """Give DCNow! or DCNET a colour. If the other network has it, the two swap, so they never share one.
+    Returns the new {"dcnow": id, "dcnet": id}."""
+    cur = network_colours()
+    if net not in cur or ident not in _NETWORK_COLOUR_IDS:
+        return cur
+    other = "dcnet" if net == "dcnow" else "dcnow"
+    if cur[other] == ident:
+        cur[other] = cur[net]
+    cur[net] = ident
+    tmp = NET_COLOURS + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cur, f)
+    os.rename(tmp, NET_COLOURS)
+    return cur
+
+
+def network_colours_css():
+    """:root rules that give the page's network colour variables the chosen colours (the page's own :root has the defaults)."""
+    def rgb(h):
+        return "%d,%d,%d" % (int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16))
+    out = ":root{"
+    for net in ("dcnow", "dcnet"):
+        c = network_colour(net)
+        out += "--%s:%s;--%s-l:%s;--%s-rgb:%s;--%s-l-rgb:%s;" % (net, c["ui"], net, c["ui_l"], net, rgb(c["ui"]), net, rgb(c["ui_l"]))
+    return out + "}"
 
 
 # ---------------------------------------------------------------- file state

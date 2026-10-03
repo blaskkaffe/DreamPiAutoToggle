@@ -44,9 +44,10 @@ def _dot_look(dstate):
     """What the DreamPi dot previews: a plain look for the state. The LED module replaces it with the look of the
     LED message that is showing (its api() hook), so the dot still says something without it."""
     dcnet = os.path.exists(core.FLAG)
-    plain = {"ok": ("#1c6fe8" if dcnet else "#ff8c00", "breathe"), "busy": ("#ffd000", "breathe"), "off": ("#ff0000", "blink"),
-             "call-dcnow": ("#ff8c00", "solid"), "call-dcnet": ("#0046ff", "solid"), "call": ("#aa00ff", "solid"),
-             "unknown": ("#3c3c3c", "solid")}.get(dstate)
+    net = core.network_colour("dcnet" if dcnet else "dcnow")["led"]
+    plain = {"ok": (net, "solid"), "busy": ("#ffd000", "blink"), "off": ("#ff0000", "blink"),
+             "call-dcnow": (core.network_colour("dcnow")["led"], "solid"), "call-dcnet": (core.network_colour("dcnet")["led"], "solid"),
+             "call": ("#aa00ff", "solid"), "unknown": ("#3c3c3c", "solid")}.get(dstate)
     return {"color": plain[0], "effect": plain[1], "speed": "slow"} if plain else None
 
 
@@ -84,6 +85,7 @@ def api_state():
         warnings.append("Modem: %s is known not to work reliably with DreamPi. "
                         "See the Modem row in Settings." % label)
     d = {"network": "dcnet" if os.path.exists(core.FLAG) else "dcnow",
+         "netcolours": dict((n, dict((k, v) for k, v in core.network_colour(n).items() if k != "led")) for n in ("dcnow", "dcnet")),
          "dreampi": {"state": dstate, "text": dtext, "look": _dot_look(dstate)},
          "modem": {"text": mtext, "since": msince, "plugged": plugged, "label": label, "compat": compat},
          "internet": checks["internet"],
@@ -111,7 +113,7 @@ def build_page():
         with io.open(os.path.join(PAGE_DIR, name), encoding="utf-8", newline="") as f:
             return f.read()
     extra = modules.page_parts()
-    html = part("index.html").replace("@@CSS@@", part("page.css") + "\n" + extra["css"]).replace("@@JS@@", part("page.js") + "\n" + extra["js"])
+    html = part("index.html").replace("@@CSS@@", part("page.css") + "\n" + extra["css"] + "\n" + core.network_colours_css()).replace("@@JS@@", part("page.js") + "\n" + extra["js"])
     for name, text in extra["slots"].items():
         html = html.replace("@@SLOT:%s@@" % name, text)
     return html
@@ -134,7 +136,7 @@ PAGE = PAGE_BYTES = None
 
 
 def _page_signature():
-    sig = [PAGE_DIR]
+    sig = [PAGE_DIR, core.network_colours()["dcnow"], core.network_colours()["dcnet"]]    # the colours are built into the page
     for f in BASE_PAGE_FILES:
         try:
             sig.append(os.path.getmtime(os.path.join(PAGE_DIR, f)))
@@ -185,6 +187,10 @@ def _button_config():
 def _button_reply():
     return {"config": _button_config(), "gpios": core.BUTTON_GPIO_PINS, "functions": core.BUTTON_FUNCTIONS,
             "wifi_choices": core.WIFI_BUTTON_CHOICES, "wifi": core.wifi_enabled()}
+
+
+def _colour_reply():
+    return {"options": [{"id": c[0], "name": c[1], "ui": c[2]} for c in core.NETWORK_COLOURS], "current": core.network_colours()}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -316,6 +322,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(json.dumps({"modules": modules.listing()}), "application/json")
         elif path == "/buttonconfig":
             self.send(json.dumps(_button_reply()), "application/json")
+        elif path == "/colours":
+            self.send(json.dumps(_colour_reply()), "application/json")
         elif modules.route("GET", path):
             modules.route("GET", path)(self)         # an enabled module's own endpoint
         elif path == "/":
@@ -342,6 +350,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_modules()
         if path == "/buttonconfig":
             return self._post_buttons()
+        if path == "/netcolour":
+            return self._post_netcolour()
         if path == "/dcnet":
             open(core.FLAG, "w").close()
             core.debug_log("web page: DCNET selected")
@@ -380,6 +390,17 @@ class Handler(BaseHTTPRequestHandler):
         core.debug_log("web page: module %s switched %s" % (name, "on" if on else "off"))
         refresh_page(force=True)
         self.send(json.dumps({"modules": modules.listing()}), "application/json")
+
+    def _post_netcolour(self):
+        """Settings > Network colours: {"network": "dcnow"|"dcnet", "colour": id}."""
+        try:
+            data = json.loads(self._body(1024).decode("utf-8"))
+            core.set_network_colour(data.get("network"), data.get("colour"))
+        except (ValueError, IOError, OSError, AttributeError) as e:
+            return self.send(str(e), "text/plain; charset=utf-8", status=400)
+        refresh_page(force=True)       # the colours are built into the page
+        core.debug_log("web page: network colours %s" % json.dumps(core.network_colours(), sort_keys=True))
+        self.send(json.dumps(_colour_reply()), "application/json")
 
     def _post_buttons(self):
         try:

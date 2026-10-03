@@ -14,6 +14,7 @@ function fire(name,arg){var handled=false;(HOOKS[name]||[]).forEach(function(f){
 //                                                 (ui.btn / a checkbox / a select ...) on the right, `below` underneath
 //   ui.btn(text, {attr: value, ...})              a small round button as HTML (attributes escaped)
 //   ui.tag(text, {attr: value, ...})              a removable item (a number, say) with a x button, for a .tags list
+//   ui.swatches(options, currentId, {attr: value})  a row of round colour choices as HTML ([{id, name, ui}] from the server)
 //   ui.popup(el)                                  turns an element (inside a card or section) into a pop-up that opens under
 //                                                 a button: p.toggle(button, event) / p.open(button) / p.close() / p.isOpen();
 //                                                 set p.onclose to be told when it closes. Esc, a click elsewhere, opening
@@ -27,6 +28,9 @@ ui.tag=function(text,a){var b={type:"button","aria-label":"Remove "+text};for(va
 ui.row=function(o){o=o||{};
  return '<div class="srow'+(o.below!=null?" wrap":"")+(o.cls?" "+o.cls:"")+'"'+(o.id?' id="'+esc(o.id)+'"':"")+"><span>"+esc(o.title||"")+
   (o.subHtml!=null?'<span class="sub">'+o.subHtml+"</span>":o.sub!=null?'<span class="sub">'+esc(o.sub)+"</span>":"")+"</span>"+(o.control||"")+(o.below!=null?'<div class="below">'+o.below+"</div>":"")+"</div>"};
+ui.swatches=function(options,current,a){
+ return '<span class="swatches">'+options.map(function(o){var b={type:"button","class":"swatch"+(o.id===current?" sel":""),style:"--c:"+o.ui,"aria-label":o.name,"aria-pressed":o.id===current?"true":"false","data-id":o.id};
+  for(var k in a)b[k]=a[k];return "<button"+ui.attrs(b)+"></button>"}).join("")+"</span>"};
 ui.closePopups=function(except){ui._pops.forEach(function(p){if(p!==except)p.close()})};
 ui.popup=function(el){
  var par=el.parentNode,p={el:el,anchor:null,onclose:null};
@@ -53,9 +57,7 @@ function setClass(el,c){if(el.className!==c)el.className=c}
 function setStyle(el,prop,v){if(el.style[prop]!==v)el.style[prop]=v}
 function dot(el,state){setClass(el,"dot "+(state||""))}
 // Status dot preview of the LED effect: [keyframes, slow s, fast s, timing]
-var DOT_FX={blink:["blink",1,.4,"steps(1)"],ping:["ping",1.5,.98,"linear"],breathe:["breathe",4,1.6,"ease-in-out"],rgb:["rgbc",20,10,"linear"],
- rainbow:["rgbc",20,10,"linear"],scanner:["breathe",3,1.2,"ease-in-out"],comet:["breathe",3,1.2,"ease-in-out"],
- chase:["blink",.6,.24,"steps(1)"],twinkle:["breathe",3,1.2,"ease-in-out"]};
+var DOT_FX={blink:["blink",1,.4,"steps(1)"]};   // solid has no animation; more effects come back here as the LED engine gets them
 function lookDot(el,look){setClass(el,"dot");if(!look){setStyle(el,"background","#333");setStyle(el,"animation","none");return}
  var f=DOT_FX[look.effect];setStyle(el,"background",look.color);
  setStyle(el,"animation",f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none")}
@@ -68,6 +70,7 @@ function render(d){
   if(d.hangup.busy){hb.disabled=true;hb.className="pill-s";
    hb.textContent=d.hangup.text?d.hangup.text.charAt(0).toUpperCase()+d.hangup.text.slice(1):"Hanging up..."}
   else if(hb.disabled){hb.disabled=false;hb.textContent="Hang up"}}
+ applyColours(d.netcolours);
  setHtml($("warnings"),d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join(""));
  window.lastDreampiState=d.dreampi.state; lookDot($("d-dot"),d.dreampi.look); setText($("d-text"),d.dreampi.text);
  setText($("m-text"),d.modem.text); setText($("m-since"),ago(d.modem.since,d.now).replace(/[()]/g,""));
@@ -79,6 +82,23 @@ function render(d){
  if(d.network!=favNet){favNet=d.network;$("fav").href="/static/favicon-"+d.network+".png";$("touch").href="/static/touch-"+d.network+".png"} setText($("net-name"),d.network=="dcnet"?"DCNET":"DCNow!");
  fire("api",d);
 }
+// Network colours: DCNow! and DCNET each have one colour, used by the whole page and the LEDs. The server builds the chosen ones
+// into the page's CSS and /api reports them, so a change made on another device shows here without a reload.
+var netColKey="";
+function hexRgb(h){return parseInt(h.slice(1,3),16)+","+parseInt(h.slice(3,5),16)+","+parseInt(h.slice(5,7),16)}
+function applyColours(c){if(!c)return;var key=JSON.stringify(c);if(key===netColKey)return;netColKey=key;
+ var root=document.documentElement.style;
+ ["dcnow","dcnet"].forEach(function(n){var x=c[n];if(!x)return;
+  root.setProperty("--"+n,x.ui);root.setProperty("--"+n+"-l",x.ui_l);root.setProperty("--"+n+"-rgb",hexRgb(x.ui));root.setProperty("--"+n+"-l-rgb",hexRgb(x.ui_l))});
+ if($("settings").classList.contains("open"))loadColours()}
+var colourOpts=null;
+function renderColours(cur){if(!colourOpts)return;
+ $("colours-card").innerHTML=[["dcnow","DCNow!"],["dcnet","DCNET"]].map(function(n){
+  return ui.row({title:n[1],control:ui.swatches(colourOpts,cur[n[0]],{"data-net":n[0]})})}).join("");
+ Array.prototype.forEach.call($("colours-card").querySelectorAll(".swatch"),function(b){b.onclick=function(){
+  xhrJson("POST","/netcolour",function(r){if(!r)return;renderColours(r.current);refresh();
+   var el=$("colours-saved");el.classList.add("show");setTimeout(function(){el.classList.remove("show")},1200)},{network:b.dataset.net,colour:b.dataset.id})}})}
+function loadColours(){xhrJson("GET","/colours",function(r){if(!r)return;colourOpts=r.options;renderColours(r.current)})}
 function toggleNet(el){el.classList.toggle("open");el.setAttribute("aria-expanded",el.classList.contains("open"))}
 $("net").onclick=function(e){if(e.target.closest&&e.target.closest(".hang"))return;toggleNet(this)};
 $("net").onkeydown=function(e){if((e.key=="Enter"||e.key==" ")&&e.target===this){e.preventDefault();toggleNet(this)}};
@@ -93,7 +113,7 @@ $("hang-f").onsubmit=function(e){e.preventDefault();e.stopPropagation();var b=$(
 function showSettings(open){$("settings").classList.toggle("open",open);
  if(!open)fire("settingsClose");
  document.body.classList.toggle("settings-open",open);
- if(open){fire("settingsOpen");loadButtons();loadModules();loadAbout()}}
+ if(open){fire("settingsOpen");loadButtons();loadModules();loadAbout();loadColours()}}
 // The PIN (when one is set with install.sh --pin) is asked for once per page load, before update / restart / Wi-Fi connect.
 var pinNeeded=false,pinValue="";
 function withPin(go){if(!pinNeeded||pinValue)return go();var p=prompt("Enter the PIN");if(p===null)return;pinValue=p;go()}

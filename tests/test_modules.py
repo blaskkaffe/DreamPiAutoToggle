@@ -174,7 +174,7 @@ class WithNothing(Base):
         self.assertEqual(self.json("/modules"), {"modules": []})
 
     def test_the_dreampi_dot_still_has_a_look(self):
-        for state, effect in (("ok", "breathe"), ("busy", "breathe"), ("off", "blink"), ("call-dcnow", "solid")):
+        for state, effect in (("ok", "solid"), ("busy", "blink"), ("off", "blink"), ("call-dcnow", "solid")):
             look = web._dot_look(state)
             self.assertEqual(look["effect"], effect, state)
             self.assertRegex(look["color"], r"^#[0-9a-f]{6}$")

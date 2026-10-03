@@ -77,22 +77,26 @@ def _log(obj, text):
         pass
 
 
-def _write_status(text):
+def _write_file(path, text):
+    """Replace a small state file in one step (write a temporary file, rename it over): the web page and the LED
+    service read these files many times a second and must never see one half-written or empty."""
+    tmp = path + ".tmp"
     try:
-        with open(STATUS, "w") as f:
-            f.write(text + "\n")
+        with open(tmp, "w") as f:
+            f.write(text)
+        os.rename(tmp, path)
     except Exception:
         pass
+
+
+def _write_status(text):
+    _write_file(STATUS, text + "\n")
 
 
 def _write_state(state):
     """DreamPi's current state for the web page: starting, ready,
     call <network> or unknown, with a unix timestamp."""
-    try:
-        with open(STATE, "w") as f:
-            f.write("%s %d\n" % (state, int(time.time())))
-    except Exception:
-        pass
+    _write_file(STATE, "%s %d\n" % (state, int(time.time())))
 
 
 def _module_active(name):
@@ -334,19 +338,11 @@ _speed = [""]
 
 
 def _write_modem(text):
-    try:
-        with open(MODEM, "w") as f:
-            f.write("%d %s\n" % (int(time.time()), text))
-    except Exception:
-        pass
+    _write_file(MODEM, "%d %s\n" % (int(time.time()), text))
 
 
 def _write_port(port):
-    try:
-        with open(MODEM_PORT, "w") as f:
-            f.write(port + "\n")
-    except Exception:
-        pass
+    _write_file(MODEM_PORT, port + "\n")
 
 
 class _ModemStatusHandler(logging.Handler):

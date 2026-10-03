@@ -9,7 +9,6 @@
 # errors outrank information and "State unknown" is only a fallback, see
 # netswitch_ledconfig.active_messages().
 # The number of LEDs is in /opt/dreampi-netswitch/led_count (install.sh).
-import colorsys
 import math
 import os
 import signal
@@ -24,198 +23,80 @@ import netswitch_ledconfig as ledconfig  # noqa: E402  (led.json, messages: shar
 import netswitch_led_drivers as drivers  # noqa: E402  (open_output(), wire orders)
 import netswitch_led_spi as spi  # noqa: E402  (SPI on/off in config.txt for GPIO10)
 
-FPS = 50
+FPS = 25           # looks at the clock this often: a blink never needs more, and the CPU belongs to DreamPi
 REFRESH = 0.25     # seconds between re-reading DreamPi's state and led.json
+KEEPALIVE = 3.0    # an unchanged frame is sent again this often, which repairs a garbled one
 
 
 # ---------------------------------------------------------------- effects
-# Each effect gives a list of (r, g, b) floats 0..1 per LED at time t.
-# Periods in seconds for (slow, fast).
-PERIODS = {
-    "blink": (1.0, 0.4),
-    "breathe": (4.0, 1.6),
-    "rainbow": (20.0, 10.0),
-    "scanner": (3.0, 1.2),
-    "comet": (3.0, 1.2),
-    "chase": (0.6, 0.24),      # time for one full 3-LED step cycle
-    "twinkle": (3.0, 1.2),
-    "rgb": (20.0, 10.0),       # fast = a standard, calm RGB cycle; slow = half that speed
-}
+# An effect says, for a message, whether its LEDs are lit t seconds after the message started (or last changed).
+# It does not touch colours: the colour is always the message's own, at full strength, and brightness is applied
+# afterwards, in one place (to_bytes), so no effect can ever change a colour's hue. Only "solid" and "blink"
+# exist for now. To add an effect, give it a name in ledconfig.EFFECTS and a function here that returns a
+# brightness factor 0..1 (1 = on, 0 = off) for the time t; a factor between 0 and 1 is a fade.
+BLINK_PERIOD = {"slow": 1.0, "fast": 0.4}     # seconds for one blink (lit for the first half, dark for the second)
 
 
-# Ping: a quick double pulse, then a longer pause - "pop pop ------- pop pop -------".
-# Seconds per speed: first pulse, gap, second pulse, pause. A pulse rises quickly (PING_RISE of
-# its length) and fades a little slower; the gap and the pause are dark.
-PING = {"slow": (0.14, 0.12, 0.14, 1.10), "fast": (0.10, 0.08, 0.10, 0.70)}
-PING_RISE = 0.3
+def _solid(t, speed):
+    return 1.0
 
 
-def _pulse(x):
-    """0..1 brightness across one pulse, x = 0..1 through it."""
-    return x / PING_RISE if x < PING_RISE else (1.0 - x) / (1.0 - PING_RISE)
+def _blink(t, speed):
+    period = BLINK_PERIOD.get(speed, BLINK_PERIOD["slow"])
+    return 1.0 if (t % period) < period / 2.0 else 0.0     # starts lit when the message appears
 
 
-def ping_level(t, speed="slow"):
-    """Brightness factor 0..1 of the ping effect t seconds after it started."""
-    first, gap, second, pause = PING["fast" if speed == "fast" else "slow"]
-    t %= first + gap + second + pause
-    if t < first:
-        return _pulse(t / first)
-    t -= first + gap
-    if 0 <= t < second:
-        return _pulse(t / second)
-    return 0.0
+EFFECT_LEVEL = {"solid": _solid, "blink": _blink}
+
+
+def effect_level(effect, speed, t):
+    """0..1: how lit a message with this effect is t seconds after it started."""
+    return EFFECT_LEVEL.get(effect, _solid)(t, speed)
 
 
 def hex_rgb(colour):
     return tuple(int(colour[i:i + 2], 16) / 255.0 for i in (1, 3, 5))
 
 
-def hue(h):
-    return colorsys.hsv_to_rgb(h % 1.0, 1.0, 1.0)
-
-
-def _mul(c, f):
-    return (c[0] * f, c[1] * f, c[2] * f)
-
-
-def _rand(i, salt):
-    """Stable pseudo-random 0..1 per LED."""
-    x = math.sin(i * 12.9898 + salt * 78.233) * 43758.5453
-    return x - math.floor(x)
-
-
-def _wave(phase):
-    """Breathing brightness 0..1, starting at full: a raised cosine. It is the brightness as the eye
-    judges it - the gamma step in to_bytes() turns it into LED duty - so no extra squaring here."""
-    return 0.5 + 0.5 * math.cos(2 * math.pi * phase)
-
-
-def _scanner(n, phase):
-    """Cylon / KITT scanner: a bright head sweeps from the first LED to the last and back, leaving a fading
-    trail behind it (what FastLED does with fadeToBlackBy). The trail is worked out from where the head was a
-    moment ago, so it needs no state and flips sides correctly at both ends. The head and trail grow with a
-    longer strip. Returns brightness 0..1 per LED."""
-    span = max(1, n - 1)
-    half = max(1.5, n / 20.0)                   # half-width of the head, in LEDs
-    trail = max(3.0, n / 5.0)                   # length of the trail, in LEDs
-    back = trail / (2.0 * span)                 # how much of the cycle the head needs to cover that distance
-    steps = int(min(40, max(4, math.ceil(trail / (0.6 * half)))))
-    out = [0.0] * n
-    for k in range(steps):
-        age = k / float(steps)                  # 0 = the head now, towards 1 = the oldest part of the trail
-        p = (phase - age * back) % 1.0
-        pos = span * (1 - abs(2 * p - 1))
-        weight = (1 - age) ** 2
-        for i in range(max(0, int(math.floor(pos - half))), min(n - 1, int(math.ceil(pos + half))) + 1):
-            v = weight * (1 - abs(i - pos) / half)
-            if v > out[i]:
-                out[i] = v
-    return out
-
-
-def effect_frame(effect, speed, colour, t, n):
-    c = hex_rgb(colour)
-    fast = speed == "fast"
-    if effect == "solid":
-        return [c] * n
-    if effect == "ping":
-        return [_mul(c, ping_level(t, speed))] * n     # every LED of the message pulses together
-    period = PERIODS.get(effect, (1.0, 0.4))[1 if fast else 0]
-    phase = (t / period) % 1.0
-    if effect == "rgb":
-        return [hue(phase)] * n
-    if effect == "blink":
-        return [c if phase < 0.5 else (0, 0, 0)] * n
-    if effect == "breathe":
-        return [_mul(c, _wave(phase))] * n
-    if n == 1:   # strip effects on a single LED
-        if effect == "rainbow":
-            return [hue(phase)]
-        if effect in ("chase", "twinkle"):
-            return [c if phase < 0.5 else (0, 0, 0)]
-        return [_mul(c, _wave(phase))]
-    if effect == "rainbow":
-        return [hue(float(i) / n - phase) for i in range(n)]       # flows towards the last LED, like the others
-    if effect == "scanner":
-        return [_mul(c, v) for v in _scanner(n, phase)]
-    if effect == "comet":
-        head = phase * n                                            # LEDs from the first, travelling forward
-        tail = max(2.0, n / 4.0)
-        out = []
-        for i in range(n):
-            d = (head - i) % n                                      # how far behind the head this LED is
-            if d > n - 1:
-                d -= n                                              # just ahead of the head: a soft front edge
-            out.append(_mul(c, 1 + d if d < 0 else max(0.0, 1 - d / tail) ** 2))
-        return out
-    if effect == "chase":
-        step = int(phase * 3 + 1e-6) % 3     # 1e-6: no float rounding at the step edges
-        return [c if (i - step) % 3 == 0 else (0, 0, 0) for i in range(n)]   # every third LED, moving forward
-    if effect == "twinkle":
-        out = []
-        for i in range(n):
-            p = period * (0.6 + 0.8 * _rand(i, 1))
-            s = math.sin(2 * math.pi * (t / p + _rand(i, 2)))
-            out.append(_mul(c, max(0.0, s) ** 6))
-        return out
-    return [c] * n
-
-
-_dither_err = {}   # (led index, channel) -> carried-over rounding error
-
-
 # ------------------------------------------------------------- calibration
-# A simple NeoPixel-style pipeline (see ledconfig.default_led_config(), which
-# stores it): requested colour -> gamma correction -> white-balance
-# multipliers -> max_brightness -> NeoPixel. Gamma (ledconfig.GAMMA, ~2.2)
-# compensates for duty-cycle brightness not matching perceived brightness
-# (dim values get dimmer, full-on is unchanged); white balance is a plain
-# per-channel multiplier (0..1, 1 = no correction) found once by eye with
-# the LED held at solid white (see ledconfig.wb_test_active()) and nudging down
-# whichever channel looks too strong; max_brightness is the familiar
-# global/per-message brightness level, applied last so it scales the
-# already-corrected colour rather than the raw request.
-def to_bytes(frame, brightness, white_balance=None, gamma=ledconfig.GAMMA, dither=True, start=0):
-    """Floats 0..1 -> 0..255 through gamma -> white balance -> brightness.
-    A channel that is on never rounds down to 0, so colours stay
-    recognisable at low brightness. With dither, the rounding error is
-    carried over to the next frame instead of discarded, so a value the
-    8-bit output can't represent exactly (typical at low brightness, where
-    slow effects like breathe would otherwise visibly step) is approximated
-    by alternating the neighbouring levels over time instead. start is the
-    absolute LED index of frame[0], so a section keeps its own dither state
-    even though render() quantizes one message's section at a time."""
+# requested colour -> gamma correction -> white-balance multipliers -> brightness -> 8-bit LED values.
+# Gamma (ledconfig.GAMMA, ~2.2) compensates for duty-cycle brightness not matching perceived brightness; white balance
+# is a plain per-channel multiplier (0..1, 1 = none) found once by eye with the LED at solid white (see
+# ledconfig.wb_test_active()); brightness (the global one or a message's own) is applied last, as a duty.
+#
+# The last step, quantize(), is what keeps a colour the same colour when it is dimmed. The LED only takes whole numbers
+# 0..255 per channel; at low brightness the wanted values are tiny (an orange of 20 / 5 / 0 at 8 %, 2 / 0.5 / 0 at 1 %)
+# and rounding each channel on its own, or forcing every lit channel up to at least 1, changes the mix: orange turned
+# yellow or green, because the green channel (also the brightest to the eye) was rounded up to match the red one.
+# quantize() rounds only the strongest channel and gives the others the same share of it that they were wanted at.
+_quantized = {}
+
+
+def quantize(x):
+    """Wanted channel values (floats, 0..255) -> the 8-bit values to send. The strongest channel is rounded; the others
+    keep their ratio to it (so a dimmed colour keeps its hue, and a smaller wanted value never gives a larger one).
+    No dithering, so no flicker: the same input always gives the same output."""
+    key = tuple(int(round(max(0.0, min(255.0, v)) * 4096)) for v in x)     # 1/4096 of a step: far below anything visible
+    got = _quantized.get(key)
+    if got is None:
+        top = max(key)
+        peak = int(round(top / 4096.0))                # the strongest channel, as the LED will show it
+        if top == 0 or peak == 0:
+            got = (0, 0, 0)                          # too faint to light even the lowest step
+        else:
+            got = tuple(min(255, int(round(peak * c / float(top)))) for c in key)
+        if len(_quantized) > 4096:
+            _quantized.clear()
+        _quantized[key] = got
+    return got
+
+
+def to_bytes(frame, brightness, white_balance=None, gamma=ledconfig.GAMMA):
+    """Floats 0..1 per LED -> 0..255 per channel through gamma -> white balance -> brightness -> quantize()."""
     wr, wg, wb = white_balance or (1.0, 1.0, 1.0)
-    out = []
-    for i, (r, g, b) in enumerate(frame):
-        idx = start + i
-        raw = ((r ** gamma) * wr * brightness * 255,
-              (g ** gamma) * wg * brightness * 255,
-              (b ** gamma) * wb * brightness * 255)
-        px = []
-        for c, x in enumerate(raw):
-            x = max(0.0, min(255.0, x))
-            if x <= 0:
-                px.append(0)
-                if dither:
-                    _dither_err.pop((idx, c), None)
-                continue
-            if dither:
-                key = (idx, c)
-                x += _dither_err.get(key, 0.0)
-                q = max(1, min(255, int(round(x))))
-                _dither_err[key] = x - q
-            else:
-                q = max(1, min(255, int(round(x))))
-            px.append(q)
-        out.append(tuple(px))
-    return out
-
-
-def reset_dither():
-    """Forget carried-over error, e.g. when the LED count changes."""
-    _dither_err.clear()
+    return [quantize(((r ** gamma) * wr * brightness * 255,
+                      (g ** gamma) * wg * brightness * 255,
+                      (b ** gamma) * wb * brightness * 255)) for (r, g, b) in frame]
 
 
 def _wb(cfg):
@@ -226,13 +107,11 @@ def _wb(cfg):
 
 # ---------------------------------------------------------------- composing
 def render(messages, now, count, clocks=None, white_balance=None, gamma=ledconfig.GAMMA):
-    """Draw the active messages (lowest priority first) into one frame.
-    Each message covers all LEDs or its own section; later (more important)
-    messages draw over earlier ones, and uncovered LEDs stay dark.
-    Every message's effect restarts from its beginning (blink on, breathe
-    bright) when the message appears or its look changes, so a change shows
-    straight away instead of landing somewhere in the middle of a cycle.
-    clocks keeps those start times between frames."""
+    """Draw the active messages (lowest priority first) into one frame of 8-bit LED values.
+    Each message covers all LEDs or its own section; later (more important) messages draw over earlier ones,
+    and uncovered LEDs stay dark. A blinking message in its dark half draws darkness over what is below it.
+    A message's effect restarts (a blink starts lit) when it appears or its look changes, so a change shows straight
+    away instead of landing somewhere in the middle of a cycle. clocks keeps those start times between frames."""
     if clocks is None:
         clocks = {}
     frame = [(0, 0, 0)] * count
@@ -240,22 +119,47 @@ def render(messages, now, count, clocks=None, white_balance=None, gamma=ledconfi
     for m in messages:
         key = m.get("key", "")
         seen.add(key)
-        sig = (m.get("effect"), m.get("speed"), m.get("color"), m.get("leds"))
+        sig = (m.get("effect"), m.get("speed"), m.get("color"), m.get("leds"), m.get("brightness"))
         if key not in clocks or clocks[key][0] != sig:
             clocks[key] = (sig, now)
         leds = m.get("leds")
         first, last = (1, count) if not leds else (max(1, leds[0]), min(count, leds[1]))
         if first > last:
             continue          # section lies beyond the end of this strip
-        n = last - first + 1
-        part = to_bytes(effect_frame(m.get("effect", "solid"), m.get("speed", "slow"),
-                                     m.get("color", "#3c3c3c"), now - clocks[key][1], n),
-                        m.get("brightness", 0.08), white_balance, gamma, start=first - 1)
-        frame[first - 1:last] = part
+        level = effect_level(m.get("effect", "solid"), m.get("speed", "slow"), now - clocks[key][1])
+        colour = hex_rgb(m.get("color", "#3c3c3c"))
+        pixel = to_bytes([tuple(c * level for c in colour)], m.get("brightness", 0.08), white_balance, gamma)[0]
+        frame[first - 1:last] = [pixel] * (last - first + 1)
     for key in list(clocks):
         if key not in seen:
             del clocks[key]   # starts over next time the message appears
     return frame
+
+
+class Steady(object):
+    """Lets a change of the message list through only when it has stayed the same for a moment. The state files the list
+    comes from are written by other processes and a reading can catch one in between (DreamPi starting a call, the web
+    service re-measuring the network); showing that for a moment is what looked like a flicker. Real changes show up
+    about HOLD seconds later; the first list is used at once."""
+    HOLD = 0.4
+
+    def __init__(self):
+        self.current, self.pending, self.since = None, None, 0.0
+
+    def feed(self, messages, now):
+        sig = repr(sorted((m["key"], m.get("effect"), m.get("speed"), m.get("color"), m.get("leds"), m.get("brightness"))
+                          for m in messages))
+        if self.current is None:
+            self.current, self.pending = (sig, messages), sig
+            return messages
+        if sig == self.current[0]:
+            self.pending = sig
+            return self.current[1]
+        if sig != self.pending:
+            self.pending, self.since = sig, now
+        elif now - self.since >= self.HOLD:
+            self.current = (sig, messages)
+        return self.current[1]
 
 
 # ---------------------------------------------------------------- main loop
@@ -306,6 +210,15 @@ def switch_output(out, count, gpio, new_count, new_gpio):
     return new_out, new_count, new_gpio, True
 
 
+def _realtime():
+    """Ask for a low real-time priority (best effort, the service runs as root): the LED data is sent by the CPU for a
+    single LED, and being pre-empted in the middle of it is one way to get a wrong colour for a moment."""
+    try:
+        os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(1))
+    except (AttributeError, OSError, ValueError):
+        pass
+
+
 def wanted_count():
     """How many LEDs to drive: the configured count while the LED module is switched on in the Modules menu, else 0
     (the output is closed and dark, and the service just waits for it to be switched on)."""
@@ -340,7 +253,9 @@ def main():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
+    _realtime()
     messages = []
+    steady = Steady()
     wb_test = False
     clocks = {}
     last_frame, last_sent = None, 0.0
@@ -350,7 +265,7 @@ def main():
         if now >= next_read:
             try:
                 wb_test = ledconfig.wb_test_active()
-                messages = ledconfig.active_messages()
+                messages = steady.feed(ledconfig.active_messages(), now)
                 cfg = ledconfig.led_config()
                 order = drivers.ORDERS.get(cfg.get("order"), drivers.DEFAULT_ORDER)
                 white_balance, gamma = _wb(cfg), cfg.get("gamma", ledconfig.GAMMA)
@@ -358,7 +273,6 @@ def main():
                 if switched:
                     clocks = {}
                     last_frame = None
-                    reset_dither()
                 if out is not None:
                     out.order = order
             except Exception:   # never let a bad read stop the LED loop
@@ -372,13 +286,11 @@ def main():
         # everything else, so what's previewed is exactly what's being
         # calibrated - see ledconfig.wb_test_active().
         if wb_test:
-            frame = to_bytes([(1.0, 1.0, 1.0)] * count, cfg.get("max_brightness", 0.08),
-                             white_balance, gamma, dither=False)
+            frame = to_bytes([(1.0, 1.0, 1.0)] * count, cfg.get("max_brightness", 0.08), white_balance, gamma)
         else:
             frame = render(messages, now, count, clocks, white_balance, gamma)
-        # Unchanged frames (solid colours) are only resent twice a second,
-        # which fixes any garbled frame and keeps the CPU free for DreamPi.
-        if frame != last_frame or now - last_sent >= 0.5:
+        # A frame is sent when it changed, and an unchanged one now and then (KEEPALIVE), which repairs a garbled frame.
+        if frame != last_frame or now - last_sent >= KEEPALIVE:
             out.show(frame)
             last_frame, last_sent = frame, now
         time.sleep(max(0.0, 1.0 / FPS - (time.time() - now)))

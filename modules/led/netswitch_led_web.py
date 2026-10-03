@@ -6,6 +6,7 @@
 # api() gives the DreamPi dot on the main page the look of the LED message that is showing.
 import json
 
+import netswitch_core as core
 import netswitch_ledconfig as ledconfig
 
 
@@ -14,6 +15,8 @@ def _get_config(h):
                        "states": ledconfig.LED_STATES, "groups": ledconfig.GROUPS,
                        "effects": ledconfig.EFFECTS, "orders": ledconfig.LED_ORDERS, "count": ledconfig.led_count(),
                        "gpio": ledconfig.led_gpio(), "gpios": ledconfig.GPIO_PINS,
+                       "net_bound": ledconfig.NET_BOUND,
+                       "net_led": {"dcnow": core.network_colour("dcnow")["led"], "dcnet": core.network_colour("dcnet")["led"]},
                        "installed": ledconfig.led_count() > 0}),
            "application/json")
 

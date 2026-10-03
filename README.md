@@ -11,14 +11,14 @@ It changes no DreamPi files, so DreamPi's auto-updates keep working and uninstal
 What you get:
 - A live status page at `http://dreampi.local` (also over HTTPS) with buttons to pick the network.
 - Special phone numbers that switch the network straight from the Dreamcast.
-- Optional status LEDs, on GPIO18 by default or GPIO10/12/21: one NeoPixel, several, or a strip. They show DreamPi's status and network or internet problems, with colours, effects, LED sections per message and a quick white-balance calibration.
+- Optional status LEDs, on GPIO18 by default or GPIO10/12/21: one NeoPixel, several, or a strip. They show DreamPi's status and network or internet problems, with colours, on/blinking effects, LED sections per message and a quick white-balance calibration.
 - Two GPIO buttons (always installed, each with its own pin and function, such as toggling the network), and optional Wi-Fi setup (`--wifi`): hold a button for 3 seconds and the Pi hosts a temporary "DreamPi WiFi Config" Wi-Fi network with a page to pick and connect to your home Wi-Fi, no keyboard or monitor needed.
 - An optional animated Dreamcast-style background for the page.
 - An online players box (who is on DCNow! and DCNET, and in which games), and a debug log for tracking down calls that go wrong.
 - Update and reboot buttons on the page, and an optional PIN for them.
 - Modem plugged-in detection and its make/model, with a warning if it's not a modem known to work with DreamPi.
 
-**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET by dialing a number (`555-0002` in that test; it is no longer a default) works end to end. The Toggle numbers (switch only, with the busy tone) haven't been tried on hardware yet. A single NeoPixel on GPIO18 works too. Several LEDs or a strip, the new LED colour calibration/wire order/dithering, the GPIO10/12/21 output pins, and the Wi-Fi setup button (including the newer second button, per-button function and combined-hold assignment), haven't been tried on real hardware yet; feedback is welcome.
+**Tested so far:** DreamPi 2.1 on a Raspberry Pi 3 with openMenu 1.7.0. The add-on loads under DreamPi's Python 2.7, and switching to DCNET by dialing a number (`555-0002` in that test; it is no longer a default) works end to end. The Toggle numbers (switch only, with the busy tone) haven't been tried on hardware yet. A single NeoPixel on GPIO18 works too. Several LEDs or a strip, the LED colour calibration/wire order, the steady no-flicker output, the GPIO10/12/21 output pins, and the Wi-Fi setup button (including the newer second button, per-button function and combined-hold assignment), haven't been tried on real hardware yet; feedback is welcome.
 
 ## Install
 
@@ -160,10 +160,11 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
   - **Button 1** / **Button 2:** each button's **function** and **pin**. Two kinds of function, in two groups in the list: **Push button** (acts on a short press) - **Off**, **Toggle network** (switches between DCNow! and DCNET, the default for button 1), **Select DCNow!** or **Select DCNET** (the default for button 2 is **Off**) - and **Toggle switch** (a latching on/off switch wired between the pin and GND, **closed = on**, which decides the state by its position, also when the Pi starts): **On = DCNET** (closed: DCNET, open: DCNow!), **On = DCNow!** (the other way round) and, while the Wi-Fi setup module is on, **On = Wi-Fi setup** (closed: Wi-Fi setup, open: normal) or **Off = Wi-Fi setup** (the opposite). A text under each row spells out the chosen function. Pick two different pins; a change takes effect within a couple of seconds, no reinstall needed. The physical wiring and the defaults (GPIO17 and GPIO4) are under [Buttons and Wi-Fi setup](#buttons-and-wi-fi-setup).
   - **Wi-Fi setup** (Wi-Fi module): which push button, or **Button 1 + 2** held together, starts Wi-Fi setup with a 3-second hold ("Hold button 1 for 3 s to start Wi-Fi setup"). A button set to a toggle switch function can't be held, so it's ignored here. A button's own short-press function still works normally; only a press that is held long enough to start Wi-Fi setup skips it.
   - **LED** (Status LEDs module): **LEDs connected** (1 to 300, just where the count starts out), **wire order** (`RGB`, `RBG`, `GRB` - most WS2812 strips, `GBR`, `BRG` or `BGR`; a wrong order shows the right brightness with the wrong colour, for example a red status looking green) and **output pin** (GPIO10, 12, 18 or 21; the pin picker is last in the row, like the buttons' pin pickers). All three take effect within a second.
+- **Network colours:** the colour of DCNow! and DCNET everywhere - the page, the status dot and the LEDs. Pick from **orange**, **blue**, **red** and **green** (the first two are the original colours; the red and green are close to the Dreamcast BIOS buttons, not an exact match). Picking the colour the other network has swaps the two, so they never look the same. Default: DCNow! orange, DCNET blue. Stored in `/opt/dreampi-netswitch/network_colours.json`. Red and green are also used by the LED for faults and Ethernet, so keep that in mind when choosing them.
 - **Status LED** (Status LEDs module; only shown when the LED count is above 0 - `--leds=0` hides it; the title shows the number of LEDs for a strip): how the LEDs look. One box with the **Calibration** row at the top, the list of messages, and **Reset LED settings to defaults** at the bottom.
   - **Calibration** has an **Adjust** button that opens a small pop-up (**Done**, Esc or a tap outside closes it, which also ends the white preview). **White balance:** three sliders, **Red**, **Green** and **Blue** (0 to 255, all at 255 by default - no correction). Tap **Preview on LED** to hold the LED at solid white, then turn down whichever channel looks too strong until it looks neutral white rather than tinted - leave at least one at 255, don't turn any of them up. Tap **Stop preview** when you're done; it also stops automatically if you close the pop-up or Settings. **Reset to neutral** sets all three back to 255. This corrects every colour the LEDs show, not just white, and takes about 30 to 60 seconds - there's no need to calibrate individual colours. **Brightness** (the maximum brightness) is in the same pop-up: 0 to 100% (default 8%), applied after the white balance as a ceiling on the whole strip regardless of colour. The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
-  - **The list of messages**, grouped into **System**, **Network**, **Call — DCNow!**, **Call — DCNET**, **Call — Netlink** and **Wi-Fi setup** (see [LED messages](#led-messages)). Every message is separate, so DCNow! and DCNET can look completely different, or the same. Per message: a **tick box** to use it or not (a message that is off shows nothing; when no ticked message applies, the LED is off), its **colour**, its **effect** and its **level**.
-  - **Effect:** tap it for a small menu. **Solid**, **Blink**, **Breathe** (fading up and down), **Ping** (two quick pulses, then a longer pause) and **RGB** (cycles through all colours, ignoring the colour set: one round every 20 seconds when slow, every 10 when fast) work on any LED. With a strip there are also **Rainbow** (flowing towards the last LED), **Scanner** (a bright dot sweeping back and forth with a fading trail, like KITT or a Cylon), **Comet** (a bright head with a fading tail running round the strip), **Chase** (every third LED, stepping forward) and **Twinkle** (random sparkles). Every effect except Solid has a **Slow** and a **Fast** speed. With a strip, the same menu sets which **LEDs** the message uses: **All**, **One LED**, or a **Range** such as 2 to 5.
+  - **The list of messages**, grouped into **System**, **Network**, **Call — DCNow!**, **Call — DCNET**, **Call — Netlink** and **Wi-Fi setup** (see [LED messages](#led-messages)). Every message is separate, so DCNow! and DCNET can look completely different, or the same. Per message: a **tick box** to use it or not (a message that is off shows nothing; when no ticked message applies, the LED is off), its **colour**, its **effect** and its **level**. The colour of the DCNow! and DCNET messages is greyed out: it follows **Network colours** (see below).
+  - **Effect:** tap it for a small menu. **Solid** (just on) or **Blink** (on and off, **Slow** once a second or **Fast** two and a half times a second). More effects will come later. With a strip, the same menu sets which **LEDs** the message uses: **All**, **One LED**, or a **Range** such as 2 to 5.
   - **Level:** the brightness for that message. Grey means it uses the maximum brightness from Calibration; tap it to give the message its own brightness with a slider, and tap **Use global** to go back.
   - **Reset LED settings to defaults** restores the defaults in [LED messages](#led-messages) and the 8% maximum brightness (not the white balance or the wire order - those describe your LEDs, not a look to reset).
 - **Modules:** every installed module with a switch (see [Modules](#modules)).
@@ -191,12 +192,12 @@ pi=CPU 7%, RAM 142/926MB, 48°C. Uptime 2 h 5 min, IP: 192.168.1.55.
 
 Every message is configured on its own in **Settings > Status LED**: on or off, colour, effect (and speed), level (brightness) and, with a strip, which LEDs it uses (all, one LED, or a range). Many messages start out with the same look on purpose; they are separate so you can change just one or send it to its own LED. The settings are grouped as System, Network, Call — DCNow!, Call — DCNET, Call — Netlink, plus Wi-Fi setup. The global (maximum) brightness is not on this list; it is in the Calibration pop-up at the top of Settings > Status LED.
 
-**Colours mean something:** orange is DCNow!, blue is DCNET, purple is Netlink, and **red means something is wrong**, so a failed call is red, not the network's own colour. You can change any colour.
+**Colours mean something:** DCNow! and DCNET use their network colours (orange and blue by default, changed in Settings > Network colours), purple is Netlink, and **red means something is wrong**, so a failed call is red, not the network's own colour. You can change the other colours per message.
 
 | Message | Default look | On by default |
 |---|---|---|
 | **System** | | |
-| Starting up | Amber, breathing slowly | Yes |
+| Starting up | Amber, blinking slowly | Yes |
 | DreamPi not running | Red, blinking slowly | Yes |
 | Power or heat problem | Red, blinking fast | Yes |
 | State unknown | Dim grey, solid | Yes |
@@ -205,19 +206,19 @@ Every message is configured on its own in **Settings > Status LED**: on or off, 
 | No internet | Amber, blinking slowly | Yes |
 | Ethernet connected | Green, solid | No |
 | Wi-Fi connected | Light blue, solid | No |
-| Network switching | White, Ping | No |
-| **Call — DCNow!** | | |
-| Ready for calls | Orange, breathing slowly | Yes |
+| Network switching | White, blinking fast | No |
+| **Call — DCNow!** (the network colour, orange) | | |
+| Ready for calls | Orange, solid | Yes |
 | Connecting | Orange, blinking slowly | Yes |
 | In a call | Orange, solid | Yes |
 | Call failed | Red, blinking fast | Yes |
-| **Call — DCNET** | the same with blue | Yes |
+| **Call — DCNET** | the same with the DCNET colour (blue) | Yes |
 | **Call — Netlink** | the same with purple | No |
-| **Wi-Fi setup** (choose a network / connected / couldn't connect) | Light blue breathing (scanning, on a strip) / green / red blinking | Yes |
+| **Wi-Fi setup** (choose a network / connected / couldn't connect) | Light blue blinking (choose a network) / green solid / red blinking | Yes |
 
 - **What the add-on can tell today:** *Ready for calls* (for the selected network), *In a call* (DCNow!, DCNET, and Netlink for DreamPi's other calls), *Starting up*, *DreamPi not running*, *State unknown*, the network messages except *Network switching*, and Wi-Fi setup. **Connecting, Call failed, Ready for calls — Netlink and Network switching can be set up but never show yet**: DreamPi's state file doesn't say when they happen, and the page marks them *not detected yet* instead of guessing.
 - **Priority** (highest first): Wi-Fi setup, errors (no network, no internet, power or heat, DreamPi not running, call failed), network switching, starting up, in a call, connecting, ready for calls, Ethernet / Wi-Fi connected. **State unknown is the last resort**: it only shows when no other message applies. A message that is switched off shows nothing.
-- **Effects:** Solid, Blink, Breathe, **Ping** (two quick pulses, then a longer pause, like a double ping), RGB and, with a strip, Rainbow, Scanner, Comet, Chase and Twinkle. Ping uses the message's own level, and on a strip it pulses only the LEDs the message is set to use.
+- **Effects:** Solid and Blink for now (the effects engine was rebuilt from scratch; more animations will be added later). A blink starts lit and runs 50 % on, 50 % off. Colours keep their hue at every brightness: a dimmed orange stays orange and never drifts towards green, and nothing is dithered, so the LED doesn't flicker when a colour changes.
 - **No network:** the Pi has no route to your router, for example because the cable is unplugged or Wi-Fi isn't connected. You can't open the web page then, so the LED is the only thing that can tell you.
 - **No internet:** the Pi reaches your router, but not the internet, or name lookups (DNS) fail.
 - **Power or heat problem:** the Pi reports under-voltage or throttling right now, or is at 80 °C or more.
@@ -256,7 +257,7 @@ This starts the `dreampi-netswitch-led` service. Later updates keep the LED coun
 
 **How it works:** GPIO12 and GPIO18 are driven by the Pi's PWM hardware, clocked from the crystal, which gives accurate NeoPixel timing without special drivers, extra Python packages or config changes; GPIO21 uses the PCM peripheral the same way, so the LEDs don't need the PWM hardware (and therefore not the analog audio jack) at all. A single LED on GPIO12/18 is fed directly; anything else on GPIO12/18/21 is fed by a DMA channel from memory shared with the GPU, the same method the rpi_ws281x library uses. GPIO10 instead goes through the kernel's own SPI driver (`dtparam=spi=on`), one SPI byte per NeoPixel bit - what this add-on used by default in its very first versions, before it moved to GPIO18.
 
-**Brightness, colours and effects:** set in the web page's settings (cogwheel). Effects run at 50 frames per second and start from the beginning whenever a message appears or changes (a blink starts lit, a breathe starts bright), and changes show up within a quarter of a second. They're stored in `/opt/dreampi-netswitch/led.json`.
+**Brightness, colours and effects:** set in the web page's settings (cogwheel). A blink starts from the beginning (lit) whenever a message appears or changes, and changes show up within a quarter of a second. A state that flips back and forth for a moment (for example while DreamPi restarts) is ignored until it has held for 0.4 seconds, and the LED service asks for real-time scheduling when it can, so the LED isn't disturbed by other work on the Pi. They're stored in `/opt/dreampi-netswitch/led.json`.
 
 If the LEDs stay dark, `systemctl status dreampi-netswitch-led` shows why.
 
@@ -272,7 +273,7 @@ Two momentary push buttons are always installed, as quick network switches and (
 3. The temporary network closes and the Pi tries to join the network you chose.
 4. If it gets online, the status LED (if installed) goes solid **green** for a few seconds and everything returns to normal; DreamPi keeps using this Wi-Fi network (and any others saved this way) after a reboot too. If it can't get online, the LED goes **red** for a few seconds and the Pi goes back to step 1, hosting "DreamPi WiFi Config" again so you can try another network or password.
 
-While it's scanning or hosting the setup network, a status LED shows a breathing blue light (a scanning animation instead, with a strip). Holding the assigned button(s) again, or the **Wi-Fi setup** control at the top of System in the settings, cancels it at any point and returns the Pi to its normal Wi-Fi connection.
+While it's scanning or hosting the setup network, a status LED blinks light blue. Holding the assigned button(s) again, or the **Wi-Fi setup** control at the top of System in the settings, cancels it at any point and returns the Pi to its normal Wi-Fi connection.
 
 **Wiring:** no resistor needed; the Pi's internal pull-up is used on each pin, so it reads high normally and low while that button is held. GPIO17 and GPIO4 were picked as the defaults because neither has any other function on any Raspberry Pi model (an earlier version of this add-on defaulted the single button to GPIO15, which doubles as the Pi's UART RX pin and could pick up noise from the serial console/Bluetooth if that's in use). A pin or function change from Settings > GPIO takes effect within a couple of seconds, with no service restart. A toggle switch is wired the same way, between the pin and GND (any simple on/off switch; closed = on).
 
