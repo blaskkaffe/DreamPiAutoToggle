@@ -33,14 +33,14 @@ class PlayersView(unittest.TestCase):
 
     def test_games_most_played_first_with_counts(self):
         self.assertEqual(pl.games_line([self.p("a", "Quake", "DCNow!"), self.p("b", "Daytona", "DCNow!"), self.p("c", "Daytona", "DCNET"), self.p("d", "", "DCNow!")]),
-                         ["Daytona (2)", "Quake (1)"])
+                         [{"text": "Daytona", "n": 2}, {"text": "Quake", "n": 1}])
         self.assertEqual(pl.games_line([]), [])
 
     def test_counts_are_per_network_and_follow_the_switcher_colours(self):
         self.prime([self.p("a", "Q", "DCNow!"), self.p("b", "Q", "DCNow!"), self.p("c", "D", "DCNET")], [{"name": "S", "ok": True, "count": 3, "error": None}])
         v = pl.view()
         self.assertEqual(v["parts"], [{"text": "DCNow! 2", "colour": "switcher.dcnow"}, {"text": "DCNET 1", "colour": "switcher.dcnet"}])
-        self.assertEqual(v["games"], ["Q (2)", "D (1)"])
+        self.assertEqual(v["games"], [{"text": "Q", "n": 2}, {"text": "D", "n": 1}])
         self.assertEqual([(x["title"], x["sub"], x["tag"], x["colour"]) for x in v["list"]][0], ("a", "Q", "DCNow!", "switcher.dcnow"))
         self.assertFalse(v["retry"])
 
@@ -127,7 +127,7 @@ class UpdateView(unittest.TestCase):
         return r
 
     def test_up_to_date_and_available(self):
-        self.assertEqual(ru.view(self.base())["text"], "The add-on is up to date (v1).")
+        self.assertEqual(ru.view(self.base())["text"], "Up to date (v1).")
         v = ru.view(self.base(addon={"available": True, "latest": "v2", "latest_date": "2026-10-02T10:00:00Z", "behind": 4, "current": "v1"}))
         self.assertEqual(v["text"], "A newer add-on version is available: v2 (2026-10-02), 4 new changes. You have v1.")
         self.assertTrue(v["show_update"])

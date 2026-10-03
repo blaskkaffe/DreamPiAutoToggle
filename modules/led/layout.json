@@ -45,7 +45,7 @@
    "items": [
     {
      "type": "custom",
-     "name": "led-messages",
+     "name": "led-groups",
      "show": "@led.installed",
      "html_file": "messages.html"
     }

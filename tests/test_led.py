@@ -145,20 +145,26 @@ class ActiveMessageTests(unittest.TestCase):
         cleanup(self.tmp)
 
     def test_errors_outrank_information(self):
-        msgs = ledconfig.active_messages("ok", {"network": False}, wifi=False)
-        keys = [m["key"] for m in msgs]
-        self.assertEqual(keys[-1], "no-network")        # last = drawn on top
-        self.assertIn("ready-dcnow", keys)
-
-    def test_disabled_message_is_left_out(self):
         cfg = ledconfig.led_config()
-        cfg["messages"]["ready-dcnow"]["enabled"] = False
+        cfg["groups"] = [{"id": "g1", "colour": "red", "effect": "blink", "messages": ["no-network"]},
+                         {"id": "g2", "colour": "blue", "messages": ["ready"]}]
         ledconfig.save_led_config(cfg)
-        keys = [m["key"] for m in ledconfig.active_messages("ok", {"network": True}, wifi=False)]
-        self.assertNotIn("ready-dcnow", keys)
+        ctx = {"state": "ok", "selected": "dcnow", "net": {"network": False}, "wifi": "idle", "update": "idle", "update_info": {},
+               "reboot": False, "dcnet_problem": False}
+        keys = [m["key"] for m in ledconfig.active_messages(ctx)]
+        self.assertEqual(keys[-1], "g1")        # last = drawn on top
+
+    def test_a_message_in_no_group_does_not_light(self):
+        cfg = ledconfig.led_config()
+        cfg["groups"] = [{"id": "g1", "colour": "blue", "messages": []}]
+        ledconfig.save_led_config(cfg)
+        self.assertEqual(ledconfig.active_messages(), [])
 
     def test_brightness_falls_back_to_max(self):
-        m = ledconfig.active_messages("ok", {"network": True}, wifi=False)[0]
+        cfg = ledconfig.led_config()
+        cfg["groups"] = [{"id": "g1", "colour": "blue", "messages": ["sel-dcnow"]}]
+        ledconfig.save_led_config(cfg)
+        m = ledconfig.active_messages()[0]
         self.assertEqual(m["brightness"], ledconfig.led_config()["max_brightness"])
 
 

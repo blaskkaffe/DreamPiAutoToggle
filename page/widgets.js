@@ -184,7 +184,7 @@ W.infobox=function(s,ctx){
   var row=h("div",{"class":"row "+(r.main?"main":"more")+(r.cls?" "+r.cls:"")});
   row.appendChild(h("span",{"class":"k",text:r.label||""}));
   var v=h("span",{"class":"v"+(r.value&&r.value.type==="carousel"?" fill":"")});v.appendChild(build(Object.assign({mod:s.mod},r.value||{type:"text",text:""}),ctx));row.appendChild(v);
-  if(r.main)row.appendChild(h("span",{"class":"arrow",html:"&#9656;"}));
+  if(r.main&&!(r.value&&r.value.type==="carousel"))row.appendChild(h("span",{"class":"arrow",html:"&#9656;"}));   // a scrolling line has no arrow: the box still opens on a tap
   if(r.show!==undefined)bind(r.show,function(x){sh(row,!!x)});
   el.appendChild(row)});
  if(s.actions&&s.actions.length){var act=h("div",{"class":"row more hang keep"});
@@ -196,7 +196,11 @@ W.infobox=function(s,ctx){
  return el};
 // ---- carousel: one line of text that scrolls round (like a news ticker) only when it does not fit
 W.carousel=function(s){var el=h("span",{"class":"carousel"}),trk=h("span",{"class":"trk"}),cur=null;el.appendChild(trk);
- function text(){var v=val(s.items!==undefined?s.items:s.text);return Array.isArray(v)?v.join("  \u2022  "):(v==null?"":String(v))}
+ // items are texts, or {text, n}: the count n is shown after the text in the subtitle colour
+ function items(){var v=val(s.items!==undefined?s.items:s.text);return Array.isArray(v)?v:(v==null||v===""?[]:[String(v)])}
+ function one(i){return i&&typeof i==="object"?String(i.text==null?"":i.text)+(i.n!=null?" "+i.n:""):String(i)}
+ function text(){return items().map(one).join("  \u2022  ")}
+ function body(){return items().map(function(i){return i&&typeof i==="object"?esc(i.text==null?"":i.text)+(i.n!=null?' <span class="cn">'+esc(i.n)+'</span>':""):esc(i)}).join("  \u2022  ")}
  // Scrolls only when the line is wider than its row (minus the arrow). While it fits it is centred like the status row above it;
  // when it scrolls its holder (.v.fill) takes the whole row so the line can run past the edges, and the arrow stays at the end.
  function fit(){var t=trk.querySelector(".t"),scroll=false,par=el.parentNode,row=el.closest&&el.closest(".row");
@@ -205,7 +209,7 @@ W.carousel=function(s){var el=h("span",{"class":"carousel"}),trk=h("span",{"clas
   if(scroll!==el.classList.contains("sc")){el.classList.toggle("sc",scroll);if(scroll)el.style.setProperty("--d",Math.max(12,Math.round(cur.length*0.28))+"s")}
   if(par)par.classList.toggle("scrolling",scroll)}
  function set(t){if(t===cur&&trk.firstChild){fit();return}cur=t;
-  var half='<span class="t">'+esc(t)+'<span class="sp">\u00a0\u00a0\u2022\u00a0\u00a0</span></span>';
+  var half='<span class="t">'+body()+'<span class="sp">\u00a0\u00a0\u2022\u00a0\u00a0</span></span>';
   setHtml(trk,t?half+half.replace('class="t"','class="t dup" aria-hidden="true"'):"");el.classList.remove("sc");fit()}
  UPD.push(function(){set(text())});set(text());
  hook("layout",function(){fit()});window.addEventListener("resize",fit);return el};
@@ -252,10 +256,14 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
 // ---- the standard "edit row": the title and a grey line on the left, a small button on the right (Edit, Add ...), and - once there is
 // something to show - a list of tags underneath. Forms, the phone number table and the colour picks all use this one look.
 //   r.el the row   r.btn the button   r.setSub(text)   r.setList(items, onRemove(i))   (an empty or missing list takes no room)
-function editRow(o){var sub=h("span",{"class":"sub"}),btn=h("button",{type:"button","class":"pill-s",text:o.button||"Edit"}),below=h("div",{"class":"below"}),
- row=h("div",{"class":"srow wrap"},[h("span",{},[document.createTextNode(o.title||""),sub]),btn,below]);
- if(o.aria)btn.setAttribute("aria-label",o.aria);sh(below,false);sh(sub,false);
- return {el:row,btn:btn,
+function editRow(o){var sub=h("span",{"class":"sub"}),title=document.createTextNode(o.title||""),dot=null,
+ btn=h("button",{type:"button","class":"pill-s",text:o.button||"Edit"}),btn2=o.button2?h("button",{type:"button","class":"pill-s",text:o.button2}):null,
+ below=h("div",{"class":"below"}),left=h("span",{},[title,sub]),
+ row=h("div",{"class":"srow wrap"},[left,btn2?h("span",{"class":"btns"},[btn,btn2]):btn,below]);
+ if(o.aria)btn.setAttribute("aria-label",o.aria);if(o.aria2&&btn2)btn2.setAttribute("aria-label",o.aria2);sh(below,false);sh(sub,false);
+ return {el:row,btn:btn,btn2:btn2,
+  setTitle:function(t){title.nodeValue=t},
+  setDot:function(css){if(!dot){dot=h("span",{"class":"gdot"});left.insertBefore(dot,left.firstChild)}dot.style.background=css},   // a small colour ball before the title
   setSub:function(t){setLines(sub,t);sh(sub,!!t)},
   setList:function(items,onRemove){below.innerHTML="";items=items||[];sh(below,items.length>0);if(!items.length)return;
    var tags=h("div",{"class":"tags"});
@@ -263,18 +271,20 @@ function editRow(o){var sub=h("span",{"class":"sub"}),btn=h("button",{type:"butt
     if(onRemove){var x=h("button",{type:"button","aria-label":"Remove "+it,html:"&#10005;"});x.onclick=function(e){e.stopPropagation();onRemove(i)};t.appendChild(x)}
     else t.style.paddingRight="12px";
     tags.appendChild(t)});below.appendChild(tags)}}}
+// ---- the standard foot of a settings table: buttons on the left (Add, Restore ...), an (i) button on the right that opens a read-only
+// pop-up with the information text (no Done button: nothing in it is saved). f.setInfo(text) sets or, when empty, hides it.
+function footRow(buttons){var info=h("button",{type:"button","class":"infobtn",text:"i",title:"Information","aria-label":"Information"}),
+ text=h("div",{"class":"infotext"}),pop=h("div",{},[text]),
+ el=h("div",{"class":"srow foot"},[h("span",{"class":"btns"},buttons),info,pop]),p=ui.popup(pop);   // the pop-up sits in the row so it finds its card
+ info.onclick=function(e){p.toggle(info,e)};hook("settingsClose",function(){p.close()});sh(info,false);
+ return {el:el,setInfo:function(t){setLines(text,t);sh(info,!!t)}}}
 // ---- a table to pick values for: groups of short items (phone numbers) with an Add pop-up per group (reply of GET source)
 W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null,addKey=null,
- list=h("div"),
- restore=h("button",{type:"button","class":"pill-s"}),info=h("button",{type:"button","class":"infobtn",text:"i",title:"Information","aria-label":"Information"}),
- foot=h("div",{"class":"srow"},[restore,info]),
- pop=h("div"),popT=h("div",{"class":"t"}),inp=h("input",{type:"text","aria-label":"Value to add"}),addB=h("button",{type:"button","class":"pill-s",text:"Add"}),msg=h("div",{"class":"msg"}),
- infoPop=h("div"),infoText=h("div",{"class":"infotext"});
+ list=h("div"),restore=h("button",{type:"button","class":"pill-s"}),foot=footRow([restore]),
+ pop=h("div"),popT=h("div",{"class":"t"}),inp=h("input",{type:"text","aria-label":"Value to add"}),addB=h("button",{type:"button","class":"pill-s",text:"Add"}),msg=h("div",{"class":"msg"});
  pop.appendChild(popT);pop.appendChild(h("div",{"class":"fld"},[inp,addB]));pop.appendChild(msg);
- infoPop.appendChild(infoText);                         // read only: no Done button, a click elsewhere or Esc closes it
- el.appendChild(list);el.appendChild(foot);el.appendChild(pop);el.appendChild(infoPop);
- var p=ui.popup(pop),ip=ui.popup(infoPop);p.onclose=function(){addKey=null};
- info.onclick=function(e){ip.toggle(info,e)};
+ el.appendChild(list);el.appendChild(foot.el);el.appendChild(pop);
+ var p=ui.popup(pop);p.onclose=function(){addKey=null};
  function rules(){return cfg.rules||{}}
  function paint(){if(!cfg)return;var R=rules();
   list.innerHTML="";
@@ -282,9 +292,9 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
    var r=editRow({title:g.label,button:R.add_label||"Add",aria:(R.add_label||"Add")+" to "+g.label});
    r.setSub(g.sub||"");r.setList(g.items,function(i){g.items.splice(i,1);save()});
    r.btn.onclick=function(e){openAdd(g,r.btn,e)};list.appendChild(r.el)});
-  setLines(infoText,R.help||"");sh(info,!!R.help);
+  foot.setInfo(R.help||"");
   sh(restore,!!R.restore);if(R.restore){setText(restore,R.restore);restore.onclick=function(){cfg.groups.forEach(function(g){g.items=(cfg.defaults[g.key]||[]).slice()});save()}}
-  sh(foot,!!(R.restore||R.help))}
+  sh(foot.el,!!(R.restore||R.help))}
  function openAdd(g,b,e){if(p.isOpen()&&addKey===g.key){p.toggle(b,e);return}addKey=g.key;var R=rules();
   setText(popT,(R.add_title||"Add to {group}").replace("{group}",g.label));inp.value="";inp.maxLength=R.max||40;setText(msg,"");p.toggle(b,e);inp.focus()}
  function addItem(){if(!addKey)return;var R=rules(),allowed=new RegExp("[^"+(R.allowed||"\\s\\S")+"]","g"),n=inp.value.replace(allowed,""),say=function(t){setText(msg,t)},g=null;
@@ -297,7 +307,7 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
  function load(){xhrJson("GET",s.source,function(r){if(r){cfg=r;paint()}})}
  function save(){clearTimeout(timer);paint();timer=setTimeout(function(){var body={};cfg.groups.forEach(function(g){body[g.key]=g.items});
   post(s.source,body,function(r){if(r){cfg=r;paint();ctx.saved()}})},100)}
- hook("settingsOpen",load);hook("settingsClose",function(){p.close();ip.close()});return el};
+ hook("settingsOpen",load);hook("settingsClose",function(){p.close()});return el};
 // ---- a console: lines of text in a box. "lines": "@path" replaces them all; "tail": "/url" adds what is new (GET url?from=N -> {text, size, reset})
 W.console=function(s,ctx){var el=h("div",{"class":"console"+(s.nowrap?" nowrap":""),role:"log","aria-label":s.label||"Log"}),size=0,busy=false,rules=(s.rules||[]).map(function(r){return[new RegExp(r[0],"i"),r[1]]}),
  follow=s.follow?val(s.follow):true;

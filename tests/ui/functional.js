@@ -25,10 +25,12 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(orange !== blue, 'the two network buttons have different colours');
   // ---- the games carousel: centred while it fits (like the status row above it), scrolling when it doesn't
   ok(await page.locator('.carousel.sc').count() === 1, 'a long games line scrolls');
-  await page.evaluate(() => { S.players = Object.assign({}, S.players, { games: ['Quake III (1)'] }); engineUpdate(); }); await settle(300);
+  await page.evaluate(() => { S.players = Object.assign({}, S.players, { games: [{ text: 'Quake III', n: 1 }] }); engineUpdate(); }); await settle(300);
   const geo = await page.evaluate(() => { const t = document.querySelector('.carousel .t').getBoundingClientRect(), b = document.querySelector('.now:nth-of-type(2), .dbox:nth-child(2) .now').getBoundingClientRect();
     return { off: Math.abs((t.left + t.right) / 2 - (b.left + b.right) / 2), sc: !!document.querySelector('.carousel.sc'), w: b.width }; });
   ok(!geo.sc && geo.off < 24, 'a short games line stands still and is centred in the box (off by ' + Math.round(geo.off) + 'px of ' + Math.round(geo.w) + ')');
+  ok(await page.locator('.carousel .cn').first().textContent() === '1' && !/\(/.test(await page.locator('.carousel').first().textContent()), 'the game count has no brackets and its own (subtitle) colour');
+  ok(await page.locator('.dbox:nth-child(2) .row.main .arrow').count() === 0, 'the players box has no small arrow');
   await page.evaluate(() => reloadData()); await settle(1200);
   // ---- choosing a network moves the primary colour with it
   const boxBg = () => page.locator('.now').first().evaluate(e => getComputedStyle(e).borderTopColor);
@@ -82,6 +84,34 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(/numbers ending in the listed numbers/.test(await page.locator('.pop.open .infotext').textContent()), 'the (i) button opens the pop-up with the information text');
   ok(await page.locator('.pop.open button', { hasText: 'Done' }).count() === 0, 'the information pop-up has no Done button (nothing to save)');
   await page.keyboard.press('Escape'); await settle(200);
+  // ---- Status LED: rows of colour + animation + level, each with the messages that light it
+  const led = page.locator('[data-box="status led"]');
+  const ledRows = led.locator('.srow:has(button[aria-label="Edit this colour"])');
+  const rows0 = await ledRows.count();
+  ok(rows0 === 6, 'the LED box starts with the six default colour rows (' + rows0 + ')');
+  ok(await ledRows.first().locator('.tag', { hasText: 'DCNow! selected' }).count() === 1, 'the first row holds DCNow! selected');
+  await led.locator('button', { hasText: 'Add colour' }).click(); await settle(900);
+  ok(await ledRows.count() === rows0 + 1, 'Add colour adds a row');
+  await ledRows.last().locator('button[aria-label="Edit this colour"]').click(); await settle(300);
+  const lg = await popGeo();
+  ok(Math.abs(lg.w - gp1.w) <= 1 && Math.abs(lg.left) <= 1 && Math.abs(lg.right) <= 1, 'the colour pop-up has the same width as the others (' + lg.w + ')');
+  await page.locator('.pop.open .swatch[aria-label="Green"]').click(); await settle(900);
+  ok(/Green/.test(await ledRows.last().textContent()), 'picking a colour names it in the row');
+  await page.locator('.pop.open button', { hasText: 'Remove' }).click(); await settle(900);
+  ok(await ledRows.count() === rows0 && await page.locator('.pop.open').count() === 0, 'Remove deletes the row and closes the pop-up');
+  await ledRows.first().locator('button[aria-label="Add messages to this colour"]').click(); await settle(300);
+  await page.locator('.pop.open .srow', { hasText: 'Weak Wi-Fi signal' }).locator('button').click(); await settle(900);
+  ok(await ledRows.first().locator('.tag', { hasText: 'Weak Wi-Fi signal' }).count() === 1, 'a message is added to the row it was added from');
+  ok(await page.locator('.pop.open .srow', { hasText: 'Weak Wi-Fi signal' }).count() === 0, 'and is no longer on offer in the list');
+  await page.keyboard.press('Escape'); await settle(200);
+  await ledRows.first().locator('.tag', { hasText: 'Weak Wi-Fi signal' }).locator('button').click(); await settle(900);
+  ok(await ledRows.first().locator('.tag', { hasText: 'Weak Wi-Fi signal' }).count() === 0, 'a message is taken out of its row with the x');
+  await led.locator('.infobtn').click(); await settle(300);
+  ok(await page.locator('.pop.open .infotext').count() === 1 && await page.locator('.pop.open button', { hasText: 'Done' }).count() === 0, 'the LED box has an information pop-up without a Done button');
+  await page.keyboard.press('Escape'); await settle(200);
+  await led.locator('button', { hasText: 'Add colour' }).click(); await settle(600);
+  await led.locator('button', { hasText: 'Restore defaults' }).click(); await settle(900);
+  ok(await ledRows.count() === rows0, 'Restore defaults brings the default rows back');
   // dividers: every row of a box has a line above it except the first, whichever module or widget it comes from
   const dividers = await page.evaluate(() => Array.from(document.querySelectorAll('#set-boxes .card')).filter(c => c.offsetParent).map(c => {
     const rows = Array.from(c.querySelectorAll('.srow')).filter(r => r.offsetParent && !r.closest('.pop') && !r.closest('.wlist.compact'));
@@ -129,7 +159,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   const dropGeo = await popGeo();
   ok(Math.abs(dropGeo.left) <= 1 && Math.abs(dropGeo.right) <= 1, 'the modules pop-up spans the card too');
   const drag = async (from, to) => {                                       // from / to are row numbers; the pointer ends on the lower half of `to`
-    await grip(Math.min(from, to)).scrollIntoViewIfNeeded();
+    await page.locator('.pop.open').evaluate(e => e.scrollIntoView({ block: 'start' }));       // the rows being dragged stay clear of the edges (a drag near an edge scrolls the page)
     const a = await grip(from).boundingBox(), rows = page.locator('.pop.open .srow[data-id]');
     const b = await rows.nth(to).boundingBox();
     await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down();
@@ -186,7 +216,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   const rowsT = tp.locator('.pop.open .srow[data-id]');
   const orderT = () => rowsT.evaluateAll(els => els.map(e => e.getAttribute('data-id')));
   const startT = await orderT();
-  await rowsT.nth(0).scrollIntoViewIfNeeded();
+  await tp.locator('.pop.open').evaluate(e => e.scrollIntoView({ block: 'start' }));
   await tp.evaluate(() => { window.__removed = 0;
     new MutationObserver(ms => ms.forEach(m => m.removedNodes.forEach(n => { if (n.classList && n.classList.contains('drag')) window.__removed++; }))).observe(document.querySelector('.pop.open .mlist'), { childList: true }); });
   const g = await tp.locator('.pop.open .srow[data-id] .grip').nth(0).boundingBox();
@@ -199,7 +229,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await touch('touchEnd'); await tp.waitForTimeout(700);
   const endT = await orderT();
   ok(endT[2] === startT[0] && await tp.locator('.pop.open').count() === 1, 'lifting the finger drops the row there (nothing is applied until Done)');
-  await rowsT.nth(2).scrollIntoViewIfNeeded();
+  await tp.locator('.pop.open').evaluate(e => e.scrollIntoView({ block: 'start' }));
   const g2 = await tp.locator('.pop.open .srow[data-id] .grip').nth(2).boundingBox(), r0 = await rowsT.nth(0).boundingBox();
   await touch('touchStart', g2.x + g2.width / 2, g2.y + g2.height / 2);
   for (let i = 1; i <= 14; i++) { await touch('touchMove', g2.x + g2.width / 2, g2.y + g2.height / 2 - (g2.y + g2.height / 2 - r0.y - 6) * i / 14); await tp.waitForTimeout(20); }

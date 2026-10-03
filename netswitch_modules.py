@@ -11,6 +11,8 @@
 #                                                                    POST function returns True once it has answered
 #   api(d, warnings)                add to the /api answer (d is its dict) and to the warning boxes
 #   PROTECTED = ("/path", ...)      POST paths that need the PIN when one is set (they run as root)
+#   start()                         called once, when the web service itself starts (start_background()) or when the module is
+#                                   switched on later: for background work that should run without anyone viewing the page
 # module.json "ui": N is the page kit version the module was written for (see UI_KIT); a newer one is not loaded.
 # A module may have a layout.json: what it shows, as data, which the base page turns into HTML (see layout()):
 #   {"dashboard": [BOX, ...], "settings": [BOX, ...], "data": {...}}       or, for a background module only, {"background": {...}}
@@ -42,7 +44,7 @@ BACKGROUND_TYPES = ("fullscreen", "part")
 _LAYOUT_KEYS = SECTIONS + ("background", "data")
 _NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _lock = threading.Lock()
-_state = {"sig": None, "loaded": [], "errors": {}, "get": {}, "post": {}, "api": [], "protected": set()}
+_state = {"sig": None, "loaded": [], "errors": {}, "get": {}, "post": {}, "api": [], "protected": set(), "background": False, "started": set()}
 
 
 def _read(path):
@@ -118,6 +120,8 @@ def refresh(force=False):
                 if callable(getattr(web, "api", None)):
                     api.append(web.api)
         _state.update(sig=sig, loaded=loaded, errors=errors, get=get, post=post, api=api, protected=protected)
+        if _state["background"]:
+            _start_new()
         return True
 
 
@@ -299,6 +303,23 @@ def live_colours():
     """{module: {key: palette id}} for the enabled modules that have colours of their own (in every /api answer, so a change
     made on another device shows at once)."""
     return dict((m["name"], core.module_colours(m["name"])) for m in _state["loaded"] if m["manifest"].get("colours"))
+
+
+def _start_new():
+    for m in _state["loaded"]:
+        web = m["web"]
+        if m["name"] not in _state["started"] and web is not None and callable(getattr(web, "start", None)):
+            _state["started"].add(m["name"])
+            try:
+                web.start()
+            except Exception as e:
+                sys.stderr.write("module %s start() failed: %s\n" % (m["name"], e))
+
+
+def start_background():
+    """The web service calls this once it runs: every enabled module's start() runs, now and for modules switched on later."""
+    _state["background"] = True
+    _start_new()
 
 
 def get(name):

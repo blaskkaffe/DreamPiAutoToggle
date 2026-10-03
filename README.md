@@ -76,7 +76,7 @@ The add-on is a small **base** plus **modules**. The base is the web page's fram
 
 | Module | Folder | Adds | On by default |
 |---|---|---|---|
-| *Network switcher, System* | `modules/switcher/`, `system/` | always on; the network box and buttons, Network colours and the GPIO settings of the two physical buttons (switcher); the About box with versions and the GitHub link (system) | yes (not in the picker) |
+| *Network switcher, About* | `modules/switcher/`, `system/` | always on (they can be moved in the picker, not switched off); the network box and buttons, Network colours and the GPIO settings of the two physical buttons (switcher); the About box with versions and the GitHub link (About) | yes |
 | **Special phone numbers** | `modules/numbers/` | Settings > Special phone numbers, to edit the numbers the Dreamcast dials. Without it the built-in default numbers are used | yes |
 | **Online players** | `modules/players/` | the Online players box on the main page | yes |
 | **Wi-Fi setup** | `modules/wifi/` | joining a Wi-Fi network without a keyboard (a temporary access point), and the Wi-Fi rows in Settings | no |
@@ -164,10 +164,7 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
   - **LED** (Status LEDs module; its row says for example "10 GRB LEDs connected to GPIO18" and has an **Edit** button for these three): **LEDs connected** (1 to 300, just where the count starts out), **wire order** (`RGB`, `RBG`, `GRB` - most WS2812 strips, `GBR`, `BRG` or `BGR`; a wrong order shows the right brightness with the wrong colour, for example a red status looking green) and **output pin** (GPIO10, 12, 18 or 21; the pin picker is last in the row, like the buttons' pin pickers). All three take effect within a second.
 - **Status LED** (Status LEDs module; only shown when the LED count is above 0 - `--leds=0` hides it; the title shows the number of LEDs for a strip): how the LEDs look. One box with the **Calibration** row at the top, the list of messages, and **Reset LED settings to defaults** at the bottom.
   - **Calibration** has an **Adjust** button that opens a small pop-up (**Done**, Esc or a tap outside closes it, which also ends the white preview). **White balance:** three sliders, **Red**, **Green** and **Blue** (0 to 255, all at 255 by default - no correction). Tap **Preview on LED** to hold the LED at solid white, then turn down whichever channel looks too strong until it looks neutral white rather than tinted - leave at least one at 255, don't turn any of them up. Tap **Stop preview** when you're done; it also stops automatically if you close the pop-up or Settings. **Reset to neutral** sets all three back to 255. This corrects every colour the LEDs show, not just white, and takes about 30 to 60 seconds - there's no need to calibrate individual colours. **Brightness** (the maximum brightness) is in the same pop-up: 0 to 100% (default 8%), applied after the white balance as a ceiling on the whole strip regardless of colour. The slider is logarithmic: its left half covers 0 to 9%, the range that suits an indicator LED best, and the right half goes up to full brightness for enclosures that need it.
-  - **The list of messages**, grouped into **System**, **Network**, **Call — DCNow!**, **Call — DCNET**, **Call — Netlink** and **Wi-Fi setup** (see [LED messages](#led-messages)). Every message is separate, so DCNow! and DCNET can look completely different, or the same. Per message: a **tick box** to use it or not (a message that is off shows nothing; when no ticked message applies, the LED is off), its **colour**, its **effect** and its **level**. The colour of the DCNow! and DCNET messages is greyed out: it follows **Network colours** (see below).
-  - **Effect:** tap it for a small menu. **Solid** (just on) or **Blink** (on and off, **Slow** once a second or **Fast** two and a half times a second). More effects will come later. With a strip, the same menu sets which **LEDs** the message uses: **All**, **One LED**, or a **Range** such as 2 to 5.
-  - **Level:** the brightness for that message. Grey means it uses the maximum brightness from Calibration; tap it to give the message its own brightness with a slider, and tap **Use global** to go back.
-  - **Reset LED settings to defaults** restores the defaults in [LED messages](#led-messages) and the 8% maximum brightness (not the white balance or the wire order - those describe your LEDs, not a look to reset).
+  - **The list of colours** works like the phone numbers: each row is one look (a colour dot, a title such as "Orange, solid" and the messages that use it as tags). **Edit** opens a pop-up with the colour (the 16 palette colours, or **DCNow!**, **DCNET** or **Selected network**, which follow the network colours in Appearance), the **animation** (Solid or Blink, Slow or Fast), the **level** (grey = the maximum brightness from Calibration, or its own) and, with a strip, which **LEDs** it uses (All, One LED, or a Range such as 2 to 5); **Remove** deletes the row. **Add** on a row lists the messages that are not used yet; tap one to give it this look. A message can be in one row at most, and a message in no row shows nothing. **Add colour** at the bottom adds a row, **Restore defaults** (the (i) next to it explains) puts the default rows back (not the white balance or the wire order - those describe your LEDs, not a look).
 - **About:** read-only. The add-on's version (date and commit it was installed from), the versions of DreamPi's own scripts `dreampi.py`, `netlink.py` and `dcnow.py` (the dates in their `_version=` lines, which DreamPi's auto-update compares), the Raspberry Pi model, the operating system, whether a PIN is set, a link to this project on GitHub, and - once a modem has been detected - its make/model, with a note if it isn't a known-working one.
 - **System** (last): what acts on the Pi or the add-on. At the top is **Modules** with an **Edit** button: it opens a pop-up with every module, a tick box to switch it on or off (the always-on ones say so) and a handle to drag it to a new place; nothing changes until you press **Done**, which saves the order and the switches and reloads the page (Settings stays open). The top of the list has priority (see [Modules](#modules)).
   - **Wi-Fi setup** (Wi-Fi module): starts or stops the same setup the button does, and while it's scanning or hosting, lists the networks it found right here too, as rows with a name, "Secured" or "Open" and the signal strength; tap **Connect** on one, enter its password in the small box if it needs one, and connect (**Other network** is for a hidden one) - which also works if this page is still reachable some other way (for example over Ethernet) while the Wi-Fi is being set up.
@@ -190,44 +187,31 @@ pi=CPU 7%, RAM 142/926MB, 48°C. Uptime 2 h 5 min, IP: 192.168.1.55.
 
 ## LED messages
 
-Every message is configured on its own in **Settings > Status LED**: on or off, colour, effect (and speed), level (brightness) and, with a strip, which LEDs it uses (all, one LED, or a range). Many messages start out with the same look on purpose; they are separate so you can change just one or send it to its own LED. The settings are grouped as System, Network, Call — DCNow!, Call — DCNET, Call — Netlink, plus Wi-Fi setup. The global (maximum) brightness is not on this list; it is in the Calibration pop-up at the top of Settings > Status LED.
+Each row in **Settings > Status LED** is a look (colour, animation, level) and the messages that use it. When any message of a row is true, the row lights; when several rows are lit, the most important message wins (and with a strip, rows that use different LEDs show side by side). When nothing is lit the LEDs are dark, or show the row that has **Off (nothing else applies)**.
 
-**Colours mean something:** DCNow! and DCNET use their network colours (orange and blue by default, changed in Settings > Appearance), purple is Netlink, and **red means something is wrong**, so a failed call is red, not the network's own colour. You can change the other colours per message.
+**Colours mean something:** DCNow! and DCNET use their network colours (orange and blue by default, changed in Settings > Appearance), purple is Netlink, and **red means something is wrong**. Colours keep their hue at every brightness.
 
-| Message | Default look | On by default |
-|---|---|---|
-| **System** | | |
-| Starting up | Amber, blinking slowly | Yes |
-| DreamPi not running | Red, blinking slowly | Yes |
-| Power or heat problem | Red, blinking fast | Yes |
-| State unknown | Dim grey, solid | Yes |
-| **Network** | | |
-| No network | Red, solid | Yes |
-| No internet | Amber, blinking slowly | Yes |
-| Ethernet connected | Green, solid | No |
-| Wi-Fi connected | Light blue, solid | No |
-| Network switching | White, blinking fast | No |
-| **Call — DCNow!** (the network colour, orange) | | |
-| Ready for calls | Orange, solid | Yes |
-| Connecting | Orange, blinking slowly | Yes |
-| In a call | Orange, solid | Yes |
-| Call failed | Red, blinking fast | Yes |
-| **Call — DCNET** | the same with the DCNET colour (blue) | Yes |
-| **Call — Netlink** | the same with purple | No |
-| **Wi-Fi setup** (choose a network / connected / couldn't connect) | Light blue blinking (choose a network) / green solid / red blinking | Yes |
+**The rows you start with:** DCNow! colour solid (*DCNow! selected*, *In a call, DCNow!*), DCNET colour solid (*DCNET selected*, *In a call, DCNET*), purple solid (*In a call, Netlink or other*), the selected network's colour solid (*Ready for calls*), yellow blinking (*Starting up*), red blinking (*DreamPi not running*). Everything else is optional and starts out in no row.
 
-- **What the add-on can tell today:** *Ready for calls* (for the selected network), *In a call* (DCNow!, DCNET, and Netlink for DreamPi's other calls), *Starting up*, *DreamPi not running*, *State unknown*, the network messages except *Network switching*, and Wi-Fi setup. **Connecting, Call failed, Ready for calls — Netlink and Network switching can be set up but never show yet**: DreamPi's state file doesn't say when they happen, and the page marks them *not detected yet* instead of guessing.
-- **Priority** (highest first): Wi-Fi setup, errors (no network, no internet, power or heat, DreamPi not running, call failed), network switching, starting up, in a call, connecting, ready for calls, Ethernet / Wi-Fi connected. **State unknown is the last resort**: it only shows when no other message applies. A message that is switched off shows nothing.
-- **Effects:** Solid and Blink for now (the effects engine was rebuilt from scratch; more animations will be added later). A blink starts lit and runs 50 % on, 50 % off. Colours keep their hue at every brightness: a dimmed orange stays orange and never drifts towards green, and nothing is dithered, so the LED doesn't flicker when a colour changes.
-- **No network:** the Pi has no route to your router, for example because the cable is unplugged or Wi-Fi isn't connected. You can't open the web page then, so the LED is the only thing that can tell you.
-- **No internet:** the Pi reaches your router, but not the internet, or name lookups (DNS) fail.
-- **Power or heat problem:** the Pi reports under-voltage or throttling right now, or is at 80 °C or more.
+| Category | Messages |
+|---|---|
+| DreamPi | Starting up, Ready for calls, DreamPi not running, State unknown (the add-on can't tell what DreamPi is doing; best as a dim last resort) |
+| Calls | In a call: DCNow!, DCNET, Netlink or other |
+| Network selection | DCNow! selected, DCNET selected |
+| Connection and link | No IP address yet (cable or Wi-Fi is up but the router has not given an address), No network, No internet, Internet OK, DNS failing, Ethernet connected, Wi-Fi connected, Weak Wi-Fi signal (-75 dBm or less), Slow connection (200 ms or more on average, or 10 % of the packets lost; measured with ping every 30 seconds) |
+| Modem | Modem plugged in, Modem missing |
+| Raspberry Pi health | Under-voltage, Throttled, Over 80 °C, 70 °C or warmer |
+| Wi-Fi setup | Scanning or hosting, Choose a network, Connecting, Connected, Could not connect |
+| The add-on | Add-on update available, DreamPi update available, Update running, Update done, Update failed, About to reboot |
+| Online players | Your game is played, A friend came online (**not detected yet**: nothing tells the add-on, so they never light) |
+| General | **Everything OK** (no error and no warning), **Error** (DreamPi not running, no network, no internet, under-voltage, over 80 °C, modem missing), **Warning** (DNS failing, slow connection, weak Wi-Fi, no IP address, throttled, warm, a failed Wi-Fi setup or update, an update available), **Off** |
+
+- **Priority** (highest first, roughly): about to reboot, Wi-Fi setup, update result, errors, no IP / no network / no internet, warnings, starting up, in a call, update available, ready for calls, then the plain status messages (selected network, Ethernet, Wi-Fi, internet OK, modem OK, everything OK, state unknown last).
+- **Updates:** nothing checks for updates by itself. *Update available* on the LED is the result of the last **Check now** in Settings > System, kept until the Pi restarts.
+- **Effects:** Solid and Blink for now. A blink starts lit and runs 50 % on, 50 % off.
+- **No network** means the Pi has no route to your router, for example an unplugged cable; you can't open the web page then, so the LED is the only thing that can tell you.
 - **Checking speed:** cables, Wi-Fi and the route are checked every 2 seconds. The internet is checked every 30 seconds while it works, every 5 seconds while it doesn't, and straight away when a connection changes.
-- **Several messages at once:**
-  - On a single LED, or when messages all use all LEDs, the most important one shows.
-  - With a strip, each message draws on its own LEDs, less important ones first, so an error on "All" takes over the whole strip.
-  - Give the errors LED 1 and "Ready for calls" LEDs 2 to 8, and LED 1 stays dark until something goes wrong while 2 to 8 keep showing DreamPi. Or give Ethernet LED 1, Wi-Fi LED 2, DCNow! calls LED 3 and DCNET calls LED 4, and each lights on its own.
-  - LEDs that no active message covers stay dark.
+- **Changed from earlier versions:** the old one-look-per-message settings are replaced by the default rows above (your earlier LED looks are reset once), and the optional messages, such as no network or no internet, show nothing until you add them to a row.
 
 ## Status NeoPixels (optional)
 

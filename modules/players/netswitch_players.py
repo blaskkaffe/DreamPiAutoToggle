@@ -280,7 +280,8 @@ def status():
 
 # ---------------------------------------------------------------- the page's side (loaded by the web service)
 def games_line(players):
-    """["Game (3)", "Other game (1)"], most played first (the carousel shows them joined with a bullet)."""
+    """[{"text": "Game", "n": 3}, {"text": "Other game", "n": 1}], most played first (the carousel shows them joined with a bullet,
+    each count in the subtitle colour)."""
     n, order = {}, []
     for p in players:
         if not p.get("game"):
@@ -290,7 +291,7 @@ def games_line(players):
             order.append(p["game"])
         n[p["game"]] += 1
     order.sort(key=lambda g: -n[g])          # stable: ties keep their order of appearance
-    return ["%s (%d)" % (g, n[g]) for g in order]
+    return [{"text": g, "n": n[g]} for g in order]
 
 
 def view():

@@ -63,11 +63,13 @@ const AUDIT = () => {
     await page.screenshot({ path: `/tmp/dpns-audit-settings-${w}.png`, fullPage: true });
     await page.click('[data-box="system"] .srow:not([data-id]):has-text("Wi-Fi setup") > button'); await page.waitForTimeout(1500);
     // popups
-    await page.evaluate(() => { const b = document.querySelector('#led-rows .fx'); if (b) b.click(); }); await page.waitForTimeout(300); await check('fx popup');
+    await page.click('[data-box="status led"] button[aria-label="Edit this colour"]'); await page.waitForTimeout(300); await check('LED colour edit pop-up');
+    await page.keyboard.press('Escape');
+    await page.click('[data-box="status led"] button[aria-label="Add messages to this colour"]'); await page.waitForTimeout(300); await check('LED add messages pop-up');
     await page.keyboard.press('Escape');
     await page.evaluate(() => { const b = document.querySelector('.wpicker button[aria-label^="Add"]'); if (b) b.click(); }); await page.waitForTimeout(300); await check('numbers add pop-up');
     await page.keyboard.press('Escape');
-    await page.evaluate(() => { const b = document.getElementById('cal-open'); if (b) b.click(); }); await page.waitForTimeout(300); await check('calibration pop-up');
+    await page.click('[data-box="status led"] .srow:has-text("Calibration") > button'); await page.waitForTimeout(300); await check('calibration pop-up');
     await page.keyboard.press('Escape');
     // switch button functions
     await page.click('[data-box="gpio"] .srow:has-text("Button 1") > button'); await page.waitForTimeout(400); await check('GPIO edit pop-up');

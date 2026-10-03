@@ -79,19 +79,26 @@ class LedTests(unittest.TestCase):
     def tearDown(self):
         cleanup(self.tmp)
 
-    def colour_of(self, key):
-        return [m for m in ledconfig.active_messages("ok", {}, False) if m["key"] == key][0]["color"]
+    def look(self, state="ok"):
+        ctx = ledconfig.gather(live=False)
+        ctx["state"] = state
+        return ledconfig.active_messages(ctx)
 
-    def test_led_messages_follow_the_network_colour(self):
-        self.assertEqual(self.colour_of("ready-dcnow"), core.network_colour("dcnow")["led"])
-        core.set_module_colour("switcher", "dcnow", "green")
-        self.assertEqual(self.colour_of("ready-dcnow"), "#00ff00")
-
-    def test_a_colour_saved_for_a_net_bound_message_is_ignored(self):
+    def test_the_network_tokens_follow_the_network_colour(self):
         cfg = ledconfig.led_config()
-        cfg["messages"]["ready-dcnow"]["color"] = "#123456"
+        cfg["groups"] = [{"id": "g1", "colour": "dcnow", "messages": ["sel-dcnow"]}]
         ledconfig.save_led_config(cfg)
-        self.assertEqual(self.colour_of("ready-dcnow"), core.network_colour("dcnow")["led"])
+        self.assertEqual(self.look()[0]["color"], core.network_colour("dcnow")["led"])
+        core.set_module_colour("switcher", "dcnow", "green")
+        self.assertEqual(self.look()[0]["color"], "#00ff00")
+
+    def test_selected_network_token_follows_the_selected_network(self):
+        cfg = ledconfig.led_config()
+        cfg["groups"] = [{"id": "g1", "colour": "network", "messages": ["ready"]}]
+        ledconfig.save_led_config(cfg)
+        self.assertEqual(self.look()[0]["color"], core.network_colour("dcnow")["led"])
+        open(core.FLAG, "w").close()
+        self.assertEqual(self.look()[0]["color"], core.network_colour("dcnet")["led"])
 
 
 class HttpTests(unittest.TestCase):

@@ -23,6 +23,8 @@ ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the op
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
 UPDATE_STATUS = "/tmp/dreampi-netswitch.update"          # running / ok / failed, written by the update script
 UPDATE_LOG = "/tmp/dreampi-netswitch.update.log"
+UPDATE_INFO = "/tmp/dreampi-netswitch.updateinfo"        # {"addon": bool|None, "dreampi": bool, "time"}: the latest check, written by the update module for the LEDs
+REBOOT_MARK = "/tmp/dreampi-netswitch.reboot"            # unix time a reboot was asked for (the LEDs show "about to reboot")
 PLAYERS_SOURCES = os.path.join(BASE_DIR, "players_sources.json")   # JSON addresses for the optional online-players list
 NUMBERS = os.path.join(BASE_DIR, "numbers.json")     # phone numbers per action, edited on the page, read by the hook
 LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness, colours, wire order, white balance
@@ -465,6 +467,58 @@ def wifi_state():
     if data.get("state", "idle") != "idle" and time.time() - data.get("time", 0) > WIFI_STALE:
         return {"state": "idle"}
     return data
+
+
+def update_status():
+    """running / ok / failed, or idle. A finished result is only reported for 10 minutes, so an old update isn't
+    announced for ever (the update module and the LEDs both ask)."""
+    text = (read_file(UPDATE_STATUS) or "").strip()
+    if text not in ("running", "ok", "failed"):
+        return "idle"
+    try:
+        if text != "running" and time.time() - os.path.getmtime(UPDATE_STATUS) > 600:
+            return "idle"
+    except OSError:
+        return "idle"
+    return text
+
+
+def write_update_info(addon, dreampi):
+    """The update module tells the LEDs what its latest check found (addon: True = a newer add-on exists)."""
+    tmp = UPDATE_INFO + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump({"addon": addon, "dreampi": bool(dreampi), "time": time.time()}, f)
+        os.rename(tmp, UPDATE_INFO)
+    except (IOError, OSError):
+        pass
+
+
+def update_info():
+    """{"addon": bool|None, "dreampi": bool} from the latest manual check, {} when there is none (the file is in /tmp: a reboot clears
+    it). Nothing checks for updates by itself, so the answer is kept until the next check."""
+    try:
+        with open(UPDATE_INFO) as f:
+            data = json.load(f)
+        return data
+    except (IOError, OSError, ValueError, AttributeError):
+        return {}
+
+
+def mark_reboot():
+    try:
+        with open(REBOOT_MARK, "w") as f:
+            f.write("%f" % time.time())
+    except (IOError, OSError):
+        pass
+
+
+def reboot_pending():
+    """True for a minute after a reboot was asked for (the Pi is about to go down)."""
+    try:
+        return time.time() - float(read_file(REBOOT_MARK) or "0") < 60
+    except ValueError:
+        return False
 
 
 def _write_net_state(data):

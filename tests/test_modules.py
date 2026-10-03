@@ -162,7 +162,14 @@ class WithEverything(Base):
         custom = led_box["items"][0]
         self.assertEqual(custom["type"], "custom")
         self.assertNotIn("led-count-i", custom["html"])                  # the hardware rows are not in the messages widget
-        self.assertIn('id="led-reset"', custom["html"])                  # but the rest of it is (markup came from messages.html)
+        self.assertIn('id="cal-pop"', custom["html"])                    # but the rest of it is (markup came from messages.html)
+
+    def test_the_about_module_is_listed_as_about_and_moves_its_box(self):
+        got = {m["name"]: m["title"] for m in self.json("/modules")["modules"]}
+        self.assertEqual(got["system"], "About")                                   # the picker row says what it moves
+        core.save_module_order(["system"])                                         # the rest keeps its order after it
+        web.refresh_page(force=True)
+        self.assertEqual([b["id"] for b in layout_of(self.page())["settings"]][0], "about")
 
     def test_protected_paths_are_the_modules_own_post_routes(self):
         import netswitch_modules as mods

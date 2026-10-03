@@ -104,6 +104,15 @@ class CheckTests(unittest.TestCase):
         self.assertTrue(r["newer"])
 
 
+    def test_nothing_checks_for_updates_by_itself(self):
+        calls = []
+        up.fetch = lambda url: calls.append(url) or ""
+        up.status()                                       # the page asking for the status must not start a check
+        time.sleep(0.2)
+        self.assertEqual(calls, [])
+        self.assertEqual(up._info["time"], 0)
+
+
 class UpdateRunTests(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox(up)

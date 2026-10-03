@@ -24,7 +24,6 @@ DEFAULT_REPO = "blaskkaffe/DreamPiAutoToggle"
 DEFAULT_BRANCH = "main"
 DREAMPI_RAW = "https://raw.githubusercontent.com/Kazade/dreampi/master/"   # what DreamPi's own updater follows
 DREAMPI_FILES = ("dreampi.py", "netlink.py", "dcnow.py")
-CHECK_EVERY = 6 * 3600     # re-check at most this often; the page's button forces one
 TIMEOUT = 10
 
 _lock = threading.Lock()
@@ -145,6 +144,8 @@ def check():
         with _lock:
             _info.update(result)
             _info["checking"] = False
+        a, d = result.get("addon"), result.get("dreampi")
+        core.write_update_info(None if not a else a.get("available"), bool(d and d.get("newer")))      # for the LEDs
 
 
 def check_in_background():
@@ -154,17 +155,8 @@ def check_in_background():
 
 
 def update_state():
-    """running / ok / failed, or idle. A finished result is only reported for
-    10 minutes, so the page doesn't announce an old update every time."""
-    text = (core.read_file(core.UPDATE_STATUS) or "").strip()
-    if text not in ("running", "ok", "failed"):
-        return "idle"
-    try:
-        if text != "running" and time.time() - os.path.getmtime(core.UPDATE_STATUS) > 600:
-            return "idle"
-    except OSError:
-        return "idle"
-    return text
+    """running / ok / failed, or idle (a finished result is only reported for 10 minutes: core.update_status())."""
+    return core.update_status()
 
 
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[@-_]")
@@ -198,12 +190,7 @@ def can_update():
 
 
 def status():
-    """What the page shows. Starts a background check when there is none yet
-    or the last one is old."""
-    with _lock:
-        stale = time.time() - _info["time"] > CHECK_EVERY and not _info["checking"]
-    if stale:
-        check_in_background()
+    """What the page shows. Never starts a check: updates are only looked for when the user presses "Check now"."""
     repo, branch, src = source()
     with _lock:
         out = dict(_info)

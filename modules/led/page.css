@@ -1,20 +1,9 @@
-/* Status LED settings (the optional LED module): added to the page only when the module's files are present */
- .ledtab td,.ledtab th{vertical-align:middle}
- .ledtab th{color:var(--muted);font-size:.78em;border-top:0;padding:4px 3px 8px;text-align:center} .ledtab th:first-child{text-align:left}
- .ledtab tbody tr:first-child td{border-top:1px solid var(--line)}
- .ledtab td.c{width:1%;padding:8px 4px;text-align:center}
- .chip{display:inline-block;height:34px;padding:0 4px;border-radius:7px;border:var(--bw) solid var(--ctl-line);background:transparent;color:var(--txt2);font-size:.72em;line-height:1.1;vertical-align:middle}
- .fx{width:74px} .fx small{display:block;color:var(--dim);font-size:.9em} .lvl{width:52px;color:var(--dim)}
- .ledtab td.name{padding-left:0} .ledtab td.name .cbox{margin-right:8px}
- .ledtab td.name .lbl-t{display:inline-block;vertical-align:middle;max-width:calc(100% - 38px)}   /* a wrapped label stays beside its tick box */
- .ledtab tr.grp td{border-top:0;padding:14px 0 4px;color:var(--muted);font-size:.72em;text-transform:uppercase;letter-spacing:.08em}
- .ledtab tr.dis td:not(.name),.ledtab tr.dis .lbl-t{opacity:.35}
- .ledtab .gdot{display:inline-block;width:.7em;height:.7em;border-radius:50%;margin-right:7px;vertical-align:-.05em}   /* the network's own colour next to its call group */
- .ledtab .nd{display:block;color:var(--dim);font-size:.78em;text-transform:none;letter-spacing:0}
- .secrow{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
- .secrow button{padding:6px 12px;font-size:.82em}
- .lvl.on{background:var(--sel);border-color:var(--sel);color:#fff}
+/* Status LED module: only what the page kit has nothing for - the segmented choices and the lists inside the Edit / Add pop-ups */
+ .seg{display:inline-flex;flex-wrap:wrap;gap:6px;justify-content:flex-end} .seg button{padding:6px 12px;font-size:.82em}
+ .seg .sel{background:var(--sel);border-color:var(--sel-line)} .seg button:disabled{opacity:.35;cursor:default}
+ .wrapcol.frow{flex-direction:column;align-items:stretch;gap:8px}
+ .lvl{display:flex;align-items:center;gap:10px;flex:1;max-width:60%} .lvl input{flex:1;min-width:0;accent-color:var(--primary)} .lvl .rv{width:3em;text-align:right;color:var(--txt2)}
+ .addlist .srow.wrap{flex-wrap:nowrap} .addlist .srow > span:first-child{flex:1}
+ .addlist{max-height:55vh;overflow-y:auto;overscroll-behavior:contain;margin:0 -4px 8px;padding:0 4px}
+ .addlist .cathead{margin:12px 0 2px;color:var(--muted);font-size:.72em;text-transform:uppercase;letter-spacing:.08em} .addlist .cathead:first-child{margin-top:0}
  #wb-preview{min-width:10.5em;text-align:center} #wb-preview.on{background:var(--sel);border-color:var(--sel-line)}
- .opts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px} .opts button{padding:6px 12px;font-size:.82em}
- .opts .sel,.secrow .sel{background:var(--sel);border-color:var(--sel-line)}
- .opts button:disabled{opacity:.35;cursor:default}

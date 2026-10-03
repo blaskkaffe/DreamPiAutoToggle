@@ -29,6 +29,7 @@ def start_reboot():
         _spawn_reboot()
     except OSError as e:
         return False, "Could not reboot (%s)" % e
+    core.mark_reboot()                                    # the LEDs say so while the Pi goes down
     core.debug_log("web page: reboot requested%s" % (" (a call was in progress)" if in_call else ""))
     return True, "Rebooting"
 
@@ -56,7 +57,7 @@ def view(r):
             a.get("latest"), " (%s)" % a["latest_date"][:10] if a.get("latest_date") else "",
             ", %d new change%s" % (behind, "s" if behind > 1 else "") if behind else "", a.get("current"))
     elif a and a.get("available") is False:
-        msg = "The add-on is up to date (%s)." % a.get("current")
+        msg = "Up to date (%s)." % a.get("current")
     else:
         msg = (a and a.get("note")) or "Couldn't tell if the add-on is current."
     if a and a.get("note") and a.get("available") is not None and not running and state == "idle":

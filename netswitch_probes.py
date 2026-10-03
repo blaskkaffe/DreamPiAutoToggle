@@ -2,6 +2,7 @@
 # link checks, Pi health, hang up, versions, modem identification, and the
 # checker() loop that publishes them. Works on Python 3 and 2.7.
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -76,7 +77,52 @@ def link_state():
     return {"ethernet": ethernet, "wifi": wifi, "network": route}
 
 
-_net = {"links": None, "internet": {"state": "checking", "text": "Checking...", "time": 0},
+WIFI_WEAK_DBM = -75           # a signal at or below this is "weak" (the same line the Wi-Fi setup list calls Weak)
+LATENCY_HIGH_MS = 200         # an internet connection slower than this (average round trip) or losing this many packets is "slow" for gaming
+LOSS_HIGH_PERCENT = 10
+
+
+def wifi_level():
+    """The signal strength of the Wi-Fi link in dBm (from /proc/net/wireless), or None without Wi-Fi or a reading."""
+    try:
+        with open("/proc/net/wireless") as f:
+            for line in f.readlines()[2:]:
+                parts = line.split()
+                if len(parts) > 3:
+                    return int(float(parts[3].rstrip(".")))
+    except (IOError, OSError, ValueError):
+        pass
+    return None
+
+
+def parse_ping(text):
+    """(average round trip in ms or None, packet loss in percent or None) from the output of ping."""
+    loss = avg = None
+    m = re.search(r"([\d.]+)% packet loss", text)
+    if m:
+        loss = float(m.group(1))
+    m = re.search(r"= [\d.]+/([\d.]+)/[\d.]+", text)
+    if m:
+        avg = float(m.group(1))
+    return avg, loss
+
+
+def ping_quality(host="1.1.1.1"):
+    """Three quick pings: (average ms or None, loss percent or None); (None, None) when ping isn't there or the answer isn't readable."""
+    try:
+        out = subprocess.check_output(["ping", "-c", "3", "-i", "0.3", "-W", "1", host], stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:      # ping exits 1 when some or all of the packets were lost: its text is still the answer
+        out = e.output or b""
+    except OSError:
+        return None, None
+    return parse_ping(out.decode("ascii", "replace"))
+
+
+def is_slow(avg, loss):
+    return bool((loss is not None and loss >= LOSS_HIGH_PERCENT) or (avg is not None and avg >= LATENCY_HIGH_MS))
+
+
+_net = {"links": None, "internet": {"state": "checking", "text": "Checking...", "time": 0}, "quality": (None, None),
         "recheck": threading.Event()}
 
 
@@ -89,6 +135,8 @@ def internet_checker():
             result = {"state": "bad", "text": "No network connection"}
         else:
             result = check_internet()
+        if result["state"] == "ok":
+            _net["quality"] = ping_quality()
         result["time"] = int(time.time())
         _net["internet"] = result
         _net["recheck"].clear()
@@ -472,9 +520,22 @@ def checker():
         with _checks_lock:
             _checks["internet"] = shown
             _checks["pi"] = pi
+        flags = pi.get("throttled")
+        level = wifi_level() if links["wifi"] else None
+        avg, loss = _net["quality"]
         core._write_net_state({"ethernet": links["ethernet"], "wifi": links["wifi"],
                           "network": links["network"], "pi_problem": pi["problem"],
                           "internet": None if internet["state"] == "checking" else internet["state"] == "ok",
+                          # what the LED messages are made from (modules/led/netswitch_ledconfig.py)
+                          "dns_fail": internet["state"] == "warn",
+                          "no_ip": bool((links["ethernet"] or links["wifi"]) and not links["network"]),
+                          "wifi_weak": level is not None and level <= WIFI_WEAK_DBM,
+                          "slow": is_slow(avg, loss) if internet["state"] == "ok" else False,
+                          "modem": modem_plugged(),
+                          "undervoltage": bool(pi.get("undervoltage")),
+                          "throttled": bool(flags is not None and flags & 0x4),
+                          "hot": pi.get("temp") is not None and pi["temp"] >= 80,
+                          "warm": pi.get("temp") is not None and pi["temp"] >= 70,
                           "time": time.time()})
         core.trim_log()
         time.sleep(LINK_EVERY)

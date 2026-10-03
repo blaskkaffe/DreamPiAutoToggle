@@ -3,6 +3,7 @@
          --card:#1b1b1b;--line:#2a2a2a;--muted:#999;
          --ctl:#1a1a1a;--ctl-line:#555;--pop:#262626;--sel:#5b6b7e;--sel-line:#9fb0c4;--dim:#777;--txt2:#ccc;--console:#0b0b0b}
  *{box-sizing:border-box}
+ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}   /* iOS Safari must not enlarge wide, scrolling lines on its own */
  body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#111;color:#eee;max-width:460px;margin:24px auto;padding:0 16px}
  header{position:relative;margin-bottom:16px} h1{text-align:center;margin:0;font-size:1.9em}
  h2{font-size:.8em;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 4px 8px;font-weight:600}
@@ -58,6 +59,7 @@
  .swatches{display:flex;gap:8px;flex:none} .swatch{width:34px;height:34px;padding:0;border-radius:50%;border:var(--bw) solid transparent;background:var(--c);box-shadow:0 0 0 1px rgba(255,255,255,.25) inset}
  .swatches.grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;width:100%;margin-top:6px} .pop .swatches.grid{margin-top:0;gap:10px} .pop .swatches.grid .swatch{max-width:52px} .swatches.grid .swatch{width:100%;height:auto;aspect-ratio:1/1;max-width:36px;justify-self:center}
  .swatch.sel{border-color:#fff} .swatch:focus-visible{outline-offset:3px}
+ @media(max-width:420px){.pop .swatches.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}   /* eight across would make the balls too small to tap on a phone */
  .msg{color:#f99;font-size:.82em} .msg:empty{display:none}
  .pop{display:none;position:absolute;z-index:20;left:16px;right:16px;box-sizing:border-box;padding:12px 16px;border-radius:var(--r);background:var(--pop);box-shadow:0 6px 24px rgba(0,0,0,.6)}
  .pop.open{display:block}   /* its width and left edge are set when it opens (ui.popup): the card's content width, the same for every pop-up */
@@ -92,7 +94,7 @@
  .now.open .carousel{white-space:normal;overflow:visible} .now.open .carousel .trk{animation:none;display:inline} .now.open .carousel .dup,.now.open .carousel .sp{display:none}
  @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
  @media(prefers-reduced-motion:reduce){.carousel.sc .trk{animation:none}.carousel.sc .dup,.carousel.sc .sp{display:none}}
- .now .row.main .v.fill.scrolling{flex:1;min-width:0;overflow:hidden} .carousel{text-align:center} .carousel.sc,.now.open .carousel{text-align:left}
+ .now .row.main .v.fill.scrolling{flex:1;min-width:0;overflow:hidden} .carousel .cn{color:rgba(255,255,255,.65)} .carousel{text-align:center} .carousel.sc,.now.open .carousel{text-align:left}
  .now .status{display:flex;align-items:baseline;min-width:0} .now .status > .dot{flex:none} .now .status > span:last-child{min-width:0}
  .now .pln{white-space:nowrap} .now .pln+.pln{margin-left:.6em}
  .now .wlist.compact{display:block;width:100%;max-height:40vh;overflow-y:auto;overscroll-behavior:contain}
@@ -102,6 +104,8 @@
  .now .links{display:flex;flex-wrap:wrap;gap:6px} .now .links a{color:#fff;opacity:.9;padding:6px 0}
  .now .st{display:block;overflow-wrap:anywhere}
  .pop .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0} .pop .frow > span{color:var(--txt2);font-size:.9em}
+ .btns{display:flex;gap:8px;flex:none} .srow.foot{padding:12px 0 8px}
+ .gdot{display:inline-block;width:.8em;height:.8em;border-radius:50%;margin-right:8px;vertical-align:-.05em;box-shadow:0 0 0 1px rgba(255,255,255,.3) inset}
  .infobtn{flex:none;width:34px;height:34px;padding:0;border-radius:50%;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#ddd;font:italic 600 1.05em Georgia,serif;line-height:1}
  .pop .infotext{font-size:.9em;color:var(--txt2);margin-bottom:10px}
  .tgl{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:4px}
@@ -126,7 +130,7 @@
  @media(min-width:1340px){#settings .in{max-width:1340px}}
  @media(min-width:1780px){#settings .in{max-width:1780px}}
  .srow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);margin:0}
- .card > .srow:first-child,.card > :first-child .srow:first-child{border-top:0} .srow .sub{display:block;margin-top:2px}   /* a divider above every row of a box except its very first, whichever widget (form, table, list) the row comes from */
+ .card > .srow:first-child,.card > :first-child .srow:first-child{border-top:0} .card .after > .srow:first-child{border-top:1px solid var(--line)} .srow .sub{display:block;margin-top:2px}   /* a divider above every row of a box except its very first, whichever widget (form, table, list) the row comes from; a list that follows another row is marked .after */
  .cbox{-webkit-appearance:none;appearance:none;flex:none;display:inline-block;width:30px;height:30px;margin:0;padding:0;border-radius:8px;
        border:var(--bw) solid #777;background:transparent center/18px no-repeat;vertical-align:middle;cursor:pointer}
  .cbox.on,.cbox:checked{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}

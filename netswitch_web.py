@@ -450,4 +450,6 @@ if __name__ == "__main__":
         t.daemon = True
         t.start()
     start_https()
+    refresh_page()
+    modules.start_background()           # modules' own background work (the update check for the LEDs ...)
     Server(("", PORT), Handler).serve_forever()

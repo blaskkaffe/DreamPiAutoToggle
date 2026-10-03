@@ -1,135 +1,123 @@
-// Status LED module, page side: the custom widget "led-messages" of the Status LED box in Settings (markup in messages.html,
-// styles in page.css; layout.json puts it in the box). The LED rows of the GPIO box are a standard form (layout.json).
-// The page builds it when it draws the layout and calls it with the empty host element that holds messages.html; settings
-// opening / closing / Escape reach it through the page's hooks.
-custom("led-messages",function(host,ctx){
-var led=null,ledDefaults=null,ledTimer=null,ledStates=[],ledGroups=[],ledEffects=[],ledCount=1;
-var wbPreviewOn=false,wbHeartbeat=null;
-function loadLed(){var x=new XMLHttpRequest();x.open("GET","/ledconfig",true);
- x.onload=function(){if(x.status!=200)return;var r=JSON.parse(x.responseText);
-  netLed=r.net_led;netBound=r.net_bound;
-  led=r.config;ledDefaults=r.defaults;ledStates=r.states;ledGroups=r.groups;ledEffects=r.effects;ledCount=r.count||1;
-  buildLed()};x.send()}
-// The DCNow! / DCNET messages show the networks' global colour (Settings > Network colours): the server gives its LED value.
-var netLed={},netBound={};
-function colourOf(st){return netBound[st]?netLed[netBound[st]]:msgOf(st).color}
-// Every message is one row of led.messages[key]: on/off, colour, effect + speed, level, LEDs.
-function msgOf(st){return led.messages[st]}
-function shortLabel(l){return l.split(" \u2014 ")[0]}   // the group heading already says DCNow! / DCNET / Netlink
-function buildLed(){
- var html="";
- ledGroups.forEach(function(g){
-  var items=ledStates.filter(function(s){return s[2]==g[0]});if(!items.length)return;
-  var net=g[0]=="call-dcnow"?netLed.dcnow:g[0]=="call-dcnet"?netLed.dcnet:"";
-  html+='<tr class="grp"><td colspan="4">'+(net?'<span class="gdot" style="background:'+net+'"></span>':"")+esc(g[1])+'</td></tr>';
-  items.forEach(function(s){var st=s[0];
-   html+='<tr id="r-'+st+'"><td class="name"><input type="checkbox" class="cbox neutral" id="e-'+st+'" title="Show this message" aria-label="Show '+esc(s[1])+'"><span class="lbl-t">'+esc(shortLabel(s[1]))+
-   (s[7]===false?'<small class="nd">not detected yet</small>':"")+'</span></td>'+
-   '<td class="c"><input type="color" id="c-'+st+'" data-state="'+st+'" aria-label="Colour: '+esc(s[1])+'"></td>'+
-   '<td class="c"><button type="button" class="chip fx" id="f-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'" aria-label="Effect: '+esc(s[1])+'"></button></td>'+
-   '<td class="c"><button type="button" class="chip lvl" id="l-'+st+'" data-state="'+st+'" data-label="'+esc(s[1])+'" aria-label="Level: '+esc(s[1])+'"></button></td></tr>'})});
- $("led-rows").innerHTML=html;
- ledStates.forEach(function(s){var st=s[0];
-  $("c-"+st).addEventListener("input",function(){if(netBound[st])return;msgOf(st).color=this.value;showFx(st);saveLed()});
-  $("e-"+st).onchange=function(){msgOf(st).enabled=this.checked;showRow(st);saveLed()};
-  $("f-"+st).onclick=function(e){e.stopPropagation();openFx(this)};
-  $("l-"+st).onclick=function(e){e.stopPropagation();openLvl(this)}});
- showLed()}
-function effectName(e){for(var i=0;i<ledEffects.length;i++)if(ledEffects[i][0]==e)return ledEffects[i][1];return e}
-function showLed(){$("led-bright").value=brightToSlider(led.max_brightness);$("led-bright-v").textContent=pct(led.max_brightness);
- showWb();
- ledStates.forEach(function(s){var st=s[0],c=msgOf(st);
-  $("c-"+st).value=colourOf(st);$("c-"+st).disabled=!!netBound[st];$("c-"+st).title=netBound[st]?"The network's colour: change it in Settings > Network colours":"";$("e-"+st).checked=c.enabled!==false;showRow(st);showFx(st);showLvl(st)})}
-function showWb(){["r","g","b"].forEach(function(c){var v=Math.round(led.white_balance[c]*255);
- $("wb-"+c).value=v;$("wb-"+c+"-v").textContent=v})}
-function showRow(st){$("r-"+st).className=msgOf(st).enabled===false?"dis":""}
-function ledsText(L){return L[0]==L[1]?"LED "+L[0]:"LEDs "+L[0]+"-"+L[1]}
-function showFx(st){var el=$("f-"+st);if(!el)return;var c=msgOf(st);
- var sub=[];if(c.effect!="solid")sub.push(c.speed);if(ledCount>1&&c.leds)sub.push(ledsText(c.leds));
- el.innerHTML=esc(effectName(c.effect))+(sub.length?"<small>"+sub.join(" \u00b7 ")+"</small>":"")}
-function showLvl(st){var el=$("l-"+st);if(!el)return;var b=msgOf(st).brightness,own=b!==null&&b!==undefined;
- el.className="chip lvl"+(own?" on":"");el.textContent=pct(own?b:led.max_brightness)}
-// The three pop-ups (the effect menu, the level slider, the calibration) are page-kit pop-ups: opening one closes the others
-// and Esc, a click elsewhere or leaving Settings closes it. Each tells us when it closes so the state it edited is let go.
-var lvlCur=null,fxCur=null;
-var fxPop=ui.popup($("fx-pop")),lvlPop=ui.popup($("lvl-pop")),calPop=ui.popup($("cal-pop"));
-fxPop.onclose=function(){fxCur=null};
-lvlPop.onclose=function(){lvlCur=null};
-calPop.onclose=function(){if(wbPreviewOn)setWbPreview(false)};   // the white test ends with the pop-up
-function closePops(){ui.closePopups()}
-$("cal-open").onclick=function(e){if(!calPop.isOpen())showWb();calPop.toggle(this,e)};
-$("cal-done").onclick=closePops;
-var secMode="all";   // what the LEDs buttons of the open effect popup show: all | one | range
-function openFx(el){var st=el.dataset.state,c=msgOf(st);fxCur=st;
- $("fx-t").textContent=el.dataset.label;
- $("fx-opts").innerHTML=ledEffects.filter(function(e){return !e[2]||ledCount>1||e[0]==c.effect}).map(function(e){
-  return '<button type="button" class="pill-s" data-fx="'+e[0]+'">'+esc(e[1])+'</button>'}).join("");
- Array.prototype.forEach.call($("fx-opts").querySelectorAll("button"),function(b){b.onclick=function(){c.effect=b.dataset.fx;fxMark();saveLed()}});
- $("fx-sec").style.display=$("fx-sec-in").style.display=ledCount>1?"flex":"none";
- $("sec-a").max=$("sec-b").max=ledCount;
- secMode=!c.leds?"all":c.leds[0]==c.leds[1]?"one":"range";
- fxMark();fxPop.open(el)}
-function fxMark(){if(!fxCur)return;var c=msgOf(fxCur),fixed=c.effect=="solid";
- Array.prototype.forEach.call($("fx-opts").querySelectorAll("button"),function(b){b.className="pill-s"+(b.dataset.fx==c.effect?" sel":"")});
- Array.prototype.forEach.call($("fx-speed").querySelectorAll("button"),function(b){b.disabled=fixed;
-  b.className="pill-s"+(!fixed&&b.dataset.speed==c.speed?" sel":"")});
- var L=c.leds;
- $("sec-all").className="pill-s"+(secMode=="all"?" sel":"");$("sec-one").className="pill-s"+(secMode=="one"?" sel":"");$("sec-range").className="pill-s"+(secMode=="range"?" sel":"");
- $("fx-sec-in").style.display=(ledCount>1&&secMode!="all")?"flex":"none";
- $("sec-b").style.display=$("sec-to").style.display=secMode=="range"?"":"none";
- $("sec-a").setAttribute("aria-label",secMode=="range"?"First LED":"LED");
- $("sec-a").value=L?L[0]:"";$("sec-b").value=L?L[1]:"";$("sec-a").placeholder="1";$("sec-b").placeholder=ledCount;
- showFx(fxCur)}
-function setLeds(first,last){if(!fxCur)return;
- first=Math.max(1,Math.min(ledCount,first));last=Math.max(first,Math.min(ledCount,last));
- msgOf(fxCur).leds=[first,last];fxMark();saveLed()}
-$("sec-all").onclick=function(){if(!fxCur)return;secMode="all";msgOf(fxCur).leds=null;fxMark();saveLed()};
-$("sec-one").onclick=function(){if(!fxCur)return;var L=msgOf(fxCur).leds;secMode="one";setLeds(L?L[0]:1,L?L[0]:1)};
-$("sec-range").onclick=function(){if(!fxCur)return;var L=msgOf(fxCur).leds;secMode="range";
- var a=L?L[0]:1,b=L&&L[1]>L[0]?L[1]:Math.min(ledCount,a+1);setLeds(a,b)};
-function secInput(){if(!fxCur)return;var a=parseInt($("sec-a").value,10),b=parseInt($("sec-b").value,10);
- if(isNaN(a)&&isNaN(b))return;if(isNaN(a))a=1;if(isNaN(b))b=ledCount;
- if(secMode=="one")b=a;
- setLeds(Math.min(a,b),Math.max(a,b))}
-$("sec-a").onchange=$("sec-b").onchange=secInput;
-Array.prototype.forEach.call($("fx-speed").querySelectorAll("button"),function(b){b.onclick=function(){
- if(!fxCur)return;msgOf(fxCur).speed=b.dataset.speed;fxMark();saveLed()}});
-$("fx-done").onclick=closePops;
-function openLvl(el){var st=el.dataset.state,c=msgOf(st);
- if(c.brightness===null||c.brightness===undefined){c.brightness=led.max_brightness;showLvl(st);saveLed()}
- lvlCur=st;
- $("lvl-t").textContent=el.dataset.label;
- $("lvl-r").style.accentColor=colourOf(st);$("lvl-r").value=brightToSlider(c.brightness);$("lvl-v").textContent=pct(c.brightness);
- lvlPop.open(el)}
-$("lvl-r").oninput=function(){if(!lvlCur)return;var b=Math.round(sliderToBright(this.value)*1000)/1000;
- msgOf(lvlCur).brightness=b;$("lvl-v").textContent=pct(b);showLvl(lvlCur);saveLed()};
-$("lvl-base").onclick=function(){if(!lvlCur)return;msgOf(lvlCur).brightness=null;showLvl(lvlCur);saveLed();closePops()};
-$("lvl-done").onclick=closePops;
-["r","g","b"].forEach(function(c){$("wb-"+c).oninput=function(){
- led.white_balance[c]=Math.round(this.value)/255;$("wb-"+c+"-v").textContent=Math.round(this.value);saveLed()}});
-function setWbPreview(on){wbPreviewOn=on;$("wb-preview").classList.toggle("on",on);
- $("wb-preview").textContent=on?"Stop preview":"Preview on LED";
- clearInterval(wbHeartbeat);
- var x=new XMLHttpRequest();x.open("POST",on?"/wbtest":"/wbtestdone",true);x.setRequestHeader("X-Requested-With","netswitch");x.send();
- if(on)wbHeartbeat=setInterval(function(){
-  var h=new XMLHttpRequest();h.open("POST","/wbtest",true);h.setRequestHeader("X-Requested-With","netswitch");h.send()},1000)}
-$("wb-preview").onclick=function(){setWbPreview(!wbPreviewOn)};
-$("wb-reset").onclick=function(){led.white_balance={r:1,g:1,b:1};showWb();saveLed()};
-function saveLed(){clearTimeout(ledTimer);ledTimer=setTimeout(function(){
- var x=new XMLHttpRequest();x.open("POST","/ledconfig",true);x.setRequestHeader("X-Requested-With","netswitch");x.setRequestHeader("Content-Type","application/json");
- x.onload=function(){if(x.status!=200)return;ctx.saved();refresh()};x.send(JSON.stringify(led))},250)}
-// Logarithmic slider: the left half covers 0-9 %, where an indicator LED is most useful.
+// Status LED module, page side: the custom widget "led-groups" of the Status LED box (layout.json; markup of the calibration
+// pop-up in messages.html, styles in page.css). It shows the colour groups: each row is one look (colour, effect, level, LEDs) with
+// the messages that use it listed under it; Edit changes the look, Add puts more messages into the row, and new rows are added
+// at the bottom. The rows, buttons, tags and pop-ups are the page's standard ones (editRow, footRow, ui.popup).
+custom("led-groups",function(host,ctx){
+var cfg=null,defaults=null,messages=[],cats=[],priority=[],colours={palette:[],tokens:[]},tokenUi={},effects=[],ledCount=1,timer=null;
+var byKey={},rowOf={},wbOn=false,wbBeat=null;
+var calRow=editRow({title:"Calibration",button:"Adjust"}),list=h("div",{"class":"after"}),
+ addGroup=h("button",{type:"button","class":"pill-s",text:"Add colour"}),restore=h("button",{type:"button","class":"pill-s",text:"Restore defaults"}),
+ foot=footRow([addGroup,restore]);
+calRow.setSub("White balance and maximum brightness");
+var calPop=document.getElementById("cal-pop");
+host.insertBefore(calRow.el,calPop);host.insertBefore(list,calPop);host.insertBefore(foot.el,calPop);
+var editPop=h("div",{"class":"gpop"}),addPop=h("div",{"class":"gpop"});host.appendChild(editPop);host.appendChild(addPop);
+var pCal=ui.popup(calPop),pEdit=ui.popup(editPop),pAdd=ui.popup(addPop),editing=null,adding=null;
+pEdit.onclose=function(){editing=null};pAdd.onclose=function(){adding=null};
+pCal.onclose=function(){if(wbOn)setWb(false)};                              // the white test ends with the pop-up
+// ---- loading and saving
+function load(){xhrJson("GET","/ledconfig",function(r){if(!r)return;
+ cfg=r.config;defaults=r.defaults;messages=r.messages;cats=r.categories;priority=r.priority;colours=r.colours;tokenUi=r.token_ui;effects=r.effects;ledCount=r.count||1;
+ byKey={};messages.forEach(function(m){byKey[m.key]=m});
+ paintAll();showCal()})}
+function save(){clearTimeout(timer);timer=setTimeout(function(){
+ post("/ledconfig",cfg,function(r){if(r)ctx.saved();refresh()})},250)}
+// ---- the rows
+function colourOf(g){for(var i=0;i<colours.palette.length;i++)if(colours.palette[i].id===g.colour)return colours.palette[i];
+ for(var j=0;j<colours.tokens.length;j++)if(colours.tokens[j].id===g.colour)return {id:g.colour,name:colours.tokens[j].name,ui:tokenUi[g.colour]};
+ return {id:g.colour,name:g.colour,ui:"#888"}}
+function effectName(g){var n=g.effect;effects.forEach(function(e){if(e[0]===g.effect)n=e[1]});return g.effect==="solid"?n.toLowerCase():g.speed+" "+n.toLowerCase()}
+function pct(b){var v=b*100;return (v<10&&v>0?String(parseFloat(v.toFixed(1))):Math.round(v))+"%"}
+function ledsText(L){return L[0]===L[1]?"LED "+L[0]:"LEDs "+L[0]+"-"+L[1]}
+function groupSub(g){var t=[g.brightness===null||g.brightness===undefined?"Global level "+pct(cfg.max_brightness):"Level "+pct(g.brightness)];
+ if(ledCount>1&&g.leds)t.push(ledsText(g.leds));return t.join(" \u00b7 ")}
+function paintRow(g,r){var c=colourOf(g);r.setTitle(c.name+", "+effectName(g));r.setDot(c.ui);r.setSub(groupSub(g));
+ r.setList(g.messages.map(function(k){return byKey[k]?byKey[k].label:k}),function(i){g.messages.splice(i,1);paintAll();save()})}
+function paintAll(){if(!cfg)return;list.innerHTML="";rowOf={};
+ cfg.groups.forEach(function(g){var r=editRow({title:"",button:"Edit",button2:"Add",aria:"Edit this colour",aria2:"Add messages to this colour"});
+  paintRow(g,r);rowOf[g.id]=r;
+  r.btn.onclick=function(e){openEdit(g,r.btn,e)};r.btn2.onclick=function(e){openAdd(g,r.btn2,e)};list.appendChild(r.el)});
+ sh(list,cfg.groups.length>0);
+ addGroup.disabled=cfg.groups.length>=24;
+ foot.setInfo(infoText());
+ if(editing)fillEdit(editing);if(adding)fillAdd(adding)}
+function infoText(){var order=priority.filter(function(k){return byKey[k]&&k!=="off"}).map(function(k){return byKey[k].label}).join(", ");
+ return "Each row is a look: a colour, an animation (solid or blinking), a level and, on a strip, which LEDs. Add messages to a row to give them that look; a message can be in one row only, and a message in no row never lights the LEDs.\n"+
+  "When several messages are true at once on the same LEDs, the most important one shows. Most important first: "+order+"."}
+// ---- Edit: the look of one row
 var LOG_BASE=100;
 function sliderToBright(p){return (Math.pow(LOG_BASE,p/1000)-1)/(LOG_BASE-1)}
 function brightToSlider(b){return Math.round(1000*Math.log(1+b*(LOG_BASE-1))/Math.log(LOG_BASE))}
-function pct(b){var v=b*100;return (v<10&&v>0?v.toFixed(1):Math.round(v))+"%"}
-$("led-bright").oninput=function(){led.max_brightness=Math.round(sliderToBright(this.value)*1000)/1000;$("led-bright-v").textContent=pct(led.max_brightness);
- ledStates.forEach(function(s){showLvl(s[0])});saveLed()};
-$("led-reset").onclick=function(){var order=led.order,wb=led.white_balance;   // wiring facts, not a look to reset
- led=JSON.parse(JSON.stringify(ledDefaults));led.order=order;led.white_balance=wb;showLed();saveLed()};
-// hooks of the base page
-hook("settingsOpen",loadLed);                                                // Settings opened
-hook("settingsClose",function(){if(wbPreviewOn)setWbPreview(false)});   // Settings closed (the pop-ups close themselves)
-// the LED count is set in the GPIO box: follow it
-hook("api",function(d){if(led&&d.led&&d.led.count&&d.led.count!==ledCount){ledCount=d.led.count;buildLed()}});
+function openEdit(g,btn,e){if(pEdit.isOpen()&&editing===g){pEdit.toggle(btn,e);return}editing=g;fillEdit(g);pEdit.toggle(btn,e)}
+function seg(options,current,onPick,disabled){var box=h("span",{"class":"seg"});
+ options.forEach(function(o){var b=h("button",{type:"button","class":"pill-s"+(o[0]===current?" sel":""),text:o[1]});b.disabled=!!disabled;b.onclick=function(){onPick(o[0])};box.appendChild(b)});return box}
+function fillEdit(g){editPop.innerHTML="";var c=colourOf(g);
+ editPop.appendChild(h("div",{"class":"t",text:"Colour, animation and level"}));
+ // colour: the palette, then the colours that follow the networks
+ var grid=h("span",{"class":"swatches grid"});
+ colours.palette.filter(function(x){return x.id.indexOf("bright-")!==0}).concat(colours.palette.filter(function(x){return x.id.indexOf("bright-")===0})).forEach(function(x){
+  var b=h("button",{type:"button","class":"swatch"+(g.colour===x.id?" sel":""),style:"--c:"+x.ui,"aria-label":x.name});
+  b.onclick=function(){g.colour=x.id;paintAll();save()};grid.appendChild(b)});
+ editPop.appendChild(h("div",{"class":"frow wrapcol"},[h("span",{text:"Colour: "+c.name}),grid]));
+ editPop.appendChild(h("div",{"class":"frow"},[h("span",{text:"Or a network colour"}),
+  seg(colours.tokens.map(function(t){return [t.id,t.name]}),g.colour,function(v){g.colour=v;paintAll();save()})]));
+ editPop.appendChild(h("div",{"class":"frow"},[h("span",{text:"Animation"}),seg(effects.map(function(e){return [e[0],e[1]]}),g.effect,function(v){g.effect=v;paintAll();save()})]));
+ editPop.appendChild(h("div",{"class":"frow"},[h("span",{text:"Speed"}),seg([["slow","Slow"],["fast","Fast"]],g.speed,function(v){g.speed=v;paintAll();save()},g.effect==="solid")]));
+ var own=g.brightness!==null&&g.brightness!==undefined,val=h("span",{"class":"rv",text:pct(own?g.brightness:cfg.max_brightness)}),
+  slider=h("input",{type:"range",min:0,max:1000,step:1,"aria-label":"Level"}),useGlobal=h("button",{type:"button","class":"pill-s",text:"Use global"});
+ slider.value=brightToSlider(own?g.brightness:cfg.max_brightness);useGlobal.disabled=!own;
+ slider.oninput=function(){g.brightness=Math.round(sliderToBright(slider.value)*1000)/1000;setText(val,pct(g.brightness));useGlobal.disabled=false;paintRow(g,rowOf[g.id]);save()};
+ useGlobal.onclick=function(){g.brightness=null;paintAll();save()};
+ editPop.appendChild(h("div",{"class":"frow"},[h("span",{text:"Level"}),h("span",{"class":"lvl"},[slider,val])]));
+ editPop.appendChild(h("div",{"class":"frow"},[h("span",{"class":"sub",text:own?"Its own level":"Uses the global level from Calibration"}),useGlobal]));
+ if(ledCount>1){   // a strip: which LEDs this look uses
+  var mode=!g.leds?"all":g.leds[0]===g.leds[1]?"one":"range",a=h("input",{type:"number",min:1,max:ledCount,"aria-label":"First LED"}),b=h("input",{type:"number",min:1,max:ledCount,"aria-label":"Last LED"});
+  function setL(x,y){x=Math.max(1,Math.min(ledCount,x));y=Math.max(x,Math.min(ledCount,y));g.leds=[x,y];paintAll();save()}
+  var L=g.leds;a.value=L?L[0]:"";b.value=L?L[1]:"";
+  a.onchange=b.onchange=function(){var x=parseInt(a.value,10),y=parseInt(b.value,10);if(isNaN(x))x=1;if(isNaN(y)||mode==="one")y=x;setL(Math.min(x,y),Math.max(x,y))};
+  editPop.appendChild(h("div",{"class":"frow"},[h("span",{text:"LEDs"}),seg([["all","All"],["one","One"],["range","Range"]],mode,function(v){
+   if(v==="all"){g.leds=null;paintAll();save()}else if(v==="one"){setL(g.leds?g.leds[0]:1,g.leds?g.leds[0]:1)}else{var s=g.leds?g.leds[0]:1;setL(s,g.leds&&g.leds[1]>s?g.leds[1]:Math.min(ledCount,s+1))}})]));
+  if(mode!=="all")editPop.appendChild(h("div",{"class":"frow"},[h("span",{"class":"sub",text:mode==="one"?"LED number":"From and to"}),h("span",{"class":"ctls"},mode==="one"?[a]:[a,b])]))}
+ var rm=h("button",{type:"button","class":"pill-s danger",text:"Remove"}),done=h("button",{type:"button","class":"pill-s",text:"Done"});
+ rm.onclick=function(){var i=cfg.groups.indexOf(g);if(i>=0)cfg.groups.splice(i,1);pEdit.close();paintAll();save()};
+ done.onclick=function(){pEdit.close()};
+ editPop.appendChild(h("div",{"class":"bar"},[rm,done]))}
+// ---- Add: pick messages for a row (only those that are in no row yet)
+function openAdd(g,btn,e){if(pAdd.isOpen()&&adding===g){pAdd.toggle(btn,e);return}adding=g;fillAdd(g);pAdd.toggle(btn,e)}
+function fillAdd(g){addPop.innerHTML="";var used={},box=h("div",{"class":"addlist"}),any=false;
+ cfg.groups.forEach(function(x){x.messages.forEach(function(k){used[k]=true})});
+ addPop.appendChild(h("div",{"class":"t",text:"Add messages to "+colourOf(g).name+", "+effectName(g)}));
+ cats.forEach(function(cat){var free=messages.filter(function(m){return m.category===cat[0]&&!used[m.key]});if(!free.length)return;any=true;
+  box.appendChild(h("div",{"class":"cathead",text:cat[1]}));
+  free.forEach(function(m){var r=editRow({title:m.label,button:"Add",aria:"Add "+m.label});
+   r.setSub(m.description+(m.detected?"":" (Not detected yet.)"));
+   r.btn.onclick=function(){g.messages.push(m.key);paintAll();save()};box.appendChild(r.el)})});
+ if(!any)box.appendChild(h("div",{"class":"sub",text:"Every message is in a row already."}));
+ addPop.appendChild(box);
+ var done=h("button",{type:"button","class":"pill-s",text:"Done"});done.onclick=function(){pAdd.close()};
+ addPop.appendChild(h("div",{"class":"bar end"},[done]))}
+// ---- the foot: a new row, back to the defaults
+addGroup.onclick=function(){var used={};cfg.groups.forEach(function(g){used[g.colour]=true});
+ var first=colours.palette.filter(function(c){return !used[c.id]&&c.id.indexOf("bright-")!==0})[0]||colours.palette[0];
+ var g={id:"g"+Date.now().toString(36),colour:first.id,effect:"solid",speed:"slow",brightness:null,leds:null,messages:[]};
+ cfg.groups.push(g);paintAll();save();var r=rowOf[g.id];if(r)openEdit(g,r.btn,{stopPropagation:function(){}})};
+restore.onclick=function(){if(!confirm("Put the colour rows back as they were when the add-on was installed? Calibration is kept."))return;
+ cfg.groups=JSON.parse(JSON.stringify(defaults.groups));pEdit.close();pAdd.close();paintAll();save()};
+// ---- Calibration: white balance and the global level (a pop-up like the others)
+function showCal(){["r","g","b"].forEach(function(c){var v=Math.round(cfg.white_balance[c]*255);$("wb-"+c).value=v;$("wb-"+c+"-v").textContent=v});
+ $("led-bright").value=brightToSlider(cfg.max_brightness);$("led-bright-v").textContent=pct(cfg.max_brightness)}
+calRow.btn.onclick=function(e){if(!pCal.isOpen())showCal();pCal.toggle(calRow.btn,e)};
+$("cal-done").onclick=function(){pCal.close()};
+["r","g","b"].forEach(function(c){$("wb-"+c).oninput=function(){cfg.white_balance[c]=Math.round(this.value)/255;$("wb-"+c+"-v").textContent=Math.round(this.value);save()}});
+function setWb(on){wbOn=on;$("wb-preview").classList.toggle("on",on);$("wb-preview").textContent=on?"Stop preview":"Preview on LED";
+ clearInterval(wbBeat);
+ var x=new XMLHttpRequest();x.open("POST",on?"/wbtest":"/wbtestdone",true);x.setRequestHeader("X-Requested-With","netswitch");x.send();
+ if(on)wbBeat=setInterval(function(){var q=new XMLHttpRequest();q.open("POST","/wbtest",true);q.setRequestHeader("X-Requested-With","netswitch");q.send()},1000)}
+$("wb-preview").onclick=function(){setWb(!wbOn)};
+$("wb-reset").onclick=function(){cfg.white_balance={r:1,g:1,b:1};showCal();save()};
+$("led-bright").oninput=function(){cfg.max_brightness=Math.round(sliderToBright(this.value)*1000)/1000;$("led-bright-v").textContent=pct(cfg.max_brightness);paintAll();save()};
+// ---- the page's hooks
+hook("settingsOpen",load);
+hook("settingsClose",function(){if(wbOn)setWb(false)});
+hook("api",function(d){if(cfg&&d.led&&d.led.count&&d.led.count!==ledCount){ledCount=d.led.count;paintAll()}});
 });
