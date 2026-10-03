@@ -1,7 +1,9 @@
 {
  "settings": [
   {"box": "favorites", "title": "Favorite players and games", "items": [
-   {"type": "picker", "source": "/players/favorites"}]}
+   {"type": "picker", "source": "/players/favorites"}]},
+  {"box": "appearance", "title": "Appearance", "items": [
+   {"type": "row", "title": "Online players colour", "sub": "Module", "control": {"type": "swatches", "key": "players", "tint": true, "title": "Colour of the online players box"}}]}
  ],
  "dashboard": [
   {"box": "players", "items": [
@@ -11,10 +13,6 @@
                                     "row": {"title": "title", "sub": "sub", "tag": "tag", "tag_colour": "colour"}}},
     {"label": "Status", "value": {"type": "text", "text": "@players.status"}},
     {"label": "Links", "value": {"type": "links", "items": "@players.links"}}]}]}
- ],
- "settings": [
-  {"box": "appearance", "title": "Appearance", "items": [
-   {"type": "row", "title": "Online players colour", "sub": "Module", "control": {"type": "swatches", "key": "players", "tint": true, "title": "Colour of the online players box"}}]}
  ],
  "data": {"players": {"url": "/players", "every": 60, "retry": 2, "retry_if": "retry"}}
 }

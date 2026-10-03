@@ -101,6 +101,19 @@ class Base(unittest.TestCase):
 
 
 class RepoModules(unittest.TestCase):
+    def test_no_json_file_of_a_module_repeats_a_key(self):
+        """A repeated key is silently dropped by JSON (the last wins): two "settings" lists once lost a whole box after a merge."""
+        def no_dupes(pairs):
+            keys = [k for k, _ in pairs]
+            self.assertEqual(len(keys), len(set(keys)), "repeated key in %s" % keys)
+            return dict(pairs)
+        for n in ALL:
+            for fn in ("module.json", "layout.json"):
+                path = os.path.join(REAL_MODULES, n, fn)
+                if os.path.exists(path):
+                    with open(path) as f:
+                        json.load(f, object_pairs_hook=no_dupes)
+
     def test_the_modules_are_there_and_well_formed(self):
         self.assertEqual(sorted(n for n in os.listdir(REAL_MODULES) if os.path.isdir(os.path.join(REAL_MODULES, n)) and n != "__pycache__"), ALL)
         for n in ALL:
