@@ -75,12 +75,12 @@
  ],
  "settings": [
   {
-   "box": "network colours",
-   "title": "Network colours",
+   "box": "appearance",
+   "title": "Appearance",
    "items": [
     {
      "type": "row",
-     "title": "DCNow!",
+     "title": "DCNow! colour",
      "control": {
       "type": "swatches",
       "key": "dcnow",
@@ -89,7 +89,7 @@
     },
     {
      "type": "row",
-     "title": "DCNET",
+     "title": "DCNET colour",
      "control": {
       "type": "swatches",
       "key": "dcnet",

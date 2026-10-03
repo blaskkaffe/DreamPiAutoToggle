@@ -25,7 +25,8 @@ ui.popup=function(el){
  p.isOpen=function(){return el.classList.contains("open")};
  p.open=function(anchor){ui.closePopups(p);p.anchor=anchor;var par=host();el.classList.add("open");
   var box=par.getBoundingClientRect(),r=anchor.getBoundingClientRect();
-  el.style.left=Math.max(0,Math.min(r.right-box.left-el.offsetWidth,box.width-el.offsetWidth))+"px";
+  var cs=window.getComputedStyle(par),padL=parseFloat(cs.paddingLeft)||0,padR=parseFloat(cs.paddingRight)||0;
+  el.style.left=padL+"px";el.style.width=(box.width-padL-padR)+"px";     // every pop-up spans the card between its left and right padding
   el.style.top=(r.bottom-box.top+6)+"px"};
  p.close=function(){if(!p.isOpen())return;el.classList.remove("open");p.anchor=null;if(p.onclose)p.onclose()};
  p.toggle=function(anchor,e){if(e&&e.stopPropagation)e.stopPropagation();if(p.isOpen()&&p.anchor===anchor)p.close();else p.open(anchor)};

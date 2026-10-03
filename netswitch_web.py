@@ -45,7 +45,7 @@ def api_state():
     else is added by the enabled modules' api() hooks (the network switcher adds the network and the status rows)."""
     warnings = ["Module %s is not loaded: %s" % (name, why) for name, why in sorted(modules.errors().items())]
     d = {"pin": security.pin_required(),     # the page asks for it before update / restart / Wi-Fi connect
-         "colours": modules.live_colours(), "primary": {},
+         "colours": modules.live_colours(), "primary": {}, "enabled": modules.enabled_map(),
          "warnings": warnings, "now": int(time.time())}
     modules.apply_api(d, warnings)          # what the enabled modules add: network, status, debug, wifi, the dot's LED look ...
     return d

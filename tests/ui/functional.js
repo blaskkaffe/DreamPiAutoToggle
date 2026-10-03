@@ -39,12 +39,23 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await page.evaluate(() => document.body.classList.contains('c-blue')), "the page's primary colour is the selected network's (blue)");
   await page.locator('.pill').nth(0).click(); await settle(1500);
   ok(await page.evaluate(() => document.body.classList.contains('c-orange')), 'and back to orange for DCNow!');
+  // ---- the two network buttons keep their own colours whichever network is selected
+  const pillCols = async () => page.locator('.pill').evaluateAll(els => els.map(e => getComputedStyle(e).backgroundColor + '|' + e.className));
+  const pc0 = await pillCols();
+  await page.locator('.pill').nth(1).click(); await settle(1800);
+  const pc1 = await pillCols();
+  ok(pc0.join() === pc1.join(), 'selecting DCNET changes neither button (' + pc0.map(x => x.split('|')[0]).join(' / ') + ')');
+  await page.locator('.pill').nth(0).click(); await settle(1500);
   // ---- the module's own colour choice (swatches from the global palette)
   await openSettings();
-  const colourBtn = page.locator('[data-box="network colours"] .colourpick > button').first();     // the DCNow! row
+  const colourBtn = page.locator('[data-box="appearance"] .colourpick > button').first();     // the DCNow! row
   ok(await colourBtn.evaluate(e => e.classList.contains('c-orange') && getComputedStyle(e).backgroundColor !== getComputedStyle(document.querySelector('.pill-s:not(.pri)')).backgroundColor), 'the Colour button shows the chosen colour (orange)');
   await colourBtn.click(); await settle(400);
   const swatches = page.locator('.pop.open .swatches .swatch');
+  const popGeo = async () => page.evaluate(() => { const p = document.querySelector('.pop.open'), c = p.closest('.card'), cs = getComputedStyle(c), pr = p.getBoundingClientRect(), cr = c.getBoundingClientRect();
+    return { left: Math.round(pr.left - cr.left - parseFloat(cs.paddingLeft)), right: Math.round(cr.right - parseFloat(cs.paddingRight) - pr.right), w: Math.round(pr.width) }; });
+  const gp1 = await popGeo();
+  ok(Math.abs(gp1.left) <= 1 && Math.abs(gp1.right) <= 1, 'the colour pop-up spans the card between its left and right padding (' + JSON.stringify(gp1) + ')');
   ok(await swatches.count() === 16, 'it opens a pop-up with the 16 palette colours');
   ok(await page.locator('.pop.open .swatch.sel').count() === 1 && await page.locator('.pop.open .swatch.sel').getAttribute('data-id') === 'orange', 'the current colour is marked');
   await swatches.nth(7).click(); await settle(1500);                       // pink (the 8 normal colours come first, then the bright ones)
@@ -56,6 +67,9 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   // ---- the picker table (phone numbers)
   const group = page.locator('.wpicker .srow').first();
   await group.locator('button').first().click();
+  const gp2 = await popGeo();
+  ok(Math.abs(gp1.w - gp2.w) <= 1, 'and every pop-up has the same width (' + gp1.w + ' and ' + gp2.w + ')');
+  ok(Math.abs(gp2.left) <= 1 && Math.abs(gp2.right) <= 1, 'the add-number pop-up does too');
   await page.fill('.pop.open input', '5551234'); await page.click('.pop.open .pill-s'); await settle(900);
   ok(await page.locator('.wpicker .tag', { hasText: '5551234' }).count() === 1, 'a number is added to its group');
   await page.locator('.wpicker .tag', { hasText: '5551234' }).locator('button').click(); await settle(900);
@@ -70,45 +84,64 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   // ---- shared boxes: wifi, system and the update rows are one box
   ok(await page.locator('[data-box="system"]').count() === 1, 'one System box is shared by several modules');
   const boxIds = await page.locator('#set-boxes [data-box]').evaluateAll(els => els.map(e => e.getAttribute('data-box')));
-  ok(boxIds.slice(-3).join() === 'modules,about,system', 'Settings ends with Modules, About and System (last): ' + boxIds.join(' | '));
+  ok(boxIds.slice(-2).join() === 'about,system', 'Settings ends with About and System (last): ' + boxIds.join(' | '));
+  ok(boxIds.includes('appearance') && !boxIds.includes('modules') && !boxIds.includes('network colours'), 'the colours are in Appearance, and the modules have no box of their own');
   ok(await page.locator('[data-box="gpio"] .wform').count() >= 2, 'and one GPIO box holds the forms of the buttons and the LED');
-  // ---- the module picker: drag a module by its handle, move one with the keyboard, switch one off
-  const order = async () => page.locator('[data-box="modules"] .srow[data-id]').evaluateAll(els => els.map(e => e.getAttribute('data-id')));
-  const grip = n => page.locator('[data-box="modules"] .srow[data-id] .grip').nth(n);
+  // ---- Appearance also has the Dreamcast background's switch (the module is off in the demo)
+  const bgToggle = page.locator('[data-box="appearance"] input[type=checkbox]');
+  ok(await bgToggle.count() === 1 && !(await bgToggle.isChecked()), 'Appearance has a switch for the Dreamcast background, off');
+  await bgToggle.check(); await page.waitForLoadState('networkidle'); await settle(2000);
+  ok(await page.evaluate(() => document.body.classList.contains('dcbg') && !!document.getElementById('dcbg')), 'switching it on draws the background (the page was rebuilt with Settings open)');
+  ok(await page.locator('#settings.open').count() === 1 && await page.locator('[data-box="appearance"] input[type=checkbox]').isChecked(), 'and the switch stays on');
+  await page.locator('[data-box="appearance"] input[type=checkbox]').uncheck(); await page.waitForLoadState('networkidle'); await settle(2000);
+  ok(await page.evaluate(() => !document.body.classList.contains('dcbg')), 'and off again');
+  // ---- the module picker: one row in System with an Edit button; the pop-up holds the list; nothing is applied until Done
+  const edit = page.locator('[data-box="system"] [data-picker="modules"] button');
+  ok(await edit.count() === 1 && (await edit.textContent()) === 'Edit' && (await page.locator('[data-box="system"] .card > .srow').first().getAttribute('data-picker')) === 'modules', 'System has a Modules row with an Edit button');
+  const openPicker = async () => { await edit.scrollIntoViewIfNeeded(); await edit.click(); await settle(500); };
+  const order = async () => page.locator('.pop.open .srow[data-id]').evaluateAll(els => els.map(e => e.getAttribute('data-id')));
+  const grip = n => page.locator('.pop.open .srow[data-id] .grip').nth(n);
+  const done = () => page.locator('.pop.open button', { hasText: 'Done' }).click();
+  await openPicker();
+  ok(await page.locator('.pop.open .srow[data-id="switcher"] .grip').count() === 1 && await page.locator('.pop.open .srow[data-id="switcher"] input').count() === 0 && /Always on/.test(await page.locator('.pop.open .srow[data-id="switcher"]').textContent()), 'an always-on module is in the list with a handle but no switch');
+  const dropGeo = await popGeo();
+  ok(Math.abs(dropGeo.left) <= 1 && Math.abs(dropGeo.right) <= 1, 'the modules pop-up spans the card too');
   const drag = async (from, to) => {                                       // from / to are row numbers; the pointer ends on the lower half of `to`
     await grip(Math.min(from, to)).scrollIntoViewIfNeeded();
-    const a = await grip(from).boundingBox(), rows = page.locator('[data-box="modules"] .srow[data-id]');
+    const a = await grip(from).boundingBox(), rows = page.locator('.pop.open .srow[data-id]');
     const b = await rows.nth(to).boundingBox();
     await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down();
     await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2 + (from < to ? 5 : -5), { steps: 3 });
     await page.mouse.move(a.x + a.width / 2, from < to ? b.y + b.height - 4 : b.y + 4, { steps: 12 });
-    return a;
   };
+  await page.evaluate(() => { window.__still = true; });
   const before0 = await order();
-  await drag(0, 1);
-  ok(JSON.stringify(await order()) !== JSON.stringify(before0) && await page.locator('[data-box="modules"] .srow.drag').count() === 1, 'dragging a row moves it while the others make room');
-  await page.mouse.up(); await page.waitForLoadState('networkidle'); await settle(1500);
-  const after = await order();
-  ok(after[0] === before0[1] && after[1] === before0[0], 'dropping saves the new order (the page reloads in Settings)');
-  ok(await page.locator('#settings.open').count() === 1, 'and Settings stays open');
-  await drag(1, 0); await page.mouse.up(); await page.waitForLoadState('networkidle'); await settle(1500);
-  ok(JSON.stringify(await order()) === JSON.stringify(before0), 'and a drag back restores it');
-  await drag(0, 2); await page.keyboard.press('Escape');
-  ok(JSON.stringify(await order()) === JSON.stringify(before0) && await page.locator('[data-box="modules"] .srow.drag').count() === 0, 'Esc while dragging cancels');
-  await page.mouse.up(); await settle(500);
-  await grip(0).focus(); await page.keyboard.press('ArrowDown'); await settle(1300); await page.waitForLoadState('networkidle'); await settle(1200);
-  ok((await order())[0] === before0[1], 'the arrow keys on a handle move the row too');
-  await grip(1).focus(); await page.keyboard.press('ArrowUp'); await settle(1300); await page.waitForLoadState('networkidle'); await settle(1200);
-  ok(JSON.stringify(await order()) === JSON.stringify(before0), 'and back');
-  ok(await page.locator('[data-box="modules"] .mv').count() === 0, 'there are no arrow buttons any more');
-  const players = page.locator('[data-box="modules"] input[data-module="players"]');
-  await players.uncheck(); await page.waitForLoadState('networkidle'); await settle(1500);
+  await drag(1, 3);
+  ok(JSON.stringify(await order()) !== JSON.stringify(before0) && await page.locator('.pop.open .srow.drag').count() === 1, 'dragging a row moves it while the others make room');
+  await page.mouse.up(); await settle(1500);
+  const moved = await order();
+  ok(moved[3] === before0[1] && await page.evaluate(() => window.__still === true) && await page.locator('.pop.open').count() === 1, 'dropping only moves it: the page is not redrawn and the pop-up stays open');
+  await drag(2, 0); await page.keyboard.press('Escape');
+  ok(JSON.stringify(await order()) === JSON.stringify(moved) && await page.locator('.pop.open .srow.drag').count() === 0 && await page.locator('.pop.open').count() === 1, 'Esc while dragging cancels the drag (the pop-up stays)');
+  await page.mouse.up(); await settle(300);
+  await grip(0).focus(); await page.keyboard.press('ArrowDown'); await settle(1300);
+  const kb = await order();
+  ok(kb[1] === moved[0] && await page.evaluate(() => window.__still === true), 'the arrow keys on a handle move the row too');
+  const players = page.locator('.pop.open input[data-module="players"]');
+  await players.uncheck(); await settle(800);
+  ok(await page.evaluate(() => window.__still === true) && await page.locator('.dbox').count() === 3, 'switching a module off changes nothing until Done');
+  await done(); await page.waitForLoadState('networkidle'); await settle(2000);
+  ok(await page.locator('#settings.open').count() === 1 && await page.evaluate(() => window.__still !== true), 'Done saves and builds the page again with Settings still open');
   await page.click('#close-settings');
-  ok(await page.locator('.dbox').count() === 2 && await page.locator('text=Online players:').count() === 0, 'a module switched off disappears from the dashboard');
-  await openSettings();
-  await page.locator('[data-box="modules"] input[data-module="players"]').check(); await page.waitForLoadState('networkidle'); await settle(1200);
+  ok(await page.locator('.dbox').count() === 2 && await page.locator('text=Online players:').count() === 0, 'the module switched off is gone from the dashboard');
+  await openSettings(); await openPicker();
+  const savedOrder = await order();
+  ok(JSON.stringify(savedOrder) === JSON.stringify(kb), 'and the new order was saved');
+  await page.locator('.pop.open input[data-module="players"]').check();
+  await drag(1, 0); await page.mouse.up(); await settle(300);                       // put the first two back as they were
+  await page.keyboard.press('Escape'); await page.waitForLoadState('networkidle'); await settle(2000);
   await page.click('#close-settings'); await settle(500);
-  ok(await page.locator('text=Online players:').count() === 1, 'and comes back when switched on');
+  ok(await page.locator('text=Online players:').count() === 1, 'Esc closes the pop-up like Done and applies: the module is back');
   // ---- the debug log expander
   await page.click('.xpand button.wide'); await settle(500);
   ok(await page.locator('.xpand .xbody').isVisible(), 'the debug log bar opens');
@@ -122,30 +155,31 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   tp.on('dialog', d => d.accept());
   await tp.goto(URL, { waitUntil: 'networkidle' }); await tp.waitForTimeout(1200);
   await tp.tap('#cog'); await tp.waitForTimeout(900);
+  const editT = tp.locator('[data-box="system"] [data-picker="modules"] button');
+  await editT.scrollIntoViewIfNeeded(); await editT.tap(); await tp.waitForTimeout(600);
   const cdp = await ctx2.newCDPSession(tp);
   const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
-  const rowsT = tp.locator('[data-box="modules"] .srow[data-id]');
+  const rowsT = tp.locator('.pop.open .srow[data-id]');
   const orderT = () => rowsT.evaluateAll(els => els.map(e => e.getAttribute('data-id')));
   const startT = await orderT();
   await rowsT.nth(0).scrollIntoViewIfNeeded();
   await tp.evaluate(() => { window.__removed = 0;
-    new MutationObserver(ms => ms.forEach(m => m.removedNodes.forEach(n => { if (n.classList && n.classList.contains('drag')) window.__removed++; }))).observe(document.querySelector('[data-box="modules"] .card'), { childList: true });
-    document.getElementById('settings').addEventListener('scroll', () => window.__scrolled++); });
-  const g = await tp.locator('[data-box="modules"] .srow[data-id] .grip').nth(0).boundingBox();
+    new MutationObserver(ms => ms.forEach(m => m.removedNodes.forEach(n => { if (n.classList && n.classList.contains('drag')) window.__removed++; }))).observe(document.querySelector('.pop.open .mlist'), { childList: true }); });
+  const g = await tp.locator('.pop.open .srow[data-id] .grip').nth(0).boundingBox();
   const r1 = await rowsT.nth(2).boundingBox();
   await touch('touchStart', g.x + g.width / 2, g.y + g.height / 2);
   for (let i = 1; i <= 14; i++) { await touch('touchMove', g.x + g.width / 2, g.y + g.height / 2 + (r1.y + r1.height - g.y - g.height / 2) * i / 14); await tp.waitForTimeout(20); }
   const mid = await orderT();
-  ok(await tp.locator('[data-box="modules"] .srow.drag').count() === 1 && mid[2] === startT[0], 'a finger drags a row two places down while the others make room');
+  ok(await tp.locator('.pop.open .srow.drag').count() === 1 && mid[2] === startT[0], 'a finger drags a row two places down while the others make room');
   ok(await tp.evaluate(() => window.__removed) === 0, 'the grabbed row is never taken out of the document (iOS ends a touch whose element is re-inserted)');
-  await touch('touchEnd'); await tp.waitForLoadState('networkidle'); await tp.waitForTimeout(1500);
+  await touch('touchEnd'); await tp.waitForTimeout(700);
   const endT = await orderT();
-  ok(endT[2] === startT[0], 'lifting the finger saves the new order');
+  ok(endT[2] === startT[0] && await tp.locator('.pop.open').count() === 1, 'lifting the finger drops the row there (nothing is applied until Done)');
   await rowsT.nth(2).scrollIntoViewIfNeeded();
-  const g2 = await tp.locator('[data-box="modules"] .srow[data-id] .grip').nth(2).boundingBox(), r0 = await rowsT.nth(0).boundingBox();
+  const g2 = await tp.locator('.pop.open .srow[data-id] .grip').nth(2).boundingBox(), r0 = await rowsT.nth(0).boundingBox();
   await touch('touchStart', g2.x + g2.width / 2, g2.y + g2.height / 2);
   for (let i = 1; i <= 14; i++) { await touch('touchMove', g2.x + g2.width / 2, g2.y + g2.height / 2 - (g2.y + g2.height / 2 - r0.y - 6) * i / 14); await tp.waitForTimeout(20); }
-  await touch('touchEnd'); await tp.waitForLoadState('networkidle'); await tp.waitForTimeout(1500);
+  await touch('touchEnd'); await tp.waitForTimeout(700);
   ok(JSON.stringify(await orderT()) === JSON.stringify(startT), 'and a drag up with a finger puts it back');
   await ctx2.close();
   // ---- no errors anywhere

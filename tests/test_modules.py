@@ -146,6 +146,9 @@ class WithEverything(Base):
         self.assertEqual(system["mods"], ["wifi", "rebootupdate"])
         self.assertEqual([w["type"] for w in system["items"] if w["mod"] == "rebootupdate"][-1], "row")      # the Reboot row ends the System box
         self.assertEqual([b["id"] for b in lay["settings"]][-2:], ["about", "system"])                     # System is the very last box, About just above it
+        appearance = [b for b in lay["settings"] if b["id"] == "appearance"][0]
+        self.assertEqual((appearance["mods"], appearance["title"]), (["switcher", "background"], "Appearance"))      # the colours and the background's switch
+        self.assertEqual([w["control"]["module"] for w in appearance["items"] if w["type"] == "row" and w["control"]["type"] == "toggle"], ["background"])
         about = [b for b in lay["settings"] if b["id"] == "about"][0]
         self.assertEqual((about["mods"], about["title"]), (["system"], "About"))               # the versions are their own box, not part of System
         self.assertEqual([b["id"] for b in lay["dashboard"]], ["network", "players", "debug log"])
@@ -169,7 +172,8 @@ class WithEverything(Base):
 
     def test_modules_menu_lists_them_all(self):
         got = self.json("/modules")["modules"]
-        self.assertEqual([m["name"] for m in got], ["players", "numbers", "led", "debuglog", "wifi", "rebootupdate", "background"])   # picker order; the hidden modules are not in it
+        self.assertEqual([m["name"] for m in got], ["switcher", "players", "numbers", "led", "debuglog", "system", "wifi", "rebootupdate", "background"])   # picker order, the always-on modules included
+        self.assertEqual([m["name"] for m in got if m["visible"] is False], ["switcher", "system"])                     # which the page lists without a switch
         self.assertTrue(all(m["enabled"] for m in got))
         self.assertTrue(all(m["title"] and m["description"] for m in got))
 
@@ -208,7 +212,7 @@ class WithNothing(Base):
         self.assertEqual(self.status("GET", "/status"), 200)
         self.assertEqual(self.status("GET", "/buttonconfig"), 200)
         self.assertEqual(self.status("GET", "/about"), 200)
-        self.assertEqual(self.json("/modules"), {"modules": []})
+        self.assertEqual([m["name"] for m in self.json("/modules")["modules"]], ["switcher", "system"])      # only the always-on ones are left
 
     def test_the_dreampi_dot_still_has_a_look(self):
         import netswitch_modules as mods

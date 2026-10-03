@@ -225,16 +225,40 @@ def _module_file(name, filename):
         return ""
 
 
+def _add_box(out, boxes, sec, key, title, name):
+    b = boxes[sec].get(key)
+    if b is None:
+        b = boxes[sec][key] = {"id": key, "title": "", "mods": [], "items": []}
+        out[sec].append(b)
+    if not b["title"] and title:
+        b["title"] = title
+    if name not in b["mods"]:
+        b["mods"].append(name)
+    return b
+
+
 def layout():
     """What the page draws, from the enabled modules in picker order:
     {"modules": [names], "dashboard": [box], "settings": [box], "backgrounds": [{"mod", "type", ...}],
      "data": {namespace: {"url", "every", "mod"}}, "primary": {name: palette id}, "colours": {name: {key: id}}}
-    box = {"id": lower-case name, "title", "mods": [names], "items": [widget + "mod"]}."""
+    box = {"id": lower-case name, "title", "mods": [names], "items": [widget + "mod"]}.
+    A module whose module.json has "toggle_box": "appearance" also gets a row with its on/off switch in that Settings box,
+    even while it is off (a switched-off module has no layout of its own to put one in): the Dreamcast background does."""
     out = {"modules": [], "dashboard": [], "settings": [], "backgrounds": [], "data": {}, "primary": {}, "colours": {}}
     boxes = dict((sec, {}) for sec in SECTIONS)
     covered = False                       # a fullscreen background above hides every one below it
-    for m in _state["loaded"]:
-        name, lay = m["name"], m.get("layout") or {}
+    loaded = dict((m["name"], m) for m in _state["loaded"])
+    for name in core.module_names():
+        manifest = core.module_manifest(name) or {}
+        toggle_box = manifest.get("toggle_box")
+        if toggle_box and core.module_visible(name, manifest):
+            b = _add_box(out, boxes, "settings", str(toggle_box).strip().lower(), str(toggle_box).strip().capitalize(), name)
+            b["items"].append({"type": "row", "title": core.module_title(name, manifest), "sub": manifest.get("description", ""), "mod": name,
+                               "control": {"type": "toggle", "module": name, "label": core.module_title(name, manifest)}})
+        m = loaded.get(name)
+        if m is None:
+            continue
+        lay = m.get("layout") or {}
         out["modules"].append(name)
         prim = _primary_of(name, m["manifest"])
         if prim:
@@ -249,15 +273,7 @@ def layout():
             continue
         for sec in SECTIONS:
             for box in lay.get(sec, []):
-                key = box["box"].strip().lower()
-                b = boxes[sec].get(key)
-                if b is None:
-                    b = boxes[sec][key] = {"id": key, "title": "", "mods": [], "items": []}
-                    out[sec].append(b)
-                if not b["title"] and box.get("title"):
-                    b["title"] = box["title"]
-                if name not in b["mods"]:
-                    b["mods"].append(name)
+                b = _add_box(out, boxes, sec, box["box"].strip().lower(), box.get("title"), name)
                 for w in box.get("items", []):
                     w = dict(w, mod=name)
                     if w.get("type") == "custom" and w.get("html_file"):         # the markup of a custom widget lives in a file of the module
@@ -271,6 +287,12 @@ def layout():
 def errors():
     """{module: why} for every module that could not be loaded (a missing or broken layout, a Python error)."""
     return dict(_state["errors"])
+
+
+def enabled_map():
+    """{module: on or off} for every installed module (in every /api answer: the picker's switches and the toggle rows follow it)."""
+    state = core.modules_state()
+    return dict((n, core.module_enabled(n, state)) for n in core.module_names())
 
 
 def live_colours():
@@ -306,14 +328,14 @@ def apply_api(d, warnings):
 
 
 def listing():
-    """What the module picker shows: every installed module that is visible there, on or off, in priority order."""
+    """What the module picker shows: every installed module in priority order, on or off. One that can't be switched
+    (visible false in its module.json, like the network switcher) is listed too, with "visible": false and no switch on the
+    page, so it can still be moved."""
     state = core.modules_state()
     out = []
     for name in core.module_names():
         m = core.module_manifest(name)
-        if not core.module_visible(name, m):
-            continue
-        out.append({"name": name, "title": core.module_title(name, m), "description": m.get("description", ""),
+        out.append({"name": name, "visible": core.module_visible(name, m), "title": core.module_title(name, m), "description": m.get("description", ""),
                     "note": m.get("note", ""), "enabled": core.module_enabled(name, state),
                     "default": core.module_default_enabled(m), "error": _state["errors"].get(name)})
     return out

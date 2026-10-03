@@ -48,13 +48,16 @@ class ManifestTests(PickerBase):
         self.assertFalse(core.save_module_enabled("fixed", False))
         self.assertTrue(core.module_enabled("fixed"))
 
-    def test_the_picker_lists_only_visible_modules(self):
+    def test_the_picker_lists_the_always_on_modules_too_so_they_can_be_moved(self):
         import netswitch_modules as mods
         self.add("fixed", {"name": "Fixed", "description": "d", "enabled": True, "visible": False})
-        names = [m["name"] for m in mods.listing()]
-        self.assertNotIn("fixed", names)
-        self.assertNotIn("switcher", names)
-        self.assertIn("numbers", names)
+        got = dict((m["name"], m) for m in mods.listing())
+        self.assertIs(got["fixed"]["visible"], False)                    # the page shows it without a switch
+        self.assertIs(got["switcher"]["visible"], False)
+        self.assertIs(got["numbers"]["visible"], True)
+        self.assertTrue(got["fixed"]["enabled"])
+        core.save_module_order(["fixed", "numbers"])
+        self.assertEqual([m["name"] for m in mods.listing()][:2], ["fixed", "numbers"])     # and it can be placed anywhere in the order
 
 
 class OrderTests(PickerBase):
@@ -110,6 +113,13 @@ class HttpOrderTests(PickerBase):
         self.assertEqual([m["name"] for m in got][:2], ["rebootupdate", "players"])
         again = json.loads(urlopen(self.base + "/modules", timeout=10).read())["modules"]
         self.assertEqual([m["name"] for m in again], [m["name"] for m in got])
+
+    def test_api_carries_which_modules_are_on(self):
+        en = json.loads(urlopen(self.base + "/api", timeout=10).read())["enabled"]
+        self.assertTrue(en["switcher"] and en["numbers"])
+        self.assertFalse(en["background"])                                 # off by default, but listed: its switch in Appearance follows this
+        self.post("/modules", {"name": "background", "enabled": True})
+        self.assertTrue(json.loads(urlopen(self.base + "/api", timeout=10).read())["enabled"]["background"])
 
     def test_post_order_rejects_junk(self):
         with self.assertRaises(HTTPError) as e:

@@ -148,6 +148,31 @@ class ValidationTests(LayoutBase):
         self.assertEqual(len(self.load()["settings"][0]["items"]), len(mods.WIDGETS))
 
 
+class ToggleBoxTests(LayoutBase):
+    def test_a_module_with_toggle_box_gets_its_switch_in_that_box_even_while_off(self):
+        self.module("host", {"settings": [{"box": "appearance", "title": "Appearance", "items": [{"type": "text", "text": "hi"}]}]})
+        self.module("bg", {"background": {"type": "fullscreen"}}, {"toggle_box": "appearance", "name": "Fancy background", "description": "Looks nice", "enabled": False})
+        lay = self.load(["host", "bg"])
+        self.assertEqual(lay["modules"], ["host"])                                  # off: not loaded, no background
+        self.assertEqual(lay["backgrounds"], [])
+        box = lay["settings"][0]
+        self.assertEqual((box["id"], box["title"], box["mods"]), ("appearance", "Appearance", ["host", "bg"]))
+        row = box["items"][-1]
+        self.assertEqual((row["title"], row["sub"], row["control"]), ("Fancy background", "Looks nice", {"type": "toggle", "module": "bg", "label": "Fancy background"}))
+        core.save_module_enabled("bg", True)
+        lay = self.load()
+        self.assertEqual(lay["backgrounds"][0]["mod"], "bg")                        # on: drawn, and the row is still there (once)
+        self.assertEqual(len([w for w in lay["settings"][0]["items"] if w.get("type") == "row"]), 1)
+
+    def test_the_box_gets_a_title_from_its_name_when_nobody_gave_one(self):
+        self.module("bg", {"background": {"type": "fullscreen"}}, {"toggle_box": "appearance"})
+        self.assertEqual(self.load()["settings"][0]["title"], "Appearance")
+
+    def test_an_always_on_module_gets_no_switch_row(self):
+        self.module("fixed", {"settings": []}, {"toggle_box": "appearance", "visible": False})
+        self.assertEqual(self.load()["settings"], [])
+
+
 class DataColourTests(LayoutBase):
     def test_data_sources_keep_their_first_owner(self):
         self.module("one", {"data": {"players": {"url": "/players", "every": 60}}})

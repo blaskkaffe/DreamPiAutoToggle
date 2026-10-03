@@ -23,8 +23,12 @@ function sh(el,show){setStyle(el,"display",show?"":"none")}
 function colourId(ref,mod){if(!ref)return"";var c=S.colours||LAY.colours||{};
  if(ref.indexOf(".")>0){var p=ref.split(".");return(c[p[0]]||{})[p[1]]||""}
  return(c[mod]||{})[ref]||ref}
-function colourClass(el,ref,mod){bind(ref,function(r){var id=colourId(r,mod),old=el._cc;if(old===id)return;
- if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._cc=id})}
+// An element with its own colour (a button of the module's colour key): it follows S.colours live and is not repainted with the
+// module's primary colour, so the network buttons keep the colours chosen in Settings whichever network is selected.
+function colourClass(el,ref,mod){el.setAttribute("data-own-colour","1");
+ function apply(){var id=colourId(val(ref),mod),old=el._cc;if(old===id)return;
+  if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._cc=id}
+ apply();UPD.push(apply)}
 // ---- talking to the server
 function post(url,body,done){xhrJson("POST",url,function(r,st,b){if(done)done(r,st,b)},body)}
 // after a button's POST: "reload" the page, "wait" until the Pi is back (a reboot), or just look at the new state
@@ -33,6 +37,7 @@ function afterPost(s,r,el){
  if(s.then==="reload"){try{sessionStorage.setItem("netswitch-reopen",s.reopen?"1":"")}catch(e){}location.reload();return}
  if(s.then==="wait"){if(el){el.disabled=true;setText(el,"Restarting...")}waitForPi();return}
  refresh();reloadData();fire("posted")}
+function reloadInSettings(){try{sessionStorage.setItem("netswitch-reopen","1")}catch(e){}location.reload()}   // modules come and go: the page is built again, Settings stays open
 function waitForPi(){var down=false,tries=0;
  (function poll(){tries++;var x=new XMLHttpRequest();x.open("GET","/ping?"+Date.now(),true);x.timeout=3000;
   x.onload=function(){if(down||tries>60)location.reload();else setTimeout(poll,2000)};
@@ -66,7 +71,7 @@ function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.conso
 function hideEmptyBoxes(){var bs=document.querySelectorAll("[data-box]"),i,j;
  for(i=0;i<bs.length;i++){var b=bs[i],host=b.querySelector(":scope > .card")||b,any=false;
   for(j=0;j<host.children.length;j++){var c=host.children[j];if(c.tagName!=="H2"&&c.style.display!=="none"){any=true;break}}
-  if(b.getAttribute("data-box")!=="modules")sh(b,any)}}
+  sh(b,any)}}
 // ---- theme: every box and widget takes the primary colour its module gave (a palette id, set in module.json or while running
 // in /api primary); the top module in the picker that has one also sets the page's own. A module below with another one
 // only uses it for itself.
@@ -77,7 +82,7 @@ function applyTheme(){var p={},k;for(k in (LAY.primary||{}))p[k]=LAY.primary[k];
  for(i=0;i<(LAY.modules||[]).length&&!root;i++)root=p[LAY.modules[i]]||"";
  function paint(el,id){var old=el._pc;if(old===id)return;if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._pc=id}
  paint(document.body,root);
- for(i=0;i<els.length;i++)paint(els[i],p[els[i].getAttribute("data-mod")]||"")}
+ for(i=0;i<els.length;i++)if(!els[i].hasAttribute("data-own-colour"))paint(els[i],p[els[i].getAttribute("data-mod")]||"")}
 // ---- data sources a module asked for in its layout ("data": {"players": {"url": "/players", "every": 60}}): fetched into S.<name>
 // every N seconds while the page is on screen (with "when": "settings", only while Settings is open); "retry_if": "busy" asks again
 // after "retry" seconds while that field of the answer is true, and after a failed request
@@ -133,6 +138,9 @@ W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.l
  if(s.text){el=h("label",{"class":"sub tgl"},[box,document.createTextNode(s.text)])}
  if(s.colour)colourClass(box,s.colour,s.mod);
  if(s.local){S._local[s.local]=s["default"]!==false;box.checked=S._local[s.local];box.onchange=function(){S._local[s.local]=box.checked;engineUpdate()};return el}
+ if(s.module){bind("@enabled."+s.module,function(v){box.checked=!!v});         // switches a whole module on or off (POST /modules), then the page is built again
+  box.onchange=function(){box.disabled=true;post("/modules",{name:s.module,enabled:box.checked},function(r){
+   if(!r){box.disabled=false;box.checked=!box.checked;return}reloadInSettings()})};return el}
  bind(s.bind,function(v){box.checked=!!v});
  box.onchange=function(){var want=box.checked;post(s.post,s.body?Object.assign({value:want},s.body):{value:want},function(){refresh();ctx.saved()})};return el};
 // a row of widgets side by side (wraps)
@@ -338,7 +346,6 @@ W.form=function(s,ctx){var el=h("div",{"class":"wform"}),F={values:{},options:{}
  function save(){clearTimeout(timer);paint();timer=setTimeout(function(){post(s.post||s.get,{values:F.values},function(r){
   if(r){F.values=r.values||F.values;F.options=r.options||F.options;paint();ctx.saved()}})},250)}
  hook("settingsOpen",load);load();return el};
-// ---- the module picker (the loader's own box): every module that may be switched, with its switch and a way to move it up or down
 // ---- drag and drop ordering: rows of a container, each with a ".grip" handle. Grab the handle (mouse, finger or pen) and move the row;
 // the others make room as it passes them and onDone(names) gets the new order of the rows' data-id values when it is dropped.
 // The handle also takes the arrow keys (up / down move the row, then onDone), so it works without a pointer. Esc while dragging cancels.
@@ -384,63 +391,38 @@ function sortable(box,onDone){
    if(!hasId(other))return;
    if(e.key==="ArrowUp")box.insertBefore(row,other);else box.insertBefore(other,row);
    grip.focus();clearTimeout(keyTimer);keyTimer=setTimeout(function(){onDone(names())},900)})})}
-// ---- the module picker (the loader's own box): every module that may be switched, with its switch and a way to move it up or down
-// ---- drag and drop ordering: rows of a container, each with a ".grip" handle. Grab the handle (mouse, finger or pen) and move the row;
-// the others make room as it passes them and onDone(names) gets the new order of the rows' data-id values when it is dropped.
-// The handle also takes the arrow keys (up / down move the row, then onDone), so it works without a pointer. Esc while dragging cancels.
-function sortable(box,onDone){
- function rows(){return Array.prototype.filter.call(box.children,function(r){return r.hasAttribute("data-id")})}
- function names(){return rows().map(function(r){return r.getAttribute("data-id")})}
- function same(a,b){return a.join("\n")===b.join("\n")}
- rows().forEach(function(row){var grip=row.querySelector(".grip");if(!grip)return;
-  grip.addEventListener("pointerdown",function(e){
-   if(e.pointerType==="mouse"&&e.button!==0)return;
-   e.preventDefault();var start=names(),grab=e.clientY-row.getBoundingClientRect().top,y=e.clientY,done=false,
-    scroller=$("settings");
-   try{grip.setPointerCapture(e.pointerId)}catch(x){}
-   row.classList.add("drag");box.classList.add("dragging");
-   function place(){row.style.transform="";var nat=row.getBoundingClientRect(),want=y-grab,guard=0;   // natural place first, then where the pointer wants it
-    row.style.transform="translateY("+(want-nat.top)+"px)";
-    while(guard++<30){var c=want+nat.height/2,prev=row.previousElementSibling,next=row.nextElementSibling;
-     function mid(el){var r=el.getBoundingClientRect();return r.top+r.height/2}
-     if(prev&&prev.hasAttribute("data-id")&&c<mid(prev)){box.insertBefore(row,prev)}
-     else if(next&&next.hasAttribute("data-id")&&c>mid(next)){box.insertBefore(next,row)}
-     else break;
-     row.style.transform="";nat=row.getBoundingClientRect();row.style.transform="translateY("+(want-nat.top)+"px)"}}
-   function move(ev){y=ev.clientY;place()}
-   var scroll=setInterval(function(){var h=window.innerHeight;                         // near the top / bottom edge: scroll Settings along
-    if(y<70)scroller.scrollTop-=14;else if(y>h-70)scroller.scrollTop+=14;else return;place()},16);
-   function finish(cancel){if(done)return;done=true;clearInterval(scroll);
-    grip.removeEventListener("pointermove",move);grip.removeEventListener("pointerup",up);grip.removeEventListener("pointercancel",cancelled);document.removeEventListener("keydown",esc,true);
-    row.classList.remove("drag");box.classList.remove("dragging");row.style.transform="";
-    if(cancel){start.forEach(function(n){box.appendChild(rows().filter(function(r){return r.getAttribute("data-id")===n})[0])});return}
-    var now=names();if(!same(start,now))onDone(now)}
-   function up(){finish(false)}function cancelled(){finish(true)}
-   function esc(ev){if(ev.key==="Escape"){ev.stopPropagation();finish(true)}}
-   grip.addEventListener("pointermove",move);grip.addEventListener("pointerup",up);grip.addEventListener("pointercancel",cancelled);document.addEventListener("keydown",esc,true)});
-  var keyTimer=null;
-  grip.addEventListener("keydown",function(e){if(e.key!=="ArrowUp"&&e.key!=="ArrowDown")return;e.preventDefault();
-   var other=e.key==="ArrowUp"?row.previousElementSibling:row.nextElementSibling;
-   if(!other||!other.hasAttribute("data-id"))return;
-   if(e.key==="ArrowUp")box.insertBefore(row,other);else box.insertBefore(other,row);
-   grip.focus();clearTimeout(keyTimer);keyTimer=setTimeout(function(){onDone(names())},900)})})}
-// ---- the module picker (the loader's own box): every module that may be switched, with its switch; drag a row by its handle to move it
-function buildPicker(cols){var saved=h("span",{"class":"saved",text:"Saved \u2713"}),card=h("div",{"class":"card"}),
- sec=h("section",{"class":"sec","data-box":"modules"},[h("h2",{},[document.createTextNode("Modules "),saved]),card]);
- var before=cols.querySelector('[data-box="about"],[data-box="system"]');cols.insertBefore(sec,before);   // the picker sits above About / System, which end the page
- function reloadInSettings(){try{sessionStorage.setItem("netswitch-reopen","1")}catch(e){}location.reload()}
- function load(){xhrJson("GET","/modules",function(r){if(r)paint(r.modules)})}
- function paint(list){card.innerHTML="";
-  list.forEach(function(m){
-   var cb=h("input",{type:"checkbox","class":"cbox neutral","data-module":m.name,"aria-label":m.title});cb.checked=m.enabled;
-   cb.onchange=function(){cb.disabled=true;post("/modules",{name:m.name,enabled:cb.checked},function(res){
-    if(!res){cb.disabled=false;cb.checked=!cb.checked;return}reloadInSettings()})};
+// ---- the module picker (the loader's own row in System): an Edit button opens a pop-up with every module - drag a row by its handle to
+// move it, tick or untick its switch (the always-on ones have none) - and nothing is applied until it is closed with Done (or Esc, or a
+// click outside); then the changes are saved and the page is built again with Settings still open.
+function buildPicker(cols){
+ var card=cols.querySelector('[data-box="system"] .card'),
+  btn=h("button",{type:"button","class":"pill-s",text:"Edit","aria-haspopup":"dialog"}),list=h("div",{"class":"mlist"}),
+  done=h("button",{type:"button","class":"pill-s",text:"Done"}),
+  pop=h("div",{},[h("div",{"class":"t",text:"Modules: tick to switch on or off, drag the handle to move. The top one has priority."}),list,h("div",{"class":"bar end"},[done])]),
+  row=h("div",{"class":"srow","data-picker":"modules"},[h("span",{},[document.createTextNode("Modules"),h("span",{"class":"sub",text:"Switch modules on or off and set their priority"})]),btn]);
+ if(!card){card=h("div",{"class":"card"});cols.appendChild(h("section",{"class":"sec","data-box":"system"},[h("h2",{text:"System"}),card]))}
+ card.insertBefore(row,card.firstChild);card.appendChild(pop);
+ var p=ui.popup(pop),mods=[],boxes={};
+ function paint(list2){mods=list2;boxes={};list.innerHTML="";
+  mods.forEach(function(m){var cb;
+   if(m.visible===false)cb=h("span",{"class":"sub fixed",text:"Always on"});                     // can be moved, not switched off
+   else{cb=h("input",{type:"checkbox","class":"cbox neutral","data-module":m.name,"aria-label":m.title});cb.checked=m.enabled;boxes[m.name]=cb}
    var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+m.title+": drag, or use the up and down arrow keys",html:"&#8942;&#8942;"}),
     left=h("span",{},[document.createTextNode(m.title),h("span",{"class":"sub",html:esc(m.description)+(m.note?"<br>"+esc(m.note):"")+(m.error?'<br><b class="modbad">Could not load: '+esc(m.error)+"</b>":"")})]);
-   card.appendChild(h("div",{"class":"srow","data-id":m.name},[grip,left,cb]))});
-  if(!list.length)card.appendChild(h("div",{"class":"srow"},[h("span",{text:"No modules installed."})]));
-  sortable(card,function(order){post("/modules/order",{order:order},function(r){if(r)reloadInSettings();else load()})})}
- hook("settingsOpen",load);load()}
+   list.appendChild(h("div",{"class":"srow","data-id":m.name},[grip,left,cb]))});
+  sortable(list,function(){})}                                                                       // the order is read from the page when Done is pressed
+ function apply(){var order=Array.prototype.map.call(list.children,function(r){return r.getAttribute("data-id")}),
+   was=mods.map(function(m){return m.name}),changes=[];
+  mods.forEach(function(m){var cb=boxes[m.name];if(cb&&cb.checked!==m.enabled)changes.push({name:m.name,enabled:cb.checked})});
+  var reorder=order.length&&order.join()!==was.join();
+  if(!reorder&&!changes.length)return;
+  var steps=[];if(reorder)steps.push(["/modules/order",{order:order}]);changes.forEach(function(c){steps.push(["/modules",c])});
+  (function next(i){if(i>=steps.length)return reloadInSettings();
+   post(steps[i][0],steps[i][1],function(r){if(!r){alert("Could not save the module changes");return reloadInSettings()}next(i+1)})})(0)}
+ p.onclose=apply;
+ btn.onclick=function(e){e.stopPropagation();if(p.isOpen()){p.close();return}
+  xhrJson("GET","/modules",function(r){if(!r)return;paint(r.modules);p.open(btn)})};
+ done.onclick=function(){p.close()}}
 // ---- backgrounds: the picker's top background module draws (a fullscreen one hides those below, a part one leaves them)
 function startBackgrounds(){(LAY.backgrounds||[]).forEach(function(b){
  var host=h("div",{"class":"bgpart "+(b.type==="part"?"part "+(b.position||"bottom"):"fullscreen"),"data-bg":b.mod});$("bg").appendChild(host);

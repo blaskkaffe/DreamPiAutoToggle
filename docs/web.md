@@ -13,7 +13,7 @@ Phone numbers (the **numbers module**, `modules/numbers/`, layout `picker` widge
 
 ## Optional modules
 
-Everything the page shows is a module in `modules/`, loaded by `netswitch_modules.py` and (except the always-on ones) switched and ordered in Settings > Modules. How they plug in (manifest, layout, widgets, colours, web entry, hooks, installer, tests) is in [modules.md](modules.md).
+Everything the page shows is a module in `modules/`, loaded by `netswitch_modules.py` and (except the always-on ones) switched and ordered in Settings > System > Modules. How they plug in (manifest, layout, widgets, colours, web entry, hooks, installer, tests) is in [modules.md](modules.md).
 
 ## Online-players module (`modules/players/`)
 

@@ -53,17 +53,17 @@ modules/<name>/
 | `name` | the title in the picker (older files: `title`) |
 | `description` | the text under it in the picker |
 | `enabled` | on when first loaded; what the user sets in the picker (`modules.json`) overrides it (older files: `default`) |
-| `visible` | `false` = not in the picker and always on (the network switcher: it can't be removed); default `true` |
+| `visible` | `false` = always on (no switch in the picker, which still lists it so it can be moved) (the network switcher: it can't be removed); default `true` |
 | `web` | Python module name of its web entry (routes, `api()` hook) |
 | `ui` | the page kit version it was written for (now 2); a module for a newer kit is not loaded |
 | `order` | where it starts out in the list until the user moves it (the picker order, `module_order.json`, replaces it) |
 | `colours` | `{"dcnow": "orange", ...}`: colours the module picks from the global palette (below); `colours_unique: true` = no two keys share one |
 | `primary` | the palette id (or one of its own colour keys) it uses as its primary colour; it may change it while running (below) |
 | `note` | an optional second line in the picker |
+| `toggle_box` | a Settings box name (`"appearance"`): the page gets a row with this module's on/off switch in that box, even while the module is off (it has no layout of its own then); the Dreamcast background uses it |
 
-The picker (**Settings > Modules**) lists the visible modules with a switch each and a **drag handle** (⋮⋮): drag a row to move it (mouse, finger or pen; the other rows make room, Esc cancels, and near the edge Settings scrolls along), or focus the handle and use the up / down arrow keys (`POST /modules/order`,
-stored in `module_order.json`). The drag is the standard `sortable()` in `page/widgets.js`: it uses pointer events with `touch-action: none` on the handle, and it never takes the grabbed row out of the page (the neighbours move instead), because iOS Safari ends a touch whose element is re-inserted. **The order is the priority**: the module at the top comes first inside shared boxes, names a box
-first, sets the page's primary colour and wins when two backgrounds compete. Switching or moving a module reloads the page.
+The picker is one **Modules** row at the top of the **System** box with an **Edit** button. Edit opens a pop-up (as wide as every pop-up: the card between its paddings) that lists **every** module in priority order, the always-on ones too: each row has a switch (the always-on ones say "Always on" instead, they can be moved but not switched off) and a **drag handle** (⋮⋮). **Nothing is applied while it is open**: ticking a switch or moving a row only changes the list; **Done** (or Esc, or a click outside) saves the order (`POST /modules/order`) and the switches (`POST /modules`) and builds the page again with Settings still open. To move a row, drag it by its handle (mouse, finger or pen; the other rows make room, Esc cancels, and near the edge Settings scrolls along), or focus the handle and use the up / down arrow keys (the order is stored in `module_order.json`). The drag is the standard `sortable()` in `page/widgets.js`: it uses pointer events with `touch-action: none` on the handle, and it never takes the grabbed row out of the page (the neighbours move instead), because iOS Safari ends a touch whose element is re-inserted. **The order is the priority**: the module at the top comes first inside shared boxes, names a box
+first, sets the page's primary colour and wins when two backgrounds compete. Applying a change reloads the page.
 A folder that is new to the picker starts at its `order` hint among the ones not yet placed.
 
 ## layout.json
@@ -89,10 +89,10 @@ warning box on the page (and in the picker).
 | `about` | read-only information: versions, hardware, links | system |
 | `gpio` | anything wired to a GPIO pin: button functions, the LED pin, hold buttons | switcher, led, wifi |
 | `configuration` | a module's general settings that fit no other box; a module with only a few settings adds them here instead of making its own box | (none yet) |
-| `appearance` | colours and the look of the page | (the switcher's colour picks are in `network colours` for now) |
+| `appearance` | colours and the look of the page | switcher (the DCNow! / DCNET colour pick), background (its switch, see `toggle_box`) |
 | `network` | (dashboard) the network selection and its status | switcher |
 
-The default order puts **About** and then **System** at the very bottom of Settings (the system module starts out before wifi and rebootupdate in the list, and the module picker box is inserted above About / System), and the Reboot row is the last row of System. Use the same title for the same box everywhere (`System`, `About`, `GPIO`, `Configuration`): the first module in picker order that gives one names it. Lower-case in `layout.json`, as the box id.
+The default order puts **About** and then **System** at the very bottom of Settings (the system module starts out before wifi and rebootupdate in the list, and the module picker is a row inside System), and the Reboot row is the last row of System. Use the same title for the same box everywhere (`System`, `About`, `GPIO`, `Configuration`): the first module in picker order that gives one names it. Lower-case in `layout.json`, as the box id.
 
 **Boxes are shared by name.** Boxes with the same `box` name (case-insensitive) in any modules are **one box**: their items follow each
 other in picker order (the items of one module keep their order). The box's title is the first non-empty `title` in picker order, so a
@@ -120,7 +120,7 @@ again after `retry` while it is true), "when": "settings" (only while Settings i
 | `text` | a paragraph | `text`, `muted`, `cls` |
 | `row` | a Settings row: title and grey subtitle on the left, a widget on the right | `title`, `sub`, `control` (a widget), `below` (widgets under the row, full width) |
 | `button` | `style` `"small"` (default round button), `"pill"` (big, in the primary colour), `"danger"` | `label`, `post` (a POST to this path), `body`, `colour` (pill: a colour reference), `confirm` (asks first), `pin` (asks for the PIN when one is set), `arm` (text shown on the first tap; a second tap within 4 s does it), `busy` + `busy_label`, `disabled`, `href` (a link instead of a POST), `aria`, `then` (`"reload"`, or `"wait"` = wait until the Pi is back, for a reboot) |
-| `toggle` | a tick box | `bind` + `post` (POSTs `{"value": bool}`), or `local` (kept in the page only, `default`), `text` (label beside it), `look` (`"neutral"` default, `"pri"`) |
+| `toggle` | a tick box | `bind` + `post` (POSTs `{"value": bool}`), or `module` (a module's own switch: follows `@enabled.<name>` and POSTs `/modules`, then the page is built again), or `local` (kept in the page only, `default`), `text` (label beside it), `look` (`"neutral"` default, `"pri"`) |
 | `swatches` | a small **Colour** button in the currently chosen colour; it opens a pop-up with the 16 palette colours (two rows: normal, bright) and a pick is stored for the module (and closes it) | `key` (one of the module's `colours` keys), `label` (default "Colour"), `title` (the pop-up's heading); use it as a `row`'s `control` |
 | `link` | a link that looks like a small button | `label`, `href`, `aria` |
 | `form` | rows of controls kept in one JSON object on the server | `get`, `post`, `fields`: `[{"title", "sub", "sub_of": key (shows the `sub` of the selected option), "show", "controls": [{"type": "select"/"number"/"text"/"toggle", "key", "options": name or list, "min", "max", "label"}]}]`; `GET` answers `{"values": {...}, "options": {name: [{"value", "label", "group", "sub"}]}}`, `POST {"values": {...}}` saves and answers the same. Changes save 250 ms after the last one. |
@@ -192,7 +192,7 @@ The page itself (`page/`): `index.html` is only the frame (`#bg`, header, `#warn
 - The **LED service** (`dreampi-netswitch-led`, `modules/led/netswitch_led.py`) drives `ledconfig.led_count()` LEDs while the module is on and **0 (closed, dark) while it is off** (`wanted_count()`), so the picker needs no systemctl. Its unit has `ConditionPathExists=` for its files, so deleting the folder from `/opt/dreampi-netswitch` makes systemd skip it quietly.
 - The **buttons service** is base and loads no module code. While the Wi-Fi module is on, a hold only touches `wifi_start` / `wifi_stop` (the same files the page's button touches). The **Wi-Fi service** (`dreampi-netswitch-wifi`, written by the module's `install.sh`, removed by its `remove.sh`) idles until a start request, runs `setup_cycle()`, and treats switching the module off mid-setup as a stop.
 - `install.sh` `sync_modules`: copies every `modules/*/` that has a `module.json` to `$DEST/modules/` (replacing the old copy as a whole); a folder that was installed before but is gone from the repo gets its `remove.sh` run and is deleted. Then every installed module's `install.sh` is sourced (the LED one writes its unit and handles SPI for GPIO10; the Wi-Fi one handles `--wifi` / `--no-wifi` / `--wifi-demo`). It also copies the base page files (`index.html`, `page.css`, `page.js`, `widgets.js`, `boot.js`).
-- To **remove a module for good**: delete its folder in the folder you installed from and run `sudo ./install.sh` (its service and files go; its settings files like `led.json`, `led_count`, `numbers.json` stay for when it comes back). To **add one**: put the folder in and run the installer. To only hide it: switch it off in Settings > Modules.
+- To **remove a module for good**: delete its folder in the folder you installed from and run `sudo ./install.sh` (its service and files go; its settings files like `led.json`, `led_count`, `numbers.json` stay for when it comes back). To **add one**: put the folder in and run the installer. To only hide it: switch it off in Settings > System > Modules.
 
 ## Adding a new module
 
