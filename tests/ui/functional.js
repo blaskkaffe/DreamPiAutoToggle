@@ -204,6 +204,15 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await bgToggle.check(); await page.waitForLoadState('networkidle'); await settle(2000);
   ok(await page.evaluate(() => document.body.classList.contains('dcbg') && !!document.getElementById('dcbg')), 'switching it on draws the background (the page was rebuilt with Settings open)');
   ok(await page.locator('#settings.open').count() === 1 && await page.locator('[data-box="appearance"] .srow:has-text("Dreamcast background") input[type=checkbox]').isChecked(), 'and the switch stays on');
+  // Highlight (a coloured background) works over the background, a neutral one is the grey of the Dreamcast pop-ups
+  await page.click('#close-settings'); await settle(400);
+  const fill = sel => page.locator(sel).first().evaluate(e => getComputedStyle(e).backgroundColor);
+  const hi = await fill('.dbox[data-box="network"] .now');
+  ok(/^rgba\(\d+, \d+, \d+, 0\.\d+\)$/.test(hi) && hi !== 'rgba(20, 20, 20, 0.78)', 'over the Dreamcast background a highlighted box keeps its translucent colour (' + hi + ')');
+  await page.evaluate(() => document.querySelector('.dbox[data-box="network"]').classList.add('plain'));
+  ok(await fill('.dbox[data-box="network"] .now') === 'rgba(20, 20, 20, 0.78)', 'and a neutral one is the translucent grey');
+  await page.evaluate(() => document.querySelector('.dbox[data-box="network"]').classList.remove('plain'));
+  await openSettings();
   await page.locator('[data-box="appearance"] .srow:has-text("Dreamcast background") input[type=checkbox]').uncheck(); await page.waitForLoadState('networkidle'); await settle(2000);
   ok(await page.evaluate(() => !document.body.classList.contains('dcbg')), 'and off again');
   // ---- the module picker: one row in System with an Edit button; the pop-up holds the list; nothing is applied until Done
