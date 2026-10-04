@@ -124,6 +124,7 @@
  .carousel{display:block;min-width:0} .carousel .dup,.carousel .sp{display:none}
  .carousel.sc{white-space:nowrap;overflow:hidden} .carousel.sc .trk{display:inline-block;animation:marquee var(--d,20s) linear infinite}
  .carousel.sc .dup,.carousel.sc .sp{display:inline}
+ .now b .carousel{white-space:nowrap}   /* the main title does not wrap while the box is closed: it scrolls when it is too long (ticker() in widgets.js) */
  .now.open .carousel{white-space:normal;overflow:visible} .now.open .carousel .trk{animation:none;display:inline} .now.open .carousel .dup,.now.open .carousel .sp{display:none}
  @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
  @media(prefers-reduced-motion:reduce){.carousel.sc .trk{animation:none}.carousel.sc .dup,.carousel.sc .sp{display:none}}

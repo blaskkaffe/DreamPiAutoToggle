@@ -206,6 +206,20 @@ W.status=function(s){var d=h("span",{"class":"dot"}),t=h("span",{"class":"nw"}),
  if(s.dot!==undefined)bind(s.dot,function(v){dotLook(d,v)});
  bind(s.text,function(v){setText(t,v==null?"":v)});bind(s.sub,function(v){setLines(sub,v);sh(sub,!!v)});
  if(s.lines!==undefined)bind(s.lines,function(v){if(!v||!v.length){setHtml(t,"...");setHtml(sub,"");return}setText(t,v[0]);setHtml(sub,v.slice(1).map(esc).join("<br>"))});return el};
+// The box's main title (the middle line): a line that scrolls round like the carousel's only when it does not fit the box (and is not
+// open, and is not a large clock). ticker(host, mod).set(html) shows html; its coloured parts (.pln, data-c = a colour reference) take the colour
+// of their reference, which paint() keeps up to date when the user changes it. The scrolling copy is only in the page while it scrolls.
+function ticker(host,mod){var el=h("span",{"class":"carousel"}),trk=h("span",{"class":"trk"}),html="",scrolling=false;el.appendChild(trk);host.appendChild(el);
+ var SP='<span class="sp">\u00a0\u00a0\u2022\u00a0\u00a0</span>';
+ function paint(){Array.prototype.forEach.call(trk.querySelectorAll(".pln"),function(x){var c=colourId(x.getAttribute("data-c"),mod),v=c?"var(--c-"+c+"-l)":"";if(x._v!==v){x._v=v;x.style.color=v}})}
+ function show(){var half='<span class="t">'+html+(scrolling?SP:"")+'</span>';
+  setHtml(trk,scrolling?half+half.replace('class="t"','class="t dup" aria-hidden="true"'):half);paint()}
+ function fit(){var box=host.closest&&host.closest(".now"),t=trk.querySelector(".t"),need=false;
+  if(t&&box&&!box.classList.contains("open")&&!box.hasAttribute("data-mode")){      // the line never wraps while the box is closed (page.css), so its width says if it fits
+   var sp=t.querySelector(".sp");need=t.offsetWidth-(sp?sp.offsetWidth:0)>host.clientWidth+1}
+  if(need!==scrolling){scrolling=need;el.classList.toggle("sc",scrolling);if(scrolling)el.style.setProperty("--d",Math.max(10,Math.round((el.textContent||"").length*0.28))+"s");show()}}
+ hook("layout",fit);window.addEventListener("resize",fit);UPD.push(paint);
+ return {set:function(next){if(next===html)return;html=next;show();fit()},paint:paint,fit:fit}}
 // "mode": "@path" puts the text on the box as data-mode (a module's page.css lays the box out differently for it); "open_if": "@path" -
 // while that is false the box has nothing to show when tapped, so it does not open (and is not a button)
 W.infobox=function(s,ctx){
@@ -213,9 +227,9 @@ W.infobox=function(s,ctx){
   head=h("b"),canOpen=true;
  if(s.label!==undefined){var lab=h("div",{"class":"nlabel"});el.appendChild(lab);bind(s.label,function(t){setText(lab,t==null||t===""?"\u00a0":t)})}   // the top line: a text or a binding; empty keeps its height
  el.appendChild(head);
- if(s.parts!==undefined)bind(s.parts,function(ps){var html=(ps||[]).map(function(p){return '<span class="pln" data-c="'+esc(p.colour||"")+'">'+esc(p.text)+'</span>'}).join("");
-  if(head._html!==html){setHtml(head,html);Array.prototype.forEach.call(head.querySelectorAll(".pln"),function(x){var c=colourId(x.getAttribute("data-c"),s.mod);if(c)x.style.color="var(--c-"+c+"-l)"})}});
- else bind(s.title,function(t){setText(head,t==null?"":t)});
+ var tk=(s.parts!==undefined||s.title!==undefined)?ticker(head,s.mod):null;      // no title and no parts: the line is empty and takes no room
+ if(tk&&s.parts!==undefined)bind(s.parts,function(ps){tk.set((ps||[]).map(function(p){return '<span class="pln" data-c="'+esc(p.colour||"")+'">'+esc(p.text)+'</span>'}).join(""))});
+ else if(tk)bind(s.title,function(t){tk.set(esc(t==null?"":t))});
  (s.rows||[]).forEach(function(r){
   var row=h("div",{"class":"row "+(r.main?"main":"more")+(r.cls?" "+r.cls:"")});
   row.appendChild(h("span",{"class":"k",text:r.label||""}));

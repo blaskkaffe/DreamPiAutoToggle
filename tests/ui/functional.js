@@ -41,6 +41,15 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   page.off('request', onReq);
   ok(!seenReq.some(u => u === '/players' || u === '/events/view' || u === '/clock'), 'pressing a network button asks only for /api, not for the data sources (' + seenReq.join(' ') + ')');
   ok((await page.locator('.now b').first().textContent()) === 'DCNET', 'DCNET button selects DCNET');
+  ok(await page.locator('.dbox[data-box="network"] .now b .pln').evaluate(e => e.style.color === 'var(--c-blue-l)'), 'the network name is in its network\'s colour (DCNET: blue), as in the players box');
+  const tick = await page.evaluate(async () => {         // set the title and look at it in one go: the page's own /api refresh would put the real name back
+    const look = () => { const c = document.querySelector('.dbox[data-box="network"] .now b .carousel'); return { sc: c.classList.contains('sc'), anim: getComputedStyle(c.querySelector('.trk')).animationName, text: document.querySelector('.dbox[data-box="network"] .now b').textContent }; };
+    S.selected = { id: 'dcnet', title: 'x', parts: [{ text: 'A very long main title that can never fit in the box', colour: 'switcher.dcnet' }] }; engineUpdate(); await new Promise(r => setTimeout(r, 150));
+    const long = look();
+    S.selected = { id: 'dcnet', title: 'DCNET', parts: [{ text: 'DCNET', colour: 'switcher.dcnet' }] }; engineUpdate(); await new Promise(r => setTimeout(r, 150));
+    return { long, short: look() }; });
+  ok(tick.long.sc && tick.long.anim === 'marquee', 'a main title that does not fit scrolls round like a carousel');
+  ok(!tick.short.sc && tick.short.text === 'DCNET', 'and a short one stands still (the text is there once)');
   ok((await boxBg()) !== before, 'the box border takes the DCNET colour');
   ok(await page.evaluate(() => document.body.classList.contains('c-blue')), "the page's primary colour is the selected network's (blue)");
   await page.locator('.pill').nth(0).click(); await settle(1500);

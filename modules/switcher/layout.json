@@ -6,7 +6,7 @@
     {
      "type": "infobox",
      "label": "Selected network:",
-     "title": "@selected.title",
+     "parts": "@selected.parts",
      "rows": [
       {
        "label": "DreamPi",

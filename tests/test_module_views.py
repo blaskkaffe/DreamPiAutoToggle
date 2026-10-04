@@ -189,7 +189,7 @@ class SwitcherView(unittest.TestCase):
 
     def test_the_selected_network_and_the_primary_colour(self):
         d, _ = self.api()
-        self.assertEqual((d["network"], d["selected"]), ("dcnow", {"id": "dcnow", "title": "DCNow!"}))
+        self.assertEqual((d["network"], d["selected"]), ("dcnow", {"id": "dcnow", "title": "DCNow!", "parts": [{"text": "DCNow!", "colour": "switcher.dcnow"}]}))     # parts: the name in its network's colour
         self.assertEqual(d["primary"]["switcher"], "orange")
         open(core.FLAG, "w").close()
         d, _ = self.api()

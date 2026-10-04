@@ -46,7 +46,9 @@ def _modem_dot(dstate, plugged, compat):
 
 def _selected():
     dcnet = os.path.exists(core.FLAG)
-    return {"id": "dcnet" if dcnet else "dcnow", "title": "DCNET" if dcnet else "DCNow!"}
+    net = "dcnet" if dcnet else "dcnow"
+    title = "DCNET" if dcnet else "DCNow!"
+    return {"id": net, "title": title, "parts": [{"text": title, "colour": "switcher." + net}]}      # parts: the name in its network's colour, as in the players box
 
 
 def api(d, warnings):
