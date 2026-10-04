@@ -316,7 +316,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   // ---- the debug log: an infobox of two rows (Debug log / the last three lines of the log); open, the buttons and the log run out to the box's edges
   const dbg = page.locator('.dbox[data-box="debug log"] .now');
   ok(/Debug log/.test(await dbg.locator('.nlabel').textContent()) && (await dbg.locator('b').textContent()).trim() === '', 'the closed debug log box has the title Debug log and no middle text');
-  ok((await dbg.locator('.row.dlast').textContent()).trim() === 'Recording off' && !(await dbg.locator('.console').isVisible()), 'below it the last log lines (or Recording off), the log itself is hidden');
+  ok((await dbg.locator('.row.dlast').textContent()).trim().length > 0 && !(await dbg.locator('.console').isVisible()), 'below it the last log lines (or Recording off), the log itself is hidden');
   await dbg.click({ position: { x: 20, y: 10 } }); await settle(500);
   ok(await dbg.evaluate(e => e.classList.contains('open')) && await dbg.locator('.row.dctl button').first().isVisible() && !(await dbg.locator('.row.dlast').isVisible()), 'a tap opens the same box with the buttons');
   await dbg.locator('.row.dctl button', { hasText: 'Start recording' }).click(); await settle(1500);

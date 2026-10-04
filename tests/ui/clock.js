@@ -44,7 +44,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await box.locator('svg.cmap polygon.land').count() >= 10 && await box.locator('svg.cmap .band.here').count() === 1, 'the land is drawn and the band of the clock\'s own time zone is highlighted');
   ok(await box.locator('svg.cmap .city').count() === 10, 'the cities are dots');
   const hrs = box.locator('svg.cmap text.hr');
-  ok(await hrs.count() === 50 && (await hrs.nth(24).textContent()) === '0' && (await hrs.nth(26).textContent()) === '+1' && (await hrs.nth(0).textContent()) !== '', 'the hour of each band is along the top and its UTC offset along the bottom');
+  ok(await hrs.count() === 50 && (await hrs.nth(25).textContent()) === '0' && (await hrs.nth(27).textContent()) === '+1' && (await hrs.nth(0).textContent()) !== '', 'the hour of each band is along the top and its UTC offset along the bottom');
   ok(await hrs.evaluateAll(els => new Set(els.map(e => getComputedStyle(e).fontSize)).size === 1), 'the UTC markers are the same size as the hours');
   ok(await box.locator('.cmapnote').count() === 0, 'there is no explaining text under the map');
   ok(await box.locator('svg.cmap .city').first().getAttribute('r') === '3.4', 'the city dots are bigger');
