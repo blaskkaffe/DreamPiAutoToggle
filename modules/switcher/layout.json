@@ -21,6 +21,7 @@
        "label": "Modem",
        "value": {
         "type": "status",
+        "dot": "@modem.state",
         "text": "@modem.text",
         "sub": "@modem.since_text"
        }
@@ -80,11 +81,28 @@
    "items": [
     {
      "type": "row",
+     "title": "Network Selector colour",
+     "sub": "Module",
+     "control": {
+      "type": "swatches", "tint": true,
+      "key": "selector",
+      "title": "Colour of the DreamPi Network Selector"
+     }
+    }
+   ]
+  },
+  {
+   "box": "colours",
+   "title": "Global colours",
+   "items": [
+    {
+     "type": "row",
      "title": "DCNow! colour",
      "sub": "Network",
      "control": {
-      "type": "swatches", "tint": true,
+      "type": "swatches",
       "key": "dcnow",
+      "exclude": ["network"],
       "title": "Colour for DCNow!"
      }
     },
@@ -93,8 +111,9 @@
      "title": "DCNET colour",
      "sub": "Network",
      "control": {
-      "type": "swatches", "tint": true,
+      "type": "swatches",
       "key": "dcnet",
+      "exclude": ["network"],
       "title": "Colour for DCNET"
      }
     },

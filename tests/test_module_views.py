@@ -230,6 +230,17 @@ class SwitcherView(unittest.TestCase):
                 probes._checks.update(old)
 
 
+class ModemDot(unittest.TestCase):
+    def test_the_modem_row_has_a_dot_in_the_states_of_the_other_rows(self):
+        import netswitch_switcher as sw
+        self.assertEqual(sw._modem_dot("ok", True, True), "ok")
+        self.assertEqual(sw._modem_dot("ok", True, None), "ok")
+        self.assertEqual(sw._modem_dot("ok", True, False), "warn")       # plugged in, but a modem known not to work well
+        self.assertEqual(sw._modem_dot("ok", False, None), "bad")        # the serial port is gone
+        self.assertEqual(sw._modem_dot("off", True, True), "bad")        # DreamPi is not running
+        self.assertEqual(sw._modem_dot("unknown", None, None), "unknown")
+
+
 class ModemCompat(unittest.TestCase):
     def usb(self, manufacturer, product):
         return {"vendor": "0572", "product": "1340", "manufacturer": manufacturer, "product_name": product, "serial": ""}

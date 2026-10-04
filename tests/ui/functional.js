@@ -30,7 +30,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
     return { off: Math.abs((t.left + t.right) / 2 - (b.left + b.right) / 2), sc: !!document.querySelector('.carousel.sc'), w: b.width }; });
   ok(!geo.sc && geo.off < 24, 'a short games line stands still and is centred in the box (off by ' + Math.round(geo.off) + 'px of ' + Math.round(geo.w) + ')');
   ok(await page.locator('.carousel .cn').first().textContent() === '1' && !/\(/.test(await page.locator('.carousel').first().textContent()), 'the game count has no brackets and its own (subtitle) colour');
-  ok(await page.locator('.dbox:nth-child(2) .row.main .arrow').count() === 0, 'the players box has no small arrow');
+  ok(await page.locator('.now .arrow').count() === 0, 'no infobox (network, clock, players, events) has the small arrow');
   await page.evaluate(() => reloadData()); await settle(1200);
   // ---- choosing a network moves the primary colour with it
   const boxBg = () => page.locator('.now').first().evaluate(e => getComputedStyle(e).borderTopColor);
@@ -50,7 +50,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('.pill').nth(0).click(); await settle(1500);
   // ---- the module's own colour choice (swatches from the global palette)
   await openSettings();
-  const colourBtn = page.locator('[data-box="appearance"] .colourpick > button').first();     // the DCNow! row
+  const colourBtn = page.locator('[data-box="colours"] .srow', { hasText: 'DCNow! colour' }).locator('.colourpick > button');     // the DCNow! row (Global colours)
   ok(await colourBtn.evaluate(e => e.classList.contains('c-orange') && getComputedStyle(e).backgroundColor !== getComputedStyle(document.querySelector('.pill-s:not(.pri)')).backgroundColor), 'the Colour button shows the chosen colour (orange)');
   await colourBtn.click(); await settle(400);
   const swatches = page.locator('.pop.open .swatches .swatch');
@@ -186,11 +186,13 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await page.locator('.dbox[data-box="players"].plain').count() === 0, 'ticking Highlight makes the box coloured');
   await appr.locator('input[type=checkbox]').uncheck(); await settle(1300);
   ok(await page.locator('.dbox[data-box="players"].plain').count() === 1, 'and unticking it makes it neutral again');
-  const dc = page.locator('[data-box="appearance"] .srow', { hasText: 'DCNow! colour' });
-  ok(await dc.locator('input[type=checkbox]').isChecked() && !(await page.locator('.pill').first().evaluate(e => e.classList.contains('plain'))), 'the network buttons are highlighted from the start');
-  await dc.locator('input[type=checkbox]').uncheck(); await settle(1300);
-  ok(await page.locator('.pill').first().evaluate(e => e.classList.contains('plain')) && !(await page.locator('.pill').nth(1).evaluate(e => e.classList.contains('plain'))), 'the network buttons have a background setting each');
-  await dc.locator('input[type=checkbox]').check(); await settle(1000);
+  ok(await page.locator('[data-box="colours"] .srow', { hasText: 'colour' }).locator('input[type=checkbox]').count() === 0, 'the network colours have no background tick box');
+  const sel = page.locator('[data-box="appearance"] .srow', { hasText: 'Network Selector colour' });
+  ok(!(await sel.locator('input[type=checkbox]').isChecked()) && await page.locator('.dbox[data-box="network"] .now.plain').count() === 1, 'the Network Selector box starts neutral (grey)');
+  ok(await sel.locator('.colourpick > button').evaluate(e => e.classList.contains('c-orange')) && !(await page.locator('.pill').first().evaluate(e => e.classList.contains('plain'))), 'its colour is Selected network (orange now) and the network buttons stay coloured');
+  await sel.locator('input[type=checkbox]').check(); await settle(1300);
+  ok(await page.locator('.dbox[data-box="network"] .now.plain').count() === 0, 'ticking its background makes the box coloured');
+  await sel.locator('input[type=checkbox]').uncheck(); await settle(1000);
   // dividers: every row of a box has a line above it except the first, whichever module or widget it comes from
   const dividers = await page.evaluate(() => Array.from(document.querySelectorAll('#set-boxes .card')).filter(c => c.offsetParent).map(c => {
     const rows = Array.from(c.querySelectorAll('.srow')).filter(r => r.offsetParent && !r.closest('.pop') && !r.closest('.wlist.compact'));
@@ -227,11 +229,12 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   // Highlight (a coloured background) works over the background, a neutral one is the grey of the Dreamcast pop-ups
   await page.click('#close-settings'); await settle(400);
   const fill = sel => page.locator(sel).first().evaluate(e => getComputedStyle(e).backgroundColor);
+  await page.evaluate(() => document.querySelector('.dbox[data-box="network"]').classList.remove('plain'));       // the Network Selector starts neutral: highlight it for this check
   const hi = await fill('.dbox[data-box="network"] .now');
   ok(/^rgba\(\d+, \d+, \d+, 0\.\d+\)$/.test(hi) && hi !== 'rgba(20, 20, 20, 0.78)', 'over the Dreamcast background a highlighted box keeps its translucent colour (' + hi + ')');
   await page.evaluate(() => document.querySelector('.dbox[data-box="network"]').classList.add('plain'));
   ok(await fill('.dbox[data-box="network"] .now') === 'rgba(20, 20, 20, 0.78)', 'and a neutral one is the translucent grey');
-  await page.evaluate(() => document.querySelector('.dbox[data-box="network"]').classList.remove('plain'));
+  await page.evaluate(() => document.querySelector('.dbox[data-box="network"]').classList.add('plain'));
   await openSettings();
   await page.locator('[data-box="appearance"] .srow:has-text("Dreamcast background") input[type=checkbox]').uncheck(); await page.waitForLoadState('networkidle'); await settle(2000);
   ok(await page.evaluate(() => !document.body.classList.contains('dcbg')), 'and off again');

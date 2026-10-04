@@ -162,8 +162,8 @@ W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.l
 W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx))};
 // ---- the module's own colour choice: a "Colour" button in the chosen colour that opens a pop-up with the palette's colours;
 // the pick is kept for the module (core.set_module_colour)
-// the palette in the server's order; the network switcher's own colours cannot be "Selected network" (that would be a circle)
-function paletteOrder(mod){return (LAY.palette||[]).filter(function(c){return !(c.id==="network"&&mod==="switcher")})}
+// the palette in the server's order, without the ids a pick leaves out ("exclude": the network colours cannot be "Selected network", that would be a circle)
+function paletteOrder(s){return (LAY.palette||[]).filter(function(c){return (s.exclude||[]).indexOf(c.id)<0})}
 function colourOfId(id){var r=null;(LAY.palette||[]).forEach(function(p){if(p.id===id)r=p});return r}
 function mixWhite(hex){var n=[1,3,5].map(function(i){var v=parseInt(hex.substr(i,2),16);return Math.round(v+(255-v)*0.45)});return "#"+n.map(function(v){return (v<16?"0":"")+v.toString(16)}).join("")}
 function rgbOf(hex){return parseInt(hex.substr(1,2),16)+","+parseInt(hex.substr(3,2),16)+","+parseInt(hex.substr(5,2),16)}
@@ -182,7 +182,7 @@ W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri
  el=h("span",{"class":"colourpick"},[tint,btn,pop]),btns={},names={},p=ui.popup(pop);
  if(tint)colourClass(tint,s.key,s.mod);          // the tick box has the colour of its pick
  if(tint)tint.onchange=function(){var want=tint.checked;post("/colour",{module:s.mod,key:s.key,tint:want},function(r){if(r){refresh();ctx.saved()}else tint.checked=!want})};
- paletteOrder(s.mod).forEach(function(c){names[c.id]=c.name;
+ paletteOrder(s).forEach(function(c){names[c.id]=c.name;
   var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui+";--cl:"+c.ui_l,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
   b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){p.close();refresh();ctx.saved()}})};grid.appendChild(b)});
  btn.onclick=function(e){p.toggle(btn,e)};
@@ -217,7 +217,6 @@ W.infobox=function(s,ctx){
   var row=h("div",{"class":"row "+(r.main?"main":"more")+(r.cls?" "+r.cls:"")});
   row.appendChild(h("span",{"class":"k",text:r.label||""}));
   var v=h("span",{"class":"v"+(r.value&&r.value.type==="carousel"?" fill":"")});v.appendChild(build(Object.assign({mod:s.mod},r.value||{type:"text",text:""}),ctx));row.appendChild(v);
-  if(r.main&&!(r.value&&r.value.type==="carousel"))row.appendChild(h("span",{"class":"arrow",html:"&#9656;"}));   // a scrolling line has no arrow: the box still opens on a tap
   if(r.show!==undefined)bind(r.show,function(x){sh(row,!!x)});
   el.appendChild(row)});
  if(s.actions&&s.actions.length){var act=h("div",{"class":"row more hang keep"});
@@ -234,11 +233,10 @@ W.carousel=function(s){var el=h("span",{"class":"carousel"}),trk=h("span",{"clas
  function one(i){return i&&typeof i==="object"?String(i.text==null?"":i.text)+(i.n!=null?" "+i.n:""):String(i)}
  function text(){return items().map(one).join("  \u2022  ")}
  function body(){return items().map(function(i){return i&&typeof i==="object"?esc(i.text==null?"":i.text)+(i.n!=null?' <span class="cn">'+esc(i.n)+'</span>':""):esc(i)}).join("  \u2022  ")}
- // Scrolls only when the line is wider than its row (minus the arrow). While it fits it is centred like the status row above it;
- // when it scrolls its holder (.v.fill) takes the whole row so the line can run past the edges, and the arrow stays at the end.
+ // Scrolls only when the line is wider than its row. While it fits it is centred like the status row above it;
+ // when it scrolls its holder (.v.fill) takes the whole row so the line can run past the edges.
  function fit(){var t=trk.querySelector(".t"),scroll=false,par=el.parentNode,row=el.closest&&el.closest(".row");
-  if(t&&cur&&par&&row&&!(el.closest(".now.open"))){var arrow=row.querySelector(".arrow");
-   scroll=t.offsetWidth>row.clientWidth-(arrow?arrow.offsetWidth+8:0)-12}
+  if(t&&cur&&par&&row&&!(el.closest(".now.open")))scroll=t.offsetWidth>row.clientWidth-12
   if(scroll!==el.classList.contains("sc")){el.classList.toggle("sc",scroll);if(scroll)el.style.setProperty("--d",Math.max(12,Math.round(cur.length*0.28))+"s")}
   if(par)par.classList.toggle("scrolling",scroll)}
  function set(t){if(t===cur&&trk.firstChild){fit();return}cur=t;

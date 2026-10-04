@@ -14,7 +14,7 @@
  .row{display:flex;align-items:baseline;padding:11px 0;border-top:1px solid var(--line)} .row:first-child{border-top:0}
  .row .k{width:84px;color:var(--muted);flex:none} .row .v{flex:1}
  .rows .more{display:none} .rows.open .more{display:flex}
- .arrow{color:#aaa;flex:none;margin-left:8px;transition:transform .15s} .rows.open .arrow{transform:rotate(90deg)}
+ .arrow{color:#aaa;flex:none;margin-left:8px;transition:transform .15s}
  .dot{display:inline-block;width:.65em;height:.65em;border-radius:50%;margin-right:8px;background:#888}
  @keyframes blink{50%{opacity:.12}} @keyframes breathe{50%{opacity:.45}}
  @keyframes dotb1{0%{opacity:1}9%,100%{opacity:.12}} @keyframes dotb2{0%,18%{opacity:1}9%,27%,100%{opacity:.12}} @keyframes dotb3{0%,18%,36%{opacity:1}9%,27%,45%,100%{opacity:.12}}
@@ -46,7 +46,6 @@
  .now .row.main{justify-content:center;border-top:0;padding:8px 0 2px}
  .now .row.main .k{display:none} .now .row.main .v{flex:none}
  .now .row .k{color:rgba(255,255,255,.65);width:68px} .now .row .v{min-width:0;display:flex;align-items:baseline} .now .row .v > .dot{flex:none} .now .row .v > span:last-child{min-width:0} .now .sub{color:rgba(255,255,255,.65)}
- .now .arrow{color:rgba(255,255,255,.7);font-size:.9em}
  .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .now .row.hang{justify-content:center;padding:12px 0 2px}
  .now .row.hang form{width:100%} .now .row.hang .pill-s{display:block;width:100%;padding:9px 12px;font-size:1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .now .row.hang .pill-s{background:rgba(160,30,30,.85);border-color:rgba(230,110,110,.85)}

@@ -28,7 +28,7 @@ class PaletteTests(unittest.TestCase):
     def test_a_saved_choice_of_a_removed_colour_becomes_its_nearest(self):
         with open(core.MODULE_COLOURS, "w") as f:
             json.dump({"switcher": {"dcnow": "bright-orange", "dcnet": "pink"}}, f)
-        self.assertEqual(core.module_colours("switcher"), {"dcnow": "orange", "dcnet": "bright-pink"})
+        self.assertEqual(core.module_colours("switcher"), {"selector": "network", "dcnow": "orange", "dcnet": "bright-pink"})
         self.assertEqual(core.colour("bright-yellow")["id"], "yellow")
 
     def test_selected_network_is_the_colour_the_selected_network_has(self):
@@ -75,29 +75,37 @@ class ModuleColourTests(unittest.TestCase):
         cleanup(self.tmp)
 
     def test_the_switcher_defaults_are_orange_and_blue(self):
-        self.assertEqual(core.module_colours("switcher"), {"dcnow": "orange", "dcnet": "blue"})
+        self.assertEqual(core.module_colours("switcher"), {"selector": "network", "dcnow": "orange", "dcnet": "blue"})
         self.assertEqual(core.network_colour("dcnow")["ui"], "#e8761c")
         self.assertEqual(core.network_colour("dcnet")["ui"], "#1c6fe8")
 
     def test_choice_persists_and_any_palette_colour_works(self):
         core.set_module_colour("switcher", "dcnow", "bright-pink")
-        self.assertEqual(core.module_colours("switcher"), {"dcnow": "bright-pink", "dcnet": "blue"})
+        self.assertEqual(core.module_colours("switcher"), {"selector": "network", "dcnow": "bright-pink", "dcnet": "blue"})
         self.assertEqual(core.network_colour("dcnow")["id"], "bright-pink")
+
+    def test_the_selector_may_be_the_selected_network_but_the_networks_may_not_and_never_swap_with_it(self):
+        self.assertEqual(core.module_colours("switcher")["selector"], "network")
+        self.assertIsNone(core.set_module_colour("switcher", "dcnow", "network"))            # a network cannot be "the selected network" (a circle)
+        got = core.set_module_colour("switcher", "selector", "orange")                       # the selector may share DCNow!'s colour: no swap
+        self.assertEqual(got, {"selector": "orange", "dcnow": "orange", "dcnet": "blue"})
+        got = core.set_module_colour("switcher", "dcnet", "orange")                          # the two networks still swap with each other
+        self.assertEqual(got, {"selector": "orange", "dcnow": "blue", "dcnet": "orange"})
 
     def test_picking_the_others_colour_swaps(self):
         core.set_module_colour("switcher", "dcnow", "blue")
-        self.assertEqual(core.module_colours("switcher"), {"dcnow": "blue", "dcnet": "orange"})
+        self.assertEqual(core.module_colours("switcher"), {"selector": "network", "dcnow": "blue", "dcnet": "orange"})
 
     def test_invalid_input_is_ignored(self):
         self.assertIsNone(core.set_module_colour("switcher", "dcnow", "chartreuse"))
         self.assertIsNone(core.set_module_colour("switcher", "other", "red"))
         self.assertIsNone(core.set_module_colour("nosuchmodule", "dcnow", "red"))
-        self.assertEqual(core.module_colours("switcher"), {"dcnow": "orange", "dcnet": "blue"})
+        self.assertEqual(core.module_colours("switcher"), {"selector": "network", "dcnow": "orange", "dcnet": "blue"})
 
     def test_a_broken_file_gives_the_defaults(self):
         with open(core.MODULE_COLOURS, "w") as f:
             f.write("{nonsense")
-        self.assertEqual(core.module_colours("switcher"), {"dcnow": "orange", "dcnet": "blue"})
+        self.assertEqual(core.module_colours("switcher"), {"selector": "network", "dcnow": "orange", "dcnet": "blue"})
 
     def test_a_module_without_colours_has_none(self):
         self.assertEqual(core.module_colours("numbers"), {})
@@ -113,16 +121,16 @@ class TintTests(unittest.TestCase):
     def test_the_boxes_start_neutral_and_the_network_buttons_highlighted(self):
         for name in ("clock", "players", "debuglog"):
             self.assertEqual(core.module_tints(name), {name: False}, name)
-        self.assertEqual(core.module_tints("switcher"), {"dcnow": True, "dcnet": True})
+        self.assertEqual(core.module_tints("switcher"), {"selector": False, "dcnow": True, "dcnet": True})
         self.assertEqual(core.set_module_tint("players", "players", True), {"players": True})       # and the user can highlight one
         self.assertEqual(core.set_module_tint("players", "players", False), {"players": False})
         self.assertEqual(json.load(open(core.MODULE_TINTS)).get("players"), {})                   # a value that is the default is not kept
 
     def test_a_network_colour_can_be_switched_off_and_on(self):
-        self.assertEqual(core.module_tints("switcher"), {"dcnow": True, "dcnet": True})
-        self.assertEqual(core.set_module_tint("switcher", "dcnet", False), {"dcnow": True, "dcnet": False})
+        self.assertEqual(core.module_tints("switcher"), {"selector": False, "dcnow": True, "dcnet": True})
+        self.assertEqual(core.set_module_tint("switcher", "dcnet", False), {"selector": False, "dcnow": True, "dcnet": False})
         self.assertEqual(core.module_tints("switcher")["dcnet"], False)
-        self.assertEqual(core.set_module_tint("switcher", "dcnet", True), {"dcnow": True, "dcnet": True})
+        self.assertEqual(core.set_module_tint("switcher", "dcnet", True), {"selector": False, "dcnow": True, "dcnet": True})
 
     def test_unknown_things_are_refused(self):
         self.assertIsNone(core.set_module_tint("switcher", "nope", False))
@@ -186,7 +194,7 @@ class HttpTests(unittest.TestCase):
     def test_round_trip(self):
         got = json.loads(urlopen(self.base + "/colours", timeout=10).read())
         self.assertEqual(len(got["palette"]), 16)
-        self.assertEqual(got["modules"]["switcher"], {"dcnow": "orange", "dcnet": "blue"})
+        self.assertEqual(got["modules"]["switcher"], {"selector": "network", "dcnow": "orange", "dcnet": "blue"})
         r = json.loads(self.post("/colour", {"module": "switcher", "key": "dcnet", "colour": "bright-green"}).read())
         self.assertEqual(r["colours"]["dcnet"], "bright-green")
         api = json.loads(urlopen(self.base + "/api", timeout=10).read())
@@ -206,12 +214,24 @@ class HttpTests(unittest.TestCase):
         self.post("/dcnow", {})
         self.post("/colour", {"module": "switcher", "key": "dcnow", "colour": "orange"})
 
+    def test_the_selector_has_its_own_colour_and_background(self):
+        api = json.loads(urlopen(self.base + "/api", timeout=10).read())
+        self.assertEqual((api["colours"]["switcher"]["selector"], api["tints"]["switcher"]["selector"]), ("network", False))      # grey, in the selected network's colour
+        self.post("/colour", {"module": "switcher", "key": "selector", "colour": "bright-cyan"})
+        self.post("/colour", {"module": "switcher", "key": "selector", "tint": True})
+        api = json.loads(urlopen(self.base + "/api", timeout=10).read())
+        self.assertEqual(api["primary"]["switcher"], "bright-cyan")                  # the box takes its own pick ...
+        self.assertEqual(api["colours"]["switcher"]["dcnow"], "orange")              # ... and neither network colour is swapped or changed
+        self.assertEqual(api["tints"]["switcher"], {"selector": True, "dcnow": True, "dcnet": True})
+        self.post("/colour", {"module": "switcher", "key": "selector", "colour": "network"})
+        self.post("/colour", {"module": "switcher", "key": "selector", "tint": False})
+
     def test_the_background_setting_goes_through_the_colour_endpoint_and_into_api(self):
         r = json.loads(self.post("/colour", {"module": "switcher", "key": "dcnow", "tint": False}).read())
-        self.assertEqual(r["tints"], {"dcnow": False, "dcnet": True})
+        self.assertEqual(r["tints"], {"selector": False, "dcnow": False, "dcnet": True})
         api = json.loads(urlopen(self.base + "/api", timeout=10).read())
         self.assertEqual(api["tints"]["switcher"]["dcnow"], False)
-        self.assertEqual(api["primary_key"]["switcher"], "dcnow")                    # the box follows the selected network's setting
+        self.assertEqual(api["primary_key"]["switcher"], "selector")                 # the box follows the Network Selector's own setting, not a network's
         self.assertEqual(api["colours"]["switcher"]["dcnow"], "orange")              # the colour itself is untouched
         self.post("/colour", {"module": "switcher", "key": "dcnow", "tint": True})
 

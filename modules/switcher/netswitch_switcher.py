@@ -34,6 +34,16 @@ def _ago(since, now):
     return "%d h ago" % (s // 3600)
 
 
+def _modem_dot(dstate, plugged, compat):
+    """The modem row's dot, in the states the other rows use: ok = its port is there, warn = a modem known not to work
+    reliably, bad = the port is gone (or DreamPi is not running), none of these = grey (not known yet)."""
+    if dstate == "off" or plugged is False:
+        return "bad"
+    if compat is False:
+        return "warn"
+    return "ok" if plugged else "unknown"
+
+
 def _selected():
     dcnet = os.path.exists(core.FLAG)
     return {"id": "dcnet" if dcnet else "dcnow", "title": "DCNET" if dcnet else "DCNow!"}
@@ -80,14 +90,15 @@ def api(d, warnings):
     busy = probes._hangup["busy"]
     pi_lines = [pi["line1"], pi.get("line2") or ""] + ([pi["warn"]] if pi.get("warn") else []) if pi.get("line1") else [pi.get("text") or "..."]
     d.update({"network": sel["id"], "selected": sel,
-              "modem": {"text": mtext, "since": msince, "since_text": _ago(msince, now), "plugged": plugged, "label": label, "compat": compat},
+              "modem": {"state": _modem_dot(dstate, plugged, compat), "text": mtext, "since": msince, "since_text": _ago(msince, now), "plugged": plugged, "label": label, "compat": compat},
               "internet": checks["internet"],
               "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"), "line2": pi.get("line2"),
                      "warn": pi.get("warn"), "lines": pi_lines},
               "hangup": {"busy": busy, "text": probes._hangup["text"] or "hanging up...",
                          "visible": dstate.startswith("call") or busy}})
-    d.setdefault("primary", {})["switcher"] = core.network_colour(sel["id"])["id"]       # the box and its borders take the selected network's colour
-    d.setdefault("primary_key", {})["switcher"] = sel["id"]                               # and the box follows that network's background setting
+    pick = core.module_colours("switcher").get("selector", "network")
+    d.setdefault("primary", {})["switcher"] = core.network_colour(sel["id"])["id"] if pick == "network" else pick      # the box and its borders: the selector's colour (the selected network's by default)
+    d.setdefault("primary_key", {})["switcher"] = "selector"                               # and the box follows the selector's background setting
 
 
 def _select(net):

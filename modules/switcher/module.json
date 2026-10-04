@@ -1,15 +1,19 @@
 {
- "name": "Network switcher",
+ "name": "DreamPi Network Selector",
  "description": "Switch between DCNow! and DCNET.",
  "enabled": true,
  "visible": false,
  "order": 10,
  "ui": 2,
  "colours": {
+  "selector": "network",
   "dcnow": "orange",
   "dcnet": "blue"
  },
  "colours_unique": true,
+ "tints": {
+  "selector": false
+ },
  "web": "netswitch_switcher",
- "primary": "dcnow"
+ "primary": "selector"
 }

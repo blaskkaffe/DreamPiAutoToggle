@@ -248,6 +248,13 @@ PALETTE_IDS = tuple(c[0] for c in PALETTE)
 # colours that were in the palette once: what a saved choice of them becomes
 LEGACY_COLOURS = {"bright-orange": "orange", "bright-yellow": "yellow", "pink": "bright-pink"}
 DEFAULT_COLOUR = "orange"
+# The switcher's two network colours (module.json "colours" keys "dcnow" / "dcnet"). Only these are real colours (never "Selected
+# network", which would be a circle) and, with "colours_unique", never the same; the module's other colour keys are free.
+NETWORKS = ("dcnow", "dcnet")
+
+
+def _network_key(name, key):
+    return name == "switcher" and key in NETWORKS
 
 
 _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -374,17 +381,20 @@ def module_colours(name):
     wanted = manifest.get("colours")
     if not isinstance(wanted, dict):
         return {}
-    def ok(v):          # the network switcher's own colours cannot be "the selected network's" (that would be a circle)
+    def ok(k, v):       # the network colours cannot be "the selected network's" (that would be a circle)
         v = LEGACY_COLOURS.get(v, v)
-        return v in PALETTE_IDS and not (name == "switcher" and v == "network")
-    out = dict((k, LEGACY_COLOURS.get(v, v) if ok(v) else DEFAULT_COLOUR) for k, v in wanted.items())
+        return v in PALETTE_IDS and not (_network_key(name, k) and v == "network")
+    out = dict((k, LEGACY_COLOURS.get(v, v) if ok(k, v) else DEFAULT_COLOUR) for k, v in wanted.items())
     mine = _saved_module_colours().get(name)
     if isinstance(mine, dict):
         for k in out:
-            if ok(mine.get(k)):
+            if ok(k, mine.get(k)):
                 out[k] = LEGACY_COLOURS.get(mine[k], mine[k])
-    if manifest.get("colours_unique") and len(set(out.values())) < len(out):
-        out = dict((k, LEGACY_COLOURS.get(v, v) if ok(v) else DEFAULT_COLOUR) for k, v in wanted.items())
+    if manifest.get("colours_unique"):
+        uniq = [k for k in out if _network_key(name, k)] or list(out)
+        if len(set(out[k] for k in uniq)) < len(uniq):
+            for k in uniq:
+                out[k] = LEGACY_COLOURS.get(wanted[k], wanted[k]) if ok(k, wanted[k]) else DEFAULT_COLOUR
     return out
 
 
@@ -417,11 +427,12 @@ def set_module_colour(name, key, ident):
     module, key or colour is unknown."""
     cur = module_colours(name)
     ident = LEGACY_COLOURS.get(ident, ident)
-    if key not in cur or ident not in PALETTE_IDS or (name == "switcher" and ident == "network"):
+    if key not in cur or ident not in PALETTE_IDS or (_network_key(name, key) and ident == "network"):
         return None
     if (module_manifest(name) or {}).get("colours_unique"):
+        uniq = [k for k in cur if _network_key(name, k)] or list(cur)
         for k, v in list(cur.items()):
-            if k != key and v == ident:
+            if k != key and v == ident and key in uniq and k in uniq:
                 cur[k] = cur[key]
     cur[key] = ident
     data = _saved_module_colours()
