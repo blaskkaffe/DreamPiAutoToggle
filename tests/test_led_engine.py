@@ -2,7 +2,7 @@
 filter that stops a half-written state file from flashing on the LED."""
 import unittest
 
-from support import sandbox, cleanup
+from support import core, ledconfig, sandbox, cleanup
 import netswitch_led as led
 
 COLOURS = ["#ff8c00", "#0046ff", "#aa00ff", "#ff0000", "#00ff00", "#00c8ff", "#ffd000", "#ffffff"]
@@ -177,8 +177,24 @@ class SteadyTests(unittest.TestCase):
 
     def test_the_led_loop_looks_at_the_flag_every_frame_and_reads_at_once_when_it_changes(self):
         src = open(led.__file__.replace(".pyc", ".py")).read()
-        self.assertIn("os.path.exists(core.FLAG)", src)
-        self.assertIn("immediate=switched_net", src)
+        self.assertIn("watched_files()", src)
+        self.assertIn("immediate=fresh", src)
+
+    def test_watched_files_change_when_a_setting_is_written_or_the_network_is_switched(self):
+        tmp = sandbox()
+        try:
+            a = led.watched_files()
+            self.assertEqual(led.watched_files(), a)                               # nothing written: the same
+            open(core.FLAG, "w").close()
+            b = led.watched_files()
+            self.assertNotEqual(a, b)                                              # the flag appeared (DCNET selected)
+            ledconfig.save_led_config(ledconfig.default_led_config())
+            c = led.watched_files()
+            self.assertNotEqual(b, c)                                              # led.json written
+            core.set_palette_colour("red", led="#00ffff")
+            self.assertNotEqual(c, led.watched_files())                            # the palette's LED colour changed
+        finally:
+            cleanup(tmp)
 
     def test_the_first_list_is_used_at_once(self):
         s = led.Steady()

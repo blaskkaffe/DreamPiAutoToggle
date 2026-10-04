@@ -285,6 +285,20 @@ def wanted_count():
     return ledconfig.led_count() if core.module_enabled("led") else 0
 
 
+def _stamp(path):
+    try:
+        st = os.stat(path)
+        return (st.st_mtime, st.st_size, st.st_ino)       # the inode: a file replaced by a rename is a new file
+    except OSError:
+        return None                                       # not there (the selected network's flag is only there for DCNET)
+
+
+def watched_files():
+    """What the files that settings and the network selection are kept in look like now (changes when one is written or removed)."""
+    return tuple(_stamp(p) for p in (core.FLAG, core.LED_CONFIG, core.PALETTE_FILE, core.MODULE_COLOURS, core.LED_COUNT, core.LED_GPIO,
+                                     core.MODULES_STATE, core.WB_TEST))
+
+
 def main():
     count, gpio = wanted_count(), ledconfig.led_gpio()
     cfg = ledconfig.led_config()
@@ -320,20 +334,22 @@ def main():
     clocks = {}
     last_frame, last_sent = None, 0.0
     next_read = 0.0
-    selected = os.path.exists(core.FLAG)
+    stamp = watched_files()
     while True:
         now = time.time()
-        # A switch of the network (the page's buttons, the physical ones) shows at once: the flag file is looked at every frame, and when it
-        # changes the state is read now and the list is not held back (it is one file written in one go, so nothing is half-read).
-        sel_now = os.path.exists(core.FLAG)
-        switched_net = sel_now != selected
-        if switched_net:
-            selected, next_read = sel_now, 0.0
+        # A change the user makes shows at once: the files the page writes (the selected network, led.json, the palette, the colours of the
+        # networks, the LED count and pin, the modules, the white-balance test) are looked at every frame, and when one has changed the state
+        # is read now and the list is not held back. Those files are written in one go (a rename), so nothing is half-read; the wait in
+        # Steady is for the state files other programs write while they work.
+        now_stamp = watched_files()
+        fresh = now_stamp != stamp
+        if fresh:
+            stamp, next_read = now_stamp, 0.0
         if now >= next_read:
             try:
                 wb_test = ledconfig.wb_test_active()
                 wb_colour = ledconfig.wb_test_colour()
-                messages = steady.feed(ledconfig.active_messages(), now, immediate=switched_net)
+                messages = steady.feed(ledconfig.active_messages(), now, immediate=fresh)
                 cfg = ledconfig.led_config()
                 order = drivers.ORDERS.get(cfg.get("order"), drivers.DEFAULT_ORDER)
                 white_balance, gamma = _wb(cfg), cfg.get("gamma", ledconfig.GAMMA)
