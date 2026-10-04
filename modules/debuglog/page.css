@@ -4,3 +4,4 @@
 [data-mod="debuglog"] .now.open .row.dlast{display:none}
 [data-mod="debuglog"] .row.dctl .k,[data-mod="debuglog"] .row.dcon .k{display:none}
 [data-mod="debuglog"] .row.dctl .v,[data-mod="debuglog"] .row.dcon .v{flex:1;display:block;width:100%}
+[data-mod="debuglog"] .row.dctl{font-size:.75em}   /* the note and the buttons of the open box are the size of a settings row, not of the small status rows */
