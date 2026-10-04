@@ -5,20 +5,5 @@
  "visible": true,
  "order": 40,
  "ui": 2,
- "web": "netswitch_led_web",
- "io": "netswitch_led_io",
- "inputs": [
-  {
-   "id": "alert_a",
-   "label": "LED alert A on"
-  },
-  {
-   "id": "alert_b",
-   "label": "LED alert B on"
-  },
-  {
-   "id": "alert_c",
-   "label": "LED alert C on"
-  }
- ]
+ "web": "netswitch_led_web"
 }

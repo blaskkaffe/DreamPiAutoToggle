@@ -5,34 +5,5 @@
  "visible": true,
  "order": 60,
  "ui": 2,
- "web": "netswitch_wifi_web",
- "io": "netswitch_wifi_io",
- "inputs": [
-  {
-   "id": "start_setup",
-   "label": "Start Wi-Fi setup"
-  },
-  {
-   "id": "stop_setup",
-   "label": "Stop Wi-Fi setup"
-  },
-  {
-   "id": "toggle_setup",
-   "label": "Start or stop Wi-Fi setup"
-  }
- ],
- "outputs": [
-  {
-   "id": "setup_running",
-   "label": "Wi-Fi setup is running"
-  },
-  {
-   "id": "setup_connected",
-   "label": "Wi-Fi setup has connected"
-  },
-  {
-   "id": "setup_failed",
-   "label": "Wi-Fi setup could not connect"
-  }
- ]
+ "web": "netswitch_wifi_web"
 }

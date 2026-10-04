@@ -5,28 +5,5 @@
  "visible": true,
  "order": 65,
  "ui": 2,
- "web": "netswitch_rebootupdate",
- "io": "netswitch_rebootupdate_io",
- "outputs": [
-  {
-   "id": "addon_update",
-   "label": "A newer version of this add-on is available"
-  },
-  {
-   "id": "dreampi_update",
-   "label": "DreamPi has newer scripts"
-  },
-  {
-   "id": "update_running",
-   "label": "An update is running"
-  },
-  {
-   "id": "update_failed",
-   "label": "The update failed"
-  },
-  {
-   "id": "rebooting",
-   "label": "The Pi is about to reboot"
-  }
- ]
+ "web": "netswitch_rebootupdate"
 }

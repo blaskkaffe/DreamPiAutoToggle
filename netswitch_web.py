@@ -22,7 +22,6 @@ except ImportError:
     from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
     from SocketServer import ThreadingMixIn
 
-import netswitch_bus as bus
 import netswitch_core as core
 import netswitch_modules as modules
 import netswitch_probes as probes
@@ -48,8 +47,8 @@ def api_state():
     d = {"pin": security.pin_required(),     # the page asks for it before update / restart / Wi-Fi connect
          "colours": modules.live_colours(), "tints": modules.live_tints(), "primary": {}, "primary_key": {}, "enabled": modules.enabled_map(),
          "warnings": warnings, "now": int(time.time()),
-         "highlight": bus.active_highlights(),       # {dashboard box id: why}: a module asks for one of its boxes to stand out for a while (an event soon, say)
-         "notices": bus.active_notices(),   # banners over the boxes that are not warnings: {"id", "text", "post" (dismiss: POST {"id"} there)}; modules add theirs
+         "highlight": {},       # {dashboard box id: why}: a module asks for one of its boxes to stand out for a while (an event soon, say)
+         "notices": [],         # banners over the boxes that are not warnings: {"id", "text", "post" (dismiss: POST {"id"} there)}
          "theme": {"highlight": core.highlight_style()}}
     modules.apply_api(d, warnings)          # what the enabled modules add: network, status, debug, wifi, the dot's LED look ...
     return d
@@ -150,13 +149,6 @@ def _static(name):
         except (IOError, OSError):
             return None
     return _static_cache[name]
-
-
-def _bus_reply():
-    """Settings > System > Connections: what the loaded modules can tell (outputs) and do (inputs), the links, and the standard links."""
-    decl = bus.declarations()
-    return {"outputs": decl["outputs"], "inputs": decl["inputs"], "links": bus.links(), "defaults": bus.default_links(),
-            "knobs": bus.knobs(), "levels": bus.levels()}
 
 
 def _colour_reply():
@@ -282,8 +274,6 @@ class Handler(BaseHTTPRequestHandler):
             self.send(json.dumps({"modules": modules.listing()}), "application/json")
         elif path == "/colours":
             self.send(json.dumps(_colour_reply()), "application/json")
-        elif path == "/bus":
-            self.send(json.dumps(_bus_reply()), "application/json")
         elif path == "/highlight":
             self.send(json.dumps(_highlight_reply()), "application/json")
         elif modules.route("GET", path):
@@ -318,8 +308,6 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_highlight()
         if path == "/palette":
             return self._post_palette()
-        if path.startswith("/bus/"):
-            return self._post_bus(path)
         if modules.route("POST", path):
             if modules.route("POST", path)(self) is True:    # an enabled module's own endpoint; True = it has answered
                 return
@@ -380,24 +368,6 @@ class Handler(BaseHTTPRequestHandler):
         refresh_page(force=True)       # the colours are built into the page
         core.debug_log("web page: %s colours %s" % (data["module"], json.dumps(got, sort_keys=True)))
         self.send(json.dumps({"module": data["module"], "colours": got, "tints": core.module_tints(data["module"])}), "application/json")
-
-    def _post_bus(self, path):
-        """The connections editor: /bus/links {"links": [...]} saves them, /bus/reset goes back to the standard ones, /bus/dismiss
-        {"id"} closes a notice."""
-        try:
-            if path == "/bus/links":
-                body = json.loads(self._body(65536).decode("utf-8"))
-                bus.save_links(body.get("links"), body.get("knobs"))
-                core.debug_log("web page: connections changed")
-            elif path == "/bus/reset":
-                bus.reset_links()
-            elif path == "/bus/dismiss":
-                bus.dismiss_notice(json.loads(self._body(1024).decode("utf-8")).get("id"))
-            else:
-                return self._refuse(404, "Not found")
-        except (ValueError, AttributeError, IOError, OSError) as e:
-            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
-        self.send(json.dumps(_bus_reply()), "application/json")
 
     def _post_palette(self):
         """The Global main colour picker: {"id": palette id, "ui": "#rrggbb"} changes how a palette colour looks on the page."""
@@ -494,17 +464,6 @@ def start_https():
     t.start()
 
 
-def bus_poller():
-    """Once a second: timers and pulses run out, jacks that are facts (DCNET is selected ...) are passed on to the cables, and modules
-    that were off hear about their inputs when they come back (netswitch_bus.poll)."""
-    while True:
-        try:
-            bus.poll({"source": "web service"})
-        except Exception:
-            traceback.print_exc()
-        time.sleep(1)
-
-
 def watchdog():
     """If the page stops answering (should never happen), exit so systemd
     restarts the service within seconds instead of leaving it dead."""
@@ -531,13 +490,11 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         HTTPS_PORT = int(sys.argv[2])
     core.reset_network_after_boot()      # DCNow! after every reboot
-    for target in (probes.checker, watchdog, bus_poller):
+    for target in (probes.checker, watchdog):
         t = threading.Thread(target=target)
         t.daemon = True
         t.start()
     start_https()
     refresh_page()
     modules.start_background()           # modules' own background work (the update check for the LEDs ...)
-    bus.resync({"source": "web service"})        # the inputs agree with the cables from the start
-    bus.pulse("app.started", 3, {"source": "web service"})
     Server(("", PORT), Handler).serve_forever()

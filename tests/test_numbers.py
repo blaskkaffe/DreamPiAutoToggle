@@ -6,8 +6,7 @@ import types
 import unittest
 import builtins
 
-from support import ROOT, core, sandbox, cleanup
-import netswitch_bus as bus
+from support import core, sandbox, cleanup
 import netswitch_numbers as nums
 import netswitch_hook as hook
 
@@ -15,12 +14,11 @@ builtins.__import__ = hook._original_import     # importing the hook may arm its
 
 
 def enable_numbers_module():
-    """The hook only reads numbers.json while the phone numbers module is installed (and not switched off); the network switcher module
-    is what the standard cables from the numbers lead to."""
-    import shutil
-    for name in ("numbers", "switcher"):
-        shutil.copytree(os.path.join(ROOT, "modules", name), os.path.join(hook.MODULES_DIR, name), ignore=shutil.ignore_patterns("__pycache__"))
-    bus._io_cache.clear()
+    """The hook only reads numbers.json while the phone numbers module is installed (and not switched off)."""
+    folder = os.path.join(hook.MODULES_DIR, "numbers")
+    os.makedirs(folder)
+    with open(os.path.join(folder, "module.json"), "w") as f:
+        f.write("{}")
 
 
 class SettingsTests(unittest.TestCase):
@@ -201,36 +199,6 @@ class WrapperTests(unittest.TestCase):
         r = self.dial("1111111")
         self.assertEqual((r["client"], self.selected()), ("PPP", "dcnet"))   # selection untouched, call on DCNow!
 
-    def test_what_a_number_does_is_set_by_the_cables_not_by_the_hook(self):
-        nums.save_numbers({"call_dcnow": ["5550001"], "call_dcnet": ["5550002"]})
-        bus.save_links([{"from": "numbers.call_dcnow", "to": "switcher.select_dcnet"}])                         # rewired
-        self.assertEqual((self.dial("5550001")["client"], self.selected()), ("dcnet", "dcnet"))               # a "call DCNow!" number now selects DCNET
-        open(hook.FLAG, "w").close()
-        bus.save_links([])                                                                                      # connected to nothing
-        self.assertEqual((self.dial("5550002")["client"], self.selected()), ("dcnet", "dcnet"))               # connects, the selection untouched
-        os.remove(hook.FLAG)
-        self.assertEqual((self.dial("5550002")["client"], self.selected()), ("PPP", "dcnow"))
-
-    def test_dialing_the_same_number_twice_counts_twice(self):
-        nums.save_numbers({"toggle_dcnow": ["5550001#"]})
-        bus.save_links([{"from": "numbers.toggle_dcnow", "to": "switcher.toggle_network"}])
-        self.dial("5550001#")
-        self.assertEqual(self.selected(), "dcnet")
-        self.dial("5550001#")                                                                                  # a new rising edge, at once
-        self.assertEqual(self.selected(), "dcnow")
-
-    def test_a_hang_up_number_can_do_something_else_and_still_hangs_up(self):
-        nums.save_numbers({"toggle_dcnow": ["5550001#"]})
-        bus.save_links([{"from": "numbers.toggle_dcnow", "to": "app.notice_a"}], {"app.notice_a": {"text": "Called", "seconds": 30}})
-        r = self.dial("5550001#")
-        self.assertEqual((r["client"], self.selected()), ("idle", "dcnow"))                                    # not answered, nothing selected
-        self.assertEqual([n["text"] for n in bus.active_notices()], ["Called"])
-
-    def test_without_the_numbers_module_the_built_in_number_still_selects_dcnow(self):
-        open(hook.FLAG, "w").close()
-        os.remove(os.path.join(hook.MODULES_DIR, "numbers", "module.json"))
-        self.assertEqual((self.dial("11111")["client"], self.selected()), ("PPP", "dcnow"))
-
     def test_other_numbers_follow_the_selection(self):
         self.assertEqual(self.dial("5551234")["client"], "PPP")
         open(hook.FLAG, "w").close()
@@ -247,7 +215,6 @@ class WrapperTests(unittest.TestCase):
         nums.save_numbers({"toggle_dcnet": ["*61#"], "call_dcnet": ["0002"]})
         self.assertEqual(self.dial("1111*61#")["client"], "idle")
         self.assertEqual(self.selected(), "dcnet")
-        bus.set_output("numbers.toggle_dcnet", False)                       # (the one-second pulse of the first number has run out)
         os.remove(hook.FLAG)
         self.assertEqual(self.dial("9990002")["client"], "dcnet")
 

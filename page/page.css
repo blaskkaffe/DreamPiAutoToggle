@@ -107,7 +107,6 @@
  .ctls{display:flex;gap:8px;align-items:center}
  .srow.wrap > .ctls{margin-left:auto}
  .grip{flex:none;width:40px;height:44px;margin:-6px 0 -6px -10px;padding:0;background:none;color:#777;font-size:1.2em;letter-spacing:-.15em;line-height:1;cursor:grab;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none} .grip:hover,.grip:focus-visible{color:#ccc}
- .wlink{padding:6px 0;border-top:1px solid var(--line)} .wlink:first-child{border-top:0} .pop .wlinks{margin:0 0 8px} .wlink select.ord,.wlink input.in{max-width:62%;min-width:0} .wlink .stack{flex-direction:column;align-items:stretch;gap:4px} .wlink .stack select.ord{max-width:none;width:100%}
  .mlist .srow:first-child{border-top:0} .pop .mlist{margin:0 0 8px} .srow[data-id] > span:nth-child(2){flex:1} .srow[data-id] > .fixed{flex:none;white-space:nowrap}
  .dragging,.dragging *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none} .dragging .grip{cursor:grabbing}
  .srow.drag{position:relative;z-index:5;will-change:transform;background:var(--card);border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.65);border-top-color:transparent}

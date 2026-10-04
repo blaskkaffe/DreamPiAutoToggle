@@ -11,50 +11,5 @@
  },
  "colours_unique": true,
  "web": "netswitch_switcher",
- "primary": "dcnow",
- "io": "netswitch_switcher_io",
- "inputs": [
-  {
-   "id": "select_dcnow",
-   "label": "Select DCNow!"
-  },
-  {
-   "id": "select_dcnet",
-   "label": "Select DCNET"
-  },
-  {
-   "id": "toggle_network",
-   "label": "Switch to the other network"
-  }
- ],
- "outputs": [
-  {
-   "id": "dcnow_selected",
-   "label": "DCNow! is selected"
-  },
-  {
-   "id": "dcnet_selected",
-   "label": "DCNET is selected"
-  },
-  {
-   "id": "dreampi_ready",
-   "label": "DreamPi is ready for calls"
-  },
-  {
-   "id": "in_call",
-   "label": "DreamPi is in a call"
-  },
-  {
-   "id": "network_up",
-   "label": "The Pi is on the network"
-  },
-  {
-   "id": "internet_ok",
-   "label": "The internet works"
-  },
-  {
-   "id": "modem_plugged",
-   "label": "The modem is plugged in"
-  }
- ]
+ "primary": "dcnow"
 }

@@ -69,7 +69,6 @@ function renderLayout(){
  (LAY.dashboard||[]).forEach(function(b){dash.appendChild(box("dashboard",b))});
  (LAY.settings||[]).forEach(function(b){cols.appendChild(box("settings",b))});
  buildPicker(cols);
- buildWiring(cols);
  AFTER.forEach(function(f){f()});AFTER=[]}
 function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});applyTheme();applyHighlight();hideEmptyBoxes()}
 // ---- highlight (/api "highlight": {box id: why}): those dashboard boxes get the class "hl" (page.css draws it) and the reason as a
@@ -501,53 +500,6 @@ function buildPicker(cols){
  btn.onclick=function(e){e.stopPropagation();if(p.isOpen()){p.close();return}
   xhrJson("GET","/modules",function(r){if(!r)return;paint(r.modules);p.open(btn)})};
  done.onclick=function(){p.close()}}
-// ---- connections (Settings > System > Connections > Edit): cables between modules' jacks (netswitch_bus.py).
-// Every output and input is a simple on/off jack. An input is off until a cable from an output that is on (or another module, through
-// the API) turns it on; "Inverted" makes a cable carry the opposite. An input's settings (knobs) belong to the input, not to a cable.
-function buildWiring(cols){
- var card=cols.querySelector('[data-box="system"] .card');if(!card)return;
- var btn=h("button",{type:"button","class":"pill-s","aria-haspopup":"dialog","aria-label":"Edit the connections",text:"Edit"}),list=h("div",{"class":"wlinks"}),
-  add=h("button",{type:"button","class":"pill-s",text:"Add cable"}),reset=h("button",{type:"button","class":"pill-s",text:"Restore standard"}),done=h("button",{type:"button","class":"pill-s",text:"Done"}),
-  pop=h("div",{},[h("div",{"class":"t",text:"Connections: a cable carries “on” from an output of one module to an input of another. Inputs are off until something turns them on. A module works without any cable."}),list,h("div",{"class":"bar"},[add,reset,done])]),
-  row=h("div",{"class":"srow","data-picker":"connections"},[h("span",{},[document.createTextNode("Connections"),h("span",{"class":"sub",text:"Cables from one module's outputs to another's inputs"})]),btn]),
-  p=ui.popup(pop),state={outputs:[],inputs:[],links:[],defaults:[],knobs:{},levels:{outputs:{},inputs:{}}},timer=null;
- var first=card.querySelector('[data-picker="modules"]');card.insertBefore(row,first?first.nextSibling:card.firstChild);card.appendChild(pop);
- function find(items,id){for(var i=0;i<items.length;i++)if(items[i].id===id)return items[i];return null}
- function save(){clearTimeout(timer);timer=setTimeout(function(){post("/bus/links",{links:state.links,knobs:state.knobs},function(){})},300)}      // the rows keep their own objects: the server's cleaned copy is not put in their place
- function selectOf(items,value,onPick,label){var sel=h("select",{"class":"ord","aria-label":label}),groups={},order=[];
-  if(value&&!find(items,value))items=items.concat([{id:value,module:"?",module_title:"Not loaded",label:value}]);
-  items.forEach(function(it){if(!groups[it.module_title]){groups[it.module_title]=h("optgroup",{label:it.module_title});order.push(it.module_title);sel.appendChild(groups[it.module_title])}
-   var o=h("option",{value:it.id,text:it.label});if(it.id===value)o.selected=true;groups[it.module_title].appendChild(o)});
-  sel.onchange=function(){onPick(sel.value)};return sel}
- function knobsOf(id){var input=find(state.inputs,id);if(!input||!input.params.length)return null;
-  var values=state.knobs[id]=state.knobs[id]||{};
-  return input.params.map(function(q){var c,cur=values[q.key]===undefined?q.default:values[q.key];
-   if(q.type==="select"){c=h("select",{"class":"ord","aria-label":q.label});q.options.forEach(function(o){var op=h("option",{value:o[0],text:o[1]});if(cur===o[0])op.selected=true;c.appendChild(op)});
-    c.onchange=function(){values[q.key]=c.value;save()}}
-   else{c=h("input",{type:q.type==="number"?"number":"text","class":"in","aria-label":q.label,value:cur===undefined?"":cur});
-    c.onchange=function(){values[q.key]=q.type==="number"?parseFloat(c.value)||0:c.value;save()}}
-   return h("div",{"class":"frow"},[h("span",{text:q.label}),c])})}
- function lamp(on){return h("span",{"class":"sub",text:on?"on now":"off now"})}
- function block(link){var b=h("div",{"class":"wlink"}),lv=state.levels||{outputs:{},inputs:{}};
-  b.appendChild(h("div",{"class":"frow stack"},[h("span",{},[document.createTextNode("From (output) "),lamp(lv.outputs[link.from])]),selectOf(state.outputs,link.from,function(v){link.from=v;save();paint()},"From")]));
-  b.appendChild(h("div",{"class":"frow stack"},[h("span",{},[document.createTextNode("To (input) "),lamp(lv.inputs[link.to])]),selectOf(state.inputs,link.to,function(v){link.to=v;save();paint()},"To")]));
-  var inv=h("input",{type:"checkbox","aria-label":"Inverted: the input is on while the output is off"});inv.checked=!!link.invert;
-  inv.onchange=function(){link.invert=inv.checked;save()};
-  b.appendChild(h("label",{"class":"frow"},[h("span",{text:"Inverted (on while the output is off)"}),inv]));
-  var kn=knobsOf(link.to);if(kn){b.appendChild(h("div",{"class":"sub",text:"Settings of this input"}));kn.forEach(function(k){b.appendChild(k)})}
-  var rm=h("button",{type:"button","class":"pill-s danger",text:"Remove","aria-label":"Remove this cable"});
-  rm.onclick=function(){state.links.splice(state.links.indexOf(link),1);save();paint()};
-  b.appendChild(h("div",{"class":"bar end"},[rm]));return b}
- function paint(){list.innerHTML="";
-  if(!state.links.length)list.appendChild(h("div",{"class":"sub",text:"No cables: every input stays off."}));
-  state.links.forEach(function(l){list.appendChild(block(l))})}
- add.onclick=function(){if(!state.outputs.length||!state.inputs.length){alert("There is nothing to connect: no loaded module has outputs and inputs.");return}
-  state.links.push({from:state.outputs[0].id,to:state.inputs[0].id,invert:false});save();paint()};
- reset.onclick=function(){if(!confirm("Put the cables back as they were when the add-on was installed?"))return;
-  post("/bus/reset",{},function(r){if(r){state=r;paint()}})};
- done.onclick=function(){p.close()};
- btn.onclick=function(e){e.stopPropagation();if(p.isOpen()){p.close();return}xhrJson("GET","/bus",function(r){if(!r)return;state=r;paint();p.open(btn)})};
- hook("settingsClose",function(){p.close()})}
 // ---- backgrounds: the picker's top background module draws (a fullscreen one hides those below, a part one leaves them)
 function startBackgrounds(){(LAY.backgrounds||[]).forEach(function(b){
  var host=h("div",{"class":"bgpart "+(b.type==="part"?"part "+(b.position||"bottom"):"fullscreen"),"data-bg":b.mod});$("bg").appendChild(host);

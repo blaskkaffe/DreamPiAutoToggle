@@ -38,7 +38,7 @@ visible in the picker is always on). Not installed or not enabled = absent: no l
 
 ```
 modules/<name>/
-  module.json      {"name", "description", "enabled", "visible"}  + optional "web", "ui", "order", "colours", "colours_unique", "primary", "note", "tints", "io", "inputs", "outputs"
+  module.json      {"name", "description", "enabled", "visible"}  + optional "web", "ui", "order", "colours", "colours_unique", "primary", "note"
   layout.json      what it shows (below); a module with only a web entry or only a background may differ
   netswitch_*.py   its Python: the web entry named in "web", plus anything its services use
   page.js          optional: custom widgets, hooks, a background (runs in the page's script after the base scripts)
@@ -56,7 +56,6 @@ modules/<name>/
 | `description` | the text under it in the picker |
 | `enabled` | on when first loaded; what the user sets in the picker (`modules.json`) overrides it (older files: `default`) |
 | `visible` | `false` = always on (no switch in the picker, which still lists it so it can be moved) (the network switcher: it can't be removed); default `true`. The picker lists a module whenever it has a dashboard box, a settings box or a background (`netswitch_modules.shows_something()`, also while it is off) or is `visible`; only a plain service with none of them is left out |
-| `io`, `inputs`, `outputs` | how the module takes part in the **connections**: its outputs (what it tells), its inputs (what it can do) and the Python 2/3 file with the handlers of the inputs. A module never calls another one; see [connections.md](connections.md) |
 | `web` | Python module name of its web entry (routes, `api()` hook) |
 | `ui` | the page kit version it was written for (now 2); a module for a newer kit is not loaded |
 | `order` | where it starts out in the list until the user moves it (the picker order, `module_order.json`, replaces it) |

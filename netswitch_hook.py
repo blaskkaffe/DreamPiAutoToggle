@@ -212,35 +212,6 @@ def _select_dcnet(on):
         os.remove(FLAG)
 
 
-# ------------------------------------------------ what a dialed number does: the links (netswitch_bus.py)
-# Dialing a number in one of the lists turns an output jack of the numbers module on for a moment ("numbers.call_dcnow" ...). What
-# that does (select a network, show a notice ...) is whatever the user plugged it into on the page, so this file knows nothing about
-# the network switcher. Only when the bus can't be loaded (a damaged install) the lists do what they always did.
-_bus_module = [None]
-_LISTS_WITHOUT_BUS = {"toggle_dcnow": False, "toggle_dcnet": True, "call_dcnow": False, "call_dcnet": True}   # list -> selects DCNET?
-
-
-def _bus():
-    """netswitch_bus once it has been imported, else None."""
-    if _bus_module[0] is None:
-        try:
-            import netswitch_bus
-            _bus_module[0] = netswitch_bus
-        except Exception:
-            _bus_module[0] = False
-    return _bus_module[0] or None
-
-
-def _run_links(action, number):
-    """Run what the list's output is linked to. Returns a few words about it for the log."""
-    bus = _bus() if _module_active("numbers") else None
-    if bus is None:       # no numbers module (its outputs are not there to link) or no bus: the built-in default numbers act as before
-        _select_dcnet(_LISTS_WITHOUT_BUS[action])
-        return "built-in: selected %s" % ("DCNET" if _LISTS_WITHOUT_BUS[action] else "DCNow!")
-    ran = bus.pulse("numbers." + action, 1.0, {"source": "dialed number"})        # the inputs it is connected to react at once
-    return "switched on %s" % (", ".join(ran) if ran else "nothing")
-
-
 def _load_numbers():
     """The number lists from numbers.json; a missing, unreadable or partly
     wrong file falls back to the defaults for what it doesn't provide."""
@@ -294,26 +265,33 @@ def _patch(module):
         # Hang-up numbers: select a network, don't answer, busy tone (like *70)
         if action in HANGUP_ACTIONS:
             try:
-                did = _run_links(action, raw_string)
+                dcnet = action == "toggle_dcnet"
+                _select_dcnet(dcnet)
+                net = "DCNET" if dcnet else "DCNow!"
                 busy = _play_busy(getattr(self, "modem", None))
-                _log(self, "%s dialed (%s): %s, not answering%s" % (raw_string, action, did, ", busy tone sent" if busy else ""))
-                _write_modem("%s dialed, call not answered (%s)" % (raw_string, did))
+                _log(self, "%s dialed (%s): %s selected, not answering%s"
+                     % (raw_string, action, net, ", busy tone sent" if busy else ""))
+                _write_modem("Switched to %s by %s, call not answered" % (net, raw_string))
             except Exception as e:
-                _log(self, "could not run what %s does: %s" % (raw_string, e))
+                _log(self, "could not switch network: %s" % e)
             self.mode = "idle"
             return {"client": "idle", "dial_string": raw_string}
-        # Call numbers: do what they are linked to (usually: select a network) before DreamPi routes the call
+        # Call numbers: remember the choice before DreamPi routes the call
         try:
-            if action in ("call_dcnow", "call_dcnet"):
-                _log(self, "%s dialed (%s): %s" % (raw_string, action, _run_links(action, raw_string)))
+            if action == "call_dcnow":
+                _select_dcnet(False)
+                _log(self, "%s dialed, DCNow! selected" % raw_string)
+            elif action == "call_dcnet":
+                _select_dcnet(True)
+                _log(self, "%s dialed, DCNET selected" % raw_string)
         except Exception as e:
-            _log(self, "could not run what %s does: %s" % (raw_string, e))
+            _log(self, "could not update selection: %s" % e)
 
         result = original(self, raw_string)
 
         try:
             if isinstance(result, dict) and result.get("client") == "PPP" \
-                    and action != "openmenu" and os.path.exists(FLAG):      # whatever is selected now, after the links ran
+                    and action not in ("openmenu", "call_dcnow") and os.path.exists(FLAG):
                 if getattr(self, "dcnet", False):
                     self.mode = "dcnet"
                     self.dial_string = raw_string

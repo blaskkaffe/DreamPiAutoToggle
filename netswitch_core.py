@@ -11,10 +11,6 @@ import time
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb", "led": "#rrggbb"}}: palette colours the user changed (on screen, on the LED)
-LINKS = os.path.join(BASE_DIR, "links.json")                    # {"links": [{"from": "numbers.call_dcnow", "to": "switcher.select_dcnow", "invert": false}], "knobs": {...}}: the cables between the modules' jacks (see netswitch_bus.py)
-SIGNALS = "/tmp/dreampi-netswitch.signals"                       # a directory: the on / off state of every jack of the bus (netswitch_bus.py)
-NOTICES = "/tmp/dreampi-netswitch.notices"                       # banners that the "Show a notice" input put up: [{"id", "text", "until"}]
-PROFILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "profile.json")   # the app's standard settings, shipped with the code: which modules start on, which links are made
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
 MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"switcher": {"dcnow": "orange", ...}}: the global-palette colours each module uses
 MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["switcher", "numbers", ...]: the order set in the module picker (top = first, wins)
@@ -116,21 +112,7 @@ def module_visible(name, manifest=None):
     return m.get("visible", True) is not False
 
 
-def profile():
-    """The app's standard settings (profile.json next to the code): {"modules": {name: on}, "links": [...]}. {} when there is none."""
-    try:
-        with open(PROFILE) as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except (IOError, OSError, ValueError):
-        return {}
-
-
-def module_default_enabled(manifest, name=None):
-    """Whether a module starts out on: the profile's choice for it, else its manifest's (the user's own choice, in modules.json, wins over both)."""
-    chosen = (profile().get("modules") or {}).get(name) if name else None
-    if isinstance(chosen, bool):
-        return chosen
+def module_default_enabled(manifest):
     return bool(manifest.get("enabled", manifest.get("default", True)))
 
 
@@ -188,7 +170,7 @@ def module_enabled(name, state=None):
     if not module_visible(name, manifest):
         return True
     state = modules_state() if state is None else state
-    return state.get(name, module_default_enabled(manifest, name))
+    return state.get(name, module_default_enabled(manifest))
 
 
 def save_module_enabled(name, on):

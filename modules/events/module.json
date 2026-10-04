@@ -12,12 +12,5 @@
  "web": "netswitch_events",
  "tints": {
   "events": false
- },
- "io": "netswitch_events_io",
- "outputs": [
-  {
-   "id": "reminder_due",
-   "label": "An event you want to be reminded of starts soon"
-  }
- ]
+ }
 }
