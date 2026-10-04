@@ -95,7 +95,7 @@ warning box on the page (and in the picker).
 | `colours` (**Global colours**) | colours more than one module uses, which a module announces by adding a row here; others pick them by name (`"network"`, `"global"`, `"switcher.dcnow"`) | switcher (DCNow! and DCNET colours, Global main, Notification highlight) |
 | `network` | (dashboard) the network selection and its status | switcher |
 
-The default order puts **About** and then **System** at the very bottom of Settings (the system module starts out before wifi and rebootupdate in the list, and the module picker is a row inside System), and the Reboot row is the last row of System. Use the same title for the same box everywhere (`System`, `About`, `GPIO`, `Configuration`): the first module in picker order that gives one names it. Lower-case in `layout.json`, as the box id.
+**System is always the last box of Settings**, whatever the module order (the loader sorts it last); the default order also puts **About** just above it. The default order puts **About** and then **System** at the very bottom of Settings (the system module starts out before wifi and rebootupdate in the list, and the module picker is a row inside System), and the Reboot row is the last row of System. Use the same title for the same box everywhere (`System`, `About`, `GPIO`, `Configuration`): the first module in picker order that gives one names it. Lower-case in `layout.json`, as the box id.
 
 **Boxes are shared by name.** Boxes with the same `box` name (case-insensitive) in any modules are **one box**: their items follow each
 other in picker order (the items of one module keep their order). The box's title is the first non-empty `title` in picker order, so a

@@ -166,6 +166,12 @@ class WithEverything(Base):
         self.assertEqual((about["mods"], about["title"]), (["system"], "About"))               # the versions are their own box, not part of System
         self.assertEqual([b["id"] for b in lay["dashboard"]], ["network", "clock", "players", "events", "debug log"])
 
+    def test_system_is_the_last_settings_box_whatever_the_picker_order(self):
+        core.save_module_order(["rebootupdate", "wifi", "system", "debuglog", "background", "led", "numbers", "events", "players", "clock", "switcher"])
+        lay = layout_of(self.page())
+        self.assertEqual([b["id"] for b in lay["settings"]][-1], "system")
+        self.assertEqual(len([b for b in lay["settings"] if b["id"] == "system"]), 1)
+
     def test_led_hardware_settings_are_in_the_gpio_box_and_come_from_the_led_module(self):
         lay = layout_of(self.page())
         gpio = [b for b in lay["settings"] if b["id"] == "gpio"][0]

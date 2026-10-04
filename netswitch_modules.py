@@ -293,6 +293,7 @@ def layout():
                     b["items"].append(w)
         for ns, spec in (lay.get("data") or {}).items():
             out["data"].setdefault(ns, dict(spec, mod=name))      # the first module to ask for a name keeps it
+    out["settings"].sort(key=lambda b: b["id"] == "system")   # System (the module picker, Wi-Fi, update, reboot) is always the last box of Settings, whatever the picker order (a stable sort: the others keep theirs)
     return out
 
 
