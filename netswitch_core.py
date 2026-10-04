@@ -12,6 +12,8 @@ BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb", "led": "#rrggbb"}}: palette colours the user changed (on screen, on the LED)
 LINKS = os.path.join(BASE_DIR, "links.json")                    # {"links": [{"from": "numbers.call_dcnow", "to": "switcher.select_network", "params": {...}}]}: what an output of one module does (see netswitch_bus.py)
+HIGHLIGHTS = "/tmp/dreampi-netswitch.highlights"                # boxes the "Highlight a box" input makes stand out: {box id: {"until", "why"}}
+LED_ALERTS = "/tmp/dreampi-netswitch.ledalerts"                  # {"a": until}: the LED alerts a link switched on (see modules/led/netswitch_led_io.py)
 NOTICES = "/tmp/dreampi-netswitch.notices"                       # banners that the "Show a notice" input put up: [{"id", "text", "until"}]
 PROFILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "profile.json")   # the app's standard settings, shipped with the code: which modules start on, which links are made
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
@@ -694,6 +696,17 @@ def update_info():
         with open(UPDATE_INFO) as f:
             data = json.load(f)
         return data
+    except (IOError, OSError, ValueError, AttributeError):
+        return {}
+
+
+def led_alerts(now=None):
+    """{"a": True, ...}: the LED alerts a connection switched on that are still running (LED_ALERTS holds {slot: until})."""
+    now = time.time() if now is None else now
+    try:
+        with open(LED_ALERTS) as f:
+            data = json.load(f)
+        return dict((k, True) for k, v in data.items() if isinstance(v, (int, float)) and v > now) if isinstance(data, dict) else {}
     except (IOError, OSError, ValueError, AttributeError):
         return {}
 

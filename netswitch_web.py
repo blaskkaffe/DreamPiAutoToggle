@@ -48,7 +48,7 @@ def api_state():
     d = {"pin": security.pin_required(),     # the page asks for it before update / restart / Wi-Fi connect
          "colours": modules.live_colours(), "tints": modules.live_tints(), "primary": {}, "primary_key": {}, "enabled": modules.enabled_map(),
          "warnings": warnings, "now": int(time.time()),
-         "highlight": {},       # {dashboard box id: why}: a module asks for one of its boxes to stand out for a while (an event soon, say)
+         "highlight": bus.active_highlights(),       # {dashboard box id: why}: a module asks for one of its boxes to stand out for a while (an event soon, say)
          "notices": bus.active_notices(),   # banners over the boxes that are not warnings: {"id", "text", "post" (dismiss: POST {"id"} there)}; modules add theirs
          "theme": {"highlight": core.highlight_style()}}
     modules.apply_api(d, warnings)          # what the enabled modules add: network, status, debug, wifi, the dot's LED look ...

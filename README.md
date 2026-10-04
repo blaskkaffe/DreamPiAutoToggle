@@ -132,7 +132,7 @@ Any other number connects to the currently selected network. `11111` is the only
 
 ## Connections
 
-Modules never call each other, so each works on its own. Instead a module says what it can **tell** (its *outputs*: a number was dialed, the selected network changed, the add-on started) and what it can **do** (its *inputs*: select a network, start Wi-Fi setup, show a notice, change a colour), and you make the **links**: "when this happens, do that". Settings > **System** > **Connections** > **Edit** lists the connections, each as **When** (an output of a loaded module) and **Do** (an input of a loaded module, with its own settings, for example which network to select); **Add connection**, **Remove** and **Restore standard** (the standard connections are the add-on's own choice and ship with it). A connection to a module that is switched off or deleted is simply skipped; it comes back to life with the module.
+Modules never call each other, so each works on its own. Instead a module says what it can **tell** (its *outputs*: a number was dialed, the selected network changed, the add-on started) and what it can **do** (its *inputs*: select a network, start Wi-Fi setup, show a notice, make a box stand out, flash an LED alert, change a colour), and you make the **links**: "when this happens, do that". Settings > **System** > **Connections** > **Edit** lists the connections, each as **When** (an output of a loaded module) and **Do** (an input of a loaded module, with its own settings, for example which network to select); **Add connection**, **Remove** and **Restore standard** (the standard connections are the add-on's own choice and ship with it). A connection to a module that is switched off or deleted is simply skipped; it comes back to life with the module.
 
 The standard connections are exactly what the add-on did before: the four number lists select DCNow! or DCNET. Change them to anything the loaded modules offer: a number that shows a notice on the page, one that changes a colour, one that starts Wi-Fi setup. Without the phone numbers module, `11111` still selects DCNow! (the add-on's built-in number); without the network switcher, the numbers still connect or hang up the call, they just select nothing.
 
@@ -220,6 +220,7 @@ Each row in **Settings > Status LED** is a look (colour, animation, level) and t
 | Modem | Modem plugged in, Modem missing |
 | Raspberry Pi health | Under-voltage, Throttled, Over 80 °C, 70 °C or warmer |
 | Wi-Fi setup | Scanning or hosting, Choose a network, Connecting, Connected, Could not connect |
+| Alerts from connections | Alert A, B and C: switched on for a while by a connection with **Show an LED alert** (so a dialed number, or anything else you link, can flash the LED in the look you pick) |
 | The add-on | Add-on update available, DreamPi update available, Update running, Update done, Update failed, About to reboot |
 | Online players | Your game is played, A friend came online (from the favorites of the Online players module; simulated in tests only, [not yet seen on hardware](docs/hardware-status.md)) |
 | DC99 events | Event starting soon (a reminded event, from the reminder time set in Settings > DC99 events until 10 minutes after its start; works without the page open) |

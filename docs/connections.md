@@ -57,6 +57,7 @@ loaded") until it comes back. `GET /bus` (outputs, inputs, links, standard links
 | Name | Kind | What |
 |---|---|---|
 | `app.notice` | input | A banner on the page for N seconds (`text`, `seconds`; stored in `/tmp/dreampi-netswitch.notices`, dismiss with ✕) |
+| `app.highlight` | input | A box on the main page stands out for N seconds (`box` = a dashboard box of a loaded module, `seconds`, `why`; the look is Settings > Appearance > Notification highlight; `/tmp/dreampi-netswitch.highlights`) |
 | `app.colour` | input | Give a colour of a loaded module a palette colour (`target` = `module.key`, `colour`), the same as its colour pick in Appearance |
 | `app.started` | output | The add-on's web service started |
 
@@ -68,6 +69,8 @@ loaded") until it comes back. `GET /bus` (outputs, inputs, links, standard links
 | `numbers.call_dcnow` / `call_dcnet` (a "call" number was dialed) | `switcher.select_network` DCNow! / DCNET | The call connects, through the network that is selected after the links ran. |
 | `switcher.network_selected` | (nothing) | Told by every way of switching: the page, a number, a link. |
 
+Other inputs to link to: `wifi.start_setup` / `stop_setup` (Wi-Fi module), `led.alert` (the LED module: switches the LED message **Alert A / B / C** on for a while; put that message in a colour row of Settings > Status LED to say what it looks like, so a number, a button or a notice can also flash the LED), `switcher.toggle_network`.
+
 The hook is the only part that knows no modules: dialing a number emits `numbers.<list>` and the bus does the rest. Without the
 bus files, or without the numbers module, the lists act as they always did (`11111` selects DCNow!), so a damaged install still
 routes calls.
@@ -78,4 +81,4 @@ routes calls.
   (pressed, closed, opened, held) of the switcher module with their actions as links.
 - The LED messages still read the other modules' state from core (`ledconfig.gather()`); they should become *state* outputs that
   any module can publish, so the LED message list is "everything the loaded modules can tell".
-- More inputs: highlight a box, show an LED look for a while, reboot, check for updates.
+- More inputs: reboot, check for updates.

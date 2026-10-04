@@ -207,6 +207,35 @@ class RunTests(BusBase):
         self.assertEqual(core.module_colours("switcher")["dcnow"], "green")
         self.assertFalse(bus.run_input("app.colour", {"target": "nope.x", "colour": "green"})["ok"])
 
+    def test_a_box_can_be_made_to_stand_out_for_a_while(self):
+        boxes = [o[0] for i in bus.declarations()["inputs"] if i["id"] == "app.highlight" for o in i["params"][0]["options"]]
+        self.assertIn("network", boxes)
+        self.assertIn("clock", boxes)
+        self.assertTrue(bus.run_input("app.highlight", {"box": "Clock", "seconds": 30, "why": "Look here"})["ok"])
+        self.assertEqual(bus.active_highlights(), {"clock": "Look here"})
+        with open(core.HIGHLIGHTS) as f:
+            data = json.load(f)
+        data["clock"]["until"] = time.time() - 1
+        with open(core.HIGHLIGHTS, "w") as f:
+            json.dump(data, f)
+        self.assertEqual(bus.active_highlights(), {})
+        self.assertFalse(bus.run_input("app.highlight", {"box": ""})["ok"])
+
+    def test_an_led_alert_lights_its_message_for_a_while(self):
+        import sys
+        sys.path.insert(0, os.path.join(REAL_MODULES, "led"))
+        import netswitch_ledconfig as ledconfig
+        ledconfig.save_led_config({"groups": [{"id": "g1", "colour": "red", "effect": "blink", "speed": "fast", "messages": ["alert-b"]}]})
+        ctx = lambda: dict(ledconfig.gather(live=False), alerts=core.led_alerts())
+        self.assertEqual(ledconfig.active_messages(ctx()), [])
+        bus.save_links([{"from": "numbers.call_dcnow", "to": "led.alert", "params": {"slot": "b", "seconds": 30}}])
+        bus.emit("numbers.call_dcnow")
+        looks = ledconfig.active_messages(ctx())
+        self.assertEqual([(m["key"], m["messages"], m["effect"]) for m in looks], [("g1", ["alert-b"], "blink")])
+        with open(core.LED_ALERTS, "w") as f:
+            json.dump({"b": time.time() - 1}, f)
+        self.assertEqual(ledconfig.active_messages(ctx()), [])
+
     def test_notices_expire_and_can_be_dismissed(self):
         bus.run_input("app.notice", {"text": "Soon gone", "seconds": 1})
         bus.run_input("app.notice", {"text": "Stays", "seconds": 60})

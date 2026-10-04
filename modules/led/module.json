@@ -5,5 +5,40 @@
  "visible": true,
  "order": 40,
  "ui": 2,
- "web": "netswitch_led_web"
+ "web": "netswitch_led_web",
+ "io": "netswitch_led_io",
+ "inputs": [
+  {
+   "id": "alert",
+   "label": "Show an LED alert",
+   "summary": "LED alert {slot}",
+   "params": [
+    {
+     "key": "slot",
+     "label": "Which alert",
+     "type": "select",
+     "options": [
+      [
+       "a",
+       "Alert A"
+      ],
+      [
+       "b",
+       "Alert B"
+      ],
+      [
+       "c",
+       "Alert C"
+      ]
+     ]
+    },
+    {
+     "key": "seconds",
+     "label": "For how many seconds",
+     "type": "number",
+     "default": 10
+    }
+   ]
+  }
+ ]
 }

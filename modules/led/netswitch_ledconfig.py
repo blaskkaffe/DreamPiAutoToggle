@@ -23,6 +23,7 @@ CATEGORIES = [   # key, heading (the order the page lists them in)
     ("addon", "The add-on"),
     ("players", "Online players"),
     ("events", "DC99 events"),
+    ("alerts", "Alerts from connections"),
     ("general", "General"),
 ]
 # key, label (the short name shown as a tag), category, what it means, detected.
@@ -67,6 +68,9 @@ MESSAGES = [
     ("players-game", "Your game is played", "players", "Someone is playing one of your favourite games (Settings > Online players).", True),
     ("players-friend", "A friend came online", "players", "One of your favourite players is online (Settings > Online players).", True),
     ("event-soon", "Event starting soon", "events", "A DC99 event you asked to be reminded of starts soon (from the time set in Settings > DC99 events until 10 minutes after the start, or until you dismiss it on the page).", True),
+    ("alert-a", "Alert A", "alerts", "Switched on for a while by a connection (Settings > System > Connections, \"Show an LED alert\"), then off again.", True),
+    ("alert-b", "Alert B", "alerts", "Switched on for a while by a connection (Settings > System > Connections, \"Show an LED alert\"), then off again.", True),
+    ("alert-c", "Alert C", "alerts", "Switched on for a while by a connection (Settings > System > Connections, \"Show an LED alert\"), then off again.", True),
     ("ok", "Everything OK", "general", "No error and no warning: DreamPi is ready or in a call, and the network and internet work.", True),
     ("error", "Error", "general", u"Anything critical: DreamPi not running, no network, no internet, under-voltage, over 80 \u00b0C or the modem missing.", True),
     ("warning", "Warning", "general", "Any warning or important information: DNS failing, slow connection, weak Wi-Fi, no IP address yet, throttled or warm, DCNET unavailable, a failed update, a failed Wi-Fi setup, an update available.", True),
@@ -79,6 +83,7 @@ WARNINGS = ("dns-fail", "net-slow", "wifi-weak", "no-ip", "throttled", "warm", "
 # then errors, warnings, what DreamPi is doing, plain information. "off" is not in the list: it only applies when nothing else does.
 PRIORITY_ORDER = [
     "reboot",
+    "alert-a", "alert-b", "alert-c",
     "wifisetup-failed", "wifisetup-ok", "wifisetup-connecting", "wifisetup-choose", "wifisetup-scan",
     "update-failed", "update-ok", "update-running",
     "error",
@@ -375,11 +380,11 @@ def gather(live=True):
     """What the messages are made from, read from the files the other services write. live=False is only what DreamPi is doing and
     which network is selected (the status dot's preview)."""
     ctx = {"state": core.dreampi_state()[0], "selected": "dcnet" if os.path.exists(core.FLAG) else "dcnow",
-           "net": {}, "players": {}, "wifi": "idle", "update": "idle", "update_info": {}, "reboot": False, "dcnet_problem": False, "event": None}
+           "net": {}, "players": {}, "alerts": {}, "wifi": "idle", "update": "idle", "update_info": {}, "reboot": False, "dcnet_problem": False, "event": None}
     if live:
         ctx.update(net=core.network_state() or {}, wifi=core.wifi_state().get("state", "idle"), update=core.update_status(),
                    update_info=core.update_info(), reboot=core.reboot_pending(), players=core.players_watch(), dcnet_problem=bool(core.dcnet_problem()),
-                   event=core.event_reminder())
+                   event=core.event_reminder(), alerts=core.led_alerts())
     return ctx
 
 
@@ -430,6 +435,9 @@ def active_keys(ctx):
         keys.add("players-friend")
     if ctx.get("event"):
         keys.add("event-soon")
+    for slot, on in (ctx.get("alerts") or {}).items():
+        if on and "alert-" + slot in MESSAGE:
+            keys.add("alert-" + slot)
     if any(k in keys for k in ERRORS):
         keys.add("error")
     if any(k in keys for k in WARNINGS) or ctx.get("dcnet_problem"):

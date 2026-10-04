@@ -17,7 +17,8 @@
 #   profile.json (next to the code, shipped with the add-on) the app's standard settings: the links used until the user changes them.
 #
 # The base has a few common inputs of its own, so a module needs nothing else to be heard: "app.notice" (a banner on the page) and
-# "app.colour" (give a module's colour a palette colour); and the output "app.started" (the add-on started).
+# "app.highlight" (a box on the page stands out), "app.colour" (give a module's colour a palette colour); and the output
+# "app.started" (the add-on started).
 import json
 import os
 import re
@@ -83,6 +84,25 @@ def _colour_targets():
     return out
 
 
+def _dashboard_boxes():
+    """[["box id", "Module: box"]]: the boxes the loaded modules have on the main page (read from their layout.json)."""
+    out = []
+    for name in core.module_names():
+        if not core.module_enabled(name):
+            continue
+        try:
+            with open(os.path.join(core.MODULES_DIR, name, "layout.json")) as f:
+                boxes = json.load(f).get("dashboard") or []
+        except (IOError, OSError, ValueError, AttributeError):
+            continue
+        for box in boxes:
+            if isinstance(box, dict) and isinstance(box.get("box"), _TEXT):
+                ident = box["box"].lower()
+                if ident not in [o[0] for o in out]:
+                    out.append([ident, "%s: %s" % (core.module_title(name), box["box"])])
+    return out
+
+
 def common():
     """The base's own outputs and inputs (the "app" module)."""
     palette = [[c["id"], c["name"]] for c in core.colours()]
@@ -92,6 +112,12 @@ def common():
          "params": [{"key": "text", "label": "Text", "type": "text", "default": "Hello"},
                     {"key": "seconds", "label": "For how many seconds", "type": "number", "default": NOTICE_SECONDS}]},
     ]
+    boxes = _dashboard_boxes()
+    if boxes:
+        inputs.append({"id": "highlight", "label": "Make a box stand out", "summary": "Highlight a box",
+                       "params": [{"key": "box", "label": "Which box", "type": "select", "options": boxes, "default": boxes[0][0]},
+                                  {"key": "seconds", "label": "For how many seconds", "type": "number", "default": NOTICE_SECONDS},
+                                  {"key": "why", "label": "Why (shown on the box)", "type": "text", "default": "Raised by a connection"}]})
     if targets:
         inputs.append({"id": "colour", "label": "Change a colour",
                        "params": [{"key": "target", "label": "Which", "type": "select", "options": targets, "default": targets[0][0]},
@@ -329,6 +355,43 @@ def dismiss_notice(ident):
         _write_notices(keep)
 
 
+def _highlight(params, ctx):
+    now = time.time()
+    try:
+        seconds = float(params.get("seconds", NOTICE_SECONDS))
+    except (TypeError, ValueError):
+        seconds = NOTICE_SECONDS
+    box = str(params.get("box") or "").lower()
+    if not box:
+        raise ValueError("no box")
+    items = _read_highlights()
+    items[box] = {"until": now + max(1.0, seconds), "why": str(params.get("why") or "")[:200]}
+    _write_highlights(items)
+    return {"box": box}
+
+
+def _read_highlights():
+    now = time.time()
+    try:
+        with open(core.HIGHLIGHTS) as f:
+            data = json.load(f)
+        return dict((k, v) for k, v in data.items() if isinstance(v, dict) and v.get("until", 0) > now) if isinstance(data, dict) else {}
+    except (IOError, OSError, ValueError):
+        return {}
+
+
+def _write_highlights(items):
+    tmp = core.HIGHLIGHTS + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(items, f)
+    os.rename(tmp, core.HIGHLIGHTS)
+
+
+def active_highlights():
+    """{box id: why} of the boxes a link asked to stand out, for the page's "highlight"."""
+    return dict((k, v.get("why") or "") for k, v in _read_highlights().items())
+
+
 def _colour(params, ctx):
     module, _dot, key = str(params.get("target") or "").partition(".")
     if core.set_module_colour(module, key, params.get("colour")) is None:
@@ -336,4 +399,4 @@ def _colour(params, ctx):
     return {"changed": True}
 
 
-_COMMON = {"notice": _notice, "colour": _colour}
+_COMMON = {"notice": _notice, "highlight": _highlight, "colour": _colour}
