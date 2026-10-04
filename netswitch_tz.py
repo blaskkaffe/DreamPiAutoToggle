@@ -150,16 +150,6 @@ def _offset(zone, now):
     return _tzif_offset(tzf, now) if tzf else None
 
 
-def standard_offset(zone, year=None):
-    """The zone's winter (standard) offset in seconds: the smaller of mid-January and mid-July (summer time always adds)."""
-    year = year or time.gmtime().tm_year
-    a = offset(zone, calendar.timegm((year, 1, 15, 12, 0, 0)))
-    b = offset(zone, calendar.timegm((year, 7, 15, 12, 0, 0)))
-    if a is None or b is None:
-        return None
-    return min(a, b)
-
-
 def local_to_utc(zone, y, mo, d, h=0, mi=0, s=0):
     """Unix time of a wall-clock time in a zone ("2026-10-08 21:00 in America/New_York"). In the hour that is skipped in spring
     it gives the time an hour later, in the hour that comes twice in autumn the first one. None when the zone is not known."""

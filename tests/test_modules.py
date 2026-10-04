@@ -319,8 +319,6 @@ class OneModuleGone(Base):
 
 class BrokenAndNewModules(Base):
     def test_a_module_that_fails_to_import_is_reported_and_the_rest_works(self):
-        with open(os.path.join(self.modules, "numbers", "netswitch_numbers.py")) as f:
-            good = f.read()
         shutil.copy(os.path.join(self.modules, "numbers", "module.json"), os.path.join(self.modules, "numbers", "module.json.bak"))
         folder = os.path.join(self.modules, "extra")
         os.makedirs(folder)

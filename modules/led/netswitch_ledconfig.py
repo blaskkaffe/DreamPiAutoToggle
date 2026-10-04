@@ -96,7 +96,6 @@ PRIORITY_ORDER = [
 ]
 # a message an older led.json has, as the messages that replaced it
 OLD_KEYS = {"ready": ["ready-dcnow", "ready-dcnet"]}
-PRIORITY = dict((k, len(PRIORITY_ORDER) - i) for i, k in enumerate(PRIORITY_ORDER))   # higher = more important
 
 # -------------------------------------------------------------------- the looks (groups)
 # A group's colour is a palette id (core.PALETTE, the LED value of it), or a token that follows the networks' global colours:
@@ -207,7 +206,23 @@ GAMMA = 2.2
 def default_led_config():
     return {"max_brightness": 0.08, "order": "GRB", "gamma": GAMMA,
             "white_balance": {"r": 1.0, "g": 1.0, "b": 1.0},
-            "groups": default_groups()}
+            "groups": default_groups(), "priority": clean_priority(None)}
+
+
+def clean_priority(data):
+    """The message order the user set (most important first) made safe: every ranked message once. The fallback "off" is not in the
+    order. A message that is missing (an older file, or one added by a newer version) goes back where the default order has it,
+    right after the message it follows there."""
+    default = [k for k in PRIORITY_ORDER if k in MESSAGE and k != "off"]
+    out = []
+    for k in data if isinstance(data, list) else []:
+        if isinstance(k, _TEXT) and k in default and k not in out:
+            out.append(str(k))
+    for i, k in enumerate(default):
+        if k not in out:
+            prev = default[i - 1] if i else None
+            out.insert(out.index(prev) + 1 if prev in out else 0, k)
+    return out
 
 
 def _valid_colour(c):
@@ -276,6 +291,7 @@ def clean_led_config(data):
     groups = clean_groups(data.get("groups"))
     if groups is not None:
         cfg["groups"] = groups
+    cfg["priority"] = clean_priority(data.get("priority"))
     return cfg
 
 
@@ -432,10 +448,11 @@ def active_messages(ctx=None):
     keys = active_keys(ctx)
     cfg = led_config()
     entries = []
+    rank = dict((k, len(cfg["priority"]) - i) for i, k in enumerate(cfg["priority"]))      # higher = more important
     for g in cfg["groups"]:
         active = [m for m in g["messages"] if m in keys]
         if active:
-            entries.append((max(PRIORITY.get(m, 0) for m in active), g, active))
+            entries.append((max(rank.get(m, 0) for m in active), g, active))
     if not entries:
         for g in cfg["groups"]:
             if "off" in g["messages"]:

@@ -4,6 +4,7 @@
  .wrapcol.frow{flex-direction:column;align-items:stretch;gap:8px}
  .lvl{display:flex;align-items:center;gap:10px;flex:1;max-width:60%} .lvl input{flex:1;min-width:0;accent-color:var(--primary)} .lvl .rv{width:3em;text-align:right;color:var(--txt2)}
  .addlist .srow.wrap{flex-wrap:nowrap} .addlist .srow > span:first-child{flex:1}
+ .prio-off{opacity:.55}
  .addlist{max-height:55vh;overflow-y:auto;overscroll-behavior:contain;margin:0 -4px 8px;padding:0 4px}
  .addlist .cathead{margin:12px 0 2px;color:var(--muted);font-size:.72em;text-transform:uppercase;letter-spacing:.08em} .addlist .cathead:first-child{margin-top:0}
  #wb-preview{min-width:10.5em;text-align:center} #wb-preview.on{background:var(--sel);border-color:var(--sel-line)}

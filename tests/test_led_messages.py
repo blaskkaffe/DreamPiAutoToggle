@@ -47,7 +47,7 @@ class CatalogueTests(Base):
             self.assertIn(m[2], cats, m[0])
             self.assertTrue(m[1] and m[3], m[0])
             if m[0] != "off":
-                self.assertIn(m[0], ledconfig.PRIORITY, m[0])
+                self.assertIn(m[0], ledconfig.PRIORITY_ORDER, m[0])
         self.assertEqual(sorted(ledconfig.PRIORITY_ORDER), sorted(k for k in KEYS if k != "off"))
         self.assertEqual(len(KEYS), len(set(KEYS)))
         for c in cats:
@@ -408,6 +408,47 @@ class PaletteCalibrationTests(Base):
         self.assertFalse(ledconfig.wb_test_active())
 
 
+class PriorityOrderTests(Base):
+    def test_the_default_order_is_the_catalogue_order_without_off(self):
+        self.assertEqual(ledconfig.clean_priority(None), ledconfig.PRIORITY_ORDER)
+        self.assertEqual(ledconfig.led_config()["priority"], ledconfig.PRIORITY_ORDER)
+        self.assertNotIn("off", ledconfig.PRIORITY_ORDER)
+
+    def test_a_saved_order_is_kept_and_made_safe(self):
+        order = list(reversed(ledconfig.PRIORITY_ORDER))
+        self.assertEqual(ledconfig.clean_priority(order), order)
+        got = ledconfig.clean_priority(["wifi", "nonsense", "wifi", 5, "error"])
+        self.assertLess(got.index("wifi"), got.index("error"))                         # their order is kept, unknown and repeated entries are dropped
+        self.assertEqual(sorted(got), sorted(ledconfig.PRIORITY_ORDER))                # and everything that is missing is back
+
+    def test_a_missing_message_goes_back_after_the_one_it_follows_by_default(self):
+        order = [k for k in ledconfig.PRIORITY_ORDER if k != "event-soon"]
+        order.reverse()
+        got = ledconfig.clean_priority(order)
+        default = ledconfig.PRIORITY_ORDER
+        prev = default[default.index("event-soon") - 1]
+        self.assertEqual(got[got.index(prev) + 1], "event-soon")
+
+    def test_the_order_decides_which_group_is_on_top(self):
+        self.groups(group("g1", "red", ["no-network"]), group("g2", "blue", ["ready-dcnow"]))
+        looks = self.looks(ctx(net={"network": False}))
+        self.assertEqual([m["key"] for m in looks], ["g2", "g1"])                      # by default the problem is on top
+        cfg = ledconfig.led_config()
+        cfg["priority"] = ["ready-dcnow"] + [k for k in cfg["priority"] if k != "ready-dcnow"]
+        ledconfig.save_led_config(cfg)
+        looks = self.looks(ctx(net={"network": False}))
+        self.assertEqual([m["key"] for m in looks], ["g1", "g2"])                      # and now being ready is
+
+    def test_the_order_comes_back_from_the_endpoint_and_is_saved_through_it(self):
+        import json as _json
+        cfg = ledconfig.led_config()
+        cfg["priority"] = cfg["priority"][1:] + cfg["priority"][:1]
+        got = ledconfig.save_led_config(cfg)
+        self.assertEqual(got["priority"][-1], ledconfig.PRIORITY_ORDER[0])
+        with open(core.LED_CONFIG) as f:
+            self.assertEqual(_json.load(f)["priority"], got["priority"])
+
+
 class WebTests(Base):
     def setUp(self):
         Base.setUp(self)
@@ -440,7 +481,8 @@ class WebTests(Base):
         self.assertEqual([t["id"] for t in r["colours"]["tokens"]], ["dcnow", "dcnet"])
         self.assertEqual(r["token_ui"]["dcnow"], {"ui": core.network_colour("dcnow")["ui"], "ui_l": core.network_colour("dcnow")["ui_l"]})
         self.assertEqual(r["config"]["groups"], r["defaults"]["groups"])
-        self.assertEqual(r["priority"], ledconfig.PRIORITY_ORDER)
+        self.assertEqual(r["defaults"]["priority"], ledconfig.PRIORITY_ORDER)
+        self.assertEqual(r["config"]["priority"], ledconfig.PRIORITY_ORDER)
         self.assertTrue(all(set(m) == {"key", "label", "category", "description", "detected"} for m in r["messages"]))
 
     def test_saving_groups_round_trips(self):

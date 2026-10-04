@@ -164,6 +164,21 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(led2.led === led2.led_default && led2.ui === led2.ui_default, 'Reset all puts the shipped colours back');
   await page.locator('.pop.open button', { hasText: 'Done' }).click(); await page.waitForLoadState('networkidle'); await settle(2000);
   ok(await page.locator('#settings.open').count() === 1, 'closing it after a change builds the page again with Settings still open');
+  // Priority: put the messages in order, most important first
+  await led.locator('button[aria-label="Edit the message priority"]').click(); await settle(500);
+  const pg = await popGeo();
+  ok(Math.abs(pg.w - gp1.w) <= 1, 'the priority pop-up has the same width as the others (' + pg.w + ')');
+  const prio = () => page.locator('.pop.open .srow[data-id]').evaluateAll(els => els.map(e => e.getAttribute('data-id')));
+  const p0 = await prio();
+  ok(p0.length > 30 && p0[0] === 'reboot' && !p0.includes('off'), 'every message is in the list, most important first (' + p0.length + ', the first is ' + p0[0] + ')');
+  await page.locator('.pop.open .srow[data-id] .grip').first().focus(); await page.keyboard.press('ArrowDown'); await settle(1500);
+  const p1 = await prio();
+  ok(p1[0] === p0[1] && p1[1] === p0[0], 'the arrow keys on a handle move a message down');
+  const saved = await page.evaluate(async () => (await (await fetch('/ledconfig')).json()).config.priority);
+  ok(saved[0] === p0[1] && saved[1] === p0[0], 'and the new order is saved');
+  await page.locator('.pop.open button', { hasText: 'Restore default order' }).click(); await settle(1200);
+  ok(JSON.stringify(await prio()) === JSON.stringify(p0), 'Restore default order puts it back');
+  await page.locator('.pop.open button', { hasText: 'Done' }).click(); await settle(300);
   // Appearance: a tick box left of each colour picks a coloured or a neutral background
   const appr = page.locator('[data-box="appearance"] .srow', { hasText: 'Online players colour' });
   ok(!(await appr.locator('input[type=checkbox]').isChecked()) && await page.locator('.dbox[data-box="players"].plain').count() === 1, 'a box starts neutral (Highlight off)');

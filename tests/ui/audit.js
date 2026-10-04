@@ -71,6 +71,8 @@ const AUDIT = () => {
     await page.keyboard.press('Escape');
     await page.click('[data-box="status led"] .srow:has-text("Calibration") > button'); await page.waitForTimeout(300); await check('calibration pop-up');
     await page.keyboard.press('Escape');
+    await page.click('[data-box="status led"] button[aria-label="Edit the message priority"]'); await page.waitForTimeout(500); await check('LED priority pop-up');
+    await page.keyboard.press('Escape');
     await page.click('[data-box="status led"] button[aria-label="Adjust the colours"]'); await page.waitForTimeout(500); await check('LED colours pop-up');
     await page.keyboard.press('Escape');
     // switch button functions

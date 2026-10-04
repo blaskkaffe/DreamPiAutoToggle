@@ -3,7 +3,7 @@
 // the messages that use it listed under it; Edit changes the look, Add puts more messages into the row, and new rows are added
 // at the bottom. The rows, buttons, tags and pop-ups are the page's standard ones (editRow, footRow, ui.popup).
 custom("led-groups",function(host,ctx){
-var cfg=null,defaults=null,messages=[],cats=[],priority=[],colours={palette:[],tokens:[]},tokenUi={},effects=[],ledCount=1,timer=null;
+var cfg=null,defaults=null,messages=[],cats=[],colours={palette:[],tokens:[]},tokenUi={},effects=[],ledCount=1,timer=null;
 var byKey={},rowOf={},wbOn=false,wbBeat=null;
 var calRow=editRow({title:"Calibration",button:"Adjust"}),list=h("div",{"class":"after"}),
  addGroup=h("button",{type:"button","class":"pill-s",text:"Add colour"}),restore=h("button",{type:"button","class":"pill-s",text:"Restore defaults"}),
@@ -17,7 +17,7 @@ pEdit.onclose=function(){editing=null};pAdd.onclose=function(){adding=null};
 pCal.onclose=function(){stopHold()};                              // the white test ends with the pop-up
 // ---- loading and saving
 function load(){xhrJson("GET","/ledconfig",function(r){if(!r)return;
- cfg=r.config;defaults=r.defaults;messages=r.messages;cats=r.categories;priority=r.priority;colours=r.colours;tokenUi=r.token_ui;effects=r.effects;ledCount=r.count||1;
+ cfg=r.config;defaults=r.defaults;messages=r.messages;cats=r.categories;colours=r.colours;tokenUi=r.token_ui;effects=r.effects;ledCount=r.count||1;
  byKey={};messages.forEach(function(m){byKey[m.key]=m});
  paintAll();showCal()})}
 function save(){clearTimeout(timer);timer=setTimeout(function(){
@@ -44,9 +44,9 @@ function paintAll(){if(!cfg)return;list.innerHTML="";rowOf={};
  addGroup.disabled=cfg.groups.length>=24;
  foot.setInfo(infoText());
  if(editing)fillEdit(editing);if(adding)fillAdd(adding)}
-function infoText(){var order=priority.filter(function(k){return byKey[k]&&k!=="off"}).map(function(k){return byKey[k].label}).join(", ");
+function infoText(){
  return "Each row is a look: a colour, an animation (solid or blinking), a level and, on a strip, which LEDs. Add messages to a row to give them that look; a message can be in one row only, and a message in no row never lights the LEDs.\n"+
-  "When several messages are true at once on the same LEDs, the most important one shows. Most important first: "+order+"."}
+  "When several messages are true at once on the same LEDs, the most important one shows. You set the order with Priority."}
 // ---- Edit: the look of one row
 var LOG_BASE=100;
 function sliderToBright(p){return (Math.pow(LOG_BASE,p/1000)-1)/(LOG_BASE-1)}
@@ -124,6 +124,25 @@ function setWb(on){if(on){startHold("#ffffff");$("wb-preview").classList.add("on
 $("wb-preview").onclick=function(){setWb(!wbOn)};
 $("wb-reset").onclick=function(){cfg.white_balance={r:1,g:1,b:1};showCal();save()};
 $("led-bright").oninput=function(){cfg.max_brightness=Math.round(sliderToBright(this.value)*1000)/1000;$("led-bright-v").textContent=pct(cfg.max_brightness);paintAll();save()};
+// ---- Priority: which message wins when several are true (drag to put them in order, most important first)
+var prioRow=editRow({title:"Priority",button:"Edit",aria:"Edit the message priority"}),prioPop=h("div",{"class":"gpop"}),pPrio=ui.popup(prioPop);
+prioRow.setSub("Which message wins when several are true");
+host.insertBefore(prioRow.el,list);host.appendChild(prioPop);
+function fillPrio(){prioPop.innerHTML="";var used={},catName={},box=h("div",{"class":"mlist"});
+ cfg.groups.forEach(function(g){g.messages.forEach(function(k){used[k]=true})});
+ cats.forEach(function(c){catName[c[0]]=c[1]});
+ prioPop.appendChild(h("div",{"class":"t",text:"Most important first. Drag the handle (or use the up and down arrow keys on it) to move a message. Dimmed messages are in no colour yet, so they do not light the LED."}));
+ cfg.priority.forEach(function(k){var m=byKey[k];if(!m)return;
+  var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+m.label+": drag, or use the up and down arrow keys",html:"&#8942;&#8942;"}),
+   left=h("span",{"class":used[k]?"":"prio-off"},[document.createTextNode(m.label),h("span",{"class":"sub",text:catName[m.category]||""})]);
+  box.appendChild(h("div",{"class":"srow","data-id":k},[grip,left]))});
+ prioPop.appendChild(box);
+ sortable(box,function(order){cfg.priority=order;save()});
+ var reset=h("button",{type:"button","class":"pill-s",text:"Restore default order"}),done=h("button",{type:"button","class":"pill-s",text:"Done"});
+ reset.onclick=function(){cfg.priority=defaults.priority.slice();fillPrio();save()};
+ done.onclick=function(){pPrio.close()};
+ prioPop.appendChild(h("div",{"class":"bar"},[reset,done]))}
+prioRow.btn.onclick=function(e){if(!pPrio.isOpen())fillPrio();pPrio.toggle(prioRow.btn,e)};
 // ---- Colours: how each palette colour looks on screen and on the LED (the LED's red need not be the page's red)
 var colRow=editRow({title:"Colours",button:"Adjust",aria:"Adjust the colours"}),colPop=h("div",{"class":"gpop"}),pCol=ui.popup(colPop),colSel=null,colPreview=null,colChanged=false,colTimer=null,pal=[];
 colRow.setSub("How each colour looks on screen and on the LED");

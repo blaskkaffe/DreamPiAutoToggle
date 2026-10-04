@@ -4,10 +4,10 @@
 # netswitch_led_drivers.py; this file decides what to show and when.
 #
 # What it shows comes from the page's settings (led.json, see netswitch_ledconfig):
-# per message (system, network and call messages, see LED_STATES): on/off, colour, effect,
-# speed, brightness and LED section. Several messages can show at once on different LEDs;
-# errors outrank information and "State unknown" is only a fallback, see
-# netswitch_ledconfig.active_messages().
+# colour groups (each a colour, an effect, a speed, a brightness and an LED section, with the
+# messages that light it, see ledconfig.MESSAGES). Several groups can show at once on different
+# LEDs; the most important message wins where they overlap, "State unknown" is only a fallback,
+# see netswitch_ledconfig.active_messages().
 # The number of LEDs is in /opt/dreampi-netswitch/led_count (install.sh).
 import colorsys
 import math

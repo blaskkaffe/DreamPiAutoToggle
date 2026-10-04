@@ -221,7 +221,7 @@ class HttpTests(unittest.TestCase):
 
     def test_ledconfig_round_trip(self):
         r = json.loads(self.get("/ledconfig")[2].decode())
-        for key in ("config", "defaults", "messages", "categories", "priority", "colours", "effects", "count", "installed"):
+        for key in ("config", "defaults", "messages", "categories", "colours", "effects", "count", "installed"):
             self.assertIn(key, r)
         cfg = r["config"]
         cfg["white_balance"]["g"] = 200 / 255.0

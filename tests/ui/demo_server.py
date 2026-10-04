@@ -3,7 +3,7 @@ service on a sandbox (all paths in a temp dir). Switches via environment:
 LEDS=n (default 3), WIFI=1, WIFIDEMO=1 (dummy Wi-Fi networks + the setup loop),
 BG=1 (the Dreamcast background module on), CLOCK=1 (the clock module on; off by default so the box counts are stable), EVENTS=1 (the DC99 events module on, with its sample events; EVENTSOON=1 adds a reminded event 5 minutes ahead), FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log), FAKEPLAYERS=1 (made-up
 players), OFF=led,wifi,... (modules switched off in the module picker; OFF=all = every module the picker can switch, only the always-on ones stay), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
-import sys, os, threading, time
+import sys, os, threading, time, json
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from support import web, core, sandbox
 import netswitch_wifi_setup as wifi
@@ -37,7 +37,7 @@ if os.environ.get("WIFIDEMO"):
             time.sleep(1)
     threading.Thread(target=loop, daemon=True).start()
 if os.environ.get("FAKEUPDATE"):
-    import json, subprocess
+    import subprocess
     import netswitch_update as up
     import netswitch_probes
     src = os.path.join(tmp, "DreamPiAutoToggle"); os.mkdir(src)
@@ -72,7 +72,6 @@ if os.environ.get("PIN"):
     netswitch_security.set_pin(os.environ["PIN"])
     __import__("netswitch_rebootupdate")._spawn_reboot = lambda: None
 if os.environ.get("FAKEPLAYERS"):
-    import json
     import netswitch_players as pl
     feed = {"dreampi": {"users": [
                 {"username": "Dave", "country": "US", "current_game_display": "Quake III Arena", "online": True},

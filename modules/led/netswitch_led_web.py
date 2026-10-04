@@ -15,7 +15,7 @@ def _get_config(h):
     sel = "dcnet" if os.path.exists(core.FLAG) else "dcnow"
     h.send(json.dumps({"config": ledconfig.led_config(), "defaults": ledconfig.default_led_config(),
                        "messages": [{"key": m[0], "label": m[1], "category": m[2], "description": m[3], "detected": m[4]} for m in ledconfig.MESSAGES],
-                       "categories": ledconfig.CATEGORIES, "priority": ledconfig.PRIORITY_ORDER, "effects": ledconfig.EFFECTS,
+                       "categories": ledconfig.CATEGORIES, "effects": ledconfig.EFFECTS,
                        "colours": ledconfig.colour_choices(),
                        "token_ui": {t: {"ui": core.network_colour(n)["ui"], "ui_l": core.network_colour(n)["ui_l"]} for t, n in (("dcnow", "dcnow"), ("dcnet", "dcnet"), ("network", sel))},
                        "count": ledconfig.led_count(), "installed": ledconfig.led_count() > 0}),
