@@ -40,7 +40,7 @@ function afterPost(s,r,el){
  if(r&&r.started===false){alert(r.message||"That did not start");return}
  if(s.then==="reload"){try{sessionStorage.setItem("netswitch-reopen",s.reopen?"1":"")}catch(e){}location.reload();return}
  if(s.then==="wait"){if(el){el.disabled=true;setText(el,"Restarting...")}waitForPi();return}
- refresh();reloadData();fire("posted")}
+ refresh();if(s.reload)reloadData(s.reload);fire("posted")}   // only /api is asked for at once: a data source is read again only when the button says so ("reload": its name)
 function reloadInSettings(){try{sessionStorage.setItem("netswitch-reopen","1")}catch(e){}location.reload()}   // modules come and go: the page is built again, Settings stays open
 function waitForPi(){var down=false,tries=0;
  (function poll(){tries++;var x=new XMLHttpRequest();x.open("GET","/ping?"+Date.now(),true);x.timeout=3000;
@@ -101,7 +101,7 @@ function applyTheme(){var p={},pk={},k;for(k in (LAY.primary||{}))p[k]=LAY.prima
 // every N seconds while the page is on screen (with "when": "settings", only while Settings is open); "retry_if": "busy" asks again
 // after "retry" seconds while that field of the answer is true, and after a failed request
 var DATA={};
-function reloadData(){for(var ns in DATA)DATA[ns]()}
+function reloadData(name){for(var ns in DATA)if(!name||ns===name)DATA[ns]()}
 // The last answer of every data source is kept in this browser and shown at once when the page opens again (with "busy": true until the
 // new answer is there), so a page never starts with empty lists: what it knew stays until something newer replaces it.
 function restoreData(){var ns;for(ns in (LAY.data||{}))try{var r=JSON.parse(localStorage.getItem("netswitch-data-"+ns));if(r&&typeof r==="object"){r.busy=true;S[ns]=r}}catch(e){}}
@@ -175,11 +175,13 @@ function rgbOf(hex){return parseInt(hex.substr(1,2),16)+","+parseInt(hex.substr(
 function applyPaletteVars(c){var s=document.documentElement.style,l=mixWhite(c.ui);
  s.setProperty("--c-"+c.id,c.ui);s.setProperty("--c-"+c.id+"-l",l);s.setProperty("--c-"+c.id+"-rgb",rgbOf(c.ui));s.setProperty("--c-"+c.id+"-l-rgb",rgbOf(l));
  (LAY.palette||[]).forEach(function(p){if(p.id===c.id){p.ui=c.ui;p.ui_l=l}})}
-// a colour picker for one palette colour (Global main): it changes the colour everywhere it is used
-W.colourpick=function(s,ctx){var inp=h("input",{type:"color","aria-label":s.label||"Colour"}),timer=null;
+// a colour picker for one palette colour (Global main): it changes the colour everywhere it is used. It looks like the other colour picks
+// (a small Colour button in its own colour); the system's colour chooser is an input laid invisibly over the button, so a tap opens it.
+W.colourpick=function(s,ctx){var inp=h("input",{type:"color","class":"cp-native","aria-label":(s.label||"Colour")}),timer=null,
+ btn=h("button",{type:"button","class":"pill-s pri c-"+s.id,text:"Colour",tabindex:"-1","aria-hidden":"true"}),el=h("span",{"class":"colourpick cp-wrap"},[btn,inp]);
  (LAY.palette||[]).forEach(function(p){if(p.id===s.id)inp.value=p.ui});
  inp.oninput=function(){var ui=inp.value;applyPaletteVars({id:s.id,ui:ui});clearTimeout(timer);timer=setTimeout(function(){post("/palette",{id:s.id,ui:ui},function(r){if(r)ctx.saved()})},250)};
- return inp};
+ return el};
 W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri",text:s.label||"Colour","aria-haspopup":"dialog"}),
  grid=h("span",{"class":"swatches grid"}),pop=h("div",{"class":"colours"},[h("div",{"class":"t",text:s.title||"Pick a colour"}),grid]),
  tint=s.tint?h("input",{type:"checkbox","class":"cbox pri",title:"Highlight: a coloured background (off = a neutral one)","aria-label":(s.title||"Colour")+": highlight with a coloured background"}):null,
@@ -226,8 +228,9 @@ W.infobox=function(s,ctx){
   buildAll(s.actions.map(function(w){return Object.assign({mod:s.mod},w)}),ctx).forEach(function(a){act.appendChild(a)});
   if(s.actions_show!==undefined)bind(s.actions_show,function(x){sh(act,!!x)});el.appendChild(act)}
  function toggle(){if(!canOpen)return;el.classList.toggle("open");el.setAttribute("aria-expanded",el.classList.contains("open"));fire("layout")}
- if(s.mode!==undefined)bind(s.mode,function(v){if(v)el.setAttribute("data-mode",v);else el.removeAttribute("data-mode");fire("layout")});
- if(s.open_if!==undefined)bind(s.open_if,function(v){canOpen=!!v;el.classList.toggle("noopen",!canOpen);
+ var lastMode=null,lastCan=null;
+ if(s.mode!==undefined)bind(s.mode,function(v){v=v||"";if(v===lastMode)return;lastMode=v;if(v)el.setAttribute("data-mode",v);else el.removeAttribute("data-mode");fire("layout")});
+ if(s.open_if!==undefined)bind(s.open_if,function(v){v=!!v;if(v===lastCan)return;lastCan=v;canOpen=v;el.classList.toggle("noopen",!canOpen);
   if(!canOpen){el.classList.remove("open");["role","tabindex","title","aria-expanded"].forEach(function(a){el.removeAttribute(a)});fire("layout")}
   else{el.setAttribute("role","button");el.setAttribute("tabindex","0");el.setAttribute("title","Show or hide details");el.setAttribute("aria-expanded",el.classList.contains("open")?"true":"false")}});
  el.onclick=function(e){if(e.target.closest&&e.target.closest("a,button,.keep"))return;toggle()};
@@ -388,7 +391,7 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
  inp.oninput=function(){var g=null;cfg.groups.forEach(function(x){if(x.key===addKey)g=x});if(g)paintChoices(g)};
  function load(){xhrJson("GET",s.source,function(r){if(r){cfg=r;paint()}})}
  function save(){clearTimeout(timer);paint();timer=setTimeout(function(){var body={};cfg.groups.forEach(function(g){body[g.key]=g.items});
-  post(s.source,body,function(r){if(r){cfg=r;paint();ctx.saved();reloadData()}})},100)}      // the data sources of the page (the stars of the players box) follow what was saved
+  post(s.source,body,function(r){if(r){cfg=r;paint();ctx.saved();if(s.reload)reloadData(s.reload)}})},100)}      // the data source that shows this list ("reload": its name; the stars of the players box) follows what was saved
  hook("settingsOpen",load);hook("settingsClose",function(){p.close()});return el};
 // ---- a console: lines of text in a box. "lines": "@path" replaces them all; "tail": "/url" adds what is new (GET url?from=N -> {text, size, reset})
 W.console=function(s,ctx){var el=h("div",{"class":"console"+(s.nowrap?" nowrap":""),role:"log","aria-label":s.label||"Log"}),size=0,busy=false,rules=(s.rules||[]).map(function(r){return[new RegExp(r[0],"i"),r[1]]}),

@@ -36,7 +36,10 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   // ---- choosing a network moves the primary colour with it
   const boxBg = () => page.locator('.now').first().evaluate(e => getComputedStyle(e).borderTopColor);
   const before = await boxBg();
+  const seenReq = []; const onReq = r => seenReq.push(new URL(r.url()).pathname); page.on('request', onReq);
   await page.locator('.pill').nth(1).click(); await settle(1800);
+  page.off('request', onReq);
+  ok(!seenReq.some(u => u === '/players' || u === '/events/view' || u === '/clock'), 'pressing a network button asks only for /api, not for the data sources (' + seenReq.join(' ') + ')');
   ok((await page.locator('.now b').first().textContent()) === 'DCNET', 'DCNET button selects DCNET');
   ok((await boxBg()) !== before, 'the box border takes the DCNET colour');
   ok(await page.evaluate(() => document.body.classList.contains('c-blue')), "the page's primary colour is the selected network's (blue)");
@@ -68,6 +71,9 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await page.locator('.pill').nth(0).evaluate(e => e.classList.contains('c-bright-pink')), 'DCNow! button follows the picked colour');
   ok(await page.evaluate(() => document.body.classList.contains('c-bright-pink')), 'and so does the page primary while DCNow! is selected');
   await colourBtn.click(); await settle(300); await page.locator('.pop.open .swatches .swatch[data-id="orange"]').click(); await settle(1200);   // back to orange
+  const gm = page.locator('[data-box="colours"] .srow', { hasText: 'Global main colour' });
+  ok(await gm.locator('button.pill-s.pri.c-global').count() === 1 && (await gm.locator('button').first().textContent()) === 'Colour', 'Global main has a Colour button like the other colour picks');
+  ok(await gm.locator('input[type=color]').evaluate(e => getComputedStyle(e).opacity === '0' && e.getBoundingClientRect().width === e.parentElement.querySelector('button').getBoundingClientRect().width), 'its colour chooser lies over the button, so a tap opens it');
   // ---- the picker table (phone numbers)
   const group = page.locator('[data-box="special phone numbers"] .wpicker .srow').first();
   await group.locator('button').first().click();

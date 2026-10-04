@@ -7,7 +7,7 @@
     {"label": "", "cls": "evl", "busy": "@events.busy", "value": {"type": "custom", "name": "events-list"}},
     {"label": "", "cls": "evs", "value": {"type": "text", "text": "@events.status", "muted": true}}],
     "actions": [
-     {"type": "button", "label": "Sync now", "post": "/api/sync"},
+     {"type": "button", "label": "Sync now", "post": "/api/sync", "reload": "events"},
      {"type": "link", "label": "DC99 calendar", "href": "https://dc99.net/community/"}]}
   ]}
  ],
@@ -17,7 +17,7 @@
     {"title": "Reminder", "sub_text": "lead", "controls": [{"type": "select", "key": "lead", "options": "leads", "label": "Start"}]},
     {"title": "Sync with DC99", "sub_text": "interval", "controls": [{"type": "select", "key": "interval", "options": "intervals", "label": "Sync"}]}]},
    {"type": "picker", "source": "/events/series"},
-   {"type": "row", "title": "Sync now", "sub": "@events.status", "control": {"type": "button", "label": "Sync", "post": "/api/sync"}}]},
+   {"type": "row", "title": "Sync now", "sub": "@events.status", "control": {"type": "button", "label": "Sync", "post": "/api/sync", "reload": "events"}}]},
   {"box": "appearance", "title": "Appearance", "items": [
    {"type": "row", "title": "DC99 events colour", "sub": "Module", "control": {"type": "swatches", "tint": true, "key": "events", "title": "Colour of the events box"}}]}
  ]

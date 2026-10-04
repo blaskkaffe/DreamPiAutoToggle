@@ -59,6 +59,7 @@
  .pill.plain{background:var(--card)}   /* "Coloured background" off: a neutral fill, the border keeps the colour */
  .dbox .wide{background:rgba(var(--primary-rgb),.62);border-color:rgba(var(--primary-l-rgb),.8)} .dbox.plain .now,.dbox.plain .wide{background:var(--card)}
  .colourpick{display:inline-flex;align-items:center;gap:12px}
+ .cp-wrap{position:relative} .cp-wrap .cp-native{position:absolute;left:0;top:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer}   /* the colour chooser laid over the Colour button */
  .pill:active{filter:brightness(1.1)}
  .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
  .srow .pill-s{white-space:nowrap}

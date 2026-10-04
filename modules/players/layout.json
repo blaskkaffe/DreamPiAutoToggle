@@ -6,7 +6,8 @@
    "items": [
     {
      "type": "picker",
-     "source": "/players/favorites"
+     "source": "/players/favorites",
+     "reload": "players"
     }
    ]
   },
