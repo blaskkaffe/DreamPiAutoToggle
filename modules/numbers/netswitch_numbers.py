@@ -13,7 +13,7 @@ import netswitch_core as core
 ACTIONS = (
     ("toggle_dcnow", "Toggle DCNow!", "Select DCNow! and hang up", []),
     ("toggle_dcnet", "Toggle DCNET", "Select DCNET and hang up", []),
-    ("call_dcnow", "Call DCNow!", "Select DCNow! and connect", ["11111", "111111", "1111111"]),
+    ("call_dcnow", "Call DCNow!", "Select DCNow! and connect", ["11111"]),
     ("call_dcnet", "Call DCNET", "Select DCNET and connect", []),
 )
 MIN_LEN, MAX_LEN, MAX_PER_ACTION = 3, 12, 10

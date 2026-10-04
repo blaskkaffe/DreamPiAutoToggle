@@ -14,7 +14,7 @@ It then wraps Netlink.check_number() with these rules:
              toggle_dcnet  selects DCNET, hangs up
              call_dcnow    selects DCNow! and connects through DCNow!
              call_dcnet    selects DCNET and connects through DCNET
-           Defaults: none / none / 11111, 111111 and 1111111 / none.
+           Defaults: none / none / 11111 / none.
   others   Go to whichever network is selected (website or the numbers above).
            Only calls DreamPi would send to its normal PPP are redirected;
            Netlink/XBAND codes and the built-in *69 prefix are untouched.
@@ -56,7 +56,7 @@ NUM_OPENMENU = "1111111"   # fixed: openMenu always dials this and it must stay 
 # Keep in sync with modules/numbers/netswitch_numbers.py ACTIONS (a test compares them).
 NUMBER_ACTIONS = ("toggle_dcnow", "toggle_dcnet", "call_dcnow", "call_dcnet")
 DEFAULT_NUMBERS = {"toggle_dcnow": [], "toggle_dcnet": [],
-                   "call_dcnow": ["11111", "111111", "1111111"], "call_dcnet": []}
+                   "call_dcnow": ["11111"], "call_dcnet": []}
 HANGUP_ACTIONS = ("toggle_dcnow", "toggle_dcnet")   # select, then hang up
 
 # __builtin__ first: on Python 2 the "future" package can provide a fake
@@ -235,7 +235,7 @@ def _classify(raw_string, numbers):
     extra leading digit (e.g. 15550002) and ISP settings add prefixes or area
     codes, so exact matching is unreliable. The longest match wins; openMenu's
     fixed number is "openmenu" and wins ties, except against "call_dcnow", which
-    goes to DCNow! as well but also selects it (the default list has 1111111)."""
+    goes to DCNow! as well but also selects it (a user may add 1111111 there)."""
     if not raw_string:
         return None, None
     best, best_len = (None, None), 0

@@ -51,7 +51,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(saved["toggle_dcnet"], ["5550002#"])          # *61# already used by toggle_dcnow
         self.assertNotIn("reset", saved)                               # the old Reset list is gone
         self.assertEqual(saved["call_dcnet"], [])                      # empty = action off
-        self.assertEqual(saved["call_dcnow"], ["11111", "111111", "1111111"])   # not a list: default
+        self.assertEqual(saved["call_dcnow"], ["11111"])   # not a list: default
         self.assertEqual(nums.numbers(), saved)
         self.assertEqual(hook._load_numbers()["toggle_dcnow"], ["*61#", "5550009"])
 
@@ -88,10 +88,10 @@ class ClassifyTests(unittest.TestCase):
         return hook._classify(dialed, numbers or self.D)[0]
 
     def test_defaults(self):
-        self.assertEqual(self.D["call_dcnow"], ["11111", "111111", "1111111"])
+        self.assertEqual(self.D["call_dcnow"], ["11111"])          # one number by default
         self.assertEqual(self.D["call_dcnet"], [])                  # no Call DCNET number by default
-        for n in ("11111", "111111", "1111111"):
-            self.assertEqual(self.c(n), "call_dcnow", n)
+        self.assertEqual(self.c("11111"), "call_dcnow")
+        self.assertEqual(self.c("1111111"), "openmenu")             # openMenu's own number is not in any list
         self.assertIsNone(self.c("5550001"))
         self.assertEqual((self.D["toggle_dcnow"], self.D["toggle_dcnet"]), ([], []))      # no toggle numbers by default
         self.assertIsNone(self.c("5550001#"))
@@ -102,7 +102,7 @@ class ClassifyTests(unittest.TestCase):
     def test_extra_leading_digits_and_prefixes(self):
         n = dict(self.D, call_dcnet=["5550002"])
         self.assertEqual(self.c("15550002", n), "call_dcnet")       # DreamPi hears an extra leading 1
-        self.assertEqual(self.c("11111111"), "call_dcnow")          # a longer run still ends with 1111111
+        self.assertEqual(self.c("11111111"), "openmenu")            # a longer run still ends with openMenu's 1111111
         n = dict(self.D, toggle_dcnow=["5550001#"])
         self.assertEqual(self.c("0412345550001#", n), "toggle_dcnow")   # ISP prefix
 
@@ -115,8 +115,10 @@ class ClassifyTests(unittest.TestCase):
     def test_longest_match_wins_and_openmenu_wins_ties(self):
         n = dict(self.D, call_dcnet=["0001"], call_dcnow=["5550001"])
         self.assertEqual(self.c("5550001", n), "call_dcnow")        # 7 characters beat 4
-        n = dict(self.D, call_dcnet=["1111111"])
+        n = dict(self.D, call_dcnow=["1111111"])
         self.assertEqual(self.c("1111111", n), "call_dcnow")        # equal length: Call DCNow! (it also selects DCNow!) ...
+        n = dict(self.D, call_dcnet=["1111111"])
+        self.assertEqual(self.c("1111111", n), "openmenu")          # ... but another action never takes the number from openMenu
         n = dict(self.D, call_dcnow=[], call_dcnet=["1111111"])
         self.assertEqual(self.c("1111111", n), "openmenu")          # ... otherwise the fixed openMenu rule wins
         n = dict(self.D, call_dcnow=[], call_dcnet=["111"])
@@ -174,7 +176,7 @@ class WrapperTests(unittest.TestCase):
 
     def test_call_dcnow_selects_and_stays_ppp(self):
         open(hook.FLAG, "w").close()
-        r = self.dial("111111")
+        r = self.dial("11111")
         self.assertEqual((r["client"], self.selected()), ("PPP", "dcnow"))
 
     def test_toggle_numbers_select_and_hang_up_without_calling_netlink(self):
@@ -185,10 +187,11 @@ class WrapperTests(unittest.TestCase):
         self.assertEqual((r["client"], self.selected()), ("idle", "dcnow"))
         self.assertEqual(self.fake.calls, [])                   # DreamPi's own check_number never ran
 
-    def test_1111111_resets_to_dcnow_by_default(self):
+    def test_1111111_resets_to_dcnow_when_it_is_in_the_call_dcnow_list(self):
+        nums.save_numbers({"call_dcnow": ["11111", "1111111"]})
         open(hook.FLAG, "w").close()
         r = self.dial("1111111")
-        self.assertEqual((r["client"], self.selected()), ("PPP", "dcnow"))   # in the default Call DCNow! list
+        self.assertEqual((r["client"], self.selected()), ("PPP", "dcnow"))
 
     def test_openmenu_always_dcnow_and_leaves_the_selection_without_the_number(self):
         nums.save_numbers({"call_dcnow": []})
