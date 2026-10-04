@@ -15,7 +15,6 @@ FORMATS = ("12h", "12h-ampm", "24h")
 LABELS = {"12h": "12h", "12h-ampm": "12h am/pm", "24h": "24h"}
 DEFAULT_FORMAT = "24h"
 MAX_CITIES = 12
-ZONES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zones.json")   # the map's areas (tools/build_clock_zones.py)
 
 CATALOGUE = tz.CITIES              # (name, IANA zone, longitude, latitude, region): the cities to pick from, also the zone list
 CITY = dict((c[0], c) for c in CATALOGUE)
@@ -146,38 +145,6 @@ def world(cfg, now=None):
     return out
 
 
-_zones = {"list": None}
-_offs = {"key": None, "offs": None}
-
-
-def map_zones():
-    """The map's areas (zones.json): {"top", "bottom", "zones": [{"tz", "p" (outlines), "l" (label points)}]}, or None."""
-    if _zones["list"] is None:
-        try:
-            with open(ZONES_FILE) as f:
-                _zones["list"] = json.load(f)
-        except (IOError, OSError, ValueError):
-            _zones["list"] = {}
-    return _zones["list"] or None
-
-
-def zone_offsets(now=None):
-    """The offset (hours) of every map area right now, in the order of zones.json; None for a zone this system lacks.
-    Worked out once a minute (offsets only change on the hour or half hour)."""
-    now = time.time() if now is None else now
-    data = map_zones()
-    if not data:
-        return []
-    key = int(now // 60)
-    if _offs["key"] != key:
-        out = []
-        for z in data["zones"]:
-            off = tz.offset(z["tz"], now)
-            out.append(None if off is None else off / 3600.0)
-        _offs.update(key=key, offs=out)
-    return _offs["offs"]
-
-
 def size(cfg, has_world):
     """How many of the box's three rows the time takes: "" = the middle one, "upper" (top and middle: world time is on, .beat is
     off), "lower" (middle and bottom: .beat is on, world time is off) or "full" (all three: neither is on). Only with "large" on."""
@@ -201,7 +168,7 @@ def view(now=None):
             "cities": [[c["name"], c["text"]] for c in cities],
             "world": cfg["world"] and bool(cities), "world_on": cfg["world"], "beat_on": cfg["beat"], "large_on": cfg["large"],
             "size": size(cfg, cfg["world"] and bool(cities)), "format": cfg["format"],
-            "map": {"cities": cities, "utc": now, "here": off / 3600.0, "offs": zone_offsets(now), "zone": utc_text(off)}
+            "map": {"cities": cities, "utc": now, "here": off / 3600.0}
             if cfg["world"] else None}
 
 
@@ -262,13 +229,6 @@ def _post_cities(h):
     return True
 
 
-def _get_zones(h):
-    data = map_zones()
-    if not data:
-        return h.send("no map", "text/plain; charset=utf-8", status=404)
-    h.send(json.dumps(data, separators=(",", ":")), "application/json")
-
-
 def _toggle(key):
     def post(h):
         body = _body(h)
@@ -280,7 +240,7 @@ def _toggle(key):
     return post
 
 
-GET = {"/clock": _get, "/clock/cities": _get_cities, "/clock/zones": _get_zones}
+GET = {"/clock": _get, "/clock/cities": _get_cities}
 POST = {"/clock": _post, "/clock/cities": _post_cities, "/clock/beat": _toggle("beat"), "/clock/world": _toggle("world"),
         "/clock/large": _toggle("large")}
 

@@ -102,13 +102,17 @@ function applyTheme(){var p={},pk={},k;for(k in (LAY.primary||{}))p[k]=LAY.prima
 // after "retry" seconds while that field of the answer is true, and after a failed request
 var DATA={};
 function reloadData(){for(var ns in DATA)DATA[ns]()}
+// The last answer of every data source is kept in this browser and shown at once when the page opens again (with "busy": true until the
+// new answer is there), so a page never starts with empty lists: what it knew stays until something newer replaces it.
+function restoreData(){var ns;for(ns in (LAY.data||{}))try{var r=JSON.parse(localStorage.getItem("netswitch-data-"+ns));if(r&&typeof r==="object"){r.busy=true;S[ns]=r}}catch(e){}}
+function keepData(ns,r){try{localStorage.setItem("netswitch-data-"+ns,JSON.stringify(r))}catch(e){}}
 function startData(){var ns;for(ns in (LAY.data||{}))(function(ns,spec){
  var timer=null,seq=0,every=(spec.every||60)*1000,retry=(spec.retry||2)*1000,onlyInSettings=spec.when==="settings";
  function wanted(){return !document.hidden&&(!onlyInSettings||$("settings").classList.contains("open"))}
  function load(){clearTimeout(timer);if(!wanted())return;var mine=++seq;
   xhrJson("GET",spec.url,function(r){var again=every;
    if(mine!==seq)return;                      // a newer question was asked meanwhile: its answer counts, this older one must not overwrite it
-   if(r){S[ns]=r;engineUpdate();if(spec.retry_if&&getPath(r,spec.retry_if))again=retry}else again=retry;
+   if(r){S[ns]=r;keepData(ns,r);engineUpdate();if(spec.retry_if&&getPath(r,spec.retry_if))again=retry}else again=retry;
    timer=setTimeout(load,again)})}
  DATA[ns]=load;
  document.addEventListener("visibilitychange",function(){if(!document.hidden)load()});
@@ -284,7 +288,8 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
     if(st==401||st==429){setText(msg,(b&&b.message)||"PIN refused");return}
     p.close();refresh()})})}
  setText(go,P.submit||"OK");go.onclick=submit;
- function paint(){var items=val(s.items)||[],k=JSON.stringify(items);if(k===key)return;key=k;
+ function paint(){var raw=val(s.items);if(raw==null){if(key!==null){key=null;inner.innerHTML=""}return}      // null: not known yet, nothing is said about it (no "Nobody ...")
+  var items=raw,k=JSON.stringify(items);if(k===key)return;key=k;
   inner.innerHTML="";
   items.forEach(function(it,i){inner.appendChild(rowFor(it,i,false))});
   if(!items.length&&s.empty)inner.appendChild(s.style==="compact"?h("span",{text:s.empty}):h("div",{"class":"srow"},[h("span",{text:s.empty})]));

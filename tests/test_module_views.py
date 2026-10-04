@@ -350,7 +350,7 @@ class ClockView(unittest.TestCase):
         self.assertEqual((v["time"], v["beat"]), ("1:05:09 PM", ".beat @%03d" % clock.beats(t)))
         self.assertEqual(len(v["items"]), len(clock.DEFAULT_CITIES))
         self.assertEqual(v["cities"][0], ["Los Angeles", "5:05 AM"])       # each city with its time, together
-        self.assertEqual((v["map"]["utc"], v["map"]["here"], v["map"]["zone"]), (t, 0.0, "UTC"))
+        self.assertEqual((v["map"]["utc"], v["map"]["here"]), (t, 0.0))
         clock.save_config({"cities": []})
         self.assertEqual((clock.view(t)["world"], clock.view(t)["world_on"]), (False, True))   # nothing to show, the switch stays on
 
@@ -367,20 +367,6 @@ class ClockView(unittest.TestCase):
         tzmod.use_zoneinfo = False                                         # what Python before 3.9 gets: the tz files read by hand
         got = dict((c["name"], c["text"]) for c in clock.world(clock.read_config(), 1783080000))
         self.assertEqual((got["London"], got["Berlin"], got["New York"], got["Sydney"], got["Mumbai"]), ("13:00", "14:00", "08:00", "22:00", "17:30"))
-
-    def test_the_map_areas_and_their_offsets(self):
-        data = clock.map_zones()
-        self.assertGreater(len(data["zones"]), 50)
-        self.assertIn("OpenStreetMap", data["source"])
-        tzs = [z["tz"] for z in data["zones"]]
-        offs = clock.zone_offsets(1783080000)
-        self.assertEqual(len(offs), len(tzs))
-        self.assertEqual(offs[tzs.index("Europe/Paris")], 2.0)            # summer time in July
-        self.assertEqual(offs[tzs.index("Asia/Kolkata")], 5.5)
-        self.assertEqual(offs[tzs.index("Australia/Sydney")], 10.0)
-        for z in data["zones"]:
-            for ring in z["p"]:
-                self.assertTrue(all(0 <= ring[i] <= 360 and 0 <= ring[i + 1] <= data["top"] - data["bottom"] for i in range(0, len(ring), 2)), z["tz"])
 
     def test_api_and_form_answer(self):
         clock.save_config({"beat": True})

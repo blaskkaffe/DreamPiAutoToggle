@@ -58,7 +58,44 @@ except NameError:
     _TEXT = str
 
 _lock = threading.Lock()
-_cache = {"time": 0, "refreshing": False, "players": [], "sources": [], "games": [], "games_time": 0, "games_live": False}
+_cache = {"time": 0, "refreshing": False, "players": [], "sources": [], "games": [], "games_time": 0, "games_live": False, "restored": False}
+_disk = {"tried": False}
+
+
+def _save_cache():
+    """Keep the list on disk: after a restart of the service the page shows it at once, marked as old, while the new one loads."""
+    with _lock:
+        data = dict((k, _cache[k]) for k in ("time", "players", "sources", "games", "games_time", "games_live"))
+    tmp = core.PLAYERS_CACHE + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump(data, f)
+        os.rename(tmp, core.PLAYERS_CACHE)
+    except (IOError, OSError):
+        pass
+
+
+def _load_cache():
+    """Once, when the list in memory is empty: take the saved one (it is old, so a refresh follows at once)."""
+    if _disk["tried"]:
+        return
+    _disk["tried"] = True
+    with _lock:
+        if _cache["time"]:
+            return
+    try:
+        with open(core.PLAYERS_CACHE) as f:
+            data = json.load(f)
+        if not (isinstance(data, dict) and isinstance(data.get("players"), list) and isinstance(data.get("time"), int) and data["time"] > 0):
+            return
+        with _lock:
+            if not _cache["time"]:
+                _cache.update({"time": data["time"], "players": data["players"][:MAX_PLAYERS], "restored": True,
+                               "sources": data.get("sources") if isinstance(data.get("sources"), list) else [],
+                               "games": data.get("games") if isinstance(data.get("games"), list) else [],
+                               "games_time": data.get("games_time") if isinstance(data.get("games_time"), int) else 0})
+    except (IOError, OSError, ValueError):
+        pass
 
 
 def fetch(url):
@@ -423,7 +460,7 @@ def watch_result(players, favs):
 def write_watch():
     """Tell the LED service (a file, no socket) which favourites are online, from the cached list."""
     with _lock:
-        have, players = _cache["time"], list(_cache["players"])
+        have, players = _cache["time"] and not _cache["restored"], list(_cache["players"])     # a list read from disk is not what is online now
     result = watch_result(players, favorites()) if have else {"games": [], "friends": []}
     result["time"] = int(time.time())
     tmp = core.PLAYERS_WATCH + ".tmp"
@@ -512,12 +549,16 @@ def refresh():
         with _lock:
             keep = failed and bool(_cache["time"])
             _cache.update({"time": _cache["time"] if keep else int(time.time()), "players": _cache["players"] if keep else players[:MAX_PLAYERS],
-                           "sources": report, "games": games, "games_time": gtime, "games_live": live, "refreshing": False})
+                           "sources": report, "games": games, "games_time": gtime, "games_live": live, "refreshing": False,
+                           "restored": _cache["restored"] if keep else False})
+        if not keep:
+            _save_cache()
         write_watch()
 
 
 def status():
     """The cached list for the page; a refresh runs in the background when it is old."""
+    _load_cache()
     with _lock:
         stale = time.time() - _cache["time"] > CACHE_SECONDS and not _cache["refreshing"]
     if stale:
@@ -564,7 +605,7 @@ def view():
     elif not out.get("time"):
         out["parts"] = [{"text": "%s -" % n, "colour": c} for n, c in nets]
         out["games"] = ["Loading..."]
-        out["list"] = out["games_list"] = []
+        out["list"] = out["games_list"] = None          # not known yet: the page shows no "Nobody is online" for what it has not heard
         out["status"] = ""
     else:
         out["parts"] = [{"text": "%s %d" % (n, len([p for p in players if p["network"] == n])), "colour": c} for n, c in nets]
@@ -580,6 +621,7 @@ def view():
                                                                          " (offline)" if v.get("offline") else "") for v in sec) if sec else x["count"]))
         out["status"] = "; ".join("%s: %s" % (x["name"], x["error"]) for x in bad) + ("  \u00b7  " if bad and detail else "") + "  \u00b7  ".join(detail)
     out["retry"] = bool(out["configured"] and (not out.get("time") or out.get("refreshing")))      # ask again soon while it is loading
+    out["busy"] = out["retry"]                                                                       # the rows show the refresh spinner meanwhile
     return out
 
 
@@ -692,6 +734,7 @@ def start():
     """Called once by the web service: keeps the list fresh while there are favourites, so the LEDs work with no page open."""
     if _watcher["on"]:
         return
+    _load_cache()
     _watcher["on"] = True
     t = threading.Thread(target=_watch_loop)
     t.daemon = True

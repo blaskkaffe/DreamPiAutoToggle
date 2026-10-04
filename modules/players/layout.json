@@ -41,7 +41,7 @@
        "label": "Games",
        "main": true,
        "cls": "pgames",
-       "busy": "@players.refreshing",
+       "busy": "@players.busy",
        "value": {
         "type": "carousel",
         "items": "@players.games"
@@ -69,7 +69,7 @@
       },
       {
        "label": "Players",
-       "busy": "@players.refreshing",
+       "busy": "@players.busy",
        "value": {
         "type": "list",
         "style": "compact",

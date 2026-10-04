@@ -3,8 +3,8 @@
  "dashboard": [
   {"box": "events", "items": [
    {"type": "infobox", "label": "Next DC99 event", "title": "@events.next.title", "rows": [
-    {"label": "When", "main": true, "busy": "@events.syncing", "value": {"type": "text", "text": "@events.next.when"}},
-    {"label": "", "cls": "evl", "busy": "@events.syncing", "value": {"type": "custom", "name": "events-list"}},
+    {"label": "When", "main": true, "busy": "@events.busy", "value": {"type": "text", "text": "@events.next.when"}},
+    {"label": "", "cls": "evl", "busy": "@events.busy", "value": {"type": "custom", "name": "events-list"}},
     {"label": "", "cls": "evs", "value": {"type": "text", "text": "@events.status", "muted": true}}],
     "actions": [
      {"type": "button", "label": "Sync now", "post": "/api/sync"},

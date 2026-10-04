@@ -30,6 +30,10 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(sawSpin, 'a spinner is shown next to the rows while the list is being fetched again');
   ok(!closed && minH >= first.h - 4, 'the box stays open and does not shrink while it refreshes (smallest ' + minH + 'px, was ' + first.h + 'px)');
   ok(!fewer, 'the old list stays until the new one replaces it');
+  // a page opened again shows the last list at once (kept in the browser), and no "Nobody ..." text before it knows anything
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const at0 = await page.evaluate(() => ({ n: window.S.players && S.players.list ? S.players.list.length : -1, busy: !!(S.players && S.players.busy), empty: document.body.innerText.indexOf('Nobody is online') >= 0 }));
+  ok(at0.n >= 5 && at0.busy && !at0.empty, 'a page opened again shows the last list at once, marked as being refreshed (' + at0.n + ' players, no "Nobody is online")');
   ok(errors.length === 0, 'no JavaScript or console errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await browser.close();
   console.log(failed ? failed + ' check(s) failed' : 'all checks passed');

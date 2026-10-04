@@ -313,14 +313,18 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.keyboard.press('Escape'); await page.waitForLoadState('networkidle'); await settle(2000);
   await page.click('#close-settings'); await settle(500);
   ok(await page.locator('text=Online players:').count() === 1, 'Esc closes the pop-up like Done and applies: the module is back');
-  // ---- the debug log: an infobox of three rows (Debug log / Recording off / the last line), the buttons and the log inside it when it is open
+  // ---- the debug log: an infobox of two rows (Debug log / the last three lines of the log); open, the buttons and the log run out to the box's edges
   const dbg = page.locator('.dbox[data-box="debug log"] .now');
-  ok(/Debug log/.test(await dbg.locator('.nlabel').textContent()) && (await dbg.locator('b').textContent()).trim() === 'Recording off', 'the closed debug log box says Debug log and Recording off');
-  ok((await dbg.locator('.row.dlast').textContent()).trim().length > 0 && !(await dbg.locator('.console').isVisible()), 'its last row is the last line of the log, the log itself is hidden');
+  ok(/Debug log/.test(await dbg.locator('.nlabel').textContent()) && (await dbg.locator('b').textContent()).trim() === '', 'the closed debug log box has the title Debug log and no middle text');
+  ok((await dbg.locator('.row.dlast').textContent()).trim() === 'Recording off' && !(await dbg.locator('.console').isVisible()), 'below it the last log lines (or Recording off), the log itself is hidden');
   await dbg.click({ position: { x: 20, y: 10 } }); await settle(500);
-  ok(await dbg.evaluate(e => e.classList.contains('open')) && await dbg.locator('.row.dctl button').first().isVisible(), 'a tap opens the same box with the buttons');
+  ok(await dbg.evaluate(e => e.classList.contains('open')) && await dbg.locator('.row.dctl button').first().isVisible() && !(await dbg.locator('.row.dlast').isVisible()), 'a tap opens the same box with the buttons');
   await dbg.locator('.row.dctl button', { hasText: 'Start recording' }).click(); await settle(1500);
-  ok(/●\s*Recording/.test(await dbg.locator('b').textContent()) && await dbg.locator('.row.dctl button', { hasText: 'Stop recording' }).count() === 1 && await dbg.locator('.console').isVisible(), 'Recording switches on: the middle line says Recording and the log shows inside the box');
+  ok(await dbg.locator('.row.dctl button', { hasText: 'Stop recording' }).count() === 1 && await dbg.locator('.console').isVisible(), 'Start recording: the button says Stop recording and the log shows inside the box');
+  const gap = await dbg.evaluate(e => { const c = e.querySelector('.console').getBoundingClientRect(), b = e.getBoundingClientRect(); return { l: c.left - b.left, r: b.right - c.right, bt: b.bottom - c.bottom }; });
+  ok(gap.l <= 6 && gap.r <= 6 && gap.bt <= 6, 'the log runs out to the left, right and bottom edge of the box (' + Math.round(gap.l) + ', ' + Math.round(gap.r) + ', ' + Math.round(gap.bt) + 'px)');
+  const sz = await dbg.evaluate(e => ({ btn: parseFloat(getComputedStyle(e.querySelector('.row.dctl button')).fontSize), set: parseFloat(getComputedStyle(document.querySelector('#set-boxes .pill-s')).fontSize) }));
+  ok(Math.abs(sz.btn - sz.set) < 2.5, 'the buttons are the size of the settings buttons (' + sz.btn.toFixed(1) + ' / ' + sz.set.toFixed(1) + 'px)');
   await dbg.locator('.row.dctl button', { hasText: 'Stop recording' }).click(); await settle(900);
   await dbg.click({ position: { x: 20, y: 10 } }); await settle(300);
   // ---- the same drag with a finger (touch events through the browser's protocol, in a phone-sized touch context)

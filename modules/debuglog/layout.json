@@ -6,25 +6,14 @@
     {
      "type": "infobox",
      "label": "Debug log",
-     "title": "@debuglog.label",
      "rows": [
       {
-       "label": "Last line",
+       "label": "Log",
        "main": true,
        "cls": "dlast",
        "value": {
         "type": "text",
         "text": "@debuglog.last"
-       }
-      },
-      {
-       "label": "",
-       "cls": "dctl keep",
-       "value": {
-        "type": "text",
-        "muted": true,
-        "cls": "note",
-        "text": "Records every modem event, DreamPi message and routing decision with millisecond timing. Turn recording on, then dial."
        }
       },
       {
@@ -48,16 +37,6 @@
             "post": "/clearlog"
            },
            {
-            "type": "link",
-            "label": "Newest 256 KB",
-            "href": "/dtmf"
-           },
-           {
-            "type": "link",
-            "label": "Full log",
-            "href": "/dtmf?all"
-           },
-           {
             "type": "toggle",
             "label": "Follow",
             "local": "follow",
@@ -72,12 +51,32 @@
       },
       {
        "label": "",
+       "cls": "dctl keep",
+       "show": "@debug",
+       "value": {
+        "type": "bar",
+        "items": [
+         {
+          "type": "link",
+          "label": "Newest 256 KB",
+          "href": "/dtmf"
+         },
+         {
+          "type": "link",
+          "label": "Full log",
+          "href": "/dtmf?all"
+         }
+        ]
+       }
+      },
+      {
+       "label": "",
        "cls": "dcon keep",
        "value": {
         "type": "console",
         "tail": "/log",
         "nowrap": true,
-        "height": "55vh",
+        "height": "40vh",
         "label": "Debug log",
         "active": "@debug",
         "follow": "@_local.follow",

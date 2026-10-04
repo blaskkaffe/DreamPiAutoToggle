@@ -1,7 +1,12 @@
-/* Debug log module: the box is an infobox like the others; closed it shows Debug log / Recording off (or Recording) / the last line of the log,
-   open it holds the buttons and the live log */
-[data-mod="debuglog"] .now .row.dlast .wtext{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+/* Debug log module: the box is an infobox like the others. Closed: "Debug log" and the last three lines of the log. Open: the buttons and the
+   log, which runs out to the edges of the box. The sizes are the ones of a settings row (the box's rows are small by default). */
+[data-mod="debuglog"] .row.dlast{padding:0;border-top:0;margin-top:4px}
+[data-mod="debuglog"] .now .row.dlast .v{display:block;width:100%;min-width:0}
+[data-mod="debuglog"] .now .row.dlast .wtext{display:block;width:100%;font:1em/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgba(255,255,255,.8)}
 [data-mod="debuglog"] .now.open .row.dlast{display:none}
 [data-mod="debuglog"] .row.dctl .k,[data-mod="debuglog"] .row.dcon .k{display:none}
-[data-mod="debuglog"] .row.dctl .v,[data-mod="debuglog"] .row.dcon .v{flex:1;display:block;width:100%}
-[data-mod="debuglog"] .row.dctl{font-size:.75em}   /* the note and the buttons of the open box are the size of a settings row, not of the small status rows */
+[data-mod="debuglog"] .row.dctl .v,[data-mod="debuglog"] .row.dcon .v{flex:1;display:block;width:100%;min-width:0}
+[data-mod="debuglog"] .row.dctl{font-size:.77em;padding:8px 0 0;border-top:0;text-align:left}
+[data-mod="debuglog"] .row.dctl .bar{margin:0;gap:8px}
+[data-mod="debuglog"] .row.dcon{font-size:.77em;padding:0;margin:10px -24px -14px;border-top:0}
+[data-mod="debuglog"] .row.dcon .console{margin:0;border:0;border-top:1px solid var(--line);border-radius:0 0 calc(var(--r) - var(--bw)) calc(var(--r) - var(--bw));font-size:.78em;max-height:none;padding:8px 14px}

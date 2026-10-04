@@ -1,20 +1,14 @@
-/* Clock module: the city list and the time zone map in the open clock box (with world time on).
-   On a coloured box the highlighted areas are white and the cities white dots; on a neutral (grey) box - the clock colour's
-   Highlight switch off, the default - the highlighted areas and the dots take the clock's colour. */
+/* Clock module: the city list and the time zone map in the open clock box (with world time on). The highlighted band and the city dots take the clock's colour. */
 [data-mod="clock"] .now.open .row.wcar{display:none}
 .cwrow .k,.mapw .k{display:none} .cwrow.row .v,.mapw.row .v{flex:1;display:block;width:100%}
 .cwl{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:3px 18px;font-size:1.05em}
 .cwc{display:flex;justify-content:space-between;gap:8px;white-space:nowrap;min-width:0}
 .cwc .cwn{overflow:hidden;text-overflow:ellipsis;color:rgba(255,255,255,.8)} .cwc .cwt{font-weight:700;font-variant-numeric:tabular-nums}
 .cmap{display:block;width:100%;height:auto}
-.cmap .sea{fill:rgba(255,255,255,.03)} .cmap .sea.alt{fill:rgba(255,255,255,.08)}
-.cmap .ofs{fill:rgba(255,255,255,.7);font-size:6.5px;text-anchor:middle} .cmap .hr{fill:#fff;font-size:8px;font-weight:700;text-anchor:middle}
-.cmap .z polygon{stroke:rgba(0,0,0,.35);stroke-width:.3;stroke-linejoin:round}
-.cmap .z{fill:rgba(255,255,255,.3)} .cmap .z.odd{fill:rgba(255,255,255,.42)} .cmap .z.frac{fill:rgba(255,255,255,.55)} .cmap .z.none{fill:rgba(255,255,255,.15)}
-.cmap .z.here{fill:rgba(255,255,255,.9)}
-.cmap .city{fill:#fff;stroke:#000;stroke-width:.8}
-[data-box="clock"].plain:not(.hl) .cmap .z.here{fill:var(--primary)}
-[data-box="clock"].plain:not(.hl) .cmap .city{fill:var(--primary-l)}
+.cmap .band{fill:rgba(255,255,255,.04)} .cmap .band.alt{fill:rgba(255,255,255,.09)} .cmap .band.here{fill:rgba(var(--primary-rgb),.28)}
+.cmap .land{fill:rgba(255,255,255,.34);stroke:rgba(255,255,255,.5);stroke-width:.4}
+.cmap .hr{fill:rgba(255,255,255,.75);font-size:8px;text-anchor:middle}
+.cmap .city{fill:var(--primary-l);stroke:#000;stroke-width:.6}
 /* Large clock (the infobox's data-mode, set from clock.size): the time spans the rows .beat and world time leave free. The box is a grid of
    its three rows (top line, time, bottom line); the time has no size of its own (contain: size), so it never changes the box's height,
    and page.js fit() sizes its text. Open (world time on, tapped) the box is the plain list and map again. */

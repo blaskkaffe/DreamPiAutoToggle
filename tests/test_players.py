@@ -1,6 +1,7 @@
 """The optional online-players list: tolerant parsing of status JSON, the cache
 and the HTTP endpoint (no network: fetch is faked)."""
 import json
+import os
 import threading
 import unittest
 from urllib.error import HTTPError
@@ -239,7 +240,8 @@ class FavoritesTests(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox()
         self._fetch = pl.fetch
-        pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": [], "games": [], "games_time": 0, "games_live": False})
+        pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": [], "games": [], "games_time": 0, "games_live": False, "restored": False})
+        pl._disk["tried"] = True
 
     def tearDown(self):
         pl.fetch = self._fetch
@@ -393,6 +395,28 @@ class FavoritesTests(unittest.TestCase):
         self.assertEqual(got["players"], before)                                # not replaced by an empty list
         self.assertFalse(got["refreshing"])
         self.assertTrue(any(not x["ok"] for x in got["sources"]))               # the report says what went wrong
+
+    def test_the_last_list_is_kept_on_disk_and_shown_again_after_a_restart(self):
+        pl.fetch = lambda url: json.dumps(self.GAMES if "dreamcastlive" in url else DC99)
+        pl.refresh()
+        before = list(pl.status()["players"])
+        self.assertTrue(before)
+        self.assertTrue(os.path.exists(core.PLAYERS_CACHE))
+        pl._cache.update({"time": 0, "players": [], "sources": [], "games": [], "restored": False})      # what a restarted service has
+        pl._disk["tried"] = False
+        pl.fetch = lambda url: (_ for _ in ()).throw(IOError("slow"))                                      # and the feeds are not answering yet
+        pl._cache["refreshing"] = True                                                                     # (a refresh is running, so status() starts none)
+        got = pl.view()
+        self.assertEqual(got["players"], before)                                                           # the old list is there at once ...
+        self.assertTrue(got["restored"] and got["list"] and got["busy"])                                   # ... and the rows say they are being refreshed
+        pl.save_favorites({"games": [], "players": [before[0]["player"]]})
+        self.assertEqual(core.players_watch(), {"games": [], "friends": []})                               # a list from disk does not light the LEDs
+
+    def test_nothing_is_said_about_a_list_that_is_not_known_yet(self):
+        pl._cache.update({"time": 0, "refreshing": True, "players": [], "sources": []})
+        pl._disk["tried"] = True
+        v = pl.view()
+        self.assertEqual((v["list"], v["games_list"], v["games"]), (None, None, ["Loading..."]))          # null, not []: the page shows no "Nobody is online" yet
 
     def test_remove_all_asks_first(self):
         self.assertTrue(pl._favorites_reply()["rules"]["restore_confirm"])

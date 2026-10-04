@@ -479,7 +479,7 @@ def view(now=None):
                       "hm": time.strftime("%H:%M", time.gmtime(r["start_utc"] + zone_offset(zone, r["start_utc"]))), "game": r["game"],
                       "source": SOURCE_LABELS.get(r["source"], r["source"]), "url": r["url"],
                       "reminded": reminded(r, cfg), "series": r["title"] in cfg["series"]} for r in soon],
-            "status": line, "syncing": st["syncing"], "zone": tz.utc_text(zone_offset(zone, now)) if not zone else tz.zone_name(zone)}
+            "status": line, "syncing": st["syncing"], "busy": st["syncing"], "zone": tz.utc_text(zone_offset(zone, now)) if not zone else tz.zone_name(zone)}
 
 
 def reminder_view(now=None):
