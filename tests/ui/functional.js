@@ -20,6 +20,8 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.goto(URL, { waitUntil: 'networkidle' }); await settle(1800);
   // ---- the dashboard comes from the layouts
   ok(await page.locator('.dbox').count() === 3, 'dashboard has the network, players and debug log boxes');
+  const alphas = await page.evaluate(() => Array.from(document.querySelectorAll('.now, .pill, .pill-s, .notebox, .warnbox')).filter(e => e.offsetParent).map(e => getComputedStyle(e).borderTopColor).filter(c => /^rgba\(/.test(c) && !/, 1\)$/.test(c)));
+  ok(alphas.length === 0, 'the borders of the boxes and buttons are opaque (' + alphas.slice(0, 3).join(' ') + ')');
   ok((await page.locator('.now b').first().textContent()) === 'DCNow!', 'network box names the selected network');
   const pillColour = async n => page.locator('.pill').nth(n).evaluate(e => getComputedStyle(e).backgroundColor);
   const orange = await pillColour(0), blue = await pillColour(1);
@@ -44,11 +46,12 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await page.locator('.dbox[data-box="network"] .now b .pln').evaluate(e => e.style.color === 'var(--c-blue-l)'), 'the network name is in its network\'s colour (DCNET: blue), as in the players box');
   const tick = await page.evaluate(async () => {         // set the title and look at it in one go: the page's own /api refresh would put the real name back
     const look = () => { const c = document.querySelector('.dbox[data-box="network"] .now b .carousel'); return { sc: c.classList.contains('sc'), anim: getComputedStyle(c.querySelector('.trk')).animationName, text: document.querySelector('.dbox[data-box="network"] .now b').textContent }; };
+    const realRender = window.render; window.render = () => {};                          // no /api answer may put the real name back meanwhile
     S.selected = { id: 'dcnet', title: 'x', parts: [{ text: 'A very long main title that can never fit in the box', colour: 'switcher.dcnet' }] }; engineUpdate(); await new Promise(r => setTimeout(r, 150));
     const long = look();
     S.selected = { id: 'dcnet', title: 'DCNET', parts: [{ text: 'DCNET', colour: 'switcher.dcnet' }] }; engineUpdate(); await new Promise(r => setTimeout(r, 150));
-    return { long, short: look() }; });
-  ok(tick.long.sc && tick.long.anim === 'marquee', 'a main title that does not fit scrolls round like a carousel');
+    const out = { long, short: look() }; window.render = realRender; return out; });
+  ok(tick.long.sc && tick.long.anim === 'marquee', 'a main title that does not fit scrolls round like a carousel ' + JSON.stringify(tick));
   ok(!tick.short.sc && tick.short.text === 'DCNET', 'and a short one stands still (the text is there once)');
   ok((await boxBg()) !== before, 'the box border takes the DCNET colour');
   ok(await page.evaluate(() => document.body.classList.contains('c-blue')), "the page's primary colour is the selected network's (blue)");
@@ -222,7 +225,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('.pop.open button', { hasText: 'Done' }).click(); await settle(300);
   // Appearance: a tick box left of each colour picks a coloured or a neutral background
   const appr = page.locator('[data-box="appearance"] .srow', { hasText: 'Online players colour' });
-  ok(!(await appr.locator('input[type=checkbox]').isChecked()) && await page.locator('.dbox[data-box="players"].plain').count() === 1, 'a box starts neutral (Highlight off)');
+  ok(!(await appr.locator('input[type=checkbox]').isChecked()) && await page.locator('.dbox[data-box="players"].plain').count() === 1, 'a box starts neutral (Highlight off) ' + await page.evaluate(() => JSON.stringify({ c: document.querySelector('.dbox[data-box="players"]').className, t: S.tints && S.tints.players, chk: document.querySelectorAll('[data-box="appearance"] .srow').length })));
   await appr.locator('input[type=checkbox]').check(); await settle(1300);
   ok(await page.locator('.dbox[data-box="players"].plain').count() === 0, 'ticking Highlight makes the box coloured');
   await appr.locator('input[type=checkbox]').uncheck(); await settle(1300);

@@ -42,6 +42,15 @@ def base_classes():
 
 
 class KitTests(unittest.TestCase):
+    def test_the_thick_borders_of_boxes_and_buttons_are_opaque(self):
+        """A box's or button's border is a solid colour (the backgrounds may be see-through); a translucent one over a see-through
+        background looks duller than the same border on a button."""
+        css = strip_comments(read(CSS))
+        for m in re.finditer(r"border(?:-color)?:[^;}]*", css):
+            decl = m.group(0)
+            if "var(--bw)" in decl or decl.startswith("border-color"):
+                self.assertNotIn("rgba(", decl, decl)
+
     def test_every_module_declares_the_kit_version_it_was_written_for(self):
         for path in glob.glob(os.path.join(MODULES, "*", "module.json")):
             m = json.loads(read(path))

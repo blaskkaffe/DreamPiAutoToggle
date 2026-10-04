@@ -7,5 +7,5 @@
 .evr .evt{flex:1;min-width:0} .evr .evt a{color:#fff;text-decoration:none} .evr .evt a:hover{text-decoration:underline}
 .evr .evsrc{display:block;font-size:.82em;color:rgba(255,255,255,.6)}
 .evs .wtext{text-align:center}
-[data-box="events"] .now .row.hang .pill-s{background:rgba(0,0,0,.25);border-color:rgba(255,255,255,.4)}   /* plain buttons: the red is the network box's Hang up */
+[data-box="events"] .now .row.hang .pill-s{background:rgba(0,0,0,.25);border-color:var(--primary-l)}   /* plain buttons: the red is the network box's Hang up */
 [data-box="events"] .now .row.hang{gap:10px}

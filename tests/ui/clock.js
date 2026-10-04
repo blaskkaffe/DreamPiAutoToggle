@@ -16,7 +16,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await box.count() === 1, 'the clock is an info box like the network and players boxes');
   const time = async () => (await box.locator('b').textContent()).trim();
   ok(/^\d{2}:\d{2}:\d{2}$/.test(await time()), 'the middle line is the time in 24-hour form (' + await time() + ')');
-  ok((await box.locator('.nlabel').textContent()).trim() === '' && await box.locator('.carousel .t').count() === 0, 'the top and bottom lines are empty to begin with');
+  ok((await box.locator('.nlabel').textContent()).trim() === '' && await box.locator('.row .carousel .t').count() === 0, 'the top and bottom lines are empty to begin with');
   const t1 = await time(); await settle(1500);
   ok(t1 !== await time(), 'the time ticks');
   // settings: 12-hour, .beat and world time
@@ -31,7 +31,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await page.click('#close-settings'); await settle(1800);
   ok(/^\d{1,2}:\d{2}:\d{2} (AM|PM)$/.test(await time()), 'the middle line follows the 12-hour setting (' + await time() + ')');
   ok(/^@\d{3} \.beats$/.test((await box.locator('.nlabel').textContent()).trim()), 'the top line shows the .beat time');
-  ok(await box.locator('.carousel .t').count() > 0 && /Tokyo/.test(await box.locator('.carousel').first().textContent()), 'the bottom line lists world times');
+  ok(await box.locator('.row .carousel .t').count() > 0 && /Tokyo/.test(await box.locator('.row .carousel').first().textContent()), 'the bottom line lists world times');
   // the open box: each city with its time on one row, and the map of the real time zone areas
   ok(!(await box.locator('svg.cmap').isVisible()), 'the map is hidden until the box is tapped');
   await box.click({ position: { x: 20, y: 10 } }); await settle(1500);
@@ -110,12 +110,12 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--c-global').trim()) === '#00aa55', 'the Global main picker changes the colour everywhere it is used at once');
   ok(await page.evaluate(() => { const c = document.querySelector('#set-boxes .cbox.neutral:checked'); return !!c && getComputedStyle(c).backgroundColor === 'rgb(0, 170, 85)'; }), 'and so do the grey tick boxes (they use Global main)');
   await page.click('#close-settings'); await settle(400);
-  ok(await clockBox.locator('.now').evaluate(e => getComputedStyle(e).borderTopColor) === 'rgba(' + [0x00 + Math.round((255 - 0) * 0.45), 0xaa + Math.round((255 - 0xaa) * 0.45), 0x55 + Math.round((255 - 0x55) * 0.45)].join(', ') + ', 0.8)', 'and the border of the box is its lighter shade');
+  ok(await clockBox.locator('.now').evaluate(e => getComputedStyle(e).borderTopColor) === 'rgb(' + [0x00 + Math.round((255 - 0) * 0.45), 0xaa + Math.round((255 - 0xaa) * 0.45), 0x55 + Math.round((255 - 0x55) * 0.45)].join(', ') + ')', 'and the border of the box is its lighter shade');
   // world time off: the map and the list go, the box stays
   await page.click('#cog'); await settle(900);
   await sec.locator('.srow', { hasText: 'World time' }).locator('input').uncheck(); await settle(900);
   await page.click('#close-settings'); await settle(1800);
-  ok(await box.locator('.carousel .t').count() === 0 && !(await box.locator('svg.cmap').isVisible()), 'with world time off the list and the map are gone');
+  ok(await box.locator('.row .carousel .t').count() === 0 && !(await box.locator('svg.cmap').isVisible()), 'with world time off the list and the map are gone');
   // the large clock: the time takes the rows that .beat and world time leave free, and the box never changes height
   const geo = async () => box.evaluate(e => { const b = e.querySelector(':scope > b'); return { h: Math.round(e.getBoundingClientRect().height), fs: parseFloat(getComputedStyle(b).fontSize), mode: e.getAttribute('data-mode'), open: e.classList.contains('open') }; });
   const h0 = (await geo()).h, fs0 = (await geo()).fs;

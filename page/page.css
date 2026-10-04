@@ -22,15 +22,15 @@
  .ok{background:#2c2} .busy,.warn{background:#e0b400} .call{background:#b04cff} .bad,.off{background:#d33}
  .warnbox{background:#7a1f1f;border:var(--bw) solid #a84a4a;padding:10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.9em}
  /* a notice: a banner that is not a warning (an event starting soon), in the page's colour, with a dismiss button */
- .notebox{display:flex;align-items:center;gap:12px;background:rgba(var(--primary-rgb),.75);border:var(--bw) solid rgba(var(--primary-l-rgb),.9);padding:10px 12px 10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.95em}
+ .notebox{display:flex;align-items:center;gap:12px;background:rgba(var(--primary-rgb),.75);border:var(--bw) solid rgb(var(--primary-l-rgb));padding:10px 12px 10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.95em}
  .notebox span{flex:1;min-width:0} .notebox .nx{flex:none;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.28)}
- .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r);text-align:center;background:rgba(var(--primary-rgb),.62);border:var(--bw) solid rgba(var(--primary-l-rgb),.8);line-height:1.35}
+ .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r);text-align:center;background:rgba(var(--primary-rgb),.62);border:var(--bw) solid rgb(var(--primary-l-rgb));line-height:1.35}
  .now b{font-size:1.25em;display:block}
  /* notification highlight: a module asks for one of its dashboard boxes to stand out for a while (/api "highlight", an event about to
     start, say). A neutral box (class plain: its colour's Highlight switch is off) takes its own colour; a box that is coloured
     already gets the global look of Settings > Appearance > Notification highlight: an animated rainbow edge (body.hl-rainbow) or
     a glow in one palette colour (--hl-rgb). */
- .dbox.hl.plain .now,.dbox.hl.plain .wide{background:rgba(var(--primary-rgb),.62);border-color:rgba(var(--primary-l-rgb),.8)}
+ .dbox.hl.plain .now,.dbox.hl.plain .wide{background:rgba(var(--primary-rgb),.62);border-color:rgb(var(--primary-l-rgb))}
  .dbox.hl:not(.plain) .now{border-color:rgb(var(--hl-rgb));animation:hlglow 1.6s ease-in-out infinite}
  @keyframes hlglow{0%,100%{box-shadow:0 0 4px 0 rgba(var(--hl-rgb),.45)}50%{box-shadow:0 0 22px 4px rgba(var(--hl-rgb),.95)}}
  body.hl-rainbow .dbox.hl:not(.plain) .now{position:relative;border-color:transparent;animation:hlwhite 1.6s ease-in-out infinite}
@@ -48,22 +48,22 @@
  .now .row .k{color:rgba(255,255,255,.65);width:68px} .now .row .v{min-width:0;display:flex;align-items:baseline} .now .row .v > .dot{flex:none} .now .row .v > span:last-child{min-width:0} .now .sub{color:rgba(255,255,255,.65)}
  .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .now .row.hang{justify-content:center;padding:12px 0 2px}
  .now .row.hang form{width:100%} .now .row.hang .pill-s{display:block;width:100%;padding:9px 12px;font-size:1em;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
- .now .row.hang .pill-s{background:rgba(160,30,30,.85);border-color:rgba(230,110,110,.85)}
+ .now .row.hang .pill-s{background:rgba(160,30,30,.85);border-color:rgb(230,110,110)}
  .now .row.hang .pill-s.arm{background:#d33;border-color:#f99}
  .nw{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sub.blk{display:block}
  .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.18)}
  .now.open .row.main .k{display:block} .now.open .row.main .v{flex:1}
  .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r);font-size:1.1em;font-weight:600;letter-spacing:.02em}
- .pill-s.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgba(var(--primary-l-rgb),.82);text-shadow:0 1px 2px rgba(0,0,0,.55)}   /* a small button in a palette colour (c-<id>), like the colour pick's */
- .pill.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgba(var(--primary-l-rgb),.82)}
+ .pill-s.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb));text-shadow:0 1px 2px rgba(0,0,0,.55)}   /* a small button in a palette colour (c-<id>), like the colour pick's */
+ .pill.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb))}
  .pill.plain{background:var(--card)}   /* "Coloured background" off: a neutral fill, the border keeps the colour */
- .dbox .wide{background:rgba(var(--primary-rgb),.62);border-color:rgba(var(--primary-l-rgb),.8)} .dbox.plain .now,.dbox.plain .wide{background:var(--card)}
+ .dbox .wide{background:rgba(var(--primary-rgb),.62);border-color:rgb(var(--primary-l-rgb))} .dbox.plain .now,.dbox.plain .wide{background:var(--card)}
  .colourpick{display:inline-flex;align-items:center;gap:12px}
  .cp-wrap{position:relative} .cp-wrap .cp-native{position:absolute;left:0;top:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer}   /* the colour chooser laid over the Colour button */
  .pill:active{filter:brightness(1.1)}
- .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#eee;font-size:.88em}
+ .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgb(80,80,80);color:#eee;font-size:.88em}
  .srow .pill-s{white-space:nowrap}
- .pill-s.danger{background:rgba(160,30,30,.85);border-color:rgba(230,110,110,.85)}
+ .pill-s.danger{background:rgba(160,30,30,.85);border-color:rgb(230,110,110)}
  a.pill-s{text-decoration:none}
  /* ===== The page kit: the building blocks every module uses (docs/modules.md, "The page kit"). The standard widgets of
     page/widgets.js (rows, buttons, forms, boxes, tables, lists, consoles ...) are made of these classes; a module only adds
@@ -84,7 +84,7 @@
  .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range > span:first-child{white-space:nowrap} .range input{flex:1;min-width:60px;accent-color:var(--primary)}
  .range.grid{display:grid;grid-template-columns:5.6em minmax(0,1fr) 3.1em;gap:12px} .range.grid span:last-child{text-align:right}   /* equal slider lengths */
  .tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
- .tag{display:inline-flex;align-items:center;gap:2px;padding:3px 4px 3px 12px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);font-size:.88em}
+ .tag{display:inline-flex;align-items:center;gap:2px;padding:3px 4px 3px 12px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgb(80,80,80);font-size:.88em}
  .tag button{background:none;color:#aaa;font-size:1.05em;line-height:1;min-width:36px;min-height:32px;padding:0;margin:-6px 0} .tag button:hover{color:#fff}
  .empty{color:var(--muted);font-size:.85em;margin:8px 0 0}
  .swatches{display:flex;gap:8px;flex:none} .swatch{width:34px;height:34px;padding:0;border-radius:50%;border:var(--bw) solid var(--cl,transparent);background:var(--c);box-shadow:0 0 0 1px rgba(255,255,255,.25) inset}
@@ -139,14 +139,14 @@
  .now .st{display:block;overflow-wrap:anywhere}
  .pop .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0} .pop .frow > span{color:var(--txt2);font-size:.9em}
  .btns{display:flex;gap:8px;flex:none} .srow.foot{padding:12px 0 8px}
- .srow.lk .pill-s,.srow.lk .tag{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgba(var(--primary-l-rgb),.82);text-shadow:0 1px 2px rgba(0,0,0,.55);color:#fff} .srow.lk .tag button{color:#fff}
+ .srow.lk .pill-s,.srow.lk .tag{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb));text-shadow:0 1px 2px rgba(0,0,0,.55);color:#fff} .srow.lk .tag button{color:#fff}
  /* a row that shows an LED look: coloured buttons and tags that run the effect between the row's colour and the default dark grey of a
     button (the LED "off"); the text keeps its colour. Periods as in modules/led/netswitch_led.py (PERIOD), slow and fast. */
- @keyframes lkblink{50%{background:rgba(42,42,42,.82);border-color:rgba(80,80,80,.85)}}
- @keyframes lkfade{0%,100%{background:rgba(var(--primary-rgb),.82);border-color:rgba(var(--primary-l-rgb),.82)}50%{background:rgba(42,42,42,.82);border-color:rgba(80,80,80,.85)}}
- @keyframes lkb1{0%{background:rgba(var(--primary-rgb),.82);border-color:rgba(var(--primary-l-rgb),.82)}9%,100%{background:rgba(42,42,42,.82);border-color:rgba(80,80,80,.85)}}
- @keyframes lkb2{0%,18%{background:rgba(var(--primary-rgb),.82);border-color:rgba(var(--primary-l-rgb),.82)}9%,27%,100%{background:rgba(42,42,42,.82);border-color:rgba(80,80,80,.85)}}
- @keyframes lkb3{0%,18%,36%{background:rgba(var(--primary-rgb),.82);border-color:rgba(var(--primary-l-rgb),.82)}9%,27%,45%,100%{background:rgba(42,42,42,.82);border-color:rgba(80,80,80,.85)}}
+ @keyframes lkblink{50%{background:rgba(42,42,42,.82);border-color:rgb(80,80,80)}}
+ @keyframes lkfade{0%,100%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}50%{background:rgba(42,42,42,.82);border-color:rgb(80,80,80)}}
+ @keyframes lkb1{0%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}9%,100%{background:rgba(42,42,42,.82);border-color:rgb(80,80,80)}}
+ @keyframes lkb2{0%,18%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}9%,27%,100%{background:rgba(42,42,42,.82);border-color:rgb(80,80,80)}}
+ @keyframes lkb3{0%,18%,36%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}9%,27%,45%,100%{background:rgba(42,42,42,.82);border-color:rgb(80,80,80)}}
  @keyframes lkrainbow{0%,100%{background:hsla(0,75%,45%,.82);border-color:hsla(0,80%,70%,.82)}17%{background:hsla(60,75%,40%,.82);border-color:hsla(60,80%,65%,.82)}33%{background:hsla(120,65%,38%,.82);border-color:hsla(120,70%,65%,.82)}50%{background:hsla(180,75%,38%,.82);border-color:hsla(180,80%,65%,.82)}67%{background:hsla(240,75%,52%,.82);border-color:hsla(240,80%,75%,.82)}83%{background:hsla(300,65%,45%,.82);border-color:hsla(300,70%,72%,.82)}}
  .srow.lk-fx .pill-s,.srow.lk-fx .tag{animation:var(--lkn) var(--lkd) var(--lkt) infinite}
  .srow.lk-blink{--lkn:lkblink;--lkd:1s;--lkt:steps(1)} .srow.lk-blink.lk-fast{--lkd:.4s}
@@ -157,7 +157,7 @@
  .srow.lk-blink3{--lkn:lkb3;--lkd:1.6s;--lkt:steps(1)} .srow.lk-blink3.lk-fast{--lkd:.8s}
  .srow.lk-rainbow{--lkn:lkrainbow;--lkd:6s;--lkt:linear} .srow.lk-rainbow.lk-fast{--lkd:2s}
  @media(prefers-reduced-motion:reduce){.srow.lk-fx .pill-s,.srow.lk-fx .tag{animation:none}}
- .infobtn{flex:none;width:34px;height:34px;padding:0;border-radius:50%;background:rgba(42,42,42,.82);border:var(--bw) solid rgba(80,80,80,.85);color:#ddd;font:italic 600 1.05em Georgia,serif;line-height:1}
+ .infobtn{flex:none;width:34px;height:34px;padding:0;border-radius:50%;background:rgba(42,42,42,.82);border:var(--bw) solid rgb(80,80,80);color:#ddd;font:italic 600 1.05em Georgia,serif;line-height:1}
  .pop .infotext{font-size:.9em;color:var(--txt2);margin-bottom:10px}
  .tgl{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:4px}
  .bar .bar{margin:0}
