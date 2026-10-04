@@ -30,4 +30,10 @@ SERVER=$!
 sleep 3
 PORT=8737 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node players.js || RESULT=1
 kill $SERVER 2>/dev/null
+# the Dreamcast background covers the window in portrait, landscape and after turning
+BG=1 PORT=8738 python3 demo_server.py > /tmp/dpns-demo-bg.log 2>&1 &
+SERVER=$!
+sleep 3
+PORT=8738 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node background.js || RESULT=1
+kill $SERVER 2>/dev/null
 exit $RESULT

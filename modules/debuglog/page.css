@@ -1,0 +1,6 @@
+/* Debug log module: the box is an infobox like the others; closed it shows Debug log / Recording off (or Recording) / the last line of the log,
+   open it holds the buttons and the live log */
+[data-mod="debuglog"] .now .row.dlast .wtext{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+[data-mod="debuglog"] .now.open .row.dlast{display:none}
+[data-mod="debuglog"] .row.dctl .k,[data-mod="debuglog"] .row.dcon .k{display:none}
+[data-mod="debuglog"] .row.dctl .v,[data-mod="debuglog"] .row.dcon .v{flex:1;display:block;width:100%}

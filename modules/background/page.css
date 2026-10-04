@@ -1,5 +1,5 @@
 /* Dreamcast background module: the scene behind the page and the grey translucent boxes on top of it */
-#dcbg{display:none;position:fixed;top:-120px;left:0;width:100vw;height:calc(100vh + 240px);height:calc(100lvh + 240px);z-index:-1;overflow:hidden;pointer-events:none;
+#dcbg{display:none;position:fixed;top:-120px;left:0;width:100vw;height:calc(100vh + 240px);height:calc(100lvh + 240px);height:calc(max(100vh,100lvh,100dvh) + 240px);min-height:calc(100% + 240px);z-index:-1;overflow:hidden;pointer-events:none;
       background:linear-gradient(to bottom,#9cc3dc,#4d639c);transform:translateZ(0)}
 body.dcbg #dcbg{display:block} body.dcbg{background:transparent} html.dcbg{background:#4d639c linear-gradient(to bottom,#9cc3dc,#4d639c) fixed}
 body.dcbg{--card:rgba(20,20,20,.78)}   /* the neutral box: grey like the Dreamcast BIOS pop-ups. A box with "Highlight" on keeps its translucent colour, so the scene shows through it */

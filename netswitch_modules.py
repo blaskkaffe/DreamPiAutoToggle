@@ -37,7 +37,7 @@ import netswitch_core as core
 UI_KIT = 2       # the version of the page kit (ui in page/page.js, the kit block in page.css); a module may ask for an older one
 _PAGE_FILES = ("page.css", "page.js")
 # the standard widgets the page can draw from a layout (docs/modules.md, "Layout"); "custom" hands a box to the module's own page.js
-WIDGETS = ("text", "row", "button", "toggle", "swatches", "colourpick", "link", "form", "infobox", "status", "expander", "bar", "carousel",
+WIDGETS = ("text", "row", "button", "toggle", "swatches", "colourpick", "link", "form", "infobox", "status", "bar", "carousel",
            "picker", "list", "links", "console", "info", "custom")
 CONTROLS = ("select", "choice", "number", "text", "toggle")      # what a form field may hold (W.form, control() in page/widgets.js)
 SECTIONS = ("dashboard", "settings")
@@ -132,7 +132,7 @@ def refresh(force=False):
 
 def _check_widget(w, where):
     """A widget is a dict with a known "type". Widgets nested inside one are checked too: a row's control, the items of an
-    expander or bar, a form field's controls, an infobox row's value, an infobox's actions. (The items of a carousel or a
+    bar, a form field's controls, an infobox row's value, an infobox's actions. (The items of a carousel or a
     list are data, not widgets.)"""
     if not isinstance(w, dict):
         raise ValueError("%s: a widget must be an object" % where)
@@ -142,7 +142,7 @@ def _check_widget(w, where):
     for key in ("control", "value"):
         if isinstance(w.get(key), dict):
             _check_widget(w[key], "%s.%s" % (where, key))
-    for key in (("items",) if t in ("expander", "bar") else ("actions",) if t == "infobox" else ()):
+    for key in (("items",) if t == "bar" else ("actions",) if t == "infobox" else ()):
         if key in w:
             if not isinstance(w[key], list):
                 raise ValueError("%s.%s must be a list" % (where, key))

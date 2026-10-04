@@ -11,7 +11,8 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 150)); });
-  page.on('dialog', d => d.accept());
+  let dialogAnswer = 'accept', asked = 0;       // every confirm() is answered here; a test sets dialogAnswer first
+  page.on('dialog', d => { asked++; return dialogAnswer === 'dismiss' ? d.dismiss() : d.accept(); });
   const settle = ms => page.waitForTimeout(ms || 1300);
   const openSettings = async () => { await page.click('#cog'); await settle(800); };
   const post = (path, body) => page.evaluate(([p, b]) => fetch(p, { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify(b || {}) }).then(r => r.status), [path, body]);
@@ -115,10 +116,10 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await pbox.evaluate(e => e.classList.contains('open')), 'the box stays open');
   await openSettings();
   ok(await fav.locator('.tag', { hasText: 'Dave' }).count() === 1 && await fav.locator('.tag', { hasText: 'Quake III Arena' }).count() === 1, 'Settings > Online players shows the starred player and game');
-  let asked = 0; page.once('dialog', d => { asked++; d.dismiss(); });
+  asked = 0; dialogAnswer = 'dismiss';
   await fav.locator('button', { hasText: 'Remove all' }).click(); await settle(500);
   ok(asked === 1 && await fav.locator('.tag').count() === 2, 'Remove all asks first, and Cancel keeps the list');
-  page.once('dialog', d => { asked++; d.accept(); });
+  dialogAnswer = 'accept';
   await fav.locator('button', { hasText: 'Remove all' }).click(); await settle(900);
   ok(asked === 2 && await fav.locator('.tag').count() === 0, 'and OK removes everything');
   await page.click('#close-settings'); await settle(900);
@@ -312,12 +313,16 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.keyboard.press('Escape'); await page.waitForLoadState('networkidle'); await settle(2000);
   await page.click('#close-settings'); await settle(500);
   ok(await page.locator('text=Online players:').count() === 1, 'Esc closes the pop-up like Done and applies: the module is back');
-  // ---- the debug log expander
-  await page.click('.xpand button.wide'); await settle(500);
-  ok(await page.locator('.xpand .xbody').isVisible(), 'the debug log bar opens');
-  await page.locator('.xpand .xbody button', { hasText: 'Recording' }).click(); await settle(1500);
-  ok(/Recording$/.test((await page.locator('.xpand .xbody button').first().textContent()).trim()) && /●/.test(await page.locator('.xpand .xbody button').first().textContent()), 'Recording switches on');
-  await page.locator('.xpand .xbody button', { hasText: 'Recording' }).click(); await settle(900);
+  // ---- the debug log: an infobox of three rows (Debug log / Recording off / the last line), the buttons and the log inside it when it is open
+  const dbg = page.locator('.dbox[data-box="debug log"] .now');
+  ok(/Debug log/.test(await dbg.locator('.nlabel').textContent()) && (await dbg.locator('b').textContent()).trim() === 'Recording off', 'the closed debug log box says Debug log and Recording off');
+  ok((await dbg.locator('.row.dlast').textContent()).trim().length > 0 && !(await dbg.locator('.console').isVisible()), 'its last row is the last line of the log, the log itself is hidden');
+  await dbg.click({ position: { x: 20, y: 10 } }); await settle(500);
+  ok(await dbg.evaluate(e => e.classList.contains('open')) && await dbg.locator('.row.dctl button').first().isVisible(), 'a tap opens the same box with the buttons');
+  await dbg.locator('.row.dctl button', { hasText: 'Start recording' }).click(); await settle(1500);
+  ok(/●\s*Recording/.test(await dbg.locator('b').textContent()) && await dbg.locator('.row.dctl button', { hasText: 'Stop recording' }).count() === 1 && await dbg.locator('.console').isVisible(), 'Recording switches on: the middle line says Recording and the log shows inside the box');
+  await dbg.locator('.row.dctl button', { hasText: 'Stop recording' }).click(); await settle(900);
+  await dbg.click({ position: { x: 20, y: 10 } }); await settle(300);
   // ---- the same drag with a finger (touch events through the browser's protocol, in a phone-sized touch context)
   const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const tp = await ctx2.newPage();

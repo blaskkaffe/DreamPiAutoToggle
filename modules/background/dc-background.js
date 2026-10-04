@@ -188,8 +188,10 @@
         function onResize() {
             var w = container.clientWidth || window.innerWidth;
             var h = container.clientHeight || window.innerHeight;
-            // Ignore small height-only changes (mobile toolbars while scrolling)
-            if (w === width && Math.abs(h - height) < 160) return;
+            // Ignore small height-only changes (mobile toolbars while scrolling). The canvas must always be as big as the
+            // container, though: when it is not (a rotation that came without a width change, a toolbar that left it short) it is redrawn.
+            var c = renderer.domElement;
+            if (w === width && Math.abs(h - height) < 160 && c.clientWidth === w && c.clientHeight === h) return;
             width = w;
             height = h;
             camera.aspect = width / height;
@@ -208,6 +210,8 @@
         }
 
         window.addEventListener("resize", onResize, false);
+        window.addEventListener("orientationchange", onResize, false);
+        if (window.visualViewport) window.visualViewport.addEventListener("resize", onResize, false);
         document.addEventListener("visibilitychange", onVisibility, false);
         animate();
 
@@ -215,6 +219,8 @@
             dispose: function () {
                 cancelAnimationFrame(state.frame);
                 window.removeEventListener("resize", onResize, false);
+                window.removeEventListener("orientationchange", onResize, false);
+                if (window.visualViewport) window.visualViewport.removeEventListener("resize", onResize, false);
                 document.removeEventListener("visibilitychange", onVisibility, false);
                 scene.traverse(function (o) {
                     if (o.geometry) o.geometry.dispose();

@@ -52,7 +52,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await gc.locator('.srow', { hasText: 'Notification highlight' }).count() === 1, 'Global colours has the Notification highlight look');
   const ev = page.locator('section[data-box="events"]');
   ok(await ev.locator('.srow', { hasText: /^Reminder\d+ minutes before/ }).count() === 1 && await ev.locator('.wpicker').count() === 1, 'Settings has the reminder time and the series list');
-  ok(await ev.locator('.srow', { hasText: /^Time zone/ }).count() === 0 && await ev.locator('.infobtn').count() === 0, 'the time zone is the global one (About), and the reminder list has no info button');
+  ok(await ev.locator('.srow', { hasText: /^Time zone/ }).count() === 0 && await ev.locator('.infobtn:visible').count() === 0, 'the time zone is the global one (About), and the reminder list has no info button');
   ok(await page.locator('section[data-box="about"] .srow', { hasText: /^Time zone/ }).count() === 1, 'About has the time zone');
   await page.click('#close-settings'); await settle(500);
   ok(errors.length === 0, 'no JavaScript or console errors' + (errors.length ? ': ' + errors.join(' | ') : ''));

@@ -1,22 +1,136 @@
 {
  "dashboard": [
-  {"box": "debug log", "items": [
-   {"type": "expander", "label": "Debug log", "items": [
-    {"type": "text", "muted": true, "cls": "note",
-     "text": "Records every modem event, DreamPi message and routing decision with millisecond timing. Turn recording on, then dial."},
-    {"type": "bar", "items": [
-     {"type": "button", "label": "@debuglog.label", "post": "/debug"},
-     {"type": "bar", "show": "@debug", "items": [
-      {"type": "button", "label": "Clear", "post": "/clearlog"},
-      {"type": "link", "label": "Newest 256 KB", "href": "/dtmf"},
-      {"type": "link", "label": "Full log", "href": "/dtmf?all"},
-      {"type": "toggle", "label": "Follow", "local": "follow", "default": true, "look": "pri", "text": "Follow"}]}]},
-    {"type": "console", "tail": "/log", "nowrap": true, "height": "55vh", "label": "Debug log", "active": "@debug", "follow": "@_local.follow",
-     "rules": [["modem: DTMF", "l-ok l-b"], ["netswitch:|add-on:", "l-info"], ["web page:", "l-warn"], ["underrun", "l-dim"],
-               ["fail|error|Couldn't|Unable|No carrier|NO CARRIER", "l-err"], ["modem", "l-mod"]]}]}]}
+  {
+   "box": "debug log",
+   "items": [
+    {
+     "type": "infobox",
+     "label": "Debug log",
+     "title": "@debuglog.label",
+     "rows": [
+      {
+       "label": "Last line",
+       "main": true,
+       "cls": "dlast",
+       "value": {
+        "type": "text",
+        "text": "@debuglog.last"
+       }
+      },
+      {
+       "label": "",
+       "cls": "dctl keep",
+       "value": {
+        "type": "text",
+        "muted": true,
+        "cls": "note",
+        "text": "Records every modem event, DreamPi message and routing decision with millisecond timing. Turn recording on, then dial."
+       }
+      },
+      {
+       "label": "",
+       "cls": "dctl keep",
+       "value": {
+        "type": "bar",
+        "items": [
+         {
+          "type": "button",
+          "label": "@debuglog.button",
+          "post": "/debug"
+         },
+         {
+          "type": "bar",
+          "show": "@debug",
+          "items": [
+           {
+            "type": "button",
+            "label": "Clear",
+            "post": "/clearlog"
+           },
+           {
+            "type": "link",
+            "label": "Newest 256 KB",
+            "href": "/dtmf"
+           },
+           {
+            "type": "link",
+            "label": "Full log",
+            "href": "/dtmf?all"
+           },
+           {
+            "type": "toggle",
+            "label": "Follow",
+            "local": "follow",
+            "default": true,
+            "look": "pri",
+            "text": "Follow"
+           }
+          ]
+         }
+        ]
+       }
+      },
+      {
+       "label": "",
+       "cls": "dcon keep",
+       "value": {
+        "type": "console",
+        "tail": "/log",
+        "nowrap": true,
+        "height": "55vh",
+        "label": "Debug log",
+        "active": "@debug",
+        "follow": "@_local.follow",
+        "rules": [
+         [
+          "modem: DTMF",
+          "l-ok l-b"
+         ],
+         [
+          "netswitch:|add-on:",
+          "l-info"
+         ],
+         [
+          "web page:",
+          "l-warn"
+         ],
+         [
+          "underrun",
+          "l-dim"
+         ],
+         [
+          "fail|error|Couldn't|Unable|No carrier|NO CARRIER",
+          "l-err"
+         ],
+         [
+          "modem",
+          "l-mod"
+         ]
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  }
  ],
  "settings": [
-  {"box": "appearance", "title": "Appearance", "items": [
-   {"type": "row", "title": "Debug log colour", "sub": "Module", "control": {"type": "swatches", "key": "debuglog", "tint": true, "title": "Colour of the debug log"}}]}
+  {
+   "box": "appearance",
+   "title": "Appearance",
+   "items": [
+    {
+     "type": "row",
+     "title": "Debug log colour",
+     "sub": "Module",
+     "control": {
+      "type": "swatches",
+      "key": "debuglog",
+      "tint": true,
+      "title": "Colour of the debug log"
+     }
+    }
+   ]
+  }
  ]
 }

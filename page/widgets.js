@@ -193,11 +193,6 @@ W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri
   for(var id in btns){var on=id===cur;btns[id].classList.toggle("sel",on);btns[id].setAttribute("aria-pressed",on?"true":"false")}}
  function paintTint(){if(tint)tint.checked=tintOf(s.key,s.mod)}
  UPD.push(paint);UPD.push(paintTint);paint();paintTint();hook("settingsClose",function(){p.close()});return el};
-// ---- a block that opens and closes (the debug log bar)
-W.expander=function(s,ctx){var open=false,body=h("div",{"class":"xbody"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx)),
- b=h("button",{type:"button","class":"wide"},[h("span",{text:s.label}),h("span",{"class":"arrow",html:"&#9656;"})]),
- el=h("div",{"class":"xpand"},[h("div",{"class":"bar"},[b]),body]);sh(body,false);
- b.onclick=function(){open=!open;sh(body,open);b.classList.toggle("open",open);el.classList.toggle("open",open);fire(open?"expand":"collapse",s.id||s.label)};return el};
 // ---- the status box: a label, a headline and rows that show when it is tapped open (network box, players box)
 function dotLook(el,v){if(v===null||typeof v==="object")lookDot(el,v);else dot(el,v)}
 W.status=function(s){var d=h("span",{"class":"dot"}),t=h("span",{"class":"nw"}),sub=h("span",{"class":"sub blk"}),
@@ -388,7 +383,7 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
  inp.oninput=function(){var g=null;cfg.groups.forEach(function(x){if(x.key===addKey)g=x});if(g)paintChoices(g)};
  function load(){xhrJson("GET",s.source,function(r){if(r){cfg=r;paint()}})}
  function save(){clearTimeout(timer);paint();timer=setTimeout(function(){var body={};cfg.groups.forEach(function(g){body[g.key]=g.items});
-  post(s.source,body,function(r){if(r){cfg=r;paint();ctx.saved()}})},100)}
+  post(s.source,body,function(r){if(r){cfg=r;paint();ctx.saved();reloadData()}})},100)}      // the data sources of the page (the stars of the players box) follow what was saved
  hook("settingsOpen",load);hook("settingsClose",function(){p.close()});return el};
 // ---- a console: lines of text in a box. "lines": "@path" replaces them all; "tail": "/url" adds what is new (GET url?from=N -> {text, size, reset})
 W.console=function(s,ctx){var el=h("div",{"class":"console"+(s.nowrap?" nowrap":""),role:"log","aria-label":s.label||"Log"}),size=0,busy=false,rules=(s.rules||[]).map(function(r){return[new RegExp(r[0],"i"),r[1]]}),
@@ -400,14 +395,15 @@ W.console=function(s,ctx){var el=h("div",{"class":"console"+(s.nowrap?" nowrap":
   setHtml(el,ls.map(row).join(""));if(stick)el.scrollTop=el.scrollHeight;if(s.hide_empty)sh(el,!!ls.length)});
  if(s.tail){var has=false,xp=null;
   var on=function(){return s.active===undefined||!!val(s.active)},
-   inside=function(){xp=xp||(el.closest&&el.closest(".xpand"));return !xp||xp.classList.contains("open")},
+   inside=function(){xp=xp||(el.closest&&el.closest(".now"));return !xp||xp.classList.contains("open")},    // a log in an infobox is only read while the box is open
    poll=function(){sh(el,on()||has);if(busy||!inside()||(!on()&&size))return;busy=true;
    xhrJson("GET",s.tail+"?from="+size,function(r){busy=false;if(!r)return;
     if(r.reset)el.innerHTML="";
     if(r.text){el.insertAdjacentHTML("beforeend",r.text.split(/\r?\n/).filter(function(l){return l.length}).map(row).join(""));
      if(!s.follow||val(s.follow))el.scrollTop=el.scrollHeight}
     size=r.size;has=has||size>0;sh(el,on()||has)})};
-  sh(el,false);UPD.push(poll);hook("expand",function(){poll();el.scrollTop=el.scrollHeight})}
+  var was=false;sh(el,false);UPD.push(poll);
+  hook("layout",function(){var now=inside();if(now&&!was){poll();el.scrollTop=el.scrollHeight}was=now})}
  if(s.show_if!==undefined)bind(s.show_if,function(v){sh(el,!!v)});return el};
 // ---- a read-only table of name / value pairs (the About rows); rows come from "@path" or the reply of "source" (fetched when Settings opens)
 W.info=function(s){var el=h("table",{"class":"about"});

@@ -54,7 +54,7 @@ const AUDIT = () => {
     await check('main closed');
     await page.locator('.now').first().click(); await page.waitForTimeout(300); await check('main net open');
     await page.locator('.now').nth(1).click({ position: { x: 20, y: 10 } }); await page.waitForTimeout(2500); await check('main players open');
-    await page.click('.xpand button.wide'); await page.waitForTimeout(500); await check('main debug open');
+    await page.locator('.dbox[data-box="debug log"] .now').click({ position: { x: 20, y: 10 } }); await page.waitForTimeout(500); await check('main debug open');
     await page.screenshot({ path: `/tmp/dpns-audit-main-${w}.png`, fullPage: true });
     await page.click('#cog'); await page.waitForTimeout(1500); await check('settings');
     // wifi flow states
