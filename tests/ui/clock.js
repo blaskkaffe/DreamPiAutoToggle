@@ -72,6 +72,9 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await page.locator('.pop.open select').last().selectOption({ label: tk }); await settle(900);
   await page.locator('.pop.open button', { hasText: 'Done' }).click(); await settle(300);
   ok(/Tokyo/.test(await about.locator('.srow', { hasText: 'Time zone' }).first().textContent()), 'the common time zone (in About) is set from the city list');
+  const tzRow = about.locator('.srow', { hasText: 'Time zone' }).first();
+  const place = await tzRow.evaluate(r => { const b = r.querySelector('button').getBoundingClientRect(), q = r.getBoundingClientRect(), t = r.querySelector('.sub').getBoundingClientRect(); return { top: b.top - q.top, right: q.right - b.right, lines: Math.round(t.height / 16) }; });
+  ok(place.top < 14 && place.right < 2 && place.lines >= 2, 'with a long text under it the Edit button stays at the top right of the row, the text wraps (' + Math.round(place.top) + 'px from the top, ' + place.lines + ' lines)');
   await page.click('#close-settings'); await settle(1800);
   const tokyo = await page.evaluate(() => S.clock.cities.filter(c => c[0] === 'Tokyo').length);
   const shown = (await time()).replace(/:\d{2} (AM|PM)$/, ' $1');
@@ -105,6 +108,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await page.click('#cog'); await settle(800);
   await page.locator('[data-box="colours"] .srow', { hasText: 'Global main colour' }).locator('input[type=color]').fill('#00aa55'); await settle(900);
   ok(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--c-global').trim()) === '#00aa55', 'the Global main picker changes the colour everywhere it is used at once');
+  ok(await page.evaluate(() => { const c = document.querySelector('#set-boxes .cbox.neutral:checked'); return !!c && getComputedStyle(c).backgroundColor === 'rgb(0, 170, 85)'; }), 'and so do the grey tick boxes (they use Global main)');
   await page.click('#close-settings'); await settle(400);
   ok(await clockBox.locator('.now').evaluate(e => getComputedStyle(e).borderTopColor) === 'rgba(' + [0x00 + Math.round((255 - 0) * 0.45), 0xaa + Math.round((255 - 0xaa) * 0.45), 0x55 + Math.round((255 - 0x55) * 0.45)].join(', ') + ', 0.8)', 'and the border of the box is its lighter shade');
   // world time off: the map and the list go, the box stays

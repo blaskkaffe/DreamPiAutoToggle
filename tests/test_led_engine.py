@@ -164,8 +164,21 @@ class DimmingTests(unittest.TestCase):
 
 
 class SteadyTests(unittest.TestCase):
+
     def msgs(self, *keys):
         return [{"key": k, "effect": "solid", "speed": "slow", "color": "#ff0000", "brightness": 0.08, "leds": None} for k in keys]
+
+    def test_a_network_switch_shows_at_once(self):
+        s = led.Steady()
+        s.feed(self.msgs("a"), 0.0)
+        self.assertEqual(s.feed(self.msgs("b"), 0.1), self.msgs("a"))                    # an ordinary change is held back for HOLD seconds ...
+        self.assertEqual(s.feed(self.msgs("b"), 0.2, immediate=True), self.msgs("b"))    # ... a switch of the network the service saw itself is not
+        self.assertEqual(s.feed(self.msgs("b"), 0.3), self.msgs("b"))
+
+    def test_the_led_loop_looks_at_the_flag_every_frame_and_reads_at_once_when_it_changes(self):
+        src = open(led.__file__.replace(".pyc", ".py")).read()
+        self.assertIn("os.path.exists(core.FLAG)", src)
+        self.assertIn("immediate=switched_net", src)
 
     def test_the_first_list_is_used_at_once(self):
         s = led.Steady()

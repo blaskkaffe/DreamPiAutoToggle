@@ -69,6 +69,7 @@
     page/widgets.js (rows, buttons, forms, boxes, tables, lists, consoles ...) are made of these classes; a module only adds
     CSS for something nothing here covers. Change a look here and every module follows. ===== */
  .srow.wrap{flex-wrap:wrap} .srow .below{flex-basis:100%}
+ .srow.wrap > span:first-child{flex:1 1 0;min-width:0}   /* the text takes the room that is left and wraps; a button never gets pushed down below it */
  .srow.edit{align-items:flex-start}   /* a row with an Edit button: the button is always at the top right, however many lines the text has */
  .optrow{display:flex;gap:8px;flex-wrap:wrap} .optrow .pill-s{flex:1 1 auto;text-align:center}   /* a simple pick: the options as a row of buttons in a pop-up */
  .wpicker .addarea{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
@@ -102,7 +103,7 @@
  .pop .msg{margin:6px 0 8px} .pop .bar{margin:0;justify-content:space-between} .pop .bar.end{justify-content:flex-end}
  .pop .bar.center{justify-content:center;margin:6px 0 8px}
  .pop .pill-s{white-space:nowrap}
- .cbox.neutral:checked,.cbox.neutral.on{background-color:var(--sel);border-color:var(--sel)}   /* a tick box in the neutral grey-blue instead of the network colour */
+ .cbox.neutral:checked,.cbox.neutral.on{background-color:var(--c-global);border-color:var(--c-global)}   /* a tick box in Global main (by default a bluish grey, instead of the network colour); it follows the Global main picker */
  input[type=color]{-webkit-appearance:none;appearance:none;flex:none;width:34px;height:34px;padding:0;border:var(--bw) solid var(--ctl-line);border-radius:7px;background:none;vertical-align:middle;cursor:pointer}
  input[type=color]::-webkit-color-swatch-wrapper{padding:0} input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
  input[type=color]::-moz-color-swatch{border:0;border-radius:4px}

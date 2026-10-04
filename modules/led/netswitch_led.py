@@ -201,9 +201,14 @@ class Steady(object):
     def __init__(self):
         self.current, self.pending, self.since = None, None, 0.0
 
-    def feed(self, messages, now):
+    def feed(self, messages, now, immediate=False):
+        """immediate: use this list now, without the wait (the selected network was just switched: a change the user made and
+        the service saw itself in a file that is written in one go, which is no half-written reading)."""
         sig = repr(sorted((m["key"], m.get("effect"), m.get("speed"), m.get("color"), m.get("leds"), m.get("brightness"))
                           for m in messages))
+        if immediate:
+            self.current, self.pending = (sig, messages), sig
+            return messages
         if self.current is None:
             self.current, self.pending = (sig, messages), sig
             return messages
@@ -315,13 +320,20 @@ def main():
     clocks = {}
     last_frame, last_sent = None, 0.0
     next_read = 0.0
+    selected = os.path.exists(core.FLAG)
     while True:
         now = time.time()
+        # A switch of the network (the page's buttons, the physical ones) shows at once: the flag file is looked at every frame, and when it
+        # changes the state is read now and the list is not held back (it is one file written in one go, so nothing is half-read).
+        sel_now = os.path.exists(core.FLAG)
+        switched_net = sel_now != selected
+        if switched_net:
+            selected, next_read = sel_now, 0.0
         if now >= next_read:
             try:
                 wb_test = ledconfig.wb_test_active()
                 wb_colour = ledconfig.wb_test_colour()
-                messages = steady.feed(ledconfig.active_messages(), now)
+                messages = steady.feed(ledconfig.active_messages(), now, immediate=switched_net)
                 cfg = ledconfig.led_config()
                 order = drivers.ORDERS.get(cfg.get("order"), drivers.DEFAULT_ORDER)
                 white_balance, gamma = _wb(cfg), cfg.get("gamma", ledconfig.GAMMA)
