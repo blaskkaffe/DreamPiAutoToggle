@@ -9,19 +9,19 @@
  "outputs": [
   {
    "id": "toggle_dcnow",
-   "label": "Hang-up number A dialed (the call is not answered)"
+   "label": "Hang-up number A was dialed (the call is not answered)"
   },
   {
    "id": "toggle_dcnet",
-   "label": "Hang-up number B dialed (the call is not answered)"
+   "label": "Hang-up number B was dialed (the call is not answered)"
   },
   {
    "id": "call_dcnow",
-   "label": "Call number A dialed (the call connects)"
+   "label": "Call number A was dialed (the call connects)"
   },
   {
    "id": "call_dcnet",
-   "label": "Call number B dialed (the call connects)"
+   "label": "Call number B was dialed (the call connects)"
   }
  ]
 }

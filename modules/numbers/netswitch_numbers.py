@@ -78,13 +78,14 @@ def save_numbers(data):
 
 # ---------------------------------------------------------------- the page's side (loaded by the web service)
 def _what_it_does(key, decl):
-    """What a list does now, from its links: "Select a network (DCNow!)" and so on (empty: nothing but the call itself)."""
+    """What a list does now, from the cables that leave its output: the labels of the connected inputs (empty: nothing but the call itself)."""
     ins = dict((i["id"], i) for i in decl["inputs"])
     out = []
     for link in bus.links(decl):
         if link["from"] != "numbers." + key or link["to"] not in ins:
             continue
-        out.append(bus.summary(ins[link["to"]], link["params"]))
+        label = ins[link["to"]].get("label") or link["to"]
+        out.append(("not: " if link.get("invert") else "") + label)
     return out
 
 

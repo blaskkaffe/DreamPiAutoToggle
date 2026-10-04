@@ -213,9 +213,9 @@ def _select_dcnet(on):
 
 
 # ------------------------------------------------ what a dialed number does: the links (netswitch_bus.py)
-# Dialing a number in one of the lists is an output of the numbers module ("numbers.call_dcnow" ...). What it does (select a
-# network, show a notice ...) is whatever the user linked it to on the page, so this file knows nothing about the network switcher.
-# Only when the bus can't be loaded (a damaged install) the lists do what they always did.
+# Dialing a number in one of the lists turns an output jack of the numbers module on for a moment ("numbers.call_dcnow" ...). What
+# that does (select a network, show a notice ...) is whatever the user plugged it into on the page, so this file knows nothing about
+# the network switcher. Only when the bus can't be loaded (a damaged install) the lists do what they always did.
 _bus_module = [None]
 _LISTS_WITHOUT_BUS = {"toggle_dcnow": False, "toggle_dcnet": True, "call_dcnow": False, "call_dcnet": True}   # list -> selects DCNET?
 
@@ -237,9 +237,8 @@ def _run_links(action, number):
     if bus is None:       # no numbers module (its outputs are not there to link) or no bus: the built-in default numbers act as before
         _select_dcnet(_LISTS_WITHOUT_BUS[action])
         return "built-in: selected %s" % ("DCNET" if _LISTS_WITHOUT_BUS[action] else "DCNow!")
-    results = bus.emit("numbers." + action, {"number": number}, {"source": "dialed number"})
-    ran = [r["to"] for r in results if r.get("ok")]
-    return "ran %s" % (", ".join(ran) if ran else "nothing")
+    ran = bus.pulse("numbers." + action, 1.0, {"source": "dialed number"})        # the inputs it is connected to react at once
+    return "switched on %s" % (", ".join(ran) if ran else "nothing")
 
 
 def _load_numbers():

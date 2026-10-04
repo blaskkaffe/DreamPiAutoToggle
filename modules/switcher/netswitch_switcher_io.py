@@ -1,13 +1,11 @@
-# DreamPi Netswitch add-on - network switcher module: what other modules can ask of it (inputs) and what it tells (outputs), see
-# netswitch_bus.py. Python 2 and 3, only the base and files: the web page, the phone numbers (inside DreamPi) and anything else
-# can run it, in any process.
+# DreamPi Netswitch add-on - network switcher module: its jacks, see netswitch_bus.py. Python 2 and 3, only the base and files: the web page,
+# the phone numbers (inside DreamPi) and anything else can switch the network through it, in any process.
 import os
 
 import netswitch_bus as bus
 import netswitch_core as core
 
-NETWORKS = (("dcnow", "DCNow!"), ("dcnet", "DCNET"))
-NAMES = dict(NETWORKS)
+NAMES = {"dcnow": "DCNow!", "dcnet": "DCNET"}
 
 
 def selected():
@@ -15,25 +13,45 @@ def selected():
     return "dcnet" if os.path.exists(core.FLAG) else "dcnow"
 
 
-def select_network(params, ctx):
-    """Input "select_network" {"network": "dcnow" | "dcnet"}. Tells "switcher.network_selected" when it changed."""
-    net = (params or {}).get("network")
+def select(net, ctx=None):
+    """Select a network (the web page's two buttons call this too); the jacks that say which is selected follow."""
     if net not in NAMES:
         raise ValueError("unknown network %r" % (net,))
-    was = selected()
     if net == "dcnet":
         open(core.FLAG, "w").close()
     elif os.path.exists(core.FLAG):
         os.remove(core.FLAG)
     core.debug_log("%s: %s selected" % ((ctx or {}).get("source", "add-on"), NAMES[net]))
-    if was != net:
-        bus.emit("switcher.network_selected", {"network": net, "network_name": NAMES[net]}, ctx)
-    return {"network": net, "changed": was != net}
+    bus.refresh("switcher.dcnow_selected", ctx)
+    bus.refresh("switcher.dcnet_selected", ctx)
 
 
-def toggle_network(params, ctx):
-    """Input "toggle_network": the other network."""
-    return select_network({"network": "dcnow" if selected() == "dcnet" else "dcnet"}, ctx)
+# ---- inputs: each acts when it turns on
+def select_dcnow(on, knobs, ctx):
+    if on:
+        select("dcnow", ctx)
 
 
-INPUTS = {"select_network": select_network, "toggle_network": toggle_network}
+def select_dcnet(on, knobs, ctx):
+    if on:
+        select("dcnet", ctx)
+
+
+def toggle_network(on, knobs, ctx):
+    if on:
+        select("dcnow" if selected() == "dcnet" else "dcnet", ctx)
+
+
+INPUTS = {"select_dcnow": select_dcnow, "select_dcnet": select_dcnet, "toggle_network": toggle_network}
+
+
+# ---- outputs: facts about the module and what it knows
+def _net(key):
+    return lambda: bool((core.network_state() or {}).get(key))
+
+
+OUTPUTS = {"dcnow_selected": lambda: selected() == "dcnow", "dcnet_selected": lambda: selected() == "dcnet",
+           "dreampi_ready": lambda: core.dreampi_state()[0] == "ok",
+           "in_call": lambda: core.dreampi_state()[0].startswith("call"),
+           "network_up": _net("network"), "internet_ok": lambda: (core.network_state() or {}).get("internet") is True,
+           "modem_plugged": lambda: (core.network_state() or {}).get("modem") is True}

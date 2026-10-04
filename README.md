@@ -10,7 +10,7 @@ It changes no DreamPi files, so DreamPi's auto-updates keep working and uninstal
 
 What you get:
 - A live status page at `http://dreampi.local` (also over HTTPS) with buttons to pick the network.
-- Special phone numbers that switch the network straight from the Dreamcast (only `11111` to start with: it selects DCNow! and connects), and **connections** that let any module trigger what another module can do.
+- Special phone numbers that switch the network straight from the Dreamcast (only `11111` to start with: it selects DCNow! and connects), and **connections**: on/off jacks that you cable together so any module can switch on what another module can do.
 - Optional status LEDs, on GPIO18 by default or GPIO10/12/21: one NeoPixel, several, or a strip. They show DreamPi's status and network or internet problems: you build colour rows from 40 or so messages, with effects (solid, blink, fade, breathe, short / double / triple blink, rainbow), a priority you can reorder, LED sections, a colour of your own per palette colour and a quick white-balance calibration.
 - Two GPIO buttons (always installed, each with its own pin and function, such as toggling the network), and optional Wi-Fi setup (`--wifi`): hold a button for 3 seconds and the Pi hosts a temporary "DreamPi WiFi Config" Wi-Fi network with a page to pick and connect to your home Wi-Fi, no keyboard or monitor needed.
 - An optional animated Dreamcast-style background for the page.
@@ -111,9 +111,9 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 
 ## Phone numbers
 
-Four lists of numbers that you edit in **Settings > Special phone numbers**. What a list does is not fixed: dialing a number in it is an event that you connect to whatever you want in [Connections](#connections) (the standard connections are in the table below). Two lists leave the call unanswered with a busy tone, two let it connect. Each list is a row named after what it does now (each row has an **Add** button that opens a small box for the number; once it has numbers they are listed under the row, remove one with its ✕; **Restore default numbers** at the bottom puts the list below back, and the **(i)** button next to it shows the rules for numbers):
+Four lists of numbers that you edit in **Settings > Special phone numbers**. What a list does is not fixed: dialing a number in it turns an output on for a moment, which you can cable to whatever you want in [Connections](#connections) (the standard cables are in the table below). Two lists leave the call unanswered with a busy tone, two let it connect. Each list is a row named after what it does now (each row has an **Add** button that opens a small box for the number; once it has numbers they are listed under the row, remove one with its ✕; **Restore default numbers** at the bottom puts the list below back, and the **(i)** button next to it shows the rules for numbers):
 
-| List | What it does (standard connection) | Default number |
+| List | What it does (standard cable) | Default number |
 |---|---|---|
 | **Hang-up number A** | Select DCNow! / DreamPi, then hang up | none (add one to use it) |
 | **Hang-up number B** | Select DCNET / FLYCAST, then hang up | none (add one to use it) |
@@ -132,11 +132,11 @@ Any other number connects to the currently selected network. `11111` is the only
 
 ## Connections
 
-Modules never call each other, so each works on its own. Instead a module says what it can **tell** (its *outputs*: a number was dialed, the selected network changed, the add-on started) and what it can **do** (its *inputs*: select a network, start Wi-Fi setup, show a notice, make a box stand out, flash an LED alert, change a colour), and you make the **links**: "when this happens, do that". Settings > **System** > **Connections** > **Edit** lists the connections, each as **When** (an output of a loaded module) and **Do** (an input of a loaded module, with its own settings, for example which network to select); **Add connection**, **Remove** and **Restore standard** (the standard connections are the add-on's own choice and ship with it). A connection to a module that is switched off or deleted is simply skipped; it comes back to life with the module.
+Think LEGO bricks or a modular synthesizer. Modules never call each other, so each works on its own. A module has **jacks**: *outputs* (what it tells: a number was dialed, DCNET is selected, the add-on started) and *inputs* (what it can do: select a network, start Wi-Fi setup, show a notice, make a box stand out, light an LED alert, change a colour). Every jack is a simple **on / off** value. An input is **off by default** and turns on while a **cable** from an output that is on reaches it (or while another module holds it on through the API). Settings > **System** > **Connections** > **Edit** lists the cables, each as **From** (an output of a loaded module) and **To** (an input of a loaded module, with the input's own settings, for example the text of a notice); **Inverted** makes a cable carry the opposite; **Add cable**, **Remove** and **Restore standard** (the standard cables are the add-on's own choice and ship with it). A cable to a module that is switched off or deleted is simply skipped; it comes back to life with the module.
 
-The standard connections are exactly what the add-on did before: the four number lists select DCNow! or DCNET. Change them to anything the loaded modules offer: a number that shows a notice on the page, one that changes a colour, one that starts Wi-Fi setup. Without the phone numbers module, `11111` still selects DCNow! (the add-on's built-in number); without the network switcher, the numbers still connect or hang up the call, they just select nothing.
+The standard cables are exactly what the add-on did before: the four number lists select DCNow! or DCNET. Change them to anything the loaded modules offer: a number that shows a notice on the page, one that starts a timer that lights an LED alert, one that starts Wi-Fi setup. Without the phone numbers module, `11111` still selects DCNow! (the add-on's built-in number); without the network switcher, the numbers still connect or hang up the call, they just select nothing.
 
-How modules declare outputs and inputs, and how to give your own module some: [docs/connections.md](docs/connections.md). Not connected yet (the next steps): the two GPIO buttons' functions and the LED messages' sources.
+How modules declare jacks, the io file rule and the API for modules: [docs/connections.md](docs/connections.md). Not connected yet (the next steps): the two GPIO buttons' functions and the LED messages' sources.
 
 ## Telling openMenu which network runs
 
@@ -220,7 +220,7 @@ Each row in **Settings > Status LED** is a look (colour, animation, level) and t
 | Modem | Modem plugged in, Modem missing |
 | Raspberry Pi health | Under-voltage, Throttled, Over 80 °C, 70 °C or warmer |
 | Wi-Fi setup | Scanning or hosting, Choose a network, Connecting, Connected, Could not connect |
-| Alerts from connections | Alert A, B and C: switched on for a while by a connection with **Show an LED alert** (so a dialed number, or anything else you link, can flash the LED in the look you pick) |
+| Alerts from connections | Alert A, B and C: switched on while a cable reaches the input **LED alert A / B / C on** (so a dialed number, or anything else you link, can flash the LED in the look you pick) |
 | The add-on | Add-on update available, DreamPi update available, Update running, Update done, Update failed, About to reboot |
 | Online players | Your game is played, A friend came online (from the favorites of the Online players module; simulated in tests only, [not yet seen on hardware](docs/hardware-status.md)) |
 | DC99 events | Event starting soon (a reminded event, from the reminder time set in Settings > DC99 events until 10 minutes after its start; works without the page open) |

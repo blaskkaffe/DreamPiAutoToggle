@@ -155,7 +155,8 @@ def _static(name):
 def _bus_reply():
     """Settings > System > Connections: what the loaded modules can tell (outputs) and do (inputs), the links, and the standard links."""
     decl = bus.declarations()
-    return {"outputs": decl["outputs"], "inputs": decl["inputs"], "links": bus.links(), "defaults": bus.default_links()}
+    return {"outputs": decl["outputs"], "inputs": decl["inputs"], "links": bus.links(), "defaults": bus.default_links(),
+            "knobs": bus.knobs(), "levels": bus.levels()}
 
 
 def _colour_reply():
@@ -385,7 +386,8 @@ class Handler(BaseHTTPRequestHandler):
         {"id"} closes a notice."""
         try:
             if path == "/bus/links":
-                bus.save_links(json.loads(self._body(65536).decode("utf-8")).get("links"))
+                body = json.loads(self._body(65536).decode("utf-8"))
+                bus.save_links(body.get("links"), body.get("knobs"))
                 core.debug_log("web page: connections changed")
             elif path == "/bus/reset":
                 bus.reset_links()
@@ -492,6 +494,17 @@ def start_https():
     t.start()
 
 
+def bus_poller():
+    """Once a second: timers and pulses run out, jacks that are facts (DCNET is selected ...) are passed on to the cables, and modules
+    that were off hear about their inputs when they come back (netswitch_bus.poll)."""
+    while True:
+        try:
+            bus.poll({"source": "web service"})
+        except Exception:
+            traceback.print_exc()
+        time.sleep(1)
+
+
 def watchdog():
     """If the page stops answering (should never happen), exit so systemd
     restarts the service within seconds instead of leaving it dead."""
@@ -518,12 +531,13 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         HTTPS_PORT = int(sys.argv[2])
     core.reset_network_after_boot()      # DCNow! after every reboot
-    for target in (probes.checker, watchdog):
+    for target in (probes.checker, watchdog, bus_poller):
         t = threading.Thread(target=target)
         t.daemon = True
         t.start()
     start_https()
     refresh_page()
     modules.start_background()           # modules' own background work (the update check for the LEDs ...)
-    bus.emit("app.started", {}, {"source": "web service"})
+    bus.resync({"source": "web service"})        # the inputs agree with the cables from the start
+    bus.pulse("app.started", 3, {"source": "web service"})
     Server(("", PORT), Handler).serve_forever()

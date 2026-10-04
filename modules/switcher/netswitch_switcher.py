@@ -93,7 +93,7 @@ def api(d, warnings):
 
 def _select(net):
     def handler(h):
-        switcher_io.select_network({"network": net}, {"source": "web page"})      # the same thing the phone numbers and the buttons can ask for
+        switcher_io.select(net, {"source": "web page"})      # the same thing the phone numbers and the buttons can ask for
     return handler
 
 

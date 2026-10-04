@@ -12,5 +12,16 @@
  "primary": "players",
  "tints": {
   "players": false
- }
+ },
+ "io": "netswitch_players_io",
+ "outputs": [
+  {
+   "id": "game_played",
+   "label": "One of your favourite games is being played"
+  },
+  {
+   "id": "friend_online",
+   "label": "One of your favourite players is online"
+  }
+ ]
 }

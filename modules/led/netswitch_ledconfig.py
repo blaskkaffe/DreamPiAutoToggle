@@ -9,6 +9,7 @@ import re
 import os
 import time
 
+import netswitch_bus as bus
 import netswitch_core as core
 
 # -------------------------------------------------------------------- the messages
@@ -68,9 +69,9 @@ MESSAGES = [
     ("players-game", "Your game is played", "players", "Someone is playing one of your favourite games (Settings > Online players).", True),
     ("players-friend", "A friend came online", "players", "One of your favourite players is online (Settings > Online players).", True),
     ("event-soon", "Event starting soon", "events", "A DC99 event you asked to be reminded of starts soon (from the time set in Settings > DC99 events until 10 minutes after the start, or until you dismiss it on the page).", True),
-    ("alert-a", "Alert A", "alerts", "Switched on for a while by a connection (Settings > System > Connections, \"Show an LED alert\"), then off again.", True),
-    ("alert-b", "Alert B", "alerts", "Switched on for a while by a connection (Settings > System > Connections, \"Show an LED alert\"), then off again.", True),
-    ("alert-c", "Alert C", "alerts", "Switched on for a while by a connection (Settings > System > Connections, \"Show an LED alert\"), then off again.", True),
+    ("alert-a", "Alert A", "alerts", "On while the jack \"LED alert A on\" is on: connect an output of any module to it (Settings > System > Connections).", True),
+    ("alert-b", "Alert B", "alerts", "On while the jack \"LED alert B on\" is on: connect an output of any module to it (Settings > System > Connections).", True),
+    ("alert-c", "Alert C", "alerts", "On while the jack \"LED alert C on\" is on: connect an output of any module to it (Settings > System > Connections).", True),
     ("ok", "Everything OK", "general", "No error and no warning: DreamPi is ready or in a call, and the network and internet work.", True),
     ("error", "Error", "general", u"Anything critical: DreamPi not running, no network, no internet, under-voltage, over 80 \u00b0C or the modem missing.", True),
     ("warning", "Warning", "general", "Any warning or important information: DNS failing, slow connection, weak Wi-Fi, no IP address yet, throttled or warm, DCNET unavailable, a failed update, a failed Wi-Fi setup, an update available.", True),
@@ -384,7 +385,7 @@ def gather(live=True):
     if live:
         ctx.update(net=core.network_state() or {}, wifi=core.wifi_state().get("state", "idle"), update=core.update_status(),
                    update_info=core.update_info(), reboot=core.reboot_pending(), players=core.players_watch(), dcnet_problem=bool(core.dcnet_problem()),
-                   event=core.event_reminder(), alerts=core.led_alerts())
+                   event=core.event_reminder(), alerts=dict((s, bus.input_level("led.alert_" + s)) for s in ("a", "b", "c")))
     return ctx
 
 

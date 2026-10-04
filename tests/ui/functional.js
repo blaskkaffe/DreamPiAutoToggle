@@ -235,29 +235,32 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await openSettings();
   await page.locator('[data-box="appearance"] .srow:has-text("Dreamcast background") input[type=checkbox]').uncheck(); await page.waitForLoadState('networkidle'); await settle(2000);
   ok(await page.evaluate(() => !document.body.classList.contains('dcbg')), 'and off again');
-  // ---- connections: what one module's output does in another (Settings > System > Connections)
+  // ---- connections: cables from one module's on/off outputs to another's inputs (Settings > System > Connections)
   const wireBtn = page.locator('[data-box="system"] [data-picker="connections"] button');
   await wireBtn.scrollIntoViewIfNeeded(); await wireBtn.click(); await settle(600);
   const wg = await popGeo();
   ok(Math.abs(wg.w - gp1.w) <= 1, 'the connections pop-up has the same width as the others (' + wg.w + ')');
   const blocks = page.locator('.pop.open .wlink');
-  ok(await blocks.count() === 4, 'the four standard connections of the phone numbers are listed (' + await blocks.count() + ')');
-  ok(await blocks.first().locator('select').first().inputValue() === 'numbers.toggle_dcnow', 'each says what happens: a number was dialed ...');
-  ok(await blocks.first().locator('select').nth(1).inputValue() === 'switcher.select_network', '... and what it does: select a network in the network switcher');
-  await blocks.first().locator('select').nth(2).selectOption('dcnet'); await settle(900);
-  const saved1 = await page.evaluate(async () => (await (await fetch('/bus')).json()).links[0]);
-  ok(saved1.params.network === 'dcnet', 'changing what it selects is saved');
-  await page.locator('.pop.open button', { hasText: 'Add connection' }).click(); await settle(700);
-  ok(await blocks.count() === 5, 'Add connection adds one');
-  await blocks.last().locator('select').nth(1).selectOption('app.notice'); await settle(300);
+  const busNow = async () => page.evaluate(async () => (await (await fetch('/bus')).json()));
+  ok(await blocks.count() === 4, 'the four standard cables of the phone numbers are listed (' + await blocks.count() + ')');
+  ok(await blocks.first().locator('select').first().inputValue() === 'numbers.toggle_dcnow', 'each says where it comes from: a number was dialed ...');
+  ok(await blocks.first().locator('select').nth(1).inputValue() === 'switcher.select_dcnow', '... and which input it turns on: select DCNow! in the network switcher');
+  await blocks.first().locator('select').nth(1).selectOption('switcher.select_dcnet'); await settle(900);
+  ok((await busNow()).links[0].to === 'switcher.select_dcnet', 'plugging the cable into another input is saved');
+  await blocks.first().locator('input[type=checkbox]').check(); await settle(900);
+  ok((await busNow()).links[0].invert === true, 'Inverted is saved');
+  await page.locator('.pop.open button', { hasText: 'Add cable' }).click(); await settle(700);
+  ok(await blocks.count() === 5, 'Add cable adds one');
+  await blocks.last().locator('select').nth(1).selectOption('app.notice_a'); await settle(300);
   ok(await blocks.last().locator('input[aria-label="Text"]').count() === 1 && await blocks.last().locator('input[aria-label="For how many seconds"]').count() === 1, 'an input has its own settings (a notice: its text and how long)');
-  await blocks.last().locator('input[aria-label="Text"]').fill('Hello from a link'); await blocks.last().locator('input[aria-label="Text"]').dispatchEvent('change'); await settle(900);
-  const linksNow = await page.evaluate(async () => (await (await fetch('/bus')).json()).links);
-  ok(linksNow.some(l => l.to === 'app.notice' && l.params.text === 'Hello from a link'), 'and they are saved');
+  await blocks.last().locator('input[aria-label="Text"]').fill('Hello from a cable'); await blocks.last().locator('input[aria-label="Text"]').dispatchEvent('change'); await settle(900);
+  const nowBus = await busNow();
+  ok(nowBus.links.some(l => l.to === 'app.notice_a') && nowBus.knobs['app.notice_a'].text === 'Hello from a cable', 'and its settings are saved with the input');
   await blocks.last().locator('button', { hasText: 'Remove' }).click(); await settle(700);
   ok(await blocks.count() === 4, 'Remove takes one away');
   await page.locator('.pop.open button', { hasText: 'Restore standard' }).click(); await settle(900);
-  ok((await page.evaluate(async () => (await (await fetch('/bus')).json()).links[0].params.network)) === 'dcnow', 'Restore standard puts the standard connections back');
+  const back = (await busNow()).links[0];
+  ok(back.to === 'switcher.select_dcnow' && back.invert === false, 'Restore standard puts the standard cables back');
   await page.locator('.pop.open button', { hasText: 'Done' }).click(); await settle(300);
   // ---- the module picker: one row in System with an Edit button; the pop-up holds the list; nothing is applied until Done
   const edit = page.locator('[data-box="system"] [data-picker="modules"] button');

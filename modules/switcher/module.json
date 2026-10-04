@@ -15,37 +15,46 @@
  "io": "netswitch_switcher_io",
  "inputs": [
   {
-   "id": "select_network",
-   "label": "Select a network",
-   "params": [
-    {
-     "key": "network",
-     "label": "Network",
-     "type": "select",
-     "options": [
-      [
-       "dcnow",
-       "DCNow!"
-      ],
-      [
-       "dcnet",
-       "DCNET"
-      ]
-     ]
-    }
-   ],
-   "summary": "Select {network}"
+   "id": "select_dcnow",
+   "label": "Select DCNow!"
+  },
+  {
+   "id": "select_dcnet",
+   "label": "Select DCNET"
   },
   {
    "id": "toggle_network",
-   "label": "Switch to the other network",
-   "summary": "Switch network"
+   "label": "Switch to the other network"
   }
  ],
  "outputs": [
   {
-   "id": "network_selected",
-   "label": "The selected network changed"
+   "id": "dcnow_selected",
+   "label": "DCNow! is selected"
+  },
+  {
+   "id": "dcnet_selected",
+   "label": "DCNET is selected"
+  },
+  {
+   "id": "dreampi_ready",
+   "label": "DreamPi is ready for calls"
+  },
+  {
+   "id": "in_call",
+   "label": "DreamPi is in a call"
+  },
+  {
+   "id": "network_up",
+   "label": "The Pi is on the network"
+  },
+  {
+   "id": "internet_ok",
+   "label": "The internet works"
+  },
+  {
+   "id": "modem_plugged",
+   "label": "The modem is plugged in"
   }
  ]
 }
