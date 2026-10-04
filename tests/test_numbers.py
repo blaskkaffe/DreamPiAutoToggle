@@ -199,6 +199,30 @@ class WrapperTests(unittest.TestCase):
         r = self.dial("1111111")
         self.assertEqual((r["client"], self.selected()), ("PPP", "dcnet"))   # selection untouched, call on DCNow!
 
+    def test_what_a_number_does_is_set_by_the_links_not_by_the_hook(self):
+        import netswitch_bus as bus
+        nums.save_numbers({"call_dcnow": ["5550001"], "call_dcnet": ["5550002"]})
+        bus.save_links([{"from": "numbers.call_dcnow", "to": "switcher.select_network", "params": {"network": "dcnet"}}])     # rewired
+        self.assertEqual((self.dial("5550001")["client"], self.selected()), ("dcnet", "dcnet"))               # a "call DCNow!" number now selects DCNET
+        open(hook.FLAG, "w").close()
+        bus.save_links([])                                                                                      # linked to nothing
+        self.assertEqual((self.dial("5550002")["client"], self.selected()), ("dcnet", "dcnet"))               # connects, the selection untouched
+        os.remove(hook.FLAG)
+        self.assertEqual((self.dial("5550002")["client"], self.selected()), ("PPP", "dcnow"))
+
+    def test_a_hang_up_number_can_do_something_else_and_still_hangs_up(self):
+        import netswitch_bus as bus
+        nums.save_numbers({"toggle_dcnow": ["5550001#"]})
+        bus.save_links([{"from": "numbers.toggle_dcnow", "to": "app.notice", "params": {"text": "Called", "seconds": 30}}])
+        r = self.dial("5550001#")
+        self.assertEqual((r["client"], self.selected()), ("idle", "dcnow"))                                    # not answered, nothing selected
+        self.assertEqual([n["text"] for n in bus.active_notices()], ["Called"])
+
+    def test_without_the_numbers_module_the_built_in_number_still_selects_dcnow(self):
+        open(hook.FLAG, "w").close()
+        os.remove(os.path.join(hook.MODULES_DIR, "numbers", "module.json"))
+        self.assertEqual((self.dial("11111")["client"], self.selected()), ("PPP", "dcnow"))
+
     def test_other_numbers_follow_the_selection(self):
         self.assertEqual(self.dial("5551234")["client"], "PPP")
         open(hook.FLAG, "w").close()

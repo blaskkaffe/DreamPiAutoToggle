@@ -12,7 +12,10 @@ import unittest
 from support import ROOT
 
 
-HOOK_FILES = [os.path.join(ROOT, "netswitch_hook.py"), os.path.join(ROOT, "modules", "debuglog", "netswitch_hookdebug.py")]
+HOOK_FILES = [os.path.join(ROOT, "netswitch_hook.py"), os.path.join(ROOT, "modules", "debuglog", "netswitch_hookdebug.py"),
+              # what the hook runs when a number is dialed: the bus, the base it needs and the modules' input handlers
+              os.path.join(ROOT, "netswitch_bus.py"), os.path.join(ROOT, "netswitch_core.py"),
+              ] + sorted(glob.glob(os.path.join(ROOT, "modules", "*", "netswitch_*_io.py")))
 
 
 class HookCompatTests(unittest.TestCase):
@@ -57,6 +60,22 @@ class LayeringTests(unittest.TestCase):
             code = ("import sys; sys.path[:0] = %r; import %s; sys.exit(1 if 'netswitch_web' in sys.modules else 0)"
                     % ([ROOT] + [os.path.join(ROOT, "modules", m) for m in os.listdir(os.path.join(ROOT, "modules"))], mod))
             self.assertEqual(subprocess.call(["python3", "-c", code]), 0, mod)
+
+    def test_a_module_never_imports_another_module(self):
+        """Modules talk through the bus (docs/connections.md), so each one can be used on its own."""
+        owner = {}
+        for path in glob.glob(os.path.join(ROOT, "modules", "*", "*.py")):
+            owner[os.path.basename(path)[:-3]] = os.path.basename(os.path.dirname(path))
+        for path in sorted(owner_path for owner_path in glob.glob(os.path.join(ROOT, "modules", "*", "*.py"))):
+            me = os.path.basename(os.path.dirname(path))
+            with open(path) as f:
+                tree = ast.parse(f.read())
+            for node in ast.walk(tree):
+                names = [a.name for a in node.names] if isinstance(node, ast.Import) else \
+                        [node.module] if isinstance(node, ast.ImportFrom) and node.module else []
+                for name in names:
+                    top = name.split(".")[0]
+                    self.assertFalse(top in owner and owner[top] != me, "%s imports %s of the %s module" % (os.path.relpath(path, ROOT), top, owner.get(top)))
 
     def test_core_does_not_import_probes(self):
         code = "import sys; sys.path.insert(0, %r); import netswitch_core; sys.exit(1 if 'netswitch_probes' in sys.modules else 0)" % ROOT

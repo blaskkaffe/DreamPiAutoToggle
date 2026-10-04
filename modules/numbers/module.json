@@ -1,9 +1,27 @@
 {
  "name": "Special phone numbers",
- "description": "Dreamcast can dial to switch network between DCNow! and DCNET.",
+ "description": "Numbers the Dreamcast can dial to make things happen, such as switching network.",
  "enabled": true,
  "visible": true,
  "order": 20,
  "ui": 2,
- "web": "netswitch_numbers"
+ "web": "netswitch_numbers",
+ "outputs": [
+  {
+   "id": "toggle_dcnow",
+   "label": "Hang-up number A dialed (the call is not answered)"
+  },
+  {
+   "id": "toggle_dcnet",
+   "label": "Hang-up number B dialed (the call is not answered)"
+  },
+  {
+   "id": "call_dcnow",
+   "label": "Call number A dialed (the call connects)"
+  },
+  {
+   "id": "call_dcnet",
+   "label": "Call number B dialed (the call connects)"
+  }
+ ]
 }

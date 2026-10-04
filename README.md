@@ -10,7 +10,7 @@ It changes no DreamPi files, so DreamPi's auto-updates keep working and uninstal
 
 What you get:
 - A live status page at `http://dreampi.local` (also over HTTPS) with buttons to pick the network.
-- Special phone numbers that switch the network straight from the Dreamcast (only `11111` to start with: it selects DCNow! and connects).
+- Special phone numbers that switch the network straight from the Dreamcast (only `11111` to start with: it selects DCNow! and connects), and **connections** that let any module trigger what another module can do.
 - Optional status LEDs, on GPIO18 by default or GPIO10/12/21: one NeoPixel, several, or a strip. They show DreamPi's status and network or internet problems: you build colour rows from 40 or so messages, with effects (solid, blink, fade, breathe, short / double / triple blink, rainbow), a priority you can reorder, LED sections, a colour of your own per palette colour and a quick white-balance calibration.
 - Two GPIO buttons (always installed, each with its own pin and function, such as toggling the network), and optional Wi-Fi setup (`--wifi`): hold a button for 3 seconds and the Pi hosts a temporary "DreamPi WiFi Config" Wi-Fi network with a page to pick and connect to your home Wi-Fi, no keyboard or monitor needed.
 - An optional animated Dreamcast-style background for the page.
@@ -111,14 +111,14 @@ If DCNET isn't available, the web page says so and every call goes to DCNow!.
 
 ## Phone numbers
 
-Four actions, each with its own list of numbers that you edit in **Settings > Special phone numbers** (each action is a row with an **Add** button that opens a small box for the number; once it has numbers they are listed under the row, remove one with its ✕; **Restore default numbers** at the bottom puts the list below back, and the **(i)** button next to it shows the rules for numbers):
+Four lists of numbers that you edit in **Settings > Special phone numbers**. What a list does is not fixed: dialing a number in it is an event that you connect to whatever you want in [Connections](#connections) (the standard connections are in the table below). Two lists leave the call unanswered with a busy tone, two let it connect. Each list is a row named after what it does now (each row has an **Add** button that opens a small box for the number; once it has numbers they are listed under the row, remove one with its ✕; **Restore default numbers** at the bottom puts the list below back, and the **(i)** button next to it shows the rules for numbers):
 
-| Action | What it does | Default number |
+| List | What it does (standard connection) | Default number |
 |---|---|---|
-| **Toggle DCNow!** | Select DCNow! / DreamPi and hang up | none (add one to use it) |
-| **Toggle DCNET** | Select DCNET / FLYCAST and hang up | none (add one to use it) |
-| **Call DCNow!** | Select DCNow! / DreamPi **and** connect | `11111` |
-| **Call DCNET** | Select DCNET / FLYCAST **and** connect | none (add one to use it) |
+| **Hang-up number A** | Select DCNow! / DreamPi, then hang up | none (add one to use it) |
+| **Hang-up number B** | Select DCNET / FLYCAST, then hang up | none (add one to use it) |
+| **Call number A** | Select DCNow! / DreamPi **and** connect | `11111` |
+| **Call number B** | Select DCNET / FLYCAST **and** connect | none (add one to use it) |
 
 Any other number connects to the currently selected network. `11111` is the only number there from the start: dialing it selects DCNow! again, which is how you get back to DCNow! by phone (a short run of ones, because a long repeated run is easy for the modem to mishear). openMenu's own `111-1111` is not in any list: it always goes to DCNow! for compatibility with openMenu and standard ISP configs, but the selected network is not changed (add it to **Call DCNow!** yourself if dialing it should select DCNow! too). If you already had numbers saved, they are kept; **Restore default numbers** brings back `11111`.
 
@@ -129,6 +129,14 @@ Any other number connects to the currently selected network. `11111` is the only
 - A run of identical digits is the hardest pattern for a DTMF decoder to count correctly (no frequency change marks a digit boundary, only a timing gap), so the modem may hear one digit too many or too few. That is why the default **Call DCNow!** number is the shorter `11111`, and why a longer run such as `1111111` is better left to openMenu. The [Debug log](#debug-log) helps track down misheard numbers. For your own numbers, `555-0001`-style numbers (the North American fictional-exchange prefix) work well.
 - openMenu always dials `111-1111`, so it always gets DCNow! (DCNET wouldn't accept openMenu's login).
 - Netlink/XBAND dial codes and DreamPi's built-in `*69` prefix ("this call to DCNET") keep working as before.
+
+## Connections
+
+Modules never call each other, so each works on its own. Instead a module says what it can **tell** (its *outputs*: a number was dialed, the selected network changed, the add-on started) and what it can **do** (its *inputs*: select a network, start Wi-Fi setup, show a notice, change a colour), and you make the **links**: "when this happens, do that". Settings > **System** > **Connections** > **Edit** lists the connections, each as **When** (an output of a loaded module) and **Do** (an input of a loaded module, with its own settings, for example which network to select); **Add connection**, **Remove** and **Restore standard** (the standard connections are the add-on's own choice and ship with it). A connection to a module that is switched off or deleted is simply skipped; it comes back to life with the module.
+
+The standard connections are exactly what the add-on did before: the four number lists select DCNow! or DCNET. Change them to anything the loaded modules offer: a number that shows a notice on the page, one that changes a colour, one that starts Wi-Fi setup. Without the phone numbers module, `11111` still selects DCNow! (the add-on's built-in number); without the network switcher, the numbers still connect or hang up the call, they just select nothing.
+
+How modules declare outputs and inputs, and how to give your own module some: [docs/connections.md](docs/connections.md). Not connected yet (the next steps): the two GPIO buttons' functions and the LED messages' sources.
 
 ## Telling openMenu which network runs
 

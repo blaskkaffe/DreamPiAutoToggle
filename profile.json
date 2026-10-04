@@ -1,0 +1,9 @@
+{
+ "modules": {},
+ "links": [
+  {"from": "numbers.toggle_dcnow", "to": "switcher.select_network", "params": {"network": "dcnow"}},
+  {"from": "numbers.toggle_dcnet", "to": "switcher.select_network", "params": {"network": "dcnet"}},
+  {"from": "numbers.call_dcnow", "to": "switcher.select_network", "params": {"network": "dcnow"}},
+  {"from": "numbers.call_dcnet", "to": "switcher.select_network", "params": {"network": "dcnet"}}
+ ]
+}

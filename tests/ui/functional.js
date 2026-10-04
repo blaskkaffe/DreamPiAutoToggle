@@ -235,6 +235,30 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await openSettings();
   await page.locator('[data-box="appearance"] .srow:has-text("Dreamcast background") input[type=checkbox]').uncheck(); await page.waitForLoadState('networkidle'); await settle(2000);
   ok(await page.evaluate(() => !document.body.classList.contains('dcbg')), 'and off again');
+  // ---- connections: what one module's output does in another (Settings > System > Connections)
+  const wireBtn = page.locator('[data-box="system"] [data-picker="connections"] button');
+  await wireBtn.scrollIntoViewIfNeeded(); await wireBtn.click(); await settle(600);
+  const wg = await popGeo();
+  ok(Math.abs(wg.w - gp1.w) <= 1, 'the connections pop-up has the same width as the others (' + wg.w + ')');
+  const blocks = page.locator('.pop.open .wlink');
+  ok(await blocks.count() === 4, 'the four standard connections of the phone numbers are listed (' + await blocks.count() + ')');
+  ok(await blocks.first().locator('select').first().inputValue() === 'numbers.toggle_dcnow', 'each says what happens: a number was dialed ...');
+  ok(await blocks.first().locator('select').nth(1).inputValue() === 'switcher.select_network', '... and what it does: select a network in the network switcher');
+  await blocks.first().locator('select').nth(2).selectOption('dcnet'); await settle(900);
+  const saved1 = await page.evaluate(async () => (await (await fetch('/bus')).json()).links[0]);
+  ok(saved1.params.network === 'dcnet', 'changing what it selects is saved');
+  await page.locator('.pop.open button', { hasText: 'Add connection' }).click(); await settle(700);
+  ok(await blocks.count() === 5, 'Add connection adds one');
+  await blocks.last().locator('select').nth(1).selectOption('app.notice'); await settle(300);
+  ok(await blocks.last().locator('input[aria-label="Text"]').count() === 1 && await blocks.last().locator('input[aria-label="For how many seconds"]').count() === 1, 'an input has its own settings (a notice: its text and how long)');
+  await blocks.last().locator('input[aria-label="Text"]').fill('Hello from a link'); await blocks.last().locator('input[aria-label="Text"]').dispatchEvent('change'); await settle(900);
+  const linksNow = await page.evaluate(async () => (await (await fetch('/bus')).json()).links);
+  ok(linksNow.some(l => l.to === 'app.notice' && l.params.text === 'Hello from a link'), 'and they are saved');
+  await blocks.last().locator('button', { hasText: 'Remove' }).click(); await settle(700);
+  ok(await blocks.count() === 4, 'Remove takes one away');
+  await page.locator('.pop.open button', { hasText: 'Restore standard' }).click(); await settle(900);
+  ok((await page.evaluate(async () => (await (await fetch('/bus')).json()).links[0].params.network)) === 'dcnow', 'Restore standard puts the standard connections back');
+  await page.locator('.pop.open button', { hasText: 'Done' }).click(); await settle(300);
   // ---- the module picker: one row in System with an Edit button; the pop-up holds the list; nothing is applied until Done
   const edit = page.locator('[data-box="system"] [data-picker="modules"] button');
   ok(await edit.count() === 1 && (await edit.textContent()) === 'Edit' && (await page.locator('[data-box="system"] .card > .srow').first().getAttribute('data-picker')) === 'modules', 'System has a Modules row with an Edit button');

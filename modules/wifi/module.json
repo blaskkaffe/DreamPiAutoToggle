@@ -5,5 +5,18 @@
  "visible": true,
  "order": 60,
  "ui": 2,
- "web": "netswitch_wifi_web"
+ "web": "netswitch_wifi_web",
+ "io": "netswitch_wifi_io",
+ "inputs": [
+  {
+   "id": "start_setup",
+   "label": "Start Wi-Fi setup",
+   "summary": "Start Wi-Fi setup"
+  },
+  {
+   "id": "stop_setup",
+   "label": "Stop Wi-Fi setup",
+   "summary": "Stop Wi-Fi setup"
+  }
+ ]
 }

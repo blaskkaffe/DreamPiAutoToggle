@@ -11,5 +11,41 @@
  },
  "colours_unique": true,
  "web": "netswitch_switcher",
- "primary": "dcnow"
+ "primary": "dcnow",
+ "io": "netswitch_switcher_io",
+ "inputs": [
+  {
+   "id": "select_network",
+   "label": "Select a network",
+   "params": [
+    {
+     "key": "network",
+     "label": "Network",
+     "type": "select",
+     "options": [
+      [
+       "dcnow",
+       "DCNow!"
+      ],
+      [
+       "dcnet",
+       "DCNET"
+      ]
+     ]
+    }
+   ],
+   "summary": "Select {network}"
+  },
+  {
+   "id": "toggle_network",
+   "label": "Switch to the other network",
+   "summary": "Switch network"
+  }
+ ],
+ "outputs": [
+  {
+   "id": "network_selected",
+   "label": "The selected network changed"
+  }
+ ]
 }

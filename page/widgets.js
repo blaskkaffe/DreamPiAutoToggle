@@ -69,6 +69,7 @@ function renderLayout(){
  (LAY.dashboard||[]).forEach(function(b){dash.appendChild(box("dashboard",b))});
  (LAY.settings||[]).forEach(function(b){cols.appendChild(box("settings",b))});
  buildPicker(cols);
+ buildWiring(cols);
  AFTER.forEach(function(f){f()});AFTER=[]}
 function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});applyTheme();applyHighlight();hideEmptyBoxes()}
 // ---- highlight (/api "highlight": {box id: why}): those dashboard boxes get the class "hl" (page.css draws it) and the reason as a
@@ -500,6 +501,46 @@ function buildPicker(cols){
  btn.onclick=function(e){e.stopPropagation();if(p.isOpen()){p.close();return}
   xhrJson("GET","/modules",function(r){if(!r)return;paint(r.modules);p.open(btn)})};
  done.onclick=function(){p.close()}}
+// ---- connections (Settings > System > Connections > Edit): what one module's output does in another module (netswitch_bus.py).
+// Each connection says "when [output] happens, [input]" with the input's parameters; the modules are listed as they are loaded now.
+function buildWiring(cols){
+ var card=cols.querySelector('[data-box="system"] .card');if(!card)return;
+ var btn=h("button",{type:"button","class":"pill-s","aria-haspopup":"dialog","aria-label":"Edit the connections",text:"Edit"}),list=h("div",{"class":"wlinks"}),
+  add=h("button",{type:"button","class":"pill-s",text:"Add connection"}),reset=h("button",{type:"button","class":"pill-s",text:"Restore standard"}),done=h("button",{type:"button","class":"pill-s",text:"Done"}),
+  pop=h("div",{},[h("div",{"class":"t",text:"Connections: when the first thing happens, the module in the second line does what you pick. A module works without any of them."}),list,h("div",{"class":"bar"},[add,reset,done])]),
+  row=h("div",{"class":"srow","data-picker":"connections"},[h("span",{},[document.createTextNode("Connections"),h("span",{"class":"sub",text:"What a module's events do in another module"})]),btn]),
+  p=ui.popup(pop),state={outputs:[],inputs:[],links:[],defaults:[]},timer=null;
+ var first=card.querySelector('[data-picker="modules"]');card.insertBefore(row,first?first.nextSibling:card.firstChild);card.appendChild(pop);
+ function find(items,id){for(var i=0;i<items.length;i++)if(items[i].id===id)return items[i];return null}
+ function save(){clearTimeout(timer);timer=setTimeout(function(){post("/bus/links",{links:state.links},function(){})},300)}      // the rows keep their own link objects: the server's cleaned copy is not put in their place
+ function selectOf(items,value,onPick,label){var sel=h("select",{"class":"ord","aria-label":label}),groups={},order=[];
+  if(value&&!find(items,value))items=items.concat([{id:value,module:"?",module_title:"Not loaded",label:value}]);
+  items.forEach(function(it){if(!groups[it.module_title]){groups[it.module_title]=h("optgroup",{label:it.module_title});order.push(it.module_title);sel.appendChild(groups[it.module_title])}
+   var o=h("option",{value:it.id,text:it.label});if(it.id===value)o.selected=true;groups[it.module_title].appendChild(o)});
+  sel.onchange=function(){onPick(sel.value)};return sel}
+ function defaults(input){var out={};((input&&input.params)||[]).forEach(function(q){out[q.key]=q.default!==undefined?q.default:""});return out}
+ function block(link){var b=h("div",{"class":"wlink"}),input=find(state.inputs,link.to);
+  b.appendChild(h("div",{"class":"frow stack"},[h("span",{text:"When"}),selectOf(state.outputs,link.from,function(v){link.from=v;save()},"When")]));
+  b.appendChild(h("div",{"class":"frow stack"},[h("span",{text:"Do"}),selectOf(state.inputs,link.to,function(v){link.to=v;link.params=defaults(find(state.inputs,v));save();paint()},"Do")]));
+  ((input&&input.params)||[]).forEach(function(q){var c;
+   if(q.type==="select"){c=h("select",{"class":"ord","aria-label":q.label});q.options.forEach(function(o){var op=h("option",{value:o[0],text:o[1]});if(link.params[q.key]===o[0])op.selected=true;c.appendChild(op)});
+    c.onchange=function(){link.params[q.key]=c.value;save()}}
+   else{c=h("input",{type:q.type==="number"?"number":"text","class":"in","aria-label":q.label,value:link.params[q.key]===undefined?"":link.params[q.key]});
+    c.onchange=function(){link.params[q.key]=q.type==="number"?parseFloat(c.value)||0:c.value;save()}}
+   b.appendChild(h("div",{"class":"frow"},[h("span",{text:q.label}),c]))});
+  var rm=h("button",{type:"button","class":"pill-s danger",text:"Remove","aria-label":"Remove this connection"});
+  rm.onclick=function(){state.links.splice(state.links.indexOf(link),1);save();paint()};
+  b.appendChild(h("div",{"class":"bar end"},[rm]));return b}
+ function paint(){list.innerHTML="";
+  if(!state.links.length)list.appendChild(h("div",{"class":"sub",text:"No connections: nothing a module does triggers anything else."}));
+  state.links.forEach(function(l){list.appendChild(block(l))})}
+ add.onclick=function(){if(!state.outputs.length||!state.inputs.length){alert("There is nothing to connect: no loaded module has outputs and inputs.");return}
+  var inp=state.inputs[0];state.links.push({from:state.outputs[0].id,to:inp.id,params:defaults(inp)});save();paint()};
+ reset.onclick=function(){if(!confirm("Put the connections back as they were when the add-on was installed?"))return;
+  post("/bus/reset",{},function(r){if(r){state=r;paint()}})};
+ done.onclick=function(){p.close()};
+ btn.onclick=function(e){e.stopPropagation();if(p.isOpen()){p.close();return}xhrJson("GET","/bus",function(r){if(!r)return;state=r;paint();p.open(btn)})};
+ hook("settingsClose",function(){p.close()})}
 // ---- backgrounds: the picker's top background module draws (a fullscreen one hides those below, a part one leaves them)
 function startBackgrounds(){(LAY.backgrounds||[]).forEach(function(b){
  var host=h("div",{"class":"bgpart "+(b.type==="part"?"part "+(b.position||"bottom"):"fullscreen"),"data-bg":b.mod});$("bg").appendChild(host);

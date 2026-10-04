@@ -1,21 +1,25 @@
-# DreamPi Netswitch add-on - the phone numbers that switch networks: four lists
-# (one per action) edited on the web page and read by netswitch_hook.py from
-# numbers.json. Works on Python 3 and 2.7.
+# DreamPi Netswitch add-on - the special phone numbers: four lists edited on the web page and read by netswitch_hook.py from
+# numbers.json. Dialing a number in a list is an OUTPUT of this module (numbers.<list>, see netswitch_bus.py); what it does is
+# whatever the user linked it to (Settings > Connections: select a network, show a notice ...). A "hang up" list also leaves the
+# call unanswered (busy tone), a "call" list lets it connect. Works on Python 3 and 2.7.
 import json
 import os
 import re
 
+import netswitch_bus as bus
 import netswitch_core as core
 
 # key, label, what it does, default numbers. The hook matches a dialed string
 # against the END of each number, longest match first, so an entry can be a
 # short ending or a whole number, with digits, * and # (e.g. "*61#").
+# (the keys are the names numbers.json has always had; what a list does is set by the links, see _title())
 ACTIONS = (
-    ("toggle_dcnow", "Toggle DCNow!", "Select DCNow! and hang up", []),
-    ("toggle_dcnet", "Toggle DCNET", "Select DCNET and hang up", []),
-    ("call_dcnow", "Call DCNow!", "Select DCNow! and connect", ["11111"]),
-    ("call_dcnet", "Call DCNET", "Select DCNET and connect", []),
+    ("toggle_dcnow", "Hang-up number A", "hang up", []),
+    ("toggle_dcnet", "Hang-up number B", "hang up", []),
+    ("call_dcnow", "Call number A", "connect", ["11111"]),
+    ("call_dcnet", "Call number B", "connect", []),
 )
+HANGS_UP = ("toggle_dcnow", "toggle_dcnet")     # the lists whose call is not answered (the others connect)
 MIN_LEN, MAX_LEN, MAX_PER_ACTION = 3, 12, 10
 _JUNK = re.compile(r"[^0-9*#]")
 
@@ -73,15 +77,35 @@ def save_numbers(data):
 
 
 # ---------------------------------------------------------------- the page's side (loaded by the web service)
+def _what_it_does(key, decl):
+    """What a list does now, from its links: "Select a network (DCNow!)" and so on (empty: nothing but the call itself)."""
+    ins = dict((i["id"], i) for i in decl["inputs"])
+    out = []
+    for link in bus.links(decl):
+        if link["from"] != "numbers." + key or link["to"] not in ins:
+            continue
+        out.append(bus.summary(ins[link["to"]], link["params"]))
+    return out
+
+
+def _title(key, decl):
+    todo = _what_it_does(key, decl)
+    return (", ".join(todo) if todo else "Nothing") + (" and hang up" if key in HANGS_UP else " and connect")
+
+
 def _reply():
-    """The standard "picker" answer (page/widgets.js W.picker): groups of items plus the rules for adding one."""
+    """The standard "picker" answer (page/widgets.js W.picker): groups of items plus the rules for adding one. A group's name says
+    what its numbers do, from the links (Settings > Connections)."""
     nums = numbers()
-    return {"groups": [{"key": a[0], "label": a[1], "sub": a[2], "items": nums.get(a[0], [])} for a in ACTIONS],
+    decl = bus.declarations()
+    return {"groups": [{"key": a[0], "label": _title(a[0], decl),
+                        "sub": "No answer, busy tone" if a[0] in HANGS_UP else "The call connects",
+                        "items": nums.get(a[0], [])} for a in ACTIONS],
             "defaults": default_numbers(),
             "rules": {"min": MIN_LEN, "max": MAX_LEN, "per_group": MAX_PER_ACTION, "allowed": "0-9*#", "unique": True,
                       "add_label": "Add", "add_title": "Add a number to {group}",
                       "min_msg": "Needs at least %d digits, * or #" % MIN_LEN,
-                      "help": "Functions are triggered by numbers ending in the listed numbers.\nUse 3 - %d digits, numbers 0-9, * and # are allowed." % MAX_LEN,
+                      "help": "Functions are triggered by numbers ending in the listed numbers.\nUse 3 - %d digits, numbers 0-9, * and # are allowed.\nWhat a list does is set in Settings > System > Connections: the name of each list says what it does now." % MAX_LEN,
                       "restore": "Restore default numbers"}}
 
 

@@ -392,7 +392,7 @@ def listing():
             continue                       # a module with no box and no background (a plain service) has nothing to move
         out.append({"name": name, "visible": core.module_visible(name, m), "title": core.module_title(name, m), "description": m.get("description", ""),
                     "note": m.get("note", ""), "enabled": core.module_enabled(name, state),
-                    "default": core.module_default_enabled(m), "error": _state["errors"].get(name)})
+                    "default": core.module_default_enabled(m, name), "error": _state["errors"].get(name)})
     return out
 
 
