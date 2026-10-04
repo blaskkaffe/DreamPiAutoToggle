@@ -347,7 +347,7 @@ class ClockView(unittest.TestCase):
         self.assertEqual((v["time"], v["beat"], v["items"], v["cities"], v["map"]), ("13:05:09", "", [], [], None))
         clock.save_config({"beat": True, "world": True, "format": "12h-ampm"})
         v = clock.view(t)
-        self.assertEqual((v["time"], v["beat"]), ("1:05:09 PM", ".beat @%03d" % clock.beats(t)))
+        self.assertEqual((v["time"], v["beat"]), ("1:05:09 PM", "@%03d .beats" % clock.beats(t)))
         self.assertEqual(len(v["items"]), len(clock.DEFAULT_CITIES))
         self.assertEqual(v["cities"][0], ["Los Angeles", "5:05 AM"])       # each city with its time, together
         self.assertEqual((v["map"]["utc"], v["map"]["here"]), (t, 0.0))
@@ -372,7 +372,7 @@ class ClockView(unittest.TestCase):
         clock.save_config({"beat": True})
         d = {}
         clock.api(d, [])
-        self.assertRegex(d["clock"]["beat"], r"^\.beat @\d{3}$")
+        self.assertRegex(d["clock"]["beat"], r"^@\d{3} \.beats$")
         r = clock._reply()
         self.assertEqual(r["values"], {"format": "24h"})
         self.assertEqual([(o["value"], o["label"]) for o in r["options"]["formats"]], [("12h", "12h"), ("12h-ampm", "12h am/pm"), ("24h", "24h")])

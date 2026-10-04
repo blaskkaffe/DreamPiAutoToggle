@@ -163,7 +163,7 @@ def view(now=None):
     cfg = read_config()
     off = clock_offset(cfg, now)
     cities = world(cfg, now) if cfg["world"] else []
-    return {"time": format_time(cfg["format"], now, off), "beat": ".beat @%03d" % beats(now) if cfg["beat"] else "",
+    return {"time": format_time(cfg["format"], now, off), "beat": "@%03d .beats" % beats(now) if cfg["beat"] else "",
             "items": [{"text": c["name"], "n": c["text"]} for c in cities],
             "cities": [[c["name"], c["text"]] for c in cities],
             "world": cfg["world"] and bool(cities), "world_on": cfg["world"], "beat_on": cfg["beat"], "large_on": cfg["large"],

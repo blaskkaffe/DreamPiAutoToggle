@@ -30,7 +30,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await sec.locator('.srow', { hasText: 'World time' }).locator('input').check(); await settle(900);
   await page.click('#close-settings'); await settle(1800);
   ok(/^\d{1,2}:\d{2}:\d{2} (AM|PM)$/.test(await time()), 'the middle line follows the 12-hour setting (' + await time() + ')');
-  ok(/^\.beat @\d{3}$/.test((await box.locator('.nlabel').textContent()).trim()), 'the top line shows the .beat time');
+  ok(/^@\d{3} \.beats$/.test((await box.locator('.nlabel').textContent()).trim()), 'the top line shows the .beat time');
   ok(await box.locator('.carousel .t').count() > 0 && /Tokyo/.test(await box.locator('.carousel').first().textContent()), 'the bottom line lists world times');
   // the open box: each city with its time on one row, and the map of the real time zone areas
   ok(!(await box.locator('svg.cmap').isVisible()), 'the map is hidden until the box is tapped');
