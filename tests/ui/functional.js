@@ -36,7 +36,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   // ---- choosing a network moves the primary colour with it
   const boxBg = () => page.locator('.now').first().evaluate(e => getComputedStyle(e).borderTopColor);
   const before = await boxBg();
-  const seenReq = []; const onReq = r => seenReq.push(new URL(r.url()).pathname); page.on('request', onReq);
+  const seenReq = []; const onReq = r => seenReq.push(r.url().replace(/^https?:\/\/[^/]+/, '').split('?')[0]); page.on('request', onReq);
   await page.locator('.pill').nth(1).click(); await settle(1800);
   page.off('request', onReq);
   ok(!seenReq.some(u => u === '/players' || u === '/events/view' || u === '/clock'), 'pressing a network button asks only for /api, not for the data sources (' + seenReq.join(' ') + ')');
