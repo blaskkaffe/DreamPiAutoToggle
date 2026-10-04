@@ -77,7 +77,7 @@ changed, n removed)` or `events: sync failed, the stored events are kept: ...`.
 ## The JSON API
 
 For other programs on the network (an openMenu companion, a second dashboard). Times are ISO 8601 with the offset of the display
-zone: the module's setting (Settings > DC99 events > Time zone; default the Pi's own) or `?tz=<IANA zone>`.
+zone: the common time zone (Settings > About, `core.time_zone()`; default the Pi's own) or `?tz=<IANA zone>`.
 
 | Request | Answer |
 |---|---|
@@ -97,7 +97,7 @@ The API answers only while the module is on (404 otherwise, like every module pa
 ## Files
 
 `modules/events/`: `netswitch_events.py` (everything above), `layout.json`, `page.js` (the `events-list` widget), `page.css`,
-`sample_events.json`. Settings in `/opt/dreampi-netswitch/events.json` (`lead`, `zone`, `interval`, `picked`, `series`,
+`sample_events.json`. Settings in `/opt/dreampi-netswitch/events.json` (`lead`, `interval`, `picked`, `series`,
 `dismissed`, `mock`), the store in `events.db`, the reminders in `event_reminders.json`. Tests: `tests/test_events.py` (parsing,
 time zones with and without `zoneinfo`, duplicates, updates, removed events, failed imports, mock mode, API filters, reminders,
 banner, highlight, LED message, settings) and `tests/ui/events.js` (the box, bells, banner, highlight, settings in a browser).

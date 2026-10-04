@@ -6,9 +6,6 @@
 .evr .evw b{display:block;font-size:1.15em;color:#fff;font-variant-numeric:tabular-nums}
 .evr .evt{flex:1;min-width:0} .evr .evt a{color:#fff;text-decoration:none} .evr .evt a:hover{text-decoration:underline}
 .evr .evsrc{display:block;font-size:.82em;color:rgba(255,255,255,.6)}
-.evr .bell{flex:none;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center}
-.evr .bell svg{width:18px;height:18px;fill:rgba(255,255,255,.45)}
-.evr.on .bell{background:rgba(255,255,255,.9)} .evr.on .bell svg{fill:var(--primary)}
 .evs .wtext{text-align:center}
 [data-box="events"] .now .row.hang .pill-s{background:rgba(0,0,0,.25);border-color:rgba(255,255,255,.4)}   /* plain buttons: the red is the network box's Hang up */
 [data-box="events"] .now .row.hang{gap:10px}

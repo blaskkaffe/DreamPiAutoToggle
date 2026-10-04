@@ -334,6 +334,69 @@ class FavoritesTests(unittest.TestCase):
         self.assertEqual(groups["players"]["items"], ["Ana"])
         self.assertTrue(groups["players"]["free"] and not groups["games"]["free"])
 
+    def test_stars_set_and_clear_the_same_favorites_as_settings(self):
+        self.assertTrue(pl.star("player", "Ana", True))
+        self.assertTrue(pl.star("game", "Quake III Arena", True))
+        self.assertEqual(pl.favorites(), {"games": ["Quake III Arena"], "players": ["Ana"]})
+        self.assertTrue(pl.star("player", " ana ", True))                      # already a favorite (same name, any case): no second one
+        self.assertEqual(pl.favorites()["players"], ["Ana"])
+        self.assertTrue(pl.star("player", "ANA", False))
+        self.assertTrue(pl.star("game", "Quake III Arena Online", False))      # the same game by its other name (same_game)
+        self.assertEqual(pl.favorites(), {"games": [], "players": []})
+        self.assertFalse(pl.star("team", "x", True))                           # not a kind
+        self.assertFalse(pl.star("player", "  ", True))
+        for i in range(pl.MAX_FAVORITES):
+            pl.star("player", "P%d" % i, True)
+        self.assertFalse(pl.star("player", "One too many", True))             # a full list says no
+
+    def test_the_view_has_the_games_list_and_what_is_starred(self):
+        pl._cache.update({"time": 5, "players": [{"player": "Ana", "game": "Quake III Arena", "network": "DCNow!"},
+                                                 {"player": "Bo", "game": "Quake III Arena", "network": "DCNow!"},
+                                                 {"player": "Cy", "game": "", "network": "DCNET"}]})
+        pl.star("player", "Bo", True)
+        pl.star("game", "Quake III Arena", True)
+        v = pl.view()
+        self.assertEqual([(x["title"], x["starred"]) for x in v["list"]], [("Ana", False), ("Bo", True), ("Cy", False)])
+        self.assertEqual(v["games_list"], [{"title": "Quake III Arena", "sub": "2 playing", "starred": True}])
+
+    def test_the_star_endpoint_answers_with_the_new_view(self):
+        pl._cache.update({"time": 5, "players": [{"player": "Ana", "game": "", "network": "DCNow!"}]})
+        class H(object):
+            body = {"kind": "player", "name": "Ana", "on": True}
+            def send(self, body, ctype, status=200):
+                self.sent = (json.loads(body) if ctype == "application/json" else body, status)
+            def _body(self, limit):
+                return json.dumps(self.body).encode()
+        h = H()
+        pl._post_star(h)
+        self.assertEqual((h.sent[1], h.sent[0]["list"][0]["starred"]), (200, True))
+        h.body = {"kind": "nope", "name": "Ana", "on": True}
+        pl._post_star(h)
+        self.assertEqual(h.sent[1], 400)
+
+    def test_the_status_is_about_the_player_feeds_not_the_game_list(self):
+        pl._cache.update({"time": 5, "players": [], "sources": [{"name": "Dreamcast Live", "ok": False, "count": 0, "error": "no games found", "kind": "games"},
+                                                                  {"name": "DC99", "ok": True, "count": 0, "error": None, "sections": []}]})
+        self.assertNotIn("Dreamcast Live", pl.view()["status"])
+        self.assertNotIn("DreamPi on GitHub", [x[0] for x in pl.LINKS])
+
+    def test_the_list_on_the_page_stays_when_no_feed_answers(self):
+        pl.fetch = lambda url: json.dumps(self.GAMES if "dreamcastlive" in url else DC99)
+        pl.refresh()
+        before = list(pl.status()["players"])
+        self.assertTrue(before)
+        def broken(url):
+            raise IOError("offline")
+        pl.fetch = broken
+        pl.refresh()
+        got = pl.status()
+        self.assertEqual(got["players"], before)                                # not replaced by an empty list
+        self.assertFalse(got["refreshing"])
+        self.assertTrue(any(not x["ok"] for x in got["sources"]))               # the report says what went wrong
+
+    def test_remove_all_asks_first(self):
+        self.assertTrue(pl._favorites_reply()["rules"]["restore_confirm"])
+
 
 def _row(name, icon, link=True):
     cell = '<a href="https://dreamcastlive.net/x/">%s</a>' % name if link else name

@@ -205,9 +205,11 @@ W.status=function(s){var d=h("span",{"class":"dot"}),t=h("span",{"class":"nw"}),
  if(s.dot!==undefined)bind(s.dot,function(v){dotLook(d,v)});
  bind(s.text,function(v){setText(t,v==null?"":v)});bind(s.sub,function(v){setLines(sub,v);sh(sub,!!v)});
  if(s.lines!==undefined)bind(s.lines,function(v){if(!v||!v.length){setHtml(t,"...");setHtml(sub,"");return}setText(t,v[0]);setHtml(sub,v.slice(1).map(esc).join("<br>"))});return el};
+// "mode": "@path" puts the text on the box as data-mode (a module's page.css lays the box out differently for it); "open_if": "@path" -
+// while that is false the box has nothing to show when tapped, so it does not open (and is not a button)
 W.infobox=function(s,ctx){
  var el=h("div",{"class":"now rows",title:"Show or hide details",role:"button",tabindex:"0","aria-expanded":"false"}),
-  head=h("b");
+  head=h("b"),canOpen=true;
  if(s.label!==undefined){var lab=h("div",{"class":"nlabel"});el.appendChild(lab);bind(s.label,function(t){setText(lab,t==null||t===""?"\u00a0":t)})}   // the top line: a text or a binding; empty keeps its height
  el.appendChild(head);
  if(s.parts!==undefined)bind(s.parts,function(ps){var html=(ps||[]).map(function(p){return '<span class="pln" data-c="'+esc(p.colour||"")+'">'+esc(p.text)+'</span>'}).join("");
@@ -217,12 +219,18 @@ W.infobox=function(s,ctx){
   var row=h("div",{"class":"row "+(r.main?"main":"more")+(r.cls?" "+r.cls:"")});
   row.appendChild(h("span",{"class":"k",text:r.label||""}));
   var v=h("span",{"class":"v"+(r.value&&r.value.type==="carousel"?" fill":"")});v.appendChild(build(Object.assign({mod:s.mod},r.value||{type:"text",text:""}),ctx));row.appendChild(v);
+  // "busy": "@path" - a small spinner at the end of the row while it is true: the row is being refreshed, what it shows stays until the new data is there
+  if(r.busy!==undefined){var sp=h("span",{"class":"spin",role:"status","aria-label":"Refreshing"});row.appendChild(sp);bind(r.busy,function(x){sh(sp,!!x)})}
   if(r.show!==undefined)bind(r.show,function(x){sh(row,!!x)});
   el.appendChild(row)});
  if(s.actions&&s.actions.length){var act=h("div",{"class":"row more hang keep"});
   buildAll(s.actions.map(function(w){return Object.assign({mod:s.mod},w)}),ctx).forEach(function(a){act.appendChild(a)});
   if(s.actions_show!==undefined)bind(s.actions_show,function(x){sh(act,!!x)});el.appendChild(act)}
- function toggle(){el.classList.toggle("open");el.setAttribute("aria-expanded",el.classList.contains("open"));fire("layout")}
+ function toggle(){if(!canOpen)return;el.classList.toggle("open");el.setAttribute("aria-expanded",el.classList.contains("open"));fire("layout")}
+ if(s.mode!==undefined)bind(s.mode,function(v){if(v)el.setAttribute("data-mode",v);else el.removeAttribute("data-mode");fire("layout")});
+ if(s.open_if!==undefined)bind(s.open_if,function(v){canOpen=!!v;el.classList.toggle("noopen",!canOpen);
+  if(!canOpen){el.classList.remove("open");["role","tabindex","title","aria-expanded"].forEach(function(a){el.removeAttribute(a)});fire("layout")}
+  else{el.setAttribute("role","button");el.setAttribute("tabindex","0");el.setAttribute("title","Show or hide details");el.setAttribute("aria-expanded",el.classList.contains("open")?"true":"false")}});
  el.onclick=function(e){if(e.target.closest&&e.target.closest("a,button,.keep"))return;toggle()};
  el.onkeydown=function(e){if((e.key=="Enter"||e.key==" ")&&e.target===el){e.preventDefault();toggle()}};
  return el};
@@ -258,7 +266,11 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
  function compactRow(it){var tag=s.row.tag?it[s.row.tag]:"",c=h("span",{"class":"pw",text:tag}),
   t=h("span",{"class":"pn"},[document.createTextNode(it[s.row.title||"title"]),h("span",{"class":"pg",text:it[s.row.sub||"sub"]||""})]);
   if(s.row.tag_colour&&it[s.row.tag_colour]){var id=colourId(it[s.row.tag_colour],s.mod);if(id)c.style.color="var(--c-"+id+"-l)"}
-  return h("div",{"class":"p"},[t,c])}
+  var kids=[t,c],st=s.row.star;       // "star": {post, kind, on: the item's field, data: the data source the answer replaces}: a star button that sets or clears a favourite
+  if(st){var name=it[st.name||s.row.title||"title"],b=ui.iconButton("star",!!it[st.on],name);
+   b.onclick=function(e){e.stopPropagation();b.disabled=true;
+    post(st.post,{kind:st.kind,name:name,on:b.getAttribute("aria-pressed")!=="true"},function(r){b.disabled=false;if(r){if(st.data)S[st.data]=r;engineUpdate()}})};kids.push(b)}
+  return h("div",{"class":"p"},kids)}
  function rowFor(it,i,extra){if(s.style==="compact")return compactRow(it);var info=extra?it.sub:it[s.row.sub||"sub"],
   title=extra?it.title:it[s.row.title||"title"],b=h("button",{type:"button","class":"pill-s",text:extra?it.button:(s.row.button||"Select"),"aria-label":(extra?it.button:(s.row.button||"Select"))+" "+title});
   var item=extra?it.item:it;
@@ -290,7 +302,7 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
 function editRow(o){var sub=h("span",{"class":"sub"}),title=document.createTextNode(o.title||""),
  btn=h("button",{type:"button","class":"pill-s",text:o.button||"Edit"}),btn2=o.button2?h("button",{type:"button","class":"pill-s",text:o.button2}):null,
  below=h("div",{"class":"below"}),left=h("span",{},[title,sub]),
- row=h("div",{"class":"srow wrap"},[left,btn2?h("span",{"class":"btns"},[btn,btn2]):btn,below]);
+ row=h("div",{"class":"srow wrap edit"},[left,btn2?h("span",{"class":"btns"},[btn,btn2]):btn,below]);
  if(o.aria)btn.setAttribute("aria-label",o.aria);if(o.aria2&&btn2)btn2.setAttribute("aria-label",o.aria2);sh(below,false);sh(sub,false);
  return {el:row,btn:btn,btn2:btn2,
   setTitle:function(t){title.nodeValue=t},
@@ -314,22 +326,46 @@ function footRow(buttons){var info=h("button",{type:"button","class":"infobtn",t
  el=h("div",{"class":"srow foot"},[h("span",{"class":"btns"},buttons),info,pop]),p=ui.popup(pop);   // the pop-up sits in the row so it finds its card
  info.onclick=function(e){p.toggle(info,e)};hook("settingsClose",function(){p.close()});sh(info,false);
  return {el:el,setInfo:function(t){setLines(text,t);sh(info,!!t)}}}
-// ---- a table to pick values for: groups of short items (phone numbers) with an Add pop-up per group (reply of GET source)
+// ---- a panel that opens and closes inside its pop-up (the same calls as ui.popup): the picker's Add area while it is in an Edit pop-up
+function inlinePanel(el){var q={onclose:null,anchor:null};sh(el,false);
+ q.isOpen=function(){return el.style.display!=="none"};
+ q.open=function(a){q.anchor=a;sh(el,true)};
+ q.close=function(){if(!q.isOpen())return;sh(el,false);q.anchor=null;if(q.onclose)q.onclose()};
+ q.toggle=function(a,e){if(e&&e.stopPropagation)e.stopPropagation();if(q.isOpen()&&q.anchor===a)q.close();else q.open(a)};return q}
+// ---- a table to pick values for: groups of short items (phone numbers) with an Add pop-up per group (reply of GET source).
+// With "edit": true a group is one short row with an Edit button (top right); the pop-up under it holds the group's tags (remove), the
+// Add button (which opens the search / pick area inside the same pop-up), Restore, the help text and Done.
 W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null,addKey=null,
  list=h("div"),restore=h("button",{type:"button","class":"pill-s"}),foot=footRow([restore]),
  pop=h("div"),popT=h("div",{"class":"t"}),inp=h("input",{type:"text","aria-label":"Value to add"}),addB=h("button",{type:"button","class":"pill-s",text:"Add"}),msg=h("div",{"class":"msg"}),choices=h("div",{"class":"choices"});
  pop.appendChild(popT);pop.appendChild(h("div",{"class":"fld"},[inp,addB]));pop.appendChild(choices);pop.appendChild(msg);
- el.appendChild(list);el.appendChild(foot.el);el.appendChild(pop);
- var p=ui.popup(pop);p.onclose=function(){addKey=null};
+ el.appendChild(list);if(!s.edit)el.appendChild(foot.el);el.appendChild(pop);
+ var p=s.edit?inlinePanel(pop):ui.popup(pop),editors={};p.onclose=function(){addKey=null};
+ if(s.edit)pop.classList.add("addarea");
  function rules(){return cfg.rules||{}}
+ function tagList(g){return g.items.map(function(n){return g.notes&&g.notes[n]?n+" ("+g.notes[n]+")":n})}
+ // the Edit pop-up of a group (made once, filled again on every change)
+ function editor(g){var ed=editors[g.key];if(ed)return ed;
+  var box=h("div"),done=h("button",{type:"button","class":"pill-s",text:"Done"});
+  ed={box:box,done:done,p:ui.popup(box)};done.onclick=function(){ed.p.close()};ed.p.onclose=function(){p.close()};
+  el.appendChild(box);editors[g.key]=ed;return ed}
+ function fillEditor(g){var ed=editor(g),R=rules(),r=editRow({title:g.label,button:R.add_label||"Add",aria:(R.add_label||"Add")+" to "+g.label});
+  r.setSub(g.sub||"");r.setList(tagList(g),function(i){g.items.splice(i,1);save()});r.btn.onclick=function(e){openAdd(g,r.btn,e)};
+  ed.box.innerHTML="";ed.box.appendChild(r.el);ed.box.appendChild(pop);
+  sh(restore,!!R.restore);if(R.restore){setText(restore,R.restore);restore.onclick=function(){if(R.restore_confirm&&!confirm(R.restore_confirm))return;cfg.groups.forEach(function(x){x.items=(cfg.defaults[x.key]||[]).slice()});save()}}
+  if(R.help)ed.box.appendChild(h("div",{"class":"sub",text:R.help}));
+  ed.box.appendChild(h("div",{"class":"bar end"},[restore,ed.done]))}
  function paint(){if(!cfg)return;var R=rules();
   list.innerHTML="";
   cfg.groups.forEach(function(g){
+   if(s.edit){var e=editRow({title:g.label,button:R.edit_label||"Edit",aria:(R.edit_label||"Edit")+" "+g.label});
+    e.setSub(g.sub||"");e.btn.onclick=function(ev){editor(g).p.toggle(e.btn,ev)};list.appendChild(e.el);fillEditor(g);return}
    var r=editRow({title:g.label,button:R.add_label||"Add",aria:(R.add_label||"Add")+" to "+g.label});
-   r.setSub(g.sub||"");r.setList(g.items.map(function(n){return g.notes&&g.notes[n]?n+" ("+g.notes[n]+")":n}),function(i){g.items.splice(i,1);save()});
+   r.setSub(g.sub||"");r.setList(tagList(g),function(i){g.items.splice(i,1);save()});
    r.btn.onclick=function(e){openAdd(g,r.btn,e)};list.appendChild(r.el)});
+  if(s.edit)return;
   foot.setInfo(R.help||"");
-  sh(restore,!!R.restore);if(R.restore){setText(restore,R.restore);restore.onclick=function(){cfg.groups.forEach(function(g){g.items=(cfg.defaults[g.key]||[]).slice()});save()}}
+  sh(restore,!!R.restore);if(R.restore){setText(restore,R.restore);restore.onclick=function(){if(R.restore_confirm&&!confirm(R.restore_confirm))return;cfg.groups.forEach(function(g){g.items=(cfg.defaults[g.key]||[]).slice()});save()}}
   sh(foot.el,!!(R.restore||R.help))}
  function openAdd(g,b,e){if(p.isOpen()&&addKey===g.key){p.toggle(b,e);return}addKey=g.key;var R=rules();
   setText(popT,(R.add_title||"Add to {group}").replace("{group}",g.label));inp.value="";inp.maxLength=R.max||40;setText(msg,"");
@@ -385,6 +421,13 @@ W.custom=function(s,ctx){var host=h("div",{"class":"wcustom"+(s.cls?" "+s.cls:""
 // ---- controls that make up a form: select, number, text, slider (bound to one key of the form's values)
 function optionList(spec,F){var o=spec.options;if(typeof o==="string")o=isBind(o)?val(o):(F.options||{})[o];return o||[]}
 function control(spec,F,change){var key=spec.key,el,paint;
+ // "choice": the options as a row of buttons, the chosen one in the module's colour; a tap picks (el._after, set by the form, then closes its pop-up)
+ if(spec.type==="choice"){el=h("span",{"class":"optrow",role:"group","aria-label":spec.aria||spec.label||key});var lastc="",btns=[];
+  paint=function(){var opts=optionList(spec,F),k=JSON.stringify(opts);
+   if(k!==lastc){lastc=k;el.innerHTML="";btns=opts.map(function(o){var b=h("button",{type:"button","class":"pill-s",text:o.label});
+    b.onclick=function(e){e.stopPropagation();F.values[key]=o.value;change();if(el._after)el._after()};el.appendChild(b);return b})}
+   opts.forEach(function(o,i){var on=String(o.value)===String(F.values[key]);btns[i].classList.toggle("pri",on);btns[i].setAttribute("aria-pressed",on?"true":"false")})};
+  el._paint=paint;return el}
  if(spec.type==="select"){el=h("select",{"class":"ord","aria-label":spec.aria||spec.label||key});var last="";
   paint=function(){var opts=optionList(spec,F),k=JSON.stringify(opts);
    if(k!==last){last=k;var groups={},order=[],html="";
@@ -408,9 +451,12 @@ W.form=function(s,ctx){var el=h("div",{"class":"wform"}),F={values:{},options:{}
  (s.fields||[]).forEach(function(f){
   var r=editRow({title:f.title,button:f.button||"Edit",aria:"Edit "+(f.title||"")}),done=h("button",{type:"button","class":"pill-s",text:"Done"}),pop=h("div"),p;
   pop.appendChild(h("div",{"class":"t",text:f.popup_title||f.title||""}));
+  // a field with one "choice" control is a simple pick: its pop-up is just the buttons, a tap picks and closes (no Done)
+  var one=(f.controls||[]).length===1&&f.controls[0].type==="choice";
   (f.controls||[]).forEach(function(c){var e=control(Object.assign({},c,{aria:(f.title||"")+": "+(c.label||c.key)}),F,save);ctls.push(e);
-   pop.appendChild(h("div",{"class":"frow"},[h("span",{text:c.label||c.key}),e]))});
-  pop.appendChild(h("div",{"class":"bar end"},[done]));
+   if(one){e._after=function(){p.close()};pop.appendChild(e)}
+   else pop.appendChild(h("div",{"class":"frow"},[h("span",{text:c.label||c.key}),e]))});
+  if(!one)pop.appendChild(h("div",{"class":"bar end"},[done]));
   el.appendChild(r.el);el.appendChild(pop);p=ui.popup(pop);
   r.btn.onclick=function(e){p.toggle(r.btn,e)};done.onclick=function(){p.close()};hook("settingsClose",function(){p.close()});
   subs.push(function(){r.setSub(f.sub_text?(F.texts||{})[f.sub_text]:f.sub);if(f.list)r.setList((F.lists||{})[f.list])});
@@ -474,7 +520,7 @@ function buildPicker(cols){
   btn=h("button",{type:"button","class":"pill-s",text:"Edit","aria-haspopup":"dialog"}),list=h("div",{"class":"mlist"}),
   done=h("button",{type:"button","class":"pill-s",text:"Done"}),
   pop=h("div",{},[h("div",{"class":"t",text:"Modules: tick to switch on or off, drag the handle to move. The top one has priority."}),list,h("div",{"class":"bar end"},[done])]),
-  row=h("div",{"class":"srow","data-picker":"modules"},[h("span",{},[document.createTextNode("Modules"),h("span",{"class":"sub",text:"Switch modules on or off and set their priority"})]),btn]);
+  row=h("div",{"class":"srow edit","data-picker":"modules"},[h("span",{},[document.createTextNode("Modules"),h("span",{"class":"sub",text:"Switch modules on or off and set their priority"})]),btn]);
  if(!card){card=h("div",{"class":"card"});cols.appendChild(h("section",{"class":"sec","data-box":"system"},[h("h2",{text:"System"}),card]))}
  card.insertBefore(row,card.firstChild);card.appendChild(pop);
  var p=ui.popup(pop),mods=[],boxes={};

@@ -8,12 +8,20 @@
 .cwc .cwn{overflow:hidden;text-overflow:ellipsis;color:rgba(255,255,255,.8)} .cwc .cwt{font-weight:700;font-variant-numeric:tabular-nums}
 .cmap{display:block;width:100%;height:auto}
 .cmap .sea{fill:rgba(255,255,255,.03)} .cmap .sea.alt{fill:rgba(255,255,255,.08)}
-.cmap .ofs{fill:rgba(255,255,255,.7);font-size:6px;text-anchor:middle}
+.cmap .ofs{fill:rgba(255,255,255,.7);font-size:6.5px;text-anchor:middle} .cmap .hr{fill:#fff;font-size:8px;font-weight:700;text-anchor:middle}
 .cmap .z polygon{stroke:rgba(0,0,0,.35);stroke-width:.3;stroke-linejoin:round}
 .cmap .z{fill:rgba(255,255,255,.3)} .cmap .z.odd{fill:rgba(255,255,255,.42)} .cmap .z.frac{fill:rgba(255,255,255,.55)} .cmap .z.none{fill:rgba(255,255,255,.15)}
 .cmap .z.here{fill:rgba(255,255,255,.9)}
-.cmap .zl{fill:#fff;font-size:5.5px;font-weight:700;text-anchor:middle;paint-order:stroke;stroke:rgba(0,0,0,.7);stroke-width:1.3px;pointer-events:none}
 .cmap .city{fill:#fff;stroke:#000;stroke-width:.8}
 [data-box="clock"].plain:not(.hl) .cmap .z.here{fill:var(--primary)}
 [data-box="clock"].plain:not(.hl) .cmap .city{fill:var(--primary-l)}
-.cmapnote{margin:6px 0 0;color:rgba(255,255,255,.65);font-size:.95em;text-align:center}
+/* Large clock (the infobox's data-mode, set from clock.size): the time spans the rows .beat and world time leave free. The box is a grid of
+   its three rows (top line, time, bottom line); the time has no size of its own (contain: size), so it never changes the box's height,
+   and page.js fit() sizes its text. Open (world time on, tapped) the box is the plain list and map again. */
+[data-mod="clock"] .now[data-mode]:not(.open){display:grid;grid-template-columns:100%;grid-template-rows:auto 1.6875em auto}
+[data-mod="clock"] .now[data-mode]:not(.open) > .nlabel{grid-row:1}
+[data-mod="clock"] .now[data-mode]:not(.open) > b{grid-column:1;contain:size;align-self:stretch;display:flex;align-items:center;justify-content:center;white-space:nowrap;line-height:1}
+[data-mod="clock"] .now[data-mode="full"]:not(.open) > b{grid-row:1 / 4}
+[data-mod="clock"] .now[data-mode="upper"]:not(.open) > b{grid-row:1 / 3}
+[data-mod="clock"] .now[data-mode="lower"]:not(.open) > b{grid-row:2 / 4}
+[data-mod="clock"] .now[data-mode]:not(.open) > .row.main{grid-row:3}

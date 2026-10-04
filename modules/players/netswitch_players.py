@@ -44,7 +44,6 @@ LINKS = [
     ("Dreamcast.online", "https://dreamcast.online/"),
     ("DCNET status", "https://dcnet.flyca.st/status/games.html"),
     ("Dreamcast Live", "https://dreamcastlive.net/"),
-    ("DreamPi on GitHub", "https://github.com/Kazade/dreampi"),
 ]
 
 _NAME_KEYS = ("name", "player", "username", "user", "nick", "nickname", "gamertag", "handle")
@@ -384,6 +383,36 @@ def save_favorites(data):
     return cleaned
 
 
+def is_favorite_player(favs, name):
+    return any(_norm(n) == _norm(name) for n in favs["players"])
+
+
+def is_favorite_game(favs, name):
+    return any(same_game(n, name) for n in favs["games"])
+
+
+def star(kind, name, on):
+    """Set or clear one favourite from the main page's star button; kind is "game" or "player". Returns False for an unknown kind
+    or a full list. The same list as Settings > Online players."""
+    if kind not in ("game", "player"):
+        return False
+    key, same = ("games", same_game) if kind == "game" else ("players", lambda a, b: _norm(a) == _norm(b))
+    favs = favorites()
+    name = " ".join(str(name).split())[:60]
+    if not name:
+        return False
+    if on:
+        if any(same(n, name) for n in favs[key]):
+            return True
+        if len(favs[key]) >= MAX_FAVORITES:
+            return False
+        favs[key].append(name)
+    else:
+        favs[key] = [n for n in favs[key] if not same(n, name)]
+    save_favorites(favs)
+    return True
+
+
 def watch_result(players, favs):
     """Which favourites are online: games = the favourite games somebody plays, friends = the favourite players that are online."""
     games = [g for g in favs["games"] if any(same_game(g, p.get("game")) for p in players)]
@@ -477,9 +506,13 @@ def refresh():
         order = {"DCNow!": 0, "DCNET": 1}
         players.sort(key=lambda p: (order.get(p["network"], 2), p["network"], p["game"].lower(), p["player"].lower()))
     finally:
+        # The list on the page is replaced only by a complete new one: when no player source answered, the old list stays (its
+        # time too, so it is asked for again soon) and only the report says what went wrong.
+        failed = bool(sources()) and not any(x["ok"] for x in report if x.get("kind") != "games")
         with _lock:
-            _cache.update({"time": int(time.time()), "players": players[:MAX_PLAYERS], "sources": report, "games": games,
-                           "games_time": gtime, "games_live": live, "refreshing": False})
+            keep = failed and bool(_cache["time"])
+            _cache.update({"time": _cache["time"] if keep else int(time.time()), "players": _cache["players"] if keep else players[:MAX_PLAYERS],
+                           "sources": report, "games": games, "games_time": gtime, "games_live": live, "refreshing": False})
         write_watch()
 
 
@@ -519,25 +552,28 @@ def view():
     list (the players), status (what each source said) and links."""
     out = status()
     players = out.get("players") or []
-    bad = [x for x in (out.get("sources") or []) if not x["ok"]]
+    reports = [x for x in (out.get("sources") or []) if x.get("kind") != "games"]       # the status says how the player feeds did, not the game list
+    bad = [x for x in reports if not x["ok"]]
+    favs = favorites()
     nets = (("DCNow!", "switcher.dcnow"), ("DCNET", "switcher.dcnet"))
     if not out["configured"]:
         out["parts"] = [{"text": "%s -" % n, "colour": c} for n, c in nets]
         out["games"] = ["No player list source is set up"]
-        out["list"] = []
+        out["list"] = out["games_list"] = []
         out["status"] = "Add the JSON address of a status page to players_sources.json (see the README), or use the links."
     elif not out.get("time"):
         out["parts"] = [{"text": "%s -" % n, "colour": c} for n, c in nets]
         out["games"] = ["Loading..."]
-        out["list"] = []
+        out["list"] = out["games_list"] = []
         out["status"] = ""
     else:
         out["parts"] = [{"text": "%s %d" % (n, len([p for p in players if p["network"] == n])), "colour": c} for n, c in nets]
         out["games"] = games_line(players) or ["Nobody is in a game" if players else "Nobody is online"]
         out["list"] = [{"title": p["player"], "sub": p.get("game") or "(Idle)", "tag": p.get("network") or "",
-                        "colour": dict(nets).get(p.get("network"), "")} for p in players]
+                        "colour": dict(nets).get(p.get("network"), ""), "starred": is_favorite_player(favs, p["player"])} for p in players]
+        out["games_list"] = [{"title": g["text"], "sub": "%d playing" % g["n"], "starred": is_favorite_game(favs, g["text"])} for g in games_line(players)]
         detail = []
-        for x in out.get("sources") or []:
+        for x in reports:
             if x["ok"]:
                 sec = x.get("sections")
                 detail.append("%s: %s" % (x["name"], ", ".join("%s %d%s%s" % (v["section"], v["shown"], "/%d" % v["listed"] if v["listed"] != v["shown"] else "",
@@ -595,10 +631,10 @@ def _favorites_reply():
             "defaults": {"games": [], "players": []},
             "rules": {"min": 1, "max": 40, "per_group": MAX_FAVORITES, "unique": False, "add_label": "Add",
                       "add_title": "Add to {group}", "min_msg": "Type a name",
-                      "help": "Pick games from the list (green = fully online, work in progress is marked; games that are not online yet "
-                              "can't be picked) or players who are online now, or type a player's name. The LED messages "
-                              "'Your game is played' and 'A friend came online' use this list.",
-                      "restore": "Remove all"}}
+                      "help": "The same list as the stars on the main page. Pick games from the list (green = fully online, work in progress "
+                              "is marked; games that are not online yet can't be picked) or players who are online now, or type a "
+                              "player's name. The LED messages 'Your game is played' and 'A friend came online' use this list.",
+                      "restore": "Remove all", "restore_confirm": "Remove all favorite games and players?"}}
 
 
 def _get_favorites(h):
@@ -622,6 +658,20 @@ def _post_favorites(h):
 
 
 _watcher = {"on": False}
+
+
+def _post_star(h):
+    try:
+        body = json.loads(h._body(2048).decode("utf-8"))
+        ok = star(body.get("kind"), body.get("name"), bool(body.get("on")))
+    except (ValueError, IOError, OSError, AttributeError) as e:
+        h.send(str(e), "text/plain; charset=utf-8", status=400)
+        return True
+    if not ok:
+        h.send("Not a game or player, or the favorites are full (%d)" % MAX_FAVORITES, "text/plain; charset=utf-8", status=400)
+        return True
+    h.send(json.dumps(view()), "application/json")
+    return True
 
 
 def _watch_loop():
@@ -653,4 +703,4 @@ def _get(h):
 
 
 GET = {"/players": _get, "/players/favorites": _get_favorites}
-POST = {"/players/favorites": _post_favorites}
+POST = {"/players/favorites": _post_favorites, "/players/star": _post_star}

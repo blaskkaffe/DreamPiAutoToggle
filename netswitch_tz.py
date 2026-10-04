@@ -108,6 +108,21 @@ def zone_options(now=None, own="This Pi's own time zone"):
     return opts
 
 
+ZONE_CHOICES = tuple(sorted(set(c[1] for c in CITIES))) + ("UTC",)       # the zones a time zone setting may hold
+
+
+def zone_text(zone, now=None):
+    """The grey line under the time zone setting: which zone it is and its offset now."""
+    if not zone:
+        t = time.localtime(time.time() if now is None else now)
+        pi = t.tm_gmtoff if hasattr(t, "tm_gmtoff") else -(time.altzone if t.tm_isdst > 0 else time.timezone)
+        return "This Pi's own time zone, %s now" % utc_text(pi)
+    off = offset(zone, now)
+    if off is None:
+        return "%s is not known on this Pi: its own time zone is used" % zone
+    return "%s, %s now (summer and winter time follow the zone)" % (zone_name(zone), utc_text(off))
+
+
 def zone_name(zone):
     """"Europe/Stockholm" -> "Stockholm" (the city of the list, else the last part of the name)."""
     for c in CITIES:

@@ -150,6 +150,19 @@ class HttpTests(unittest.TestCase):
         self.post("/highlight", {"values": {"style": "plaid"}})          # not a look: back to the rainbow
         self.assertEqual(core.highlight_style(), "rainbow")
 
+    def test_the_time_zone_is_a_global_setting(self):
+        r = json.loads(self.get("/timezone")[2].decode())
+        self.assertEqual(r["values"], {"zone": ""})
+        self.assertEqual(r["options"]["zones"][0]["value"], "")
+        self.assertIn("Europe/Stockholm", [o["value"] for o in r["options"]["zones"]])
+        st, body = self.post("/timezone", {"values": {"zone": "Europe/Stockholm"}})
+        got = json.loads(body.decode())
+        self.assertEqual(got["values"], {"zone": "Europe/Stockholm"})
+        self.assertIn("Stockholm", got["texts"]["zone"])
+        self.assertEqual(core.time_zone(), "Europe/Stockholm")
+        self.post("/timezone", {"values": {"zone": "Mars/Olympus"}})     # not a zone of the list: the Pi's own
+        self.assertEqual(core.time_zone(), "")
+
     def test_a_module_prefix_route(self):
         st, hdr, body = self.get("/api/status")              # the events module's API (on by default)
         self.assertEqual(json.loads(body.decode())["source"], "dc99")

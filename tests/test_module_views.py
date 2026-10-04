@@ -274,16 +274,27 @@ class ClockView(unittest.TestCase):
 
     def test_the_settings_are_a_core_path_and_default_to_24h_only(self):
         self.assertTrue(core.CLOCK_CONFIG.startswith(self.tmp))
-        self.assertEqual(clock.read_config(), {"format": "24h", "beat": False, "world": False, "zone": "", "cities": clock.DEFAULT_CITIES})
+        self.assertEqual(clock.read_config(), {"format": "24h", "beat": False, "world": False, "large": False, "zone": "", "cities": clock.DEFAULT_CITIES})
         self.assertEqual(clock.save_config({"format": " 12H "})["format"], "12h")
+        self.assertEqual(clock.save_config({"format": "12h-ampm"})["format"], "12h-ampm")
         self.assertEqual(clock.save_config({"format": "nonsense"})["format"], "24h")
         self.assertEqual(clock.save_config({"format": "beat"})["format"], "24h")           # .beat is a switch of its own now
         got = clock.save_config({"beat": "true", "world": 1})
         self.assertEqual((got["beat"], got["world"]), (True, True))
         self.assertEqual(clock.save_config({"beat": False})["world"], True)               # a key that is not given stays as it was
-        self.assertEqual(clock.save_config({"zone": "Asia/Tokyo"})["zone"], "Asia/Tokyo")
-        self.assertEqual(clock.save_config({"zone": "../../etc/passwd"})["zone"], "")      # only zones of the list
-        self.assertEqual(clock.save_config({"zone": "Mars/Olympus"})["zone"], "")
+        self.assertEqual(clock.save_config({"zone": "Asia/Tokyo"})["zone"], "")             # the time zone is not the clock's setting any more ...
+        self.assertNotIn("zone", json.load(open(core.CLOCK_CONFIG)))
+        self.assertEqual(core.save_time_zone("Asia/Tokyo"), "Asia/Tokyo")                  # ... it is the common one (Settings > About)
+        self.assertEqual(clock.read_config()["zone"], "Asia/Tokyo")
+        self.assertEqual(core.save_time_zone("../../etc/passwd"), "")                      # only zones of the list
+        self.assertEqual(core.save_time_zone("Mars/Olympus"), "")
+
+    def test_an_older_clock_json_zone_is_carried_over_to_the_common_one(self):
+        with open(core.CLOCK_CONFIG, "w") as f:
+            json.dump({"format": "24h", "zone": "Europe/Stockholm"}, f)
+        self.assertEqual(core.time_zone(), "Europe/Stockholm")
+        core.save_time_zone("")                                                           # once set (even to the Pi's own) the file wins
+        self.assertEqual(core.time_zone(), "")
 
     def test_the_city_list_keeps_known_cities_once_and_at_most_twelve(self):
         self.assertEqual(clock.DEFAULT_CITIES, ["Los Angeles", "New York", "São Paulo", "London", "Berlin", "Moscow", "Mumbai", "Tokyo", "Sydney", "Auckland"])
@@ -318,23 +329,23 @@ class ClockView(unittest.TestCase):
     def test_12h_and_24h_use_local_time(self):
         t = 13 * 3600 + 5 * 60 + 9
         self.assertEqual(clock.format_time("24h", t), "13:05:09")
-        self.assertEqual(clock.format_time("12h", t), "1:05:09 PM")
-        self.assertEqual(clock.format_time("12h", 0), "12:00:00 AM")
+        self.assertEqual(clock.format_time("12h-ampm", t), "1:05:09 PM")
+        self.assertEqual(clock.format_time("12h-ampm", 0), "12:00:00 AM")
+        self.assertEqual(clock.format_time("12h", t), "1:05:09")                          # 12h without the AM / PM
+        self.assertEqual(clock.format_time("12h", 0), "12:00:00")
 
     def test_the_clock_follows_the_picked_zone_with_summer_time(self):
         summer, winter = 1783080000, 1767268800                           # 2026-07-03 12:00 UTC, 2026-01-01 12:00 UTC
         self.assertEqual(clock.view(summer)["time"], "12:00:00")           # the Pi's own zone (UTC here)
-        clock.save_config({"zone": "Europe/Stockholm"})
+        core.save_time_zone("Europe/Stockholm")
         self.assertEqual(clock.view(summer)["time"], "14:00:00")
         self.assertEqual(clock.view(winter)["time"], "13:00:00")
-        self.assertEqual(clock._reply()["values"]["zone"], "Europe/Stockholm")
-        self.assertIn("Stockholm", clock._reply()["texts"]["zone"])
 
     def test_the_three_lines_are_empty_unless_switched_on(self):
         t = 13 * 3600 + 5 * 60 + 9
         v = clock.view(t)
         self.assertEqual((v["time"], v["beat"], v["items"], v["cities"], v["map"]), ("13:05:09", "", [], [], None))
-        clock.save_config({"beat": True, "world": True, "format": "12h"})
+        clock.save_config({"beat": True, "world": True, "format": "12h-ampm"})
         v = clock.view(t)
         self.assertEqual((v["time"], v["beat"]), ("1:05:09 PM", ".beat @%03d" % clock.beats(t)))
         self.assertEqual(len(v["items"]), len(clock.DEFAULT_CITIES))
@@ -349,7 +360,7 @@ class ClockView(unittest.TestCase):
         self.assertEqual((got["London"], got["Berlin"], got["Tokyo"], got["Mumbai"], got["Sydney"]), ("12:00", "13:00", "21:00", "17:30", "23:00"))
         got = dict((c["name"], c["text"]) for c in clock.world(clock.read_config(), jul))
         self.assertEqual((got["London"], got["Berlin"], got["New York"], got["Sydney"]), ("13:00", "14:00", "08:00", "22:00"))
-        cfg = dict(clock.read_config(), format="12h")
+        cfg = dict(clock.read_config(), format="12h-ampm")
         self.assertEqual(dict((c["name"], c["text"]) for c in clock.world(cfg, jan))["Tokyo"], "9:00 PM")
 
     def test_summer_time_also_without_zoneinfo(self):
@@ -377,11 +388,31 @@ class ClockView(unittest.TestCase):
         clock.api(d, [])
         self.assertRegex(d["clock"]["beat"], r"^\.beat @\d{3}$")
         r = clock._reply()
-        self.assertEqual(r["values"], {"format": "24h", "zone": ""})
-        self.assertEqual([o["value"] for o in r["options"]["formats"]], ["24h", "12h"])
-        self.assertEqual(r["options"]["zones"][0]["value"], "")
-        self.assertIn("Europe/Stockholm", [o["value"] for o in r["options"]["zones"]])
-        self.assertEqual(r["texts"]["clock"], "Shown as 24-hour")
+        self.assertEqual(r["values"], {"format": "24h"})
+        self.assertEqual([(o["value"], o["label"]) for o in r["options"]["formats"]], [("12h", "12h"), ("12h-ampm", "12h am/pm"), ("24h", "24h")])
+        self.assertNotIn("zones", r["options"])                                            # the time zone is in About now
+        self.assertEqual(r["texts"]["clock"], "Shown as 24h")
+
+    def test_the_large_clock_takes_the_rows_beat_and_world_leave_free(self):
+        t = 13 * 3600
+        self.assertEqual(clock.view(t)["size"], "")                                        # off: always the middle row
+        clock.save_config({"large": True})
+        self.assertEqual((clock.view(t)["size"], clock.view(t)["large_on"]), ("full", True))     # neither: all three rows
+        clock.save_config({"beat": True})
+        self.assertEqual(clock.view(t)["size"], "lower")                                   # .beat on: middle and bottom
+        clock.save_config({"beat": False, "world": True})
+        self.assertEqual(clock.view(t)["size"], "upper")                                   # world time on: top and middle
+        clock.save_config({"beat": True})
+        self.assertEqual(clock.view(t)["size"], "")                                        # both: the middle row again
+        clock.save_config({"beat": False, "cities": []})
+        self.assertEqual(clock.view(t)["size"], "full")                                    # world time on without cities shows nothing: counts as off
+
+    def test_the_time_zone_is_a_base_setting_any_module_reads(self):
+        self.assertEqual(core.time_zone(), "")
+        core.save_time_zone("Asia/Tokyo")
+        self.assertEqual(core.time_zone(), "Asia/Tokyo")
+        self.assertIn("Tokyo", tzmod.zone_text("Asia/Tokyo"))
+        self.assertIn("own time zone", tzmod.zone_text(""))
 
 
 if __name__ == "__main__":

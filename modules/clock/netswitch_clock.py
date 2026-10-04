@@ -1,8 +1,9 @@
 # DreamPi Netswitch add-on - the dashboard clock (web service side).
-# The middle line is the time in 24-hour or 12-hour (AM/PM) form, in the Pi's own time zone or one picked in Settings; the top line
-# is empty or the .beat time; the bottom line is empty or a scrolling list of world times (cities the user picks, up to 12). With
-# world time on, a tap opens the cities as a list and a map of the world's time zones. Summer time comes from netswitch_tz (zoneinfo,
-# or the system's tz files on older Python). Runs in the web service (Python 3).
+# The middle line is the time in 24-hour, 12-hour or 12-hour AM/PM form, in the common time zone (core.time_zone(), Settings > About;
+# the Pi's own when none is set); the top line is empty or the .beat time; the bottom line is empty or a scrolling list of world
+# times (cities the user picks, up to 12). With "large" on the time takes the rows that .beat and world time leave free (view()
+# "size"). With world time on, a tap opens the cities as a list and a map of the world's time zones. Summer time comes from
+# netswitch_tz (zoneinfo, or the system's tz files on older Python). Runs in the web service (Python 3).
 import json
 import os
 import time
@@ -10,8 +11,8 @@ import time
 import netswitch_core as core
 import netswitch_tz as tz
 
-FORMATS = ("24h", "12h")
-LABELS = {"24h": "24-hour", "12h": "12-hour (AM/PM)"}
+FORMATS = ("12h", "12h-ampm", "24h")
+LABELS = {"12h": "12h", "12h-ampm": "12h am/pm", "24h": "24h"}
 DEFAULT_FORMAT = "24h"
 MAX_CITIES = 12
 ZONES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zones.json")   # the map's areas (tools/build_clock_zones.py)
@@ -19,7 +20,6 @@ ZONES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zones.jso
 CATALOGUE = tz.CITIES              # (name, IANA zone, longitude, latitude, region): the cities to pick from, also the zone list
 CITY = dict((c[0], c) for c in CATALOGUE)
 DEFAULT_CITIES = ["Los Angeles", "New York", "São Paulo", "London", "Berlin", "Moscow", "Mumbai", "Tokyo", "Sydney", "Auckland"]
-ZONE_CHOICES = tuple(sorted(set(c[1] for c in CATALOGUE))) + ("UTC",)
 
 
 def _flag(value, default=False):
@@ -33,12 +33,6 @@ def _flag(value, default=False):
 def _format(value):
     value = str(value or "").strip().lower()
     return value if value in FORMATS else DEFAULT_FORMAT
-
-
-def _zone(value):
-    """A zone from the list, or "" = the Pi's own."""
-    value = str(value or "").strip()
-    return value if value in ZONE_CHOICES else ""
 
 
 def _cities(value):
@@ -63,7 +57,8 @@ def _legacy():
 
 
 def read_config():
-    """{"format": "24h"|"12h", "beat": bool, "world": bool, "zone": "" (the Pi's own) | IANA name, "cities": [names]}."""
+    """{"format": "24h"|"12h"|"12h-ampm", "beat": bool, "world": bool, "large": bool, "zone": the common time zone (read only here),
+    "cities": [names]}."""
     try:
         with open(core.CLOCK_CONFIG) as f:
             data = json.load(f)
@@ -72,19 +67,19 @@ def read_config():
     if not isinstance(data, dict):
         data = _legacy() or {}
     return {"format": _format(data.get("format")), "beat": _flag(data.get("beat")), "world": _flag(data.get("world")),
-            "zone": _zone(data.get("zone")), "cities": _cities(data.get("cities"))}
+            "large": _flag(data.get("large")), "zone": core.time_zone(), "cities": _cities(data.get("cities"))}
 
 
 def save_config(values):
-    """Merge the given keys (format, beat, world, zone, cities) into the saved settings and return them."""
+    """Merge the given keys (format, beat, world, large, cities) into the saved settings and return them."""
     cfg = read_config()
     if isinstance(values, dict):
-        for key, clean in (("format", _format), ("beat", _flag), ("world", _flag), ("zone", _zone), ("cities", _cities)):
+        for key, clean in (("format", _format), ("beat", _flag), ("world", _flag), ("large", _flag), ("cities", _cities)):
             if key in values:
                 cfg[key] = clean(values[key])
     tmp = core.CLOCK_CONFIG + ".tmp"
     with open(tmp, "w") as f:
-        json.dump(cfg, f)
+        json.dump(dict((k, v) for k, v in cfg.items() if k != "zone"), f)
     os.rename(tmp, core.CLOCK_CONFIG)
     return cfg
 
@@ -114,13 +109,15 @@ def clock_offset(cfg, now=None):
 
 def _text(now, off, mode, seconds):
     t = time.gmtime(now + off)
-    if _format(mode) == "12h":
-        return "%d:%s" % (int(time.strftime("%I", t)), time.strftime("%M:%S %p" if seconds else "%M %p", t))
-    return time.strftime("%H:%M:%S" if seconds else "%H:%M", t)
+    mode = _format(mode)
+    if mode == "24h":
+        return time.strftime("%H:%M:%S" if seconds else "%H:%M", t)
+    ampm = " %p" if mode == "12h-ampm" else ""
+    return "%d:%s" % (int(time.strftime("%I", t)), time.strftime(("%M:%S" if seconds else "%M") + ampm, t))
 
 
 def format_time(mode, now=None, off=None):
-    """The time of day at an offset (default: the Pi's own): "13:05:09" (24h) or "1:05:09 PM" (12h). Mode "beat": "@041"."""
+    """The time of day at an offset (default: the Pi's own): "13:05:09" (24h), "1:05:09" (12h) or "1:05:09 PM" (12h-ampm). Mode "beat": "@041"."""
     now = time.time() if now is None else now
     if mode == "beat":
         return "@%03d" % beats(now)
@@ -181,9 +178,20 @@ def zone_offsets(now=None):
     return _offs["offs"]
 
 
+def size(cfg, has_world):
+    """How many of the box's three rows the time takes: "" = the middle one, "upper" (top and middle: world time is on, .beat is
+    off), "lower" (middle and bottom: .beat is on, world time is off) or "full" (all three: neither is on). Only with "large" on."""
+    if not cfg["large"]:
+        return ""
+    if cfg["beat"] and has_world:
+        return ""
+    return "lower" if cfg["beat"] else ("upper" if has_world else "full")
+
+
 def view(now=None):
     """What the page's widgets show (layout.json binds to these): time (middle line), beat (top, empty when off), items (bottom:
-    the scrolling list, empty when world time is off), cities (the open box's list), map (for the time zone map, or None)."""
+    the scrolling list, empty when world time is off), cities (the open box's list), size (see size()), map (for the time zone
+    map, or None)."""
     now = time.time() if now is None else now
     cfg = read_config()
     off = clock_offset(cfg, now)
@@ -191,26 +199,16 @@ def view(now=None):
     return {"time": format_time(cfg["format"], now, off), "beat": ".beat @%03d" % beats(now) if cfg["beat"] else "",
             "items": [{"text": c["name"], "n": c["text"]} for c in cities],
             "cities": [[c["name"], c["text"]] for c in cities],
-            "world": cfg["world"] and bool(cities), "world_on": cfg["world"], "beat_on": cfg["beat"], "format": cfg["format"],
+            "world": cfg["world"] and bool(cities), "world_on": cfg["world"], "beat_on": cfg["beat"], "large_on": cfg["large"],
+            "size": size(cfg, cfg["world"] and bool(cities)), "format": cfg["format"],
             "map": {"cities": cities, "utc": now, "here": off / 3600.0, "offs": zone_offsets(now), "zone": utc_text(off)}
             if cfg["world"] else None}
 
 
-def _zone_line(cfg, now=None):
-    if not cfg["zone"]:
-        return "This Pi's own time zone, %s now" % utc_text(pi_offset(now))
-    names = [c[0] for c in CATALOGUE if c[1] == cfg["zone"]]
-    off = tz.offset(cfg["zone"], now)
-    if off is None:
-        return "%s is not known on this Pi: its own time zone is used" % cfg["zone"]
-    return "%s, %s now (summer and winter time follow the zone)" % (names[0] if names else cfg["zone"], utc_text(off))
-
-
 def _reply():
     cfg = read_config()
-    return {"values": {"format": cfg["format"], "zone": cfg["zone"]},
-            "texts": {"clock": "Shown as %s" % LABELS[cfg["format"]], "zone": _zone_line(cfg)},
-            "options": {"formats": [{"value": f, "label": LABELS[f]} for f in FORMATS], "zones": tz.zone_options()}}
+    return {"values": {"format": cfg["format"]}, "texts": {"clock": "Shown as %s" % LABELS[cfg["format"]]},
+            "options": {"formats": [{"value": f, "label": LABELS[f]} for f in FORMATS]}}
 
 
 def _cities_reply():
@@ -245,7 +243,7 @@ def _post(h):
     if body is None:
         return True
     values = body.get("values") if isinstance(body.get("values"), dict) else {}
-    save_config(dict((k, values[k]) for k in ("format", "zone") if k in values))
+    save_config(dict((k, values[k]) for k in ("format",) if k in values))
     h.send(json.dumps(_reply()), "application/json")
     return True
 
@@ -283,7 +281,8 @@ def _toggle(key):
 
 
 GET = {"/clock": _get, "/clock/cities": _get_cities, "/clock/zones": _get_zones}
-POST = {"/clock": _post, "/clock/cities": _post_cities, "/clock/beat": _toggle("beat"), "/clock/world": _toggle("world")}
+POST = {"/clock": _post, "/clock/cities": _post_cities, "/clock/beat": _toggle("beat"), "/clock/world": _toggle("world"),
+        "/clock/large": _toggle("large")}
 
 
 def api(d, warnings):

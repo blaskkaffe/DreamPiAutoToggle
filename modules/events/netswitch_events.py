@@ -67,8 +67,8 @@ def _flag(v):
 
 
 def read_config():
-    """{"lead": minutes, "zone": "" (the Pi's own) | IANA, "interval": minutes, "picked": [event ids], "series": [titles],
-    "dismissed": [event ids], "mock": bool}."""
+    """{"lead": minutes, "zone": the common time zone (core.time_zone(): "" = the Pi's own, read only here), "interval": minutes,
+    "picked": [event ids], "series": [titles], "dismissed": [event ids], "mock": bool}."""
     try:
         with open(core.EVENTS_CONFIG) as f:
             data = json.load(f)
@@ -78,12 +78,11 @@ def read_config():
         data = {}
     lead = data.get("lead")
     interval = data.get("interval")
-    zone = data.get("zone") if isinstance(data.get("zone"), str) else ""
 
     def ids(v):
         return [str(x) for x in v if isinstance(x, (str, int))][:500] if isinstance(v, list) else []
     return {"lead": lead if lead in LEADS else DEFAULT_LEAD,
-            "zone": zone if (zone == "" or tz.valid_name(zone)) else "",
+            "zone": core.time_zone(),
             "interval": interval if interval in INTERVALS else DEFAULT_INTERVAL,
             "picked": ids(data.get("picked")), "dismissed": ids(data.get("dismissed")),
             "series": [s for s in data.get("series") or [] if isinstance(s, str) and s.strip()][:MAX_SERIES]
@@ -94,6 +93,7 @@ def read_config():
 def save_config(values):
     cfg = read_config()
     cfg.update(values)
+    cfg.pop("zone", None)                 # the time zone is the common setting (core.time_zone()), not kept here
     tmp = core.EVENTS_CONFIG + ".tmp"
     with open(tmp, "w") as f:
         json.dump(cfg, f)
@@ -506,12 +506,10 @@ def _settings_reply():
     cfg = read_config()
     interval = sync_interval(cfg)
     env = bool(os.environ.get("DC99_SYNC_INTERVAL"))
-    return {"values": {"lead": cfg["lead"], "zone": cfg["zone"], "interval": cfg["interval"]},
+    return {"values": {"lead": cfg["lead"], "interval": cfg["interval"]},
             "options": {"leads": [{"value": n, "label": "%d minutes before" % n} for n in LEADS],
-                        "zones": tz.zone_options(own="This Pi's own time zone"),
                         "intervals": [{"value": n, "label": _every(n)} for n in INTERVALS]},
             "texts": {"lead": "%d minutes before the start" % cfg["lead"],
-                      "zone": tz.zone_name(cfg["zone"]) if cfg["zone"] else "This Pi's own time zone",
                       "interval": ("Every %g minutes (set by DC99_SYNC_INTERVAL)" % interval) if env else
                       "%s, and with Sync now" % _every(interval)}}
 
@@ -538,11 +536,7 @@ def _series_reply(now=None):
                         "choices": [] if len(cfg["series"]) >= MAX_SERIES else [{"value": t, "label": t} for t in sorted(titles, key=lambda s: s.lower())],
                         "empty": "The list is full" if len(cfg["series"]) >= MAX_SERIES else "No event matches"}],
             "defaults": {"series": []},
-            "rules": {"per_group": MAX_SERIES, "unique": True, "add_label": "Add", "add_title": "Remind me of every",
-                      "help": "Remind me of every event of a series here, or of one event with its bell on the main page. "
-                              "A reminder shows as a banner on the main page, makes the clock box stand out and lights the LED message "
-                              "\"Event starting soon\" (Settings > Status LED). DC99 lists its times without a time zone: they are read "
-                              "as US Eastern time, and UK time for an event with \"UK\" in its name."}}
+            "rules": {"per_group": MAX_SERIES, "unique": True, "add_label": "Add", "add_title": "Remind me of every"}}
 
 
 def _body(h, limit=8192):
@@ -605,8 +599,6 @@ def _post_settings(h):
         changes["lead"] = v["lead"]
     if v.get("interval") in INTERVALS:
         changes["interval"] = v["interval"]
-    if "zone" in v and (v["zone"] == "" or (isinstance(v["zone"], str) and tz.valid_name(v["zone"]))):
-        changes["zone"] = v["zone"]
     if changes:
         save_config(changes)
         write_reminders()

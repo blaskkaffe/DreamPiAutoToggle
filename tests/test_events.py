@@ -204,12 +204,22 @@ class Store(Base):
         os.environ.pop("DC99_SYNC_INTERVAL")
 
 
+class CommonSettings(Base):
+    def test_the_time_zone_is_the_common_one_and_the_reminder_picker_has_no_info_text(self):
+        self.assertEqual(ev.read_config()["zone"], "")
+        core.save_time_zone("Asia/Tokyo")
+        self.assertEqual(ev.display_zone(), "Asia/Tokyo")                       # read from the global setting
+        self.assertNotIn("zones", ev._settings_reply()["options"])
+        self.assertNotIn("zone", ev._settings_reply()["values"])
+        self.assertNotIn("help", ev._series_reply()["rules"])                    # no (i) button: how a reminder reaches the clock is for the module rework
+
+
 class Api(Base):
     def setUp(self):
         Base.setUp(self)
         self.serve([E_DISCORD, E_UK, E_US])
         ev.import_events(NOW)
-        ev.save_config({"zone": "Europe/Stockholm"})
+        core.save_time_zone("Europe/Stockholm")
 
     def test_events_and_filters(self):
         d = self.get("/api/events").json()
@@ -296,9 +306,11 @@ class Reminders(Base):
 
     def test_settings(self):
         r = self.get("/events/settings").json()
-        self.assertEqual(r["values"], {"lead": 15, "zone": "", "interval": 60})
+        self.assertEqual(r["values"], {"lead": 15, "interval": 60})
         r = self.post("/events/settings", {"values": {"lead": 30, "zone": "Europe/Stockholm", "interval": 7}}).json()
-        self.assertEqual(r["values"], {"lead": 30, "zone": "Europe/Stockholm", "interval": 60})      # 7 is not a choice
+        self.assertEqual(r["values"], {"lead": 30, "interval": 60})                                  # 7 is not a choice; the zone is not an events setting
+        self.assertEqual(core.time_zone(), "")                                                       # and posting one here does not change the common one
+        self.assertNotIn("zone", json.load(open(core.EVENTS_CONFIG)))
         self.remind("US Game Night")
         self.assertEqual(json.load(open(core.EVENT_REMINDERS))["lead"], 30)
         self.assertEqual(core.event_reminder(utc(2026, 10, 9, 1) - 29 * 60)["title"], "US Game Night")

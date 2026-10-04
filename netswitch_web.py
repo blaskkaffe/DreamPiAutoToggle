@@ -70,6 +70,13 @@ def _highlight_reply():
             "texts": {"highlight": label}}
 
 
+def _timezone_reply():
+    """The form widget's answer for the common time zone (Settings > About)."""
+    import netswitch_tz as tz
+    zone = core.time_zone()
+    return {"values": {"zone": zone}, "options": {"zones": tz.zone_options()}, "texts": {"zone": tz.zone_text(zone)}}
+
+
 def _layout_script():
     """window.LAYOUT: the boxes, data sources, colours and backgrounds of the enabled modules (netswitch_modules.layout()),
     plus the palette. Put in a <script> tag, so a "</" inside a text is escaped."""
@@ -276,6 +283,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(json.dumps(_colour_reply()), "application/json")
         elif path == "/highlight":
             self.send(json.dumps(_highlight_reply()), "application/json")
+        elif path == "/timezone":
+            self.send(json.dumps(_timezone_reply()), "application/json")
         elif modules.route("GET", path):
             modules.route("GET", path)(self)         # an enabled module's own endpoint
         elif path == "/":
@@ -306,6 +315,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_colour()
         if path == "/highlight":
             return self._post_highlight()
+        if path == "/timezone":
+            return self._post_timezone()
         if path == "/palette":
             return self._post_palette()
         if modules.route("POST", path):
@@ -388,6 +399,15 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, AttributeError, IOError, OSError) as e:
             return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
         self.send(json.dumps(_highlight_reply()), "application/json")
+
+    def _post_timezone(self):
+        """Settings > About > Time zone: {"values": {"zone": "" | IANA name}} (the form widget's format)."""
+        try:
+            values = json.loads(self._body(1024).decode("utf-8")).get("values") or {}
+            core.save_time_zone(values.get("zone"))
+        except (ValueError, AttributeError, IOError, OSError) as e:
+            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
+        self.send(json.dumps(_timezone_reply()), "application/json")
 
     def log_message(self, *args):
         pass

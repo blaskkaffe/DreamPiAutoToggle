@@ -35,7 +35,8 @@ HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id:
 EVENTS_DB = os.path.join(BASE_DIR, "events.db")        # SQLite: the DC99 events imported by the events module
 EVENTS_CONFIG = os.path.join(BASE_DIR, "events.json")   # its settings: reminder lead time, time zone, sync interval, picked events, series
 EVENT_REMINDERS = os.path.join(BASE_DIR, "event_reminders.json")   # the DC99 events the user asked to be reminded of (events module, read by the LEDs)
-CLOCK_CONFIG = os.path.join(BASE_DIR, "clock.json")  # {"format": "24h"|"12h", "beat": bool, "world": bool}: the clock module's settings
+CLOCK_CONFIG = os.path.join(BASE_DIR, "clock.json")  # {"format": "24h"|"12h"|"12h-ampm", "beat": bool, "world": bool, "large": bool, "cities": [...]}: the clock module's settings
+TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the Pi's own (Settings > About)
 LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness, colours, wire order, white balance
 LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs, editable from the page
 LED_GPIO = os.path.join(BASE_DIR, "led_gpio")        # output pin (10, 12, 18 or 21), likewise
@@ -482,6 +483,31 @@ def set_module_tint(name, key, coloured):
         json.dump(data, f, sort_keys=True)
     os.rename(tmp, MODULE_TINTS)
     return module_tints(name)
+
+
+def time_zone():
+    """The common time zone setting: an IANA name from netswitch_tz.ZONE_CHOICES, or "" = the Pi's own. Any module that shows a
+    time of day reads it here (the clock does; the events module still has a zone of its own). Older installs kept it in clock.json."""
+    import netswitch_tz as tz
+    zone = read_file(TIME_ZONE)
+    if zone is None:
+        try:
+            with open(CLOCK_CONFIG) as f:
+                zone = json.load(f).get("zone")
+        except (IOError, OSError, ValueError, AttributeError):
+            zone = ""
+    return zone if zone in tz.ZONE_CHOICES else ""
+
+
+def save_time_zone(value):
+    """Save the common time zone ("" = the Pi's own; anything not in the list is the Pi's own too). Returns what is now set."""
+    import netswitch_tz as tz
+    value = value if value in tz.ZONE_CHOICES else ""
+    tmp = TIME_ZONE + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(value)
+    os.rename(tmp, TIME_ZONE)
+    return value
 
 
 def network_colour(net):

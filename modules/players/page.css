@@ -1,0 +1,2 @@
+/* Online players module: the open box lists the games (each with its star) instead of the one scrolling line */
+[data-mod="players"] .now.open .row.pgames{display:none}

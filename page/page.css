@@ -47,7 +47,7 @@
  .now .row.main .k{display:none} .now .row.main .v{flex:none}
  .now .row .k{color:rgba(255,255,255,.65);width:68px} .now .row .v{min-width:0;display:flex;align-items:baseline} .now .row .v > .dot{flex:none} .now .row .v > span:last-child{min-width:0} .now .sub{color:rgba(255,255,255,.65)}
  .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .now .row.hang{justify-content:center;padding:12px 0 2px}
- .now .row.hang form{width:100%} .now .row.hang .pill-s{display:block;width:100%;padding:9px 12px;font-size:1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .now .row.hang form{width:100%} .now .row.hang .pill-s{display:block;width:100%;padding:9px 12px;font-size:1em;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .now .row.hang .pill-s{background:rgba(160,30,30,.85);border-color:rgba(230,110,110,.85)}
  .now .row.hang .pill-s.arm{background:#d33;border-color:#f99}
  .nw{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sub.blk{display:block}
@@ -68,6 +68,14 @@
     page/widgets.js (rows, buttons, forms, boxes, tables, lists, consoles ...) are made of these classes; a module only adds
     CSS for something nothing here covers. Change a look here and every module follows. ===== */
  .srow.wrap{flex-wrap:wrap} .srow .below{flex-basis:100%}
+ .srow.edit{align-items:flex-start}   /* a row with an Edit button: the button is always at the top right, however many lines the text has */
+ .optrow{display:flex;gap:8px;flex-wrap:wrap} .optrow .pill-s{flex:1 1 auto;text-align:center}   /* a simple pick: the options as a row of buttons in a pop-up */
+ .wpicker .addarea{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+ .rows.noopen{cursor:default}
+ .ibtn{flex:none;width:36px;height:36px;padding:0;border-radius:50%;background:rgba(0,0,0,.25);display:inline-flex;align-items:center;justify-content:center}   /* a round on / off icon button: ui.iconButton() */
+ .ibtn svg{width:18px;height:18px;fill:rgba(255,255,255,.45)} .ibtn.on{background:rgba(255,255,255,.9)} .ibtn.on svg{fill:var(--primary)}
+ .spin{flex:none;display:inline-block;width:.8em;height:.8em;margin-left:8px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spin .8s linear infinite}   /* "refreshing": next to a row whose data is being fetched again, the old data stays */
+ @keyframes spin{to{transform:rotate(360deg)}} @media(prefers-reduced-motion:reduce){.spin{animation:none}}
  .srow > span:first-child{min-width:0;overflow-wrap:anywhere} .srow .pill-s{flex:none}
  input[type=number]{width:54px;box-sizing:border-box;height:36px;padding:0 6px;border-radius:8px;border:var(--bw) solid var(--ctl-line);background:var(--ctl);color:#eee;font:inherit;font-size:.85em}
  input[type=range]{min-height:28px}
@@ -124,7 +132,7 @@
  .now .wlist.compact{display:block;width:100%;max-height:40vh;overflow-y:auto;overscroll-behavior:contain}
  .now .wlist .p{display:flex;gap:8px;padding:4px 0;border-top:1px solid rgba(255,255,255,.12)} .now .wlist .p:first-child{border-top:0}
  .now .wlist .pn{flex:1;min-width:0;overflow-wrap:anywhere} .now .wlist .pg{display:block;color:rgba(255,255,255,.65)}
- .now .wlist .pw{flex:none;font-weight:bold;white-space:nowrap}
+ .now .wlist .pw{flex:none;font-weight:bold;white-space:nowrap} .now .wlist .p{align-items:center} .now .wlist .p .ibtn{width:30px;height:30px}
  .now .links{display:flex;flex-wrap:wrap;gap:6px} .now .links a{color:#fff;opacity:.9;padding:6px 0}
  .now .st{display:block;overflow-wrap:anywhere}
  .pop .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0} .pop .frow > span{color:var(--txt2);font-size:.9em}

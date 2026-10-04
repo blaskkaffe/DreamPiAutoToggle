@@ -38,6 +38,9 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await rows.nth(1).locator('.bell[aria-pressed="true"]').count() === 1, 'a bell sets a reminder (' + title.slice(0, 30) + ')');
   await rows.nth(1).locator('.bell').click(); await settle(900);
   ok(await rows.nth(1).locator('.bell[aria-pressed="false"]').count() === 1, 'and clears it again');
+  const calBtn = box.locator('.row.hang a.pill-s', { hasText: 'DC99 calendar' });
+  ok(await calBtn.evaluate(e => getComputedStyle(e).textAlign) === 'center', 'the text of the DC99 calendar button is centred');
+  ok(await box.locator('.arrow, .row.main .arrow').count() === 0, 'no small arrow at the end of the rows');
   ok(await box.locator('.evs').isVisible() && /Synced/.test(await box.locator('.evs').textContent()), 'the box says when it last synced');
   // dismissing the banner ends the highlight
   await banner.locator('.nx').click(); await settle(1800);
@@ -45,10 +48,12 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await page.locator('.dbox.hl').count() === 0, 'and the boxes stop standing out');
   // the highlight look is a global setting
   await page.click('#cog'); await settle(900);
-  const ap = page.locator('section[data-box="appearance"]');
-  ok(await ap.locator('.srow', { hasText: 'Notification highlight' }).count() === 1, 'Appearance has the Notification highlight look');
+  const gc = page.locator('section[data-box="colours"]');
+  ok(await gc.locator('.srow', { hasText: 'Notification highlight' }).count() === 1, 'Global colours has the Notification highlight look');
   const ev = page.locator('section[data-box="events"]');
   ok(await ev.locator('.srow', { hasText: /^Reminder\d+ minutes before/ }).count() === 1 && await ev.locator('.wpicker').count() === 1, 'Settings has the reminder time and the series list');
+  ok(await ev.locator('.srow', { hasText: /^Time zone/ }).count() === 0 && await ev.locator('.infobtn').count() === 0, 'the time zone is the global one (About), and the reminder list has no info button');
+  ok(await page.locator('section[data-box="about"] .srow', { hasText: /^Time zone/ }).count() === 1, 'About has the time zone');
   await page.click('#close-settings'); await settle(500);
   ok(errors.length === 0, 'no JavaScript or console errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await browser.close();

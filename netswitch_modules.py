@@ -39,7 +39,7 @@ _PAGE_FILES = ("page.css", "page.js")
 # the standard widgets the page can draw from a layout (docs/modules.md, "Layout"); "custom" hands a box to the module's own page.js
 WIDGETS = ("text", "row", "button", "toggle", "swatches", "colourpick", "link", "form", "infobox", "status", "expander", "bar", "carousel",
            "picker", "list", "links", "console", "info", "custom")
-CONTROLS = ("select", "number", "text", "toggle")      # what a form field may hold (W.form, control() in page/widgets.js)
+CONTROLS = ("select", "choice", "number", "text", "toggle")      # what a form field may hold (W.form, control() in page/widgets.js)
 SECTIONS = ("dashboard", "settings")
 BACKGROUND_TYPES = ("fullscreen", "part")
 _LAYOUT_KEYS = SECTIONS + ("background", "data")

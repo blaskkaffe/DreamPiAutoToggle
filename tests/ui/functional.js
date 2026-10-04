@@ -86,7 +86,8 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await page.locator('.pop.open button', { hasText: 'Done' }).count() === 0, 'the information pop-up has no Done button (nothing to save)');
   await page.keyboard.press('Escape'); await settle(200);
   // ---- favorite players and games: pick from the lists (not-online games can't be picked, work in progress is marked)
-  const fav = page.locator('[data-box="favorites"] .wpicker');
+  const fav = page.locator('section[data-box="players"] .wpicker');
+  ok(/Online players/.test(await page.locator('section[data-box="players"] h2').textContent()), 'the settings box is called Online players');
   await fav.locator('.srow').first().locator('button').first().click(); await settle(500);
   ok(await page.locator('.pop.open .choice').count() >= 4, 'the favorite games pop-up lists the games of the list');
   ok(await page.locator('.pop.open .choice', { hasText: 'Dead Game Online' }).count() === 0, 'only games being played now are listed at first');
@@ -100,6 +101,30 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await fav.locator('.tag', { hasText: 'Outtrigger (work in progress)' }).count() === 1, 'the picked game is a favorite, marked as work in progress');
   await fav.locator('.tag', { hasText: 'Outtrigger' }).locator('button').click(); await settle(900);
   ok(await fav.locator('.tag', { hasText: 'Outtrigger' }).count() === 0, 'and can be removed');
+  // ---- the stars on the main page are the same list
+  await page.click('#close-settings'); await settle(400);
+  const pbox = page.locator('.dbox[data-box="players"] .now');
+  await pbox.click({ position: { x: 20, y: 10 } }); await settle(500);
+  ok(await pbox.locator('.pgl .ibtn').count() >= 2 && !(await pbox.locator('.row.pgames').isVisible()), 'the open players box lists the games, each with a star, instead of the scrolling line');
+  ok(await pbox.locator('.wlist .p .ibtn').count() >= 5, 'and every player has a star');
+  const daveRow = pbox.locator('.p', { hasText: 'Dave' }).last();
+  await daveRow.locator('.ibtn').click(); await settle(900);
+  ok(await daveRow.locator('.ibtn.on[aria-pressed="true"]').count() === 1, 'a star on a player makes them a favorite');
+  await pbox.locator('.pgl .p', { hasText: 'Quake III' }).locator('.ibtn').click(); await settle(900);
+  ok(await pbox.locator('.pgl .p', { hasText: 'Quake III' }).locator('.ibtn.on').count() === 1, 'and a star on a game makes it a favorite');
+  ok(await pbox.evaluate(e => e.classList.contains('open')), 'the box stays open');
+  await openSettings();
+  ok(await fav.locator('.tag', { hasText: 'Dave' }).count() === 1 && await fav.locator('.tag', { hasText: 'Quake III Arena' }).count() === 1, 'Settings > Online players shows the starred player and game');
+  let asked = 0; page.once('dialog', d => { asked++; d.dismiss(); });
+  await fav.locator('button', { hasText: 'Remove all' }).click(); await settle(500);
+  ok(asked === 1 && await fav.locator('.tag').count() === 2, 'Remove all asks first, and Cancel keeps the list');
+  page.once('dialog', d => { asked++; d.accept(); });
+  await fav.locator('button', { hasText: 'Remove all' }).click(); await settle(900);
+  ok(asked === 2 && await fav.locator('.tag').count() === 0, 'and OK removes everything');
+  await page.click('#close-settings'); await settle(900);
+  ok(await pbox.locator('.ibtn.on').count() === 0, 'the stars on the main page are off again');
+  await pbox.click({ position: { x: 20, y: 10 } }); await settle(300);
+  await openSettings();
   // ---- Status LED: rows of colour + animation + level, each with the messages that light it
   const led = page.locator('[data-box="status led"]');
   const ledRows = led.locator('.srow:has(button[aria-label="Edit this colour"])');

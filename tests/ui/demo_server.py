@@ -2,7 +2,7 @@
 service on a sandbox (all paths in a temp dir). Switches via environment:
 LEDS=n (default 3), WIFI=1, WIFIDEMO=1 (dummy Wi-Fi networks + the setup loop),
 BG=1 (the Dreamcast background module on), CLOCK=1 (the clock module on; off by default so the box counts are stable), EVENTS=1 (the DC99 events module on, with its sample events; EVENTSOON=1 adds a reminded event 5 minutes ahead), FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log), FAKEPLAYERS=1 (made-up
-players), OFF=led,wifi,... (modules switched off in the module picker; OFF=all = every module the picker can switch, only the always-on ones stay), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
+players; PLAYERSFAST=1 makes the downloads slow and the list stale after 3 s), OFF=led,wifi,... (modules switched off in the module picker; OFF=all = every module the picker can switch, only the always-on ones stay), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
 import sys, os, threading, time, json
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from support import web, core, sandbox
@@ -84,7 +84,11 @@ if os.environ.get("FAKEPLAYERS"):
     users = {"users": [{"username": "Dave", "country": "US", "current_game_display": "Quake III Arena", "online": True}]}
     games = {"games": [{"name": "Phantasy Star Online", "status": "green"}, {"name": "Quake III Arena", "status": "green"},
                        {"name": "Outtrigger", "status": "work in progress"}, {"name": "Dead Game Online", "status": "red"}]}
-    pl.fetch = lambda url: json.dumps(games if "dreamcastlive" in url else users if "dreamcast.online" in url else feed)      # the real default source (dc99.net) is used, only the download is faked
+    def fake_fetch(url):
+        if os.environ.get("PLAYERSFAST"): time.sleep(1.5)      # PLAYERSFAST=1: a slow download and a list that is stale after 3 s, to watch a refresh happen
+        return json.dumps(games if "dreamcastlive" in url else users if "dreamcast.online" in url else feed)
+    pl.fetch = fake_fetch      # the real default source (dc99.net) is used, only the download is faked
+    if os.environ.get("PLAYERSFAST"): pl.CACHE_SECONDS = 3
 print("state dir", tmp, flush=True)
 srv = web.Server(('127.0.0.1', int(os.environ.get('PORT', '8734'))), web.Handler)
 srv.serve_forever()

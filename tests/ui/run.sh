@@ -24,4 +24,10 @@ SERVER=$!
 sleep 3
 PORT=8736 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node events.js || RESULT=1
 kill $SERVER 2>/dev/null
+# the online players while the list is fetched again (slow downloads: the box keeps its state, a spinner shows)
+FAKEPLAYERS=1 PLAYERSFAST=1 PORT=8737 python3 demo_server.py > /tmp/dpns-demo-players.log 2>&1 &
+SERVER=$!
+sleep 3
+PORT=8737 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node players.js || RESULT=1
+kill $SERVER 2>/dev/null
 exit $RESULT
