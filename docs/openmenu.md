@@ -39,18 +39,19 @@ Unknown future codes should be ignored by openMenu. The same code is in `GET /st
 
 ## The openMenu link module (`modules/openmenu/`)
 
-The other direction: openMenu on the Dreamcast tells the Pi what is on its SD card, and a phone page starts a game on the Dreamcast. The module came with an openMenu build (`openMenu/src/openmenu/src/backend/dreampi_link.c`) and was ported to the add-on's module system. Same transport as `/tag`: plain HTTP over the PPP link to the web service port. Nothing is pushed to the Dreamcast; a launch waits until openMenu asks.
+The other direction: openMenu on the Dreamcast tells the Pi what is on its SD card, and a phone page starts a game on the Dreamcast. Same transport as `/tag`: plain HTTP over the PPP link to the web service port. Nothing is pushed to the Dreamcast; a launch waits until openMenu asks. The module pairs with an openMenu build that has `dreampi_link.c` (`openMenu/src/openmenu/src/backend/dreampi_link.c`).
 
 **Wire protocol (openMenu to the Pi)**
 
 - `GET /openmenu/poll?v=1&n=<games>&h=<hash>` every 3 s answers `openmenu 1`, then `NEED games` if the Pi's copy does not match the hash (or there is none), and `LAUNCH <product>` once when a launch is queued.
 - `POST /openmenu/games` with `X-Requested-With: openMenu`; body `#openmenu-games 1 <hash> <count>`, then one game per line, tab separated: product, slot, disc, region, folder, name. Kept in `openmenu_games.json` (`core.OPENMENU_GAMES`), at most 5000 games.
 
-**The phone page** (`layout.json`): the box shows the connection (a Dreamcast counts as connected while it was heard in the last 15 s), the players who can be joined, DC99 events and the games, each with **Start** / **Join** that asks first. `POST /openmenu/launch {"product"}` is refused unless the game is on the card and the Dreamcast is connected, expires after 60 s, and needs the PIN when one is set (it is a `PROTECTED` path; the Dreamcast's own paths cannot ask for one).
+**The phone page:** the box (`layout.json`: an `infobox` over `GET /openmenu/view`, every 5 s) shows the connection (a Dreamcast counts as connected while it was heard in the last 15 s) and how many games are on the card. Opened, the custom widget `openmenu-games` (`page.js`) lists
+- the online players whose game is on the card, each with **Join** (the players come from the Online players module's data in the page, `S.players.list`, so the list is empty while that module is off; the game is matched by name: the same normalised name, else one name inside the other, the shortest wins);
+- the card's games (`GET /openmenu/games`, read again when the hash in `/openmenu/view` changes) with a search box, 60 rows at most, each with **Start**.
 
-- **Join:** the online players in a game (from `players_cache.json`, the file the Online players module keeps; only while that module is on and its list is under 5 minutes old) whose game matches one on the card by name (same normalised name, else one name inside the other, the shortest wins).
-- **Events:** the module downloads `https://dc99.net/community/` itself (at most every 10 minutes while the page is open) and reads the `const EVENTS = [ ... ]` list, as the DC99 events module does (see [events.md](events.md)); a Start button shows when a card game's name appears in an event's title or summary. Times are shown as DC99 gives them. If DC99 changes the page the box says so and keeps the events it had.
-- **Games:** all games come as rows; the list widget's search box narrows them and 60 rows are drawn at most.
+Start / Join asks first, then `POST /openmenu/launch {"product"}`; it is refused unless the game is on the card and the Dreamcast is connected, and a launch nobody collects expires after 60 s. The buttons are off while the Dreamcast is not connected or a launch is waiting.
 
-**Limits:** anyone who can open the page (and enters the PIN, if set) can start a game; a launch only works while openMenu is the running program and the link is up; joining a game here only starts it (its own dialing and lobby still apply). **Not run on a Dreamcast or a Pi**: the Pi side is tested off-hardware (`tests/test_openmenu.py`, the page by `tests/ui/openmenu.js`) and the openMenu side was only syntax-checked by its author.
+DC99 events are not handled here: the events module owns them.
 
+**Limits:** anyone who can open the page can start a game (there is no PIN on it, like selecting a network); a launch only works while openMenu is the running program and the link is up; joining a game here only starts it (its own dialing and lobby still apply). **Not run on a Dreamcast or a Pi**: the Pi side is tested off-hardware (`tests/test_openmenu.py`, the page by `tests/ui/openmenu.js`) and the openMenu side was only syntax-checked by its author.

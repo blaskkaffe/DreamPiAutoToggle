@@ -1,7 +1,7 @@
 """Demo server for looking at the page and for tests/ui/audit.js: the real web
 service on a sandbox (all paths in a temp dir). Switches via environment:
 LEDS=n (default 3), WIFI=1, WIFIDEMO=1 (dummy Wi-Fi networks + the setup loop),
-BG=1 (the Dreamcast background module on), CLOCK=1 (the clock module on; off by default so the box counts are stable), EVENTS=1 (the DC99 events module on, with its sample events; EVENTSOON=1 adds a reminded event 5 minutes ahead), OPENMENU=1 (the openMenu link module on, with a made-up SD card of 70 games, two events and a Dreamcast that polls every 3 s; OPENMENU=quiet: the Dreamcast never polls), FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log), FAKEPLAYERS=1 (made-up
+BG=1 (the Dreamcast background module on), CLOCK=1 (the clock module on; off by default so the box counts are stable), EVENTS=1 (the DC99 events module on, with its sample events; EVENTSOON=1 adds a reminded event 5 minutes ahead), OPENMENU=1 (the openMenu link module on, with a made-up SD card of 72 games and a Dreamcast that polls every 3 s; OPENMENU=quiet: the Dreamcast never polls), FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log), FAKEPLAYERS=1 (made-up
 players; PLAYERSFAST=1 makes the downloads slow and the list stale after 3 s), OFF=led,wifi,... (modules switched off in the module picker; OFF=all = every module the picker can switch, only the always-on ones stay), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
 import sys, os, threading, time, json
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
@@ -29,8 +29,6 @@ if os.environ.get("OPENMENU"):
     card = "#openmenu-games 1 demo0001 72\n" + "".join("DEMO%03d\t%d\t1/1\tU\t\tDemo Game %02d\n" % (i, i, i) for i in range(1, 71)) + \
         "T1234N\t71\t1/1\tU\t\tQuake III Arena\nMK51035\t72\t1/2\tU\tRacing\tCrazy Taxi\n"
     om.save_games(*om.parse_games(card))
-    om.fetch = lambda url: ('<script>const EVENTS = [{"title": "Crazy Taxi night", "date": "2026-10-10 20:00:00", "endDate": "2026-10-10 22:00:00", "location": "Discord", '
-                            '"summary": "Come race", "source": "discord", "url": "/events/taxi-night"}, {"title": "Open lobby", "date": "2026-10-09 19:00:00", "source": "manual"}];</script>')
     if os.environ["OPENMENU"] != "quiet":
         def heartbeat():            # the Dreamcast's openMenu asks every 3 seconds
             while True:

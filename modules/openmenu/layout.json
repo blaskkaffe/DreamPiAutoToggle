@@ -1,4 +1,11 @@
 {
+ "data": {
+  "openmenu": {
+   "url": "/openmenu/view",
+   "every": 5,
+   "retry": 3
+  }
+ },
  "dashboard": [
   {
    "box": "openmenu",
@@ -9,97 +16,19 @@
      "title": "@openmenu.title",
      "rows": [
       {
-       "label": "Message",
+       "label": "Games",
        "main": true,
        "value": {
         "type": "text",
-        "text": "@openmenu.message"
+        "text": "@openmenu.note"
        }
       },
       {
-       "label": "Join",
+       "label": "",
+       "full": true,
        "value": {
-        "type": "list",
-        "items": "@openmenu.join",
-        "empty": "No players online",
-        "row": {
-         "title": "title",
-         "sub": "sub",
-         "button": "Join",
-         "button_if": "product"
-        },
-        "popup": {
-         "title": "Join {sub} on the Dreamcast?",
-         "fields": [
-          {
-           "key": "product",
-           "label": "Game",
-           "show_if": "never"
-          }
-         ],
-         "submit": "Join",
-         "busy": "Sending...",
-         "post": "/openmenu/launch",
-         "reload": "openmenu"
-        }
-       }
-      },
-      {
-       "label": "Events",
-       "value": {
-        "type": "list",
-        "items": "@openmenu.events",
-        "empty": "@openmenu.events_empty",
-        "row": {
-         "title": "title",
-         "href": "href",
-         "sub": "sub",
-         "button": "Start",
-         "button_if": "product"
-        },
-        "popup": {
-         "title": "Start {game} on the Dreamcast?",
-         "fields": [
-          {
-           "key": "product",
-           "label": "Game",
-           "show_if": "never"
-          }
-         ],
-         "submit": "Start",
-         "busy": "Sending...",
-         "post": "/openmenu/launch",
-         "reload": "openmenu"
-        }
-       }
-      },
-      {
-       "label": "Games",
-       "value": {
-        "type": "list",
-        "items": "@om_games.games",
-        "empty": "@om_games.empty",
-        "search": "Search the card",
-        "limit": 60,
-        "row": {
-         "title": "title",
-         "sub": "sub",
-         "button": "Start"
-        },
-        "popup": {
-         "title": "Start {title} on the Dreamcast?",
-         "fields": [
-          {
-           "key": "product",
-           "label": "Game",
-           "show_if": "never"
-          }
-         ],
-         "submit": "Start",
-         "busy": "Sending...",
-         "post": "/openmenu/launch",
-         "reload": "openmenu"
-        }
+        "type": "custom",
+        "name": "openmenu-games"
        }
       }
      ]
@@ -120,20 +49,10 @@
       "type": "swatches",
       "key": "openmenu",
       "tint": true,
-      "title": "Colour of the openMenu link box"
+      "title": "Colour of the openMenu box"
      }
     }
    ]
   }
- ],
- "data": {
-  "openmenu": {
-   "url": "/openmenu/view",
-   "every": 5
-  },
-  "om_games": {
-   "url": "/openmenu/games.json",
-   "every": 60
-  }
- }
+ ]
 }
