@@ -296,6 +296,20 @@ class ClockView(unittest.TestCase):
         core.save_time_zone("")                                                           # once set (even to the Pi's own) the file wins
         self.assertEqual(core.time_zone(), "")
 
+    def test_the_map_puts_the_clocks_own_place_in_its_winter_band(self):
+        cfg = {"zone": "Europe/Stockholm", "format": "24h"}
+        summer = 1782000000                                   # 21 June 2026: Stockholm is on UTC+2
+        d = clock.here(cfg, summer, 7200)
+        self.assertEqual((d["name"], d["text"]), ("Stockholm", "%02d:%02d" % divmod(((summer + 7200) % 86400) // 60, 60)))
+        self.assertEqual(round(d["lon"] / 15), 1)             # it sits in the UTC+1 band, not in the +2 one that summer time makes of it
+        zone = clock.here({"zone": "Europe/Zurich", "format": "24h"}, summer, 7200)     # a zone with no city of its own
+        self.assertEqual(zone["lon"], 15.0)                   # the middle of the band of its winter offset (+1)
+        self.assertEqual(clock.view(summer)["map"], None)     # no map while world time is off
+        clock.save_config({"world": True})
+        core.save_time_zone("Europe/Stockholm")
+        m = clock.view(summer)["map"]
+        self.assertEqual((m["here"], m["dot"]["name"]), (2.0, "Stockholm"))
+
     def test_the_city_list_keeps_known_cities_once_and_at_most_twelve(self):
         self.assertEqual(clock.DEFAULT_CITIES, ["Los Angeles", "New York", "São Paulo", "London", "Berlin", "Moscow", "Mumbai", "Tokyo", "Sydney", "Auckland"])
         self.assertEqual(clock.save_config({"cities": ["Tokyo", "Nowhere", "Tokyo", 3, "Stockholm"]})["cities"], ["Tokyo", "Stockholm"])

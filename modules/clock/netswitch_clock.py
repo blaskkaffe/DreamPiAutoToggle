@@ -145,6 +145,35 @@ def world(cfg, now=None):
     return out
 
 
+def _system_zone():
+    """The Pi's own time zone name ("Europe/Stockholm") from /etc/timezone or the /etc/localtime link, or ""."""
+    try:
+        with open("/etc/timezone") as f:
+            name = f.read().strip()
+        if name:
+            return name
+    except (IOError, OSError):
+        pass
+    try:
+        link = os.readlink("/etc/localtime")
+        return link.split("zoneinfo/", 1)[1] if "zoneinfo/" in link else ""
+    except (IOError, OSError):
+        return ""
+
+
+def here(cfg, now, off):
+    """Where the clock's own time zone is on the map: {"name", "lon", "lat", "text"}. The place is the first city in the catalogue that
+    has the zone (the picked one, or the Pi's own); a zone that has no city is put in the middle of the band of its winter-time offset,
+    so summer time does not move it into the next band."""
+    zone = cfg.get("zone") or _system_zone()
+    for c in CATALOGUE:
+        if c[1] == zone:
+            return {"name": c[0], "lon": c[2], "lat": c[3], "text": clock_hm(now, off, cfg["format"])}
+    offs = [o for o in (tz.offset(zone, now - k * 91 * 86400) for k in range(5)) if o is not None] if zone else []      # a year of samples
+    winter = min(offs) if offs else off
+    return {"name": zone or "Here", "lon": max(-180.0, min(180.0, winter / 3600.0 * 15)), "lat": 40.0, "text": clock_hm(now, off, cfg["format"])}
+
+
 def size(cfg, has_world):
     """How many of the box's three rows the time takes: "" = the middle one, "upper" (top and middle: world time is on, .beat is
     off), "lower" (middle and bottom: .beat is on, world time is off) or "full" (all three: neither is on). Only with "large" on."""
@@ -168,7 +197,7 @@ def view(now=None):
             "cities": [{"title": c["name"], "tag": c["text"]} for c in cities],
             "world": cfg["world"] and bool(cities), "world_on": cfg["world"], "beat_on": cfg["beat"], "large_on": cfg["large"],
             "size": size(cfg, cfg["world"] and bool(cities)), "format": cfg["format"],
-            "map": {"cities": cities, "utc": now, "here": off / 3600.0}
+            "map": {"cities": cities, "utc": now, "here": off / 3600.0, "dot": here(cfg, now, off)}
             if cfg["world"] else None}
 
 

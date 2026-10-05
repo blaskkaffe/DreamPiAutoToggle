@@ -311,15 +311,19 @@ W.worldmap=function(s){
   hours.push(el("text",{"class":"hr",x:(x0+x1)/2,y:TOP-2.5},svg));                              // the hour in this band (top)
   var u=el("text",{"class":"hr",x:(x0+x1)/2,y:H_-2.5},svg);u.textContent=o>0?"+"+o:String(o)}   // its UTC offset (bottom)
  WORLD_LAND.forEach(function(p){var pts=[];for(var i=0;i<p.length;i+=2)pts.push(X(p[i])+","+Y(p[i+1]));el("polygon",{"class":"land",points:pts.join(" ")},svg)});
- var dots=el("g",{},svg),made="";host.appendChild(svg);
- function paint(){var m=val(s.map),fmt=val(s.format);if(!m)return;var here=Math.round(m.here);
-  for(var i=0;i<bands.length;i++){var off=i-12,hr=Math.floor((((m.utc+off*3600)%86400)+86400)%86400/3600);
+ var dots=el("g",{},svg),made="",me=el("circle",{"class":"here",r:3.8},svg);host.appendChild(svg);
+ function paint(){var m=val(s.map),fmt=val(s.format);if(!m)return;
+  // the clock's own band is the one its place is in (summer time does not move a place into the next band), and its hour is the clock's own
+  var here=m.dot?Math.round(m.dot.lon/15):Math.round(m.here);
+  for(var i=0;i<bands.length;i++){var off=i-12,hr=Math.floor((((m.utc+(off===here&&m.dot?m.here:off)*3600)%86400)+86400)%86400/3600);
    if(fmt!=="24h")hr=hr%12||12;
    setText(hours[i],String(hr));var cls="band"+(off%2?" alt":"")+(off===here?" here":"");if(bands[i].getAttribute("class")!==cls)bands[i].setAttribute("class",cls)}
   var key=JSON.stringify(m.cities.map(function(x){return[x.name,x.lon,x.lat]}));
   if(key!==made){made=key;dots.innerHTML="";m.cities.forEach(function(ci){
    var d=el("circle",{"class":"city",cx:X(ci.lon),cy:Y(ci.lat),r:3.4},dots);el("title",{},d)})}
-  Array.prototype.forEach.call(dots.childNodes,function(d,i){var ci=m.cities[i];if(ci)setText(d.firstChild,ci.name+" "+ci.text)})}
+  Array.prototype.forEach.call(dots.childNodes,function(d,i){var ci=m.cities[i];if(ci)setText(d.firstChild,ci.name+" "+ci.text)});
+  if(m.dot){me.setAttribute("cx",X(m.dot.lon));me.setAttribute("cy",Y(m.dot.lat));if(!me.firstChild)el("title",{},me);setText(me.firstChild,m.dot.name+" (here) "+m.dot.text);me.style.display=""}
+  else me.style.display="none"}
  UPD.push(paint);paint();return host};
 // ---- a list of things from the server, each with a button that opens a small form (the Wi-Fi networks)
 W.links=function(s){var el=h("span",{"class":"links keep"});

@@ -148,13 +148,13 @@
  .now .wlist .p{display:flex;gap:8px;padding:4px 0;border-top:1px solid rgba(255,255,255,.12)} .now .wlist .p:first-child{border-top:0}
  .now .wlist .pn{flex:1;min-width:0;overflow-wrap:anywhere} .now .wlist .pg{display:block;color:var(--box-text-3)}
  .now .wlist .pl{flex:none;width:5.6em;line-height:1.25;color:var(--box-text-3);white-space:nowrap} .now .wlist .pl b{display:block;font-size:1.15em;color:#fff;font-variant-numeric:tabular-nums} .now .wlist .pn a{color:#fff;text-decoration:none}
- .now .wlist.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:3px 18px;width:100%} .now .wlist.grid .p{border-top:0;padding:0;justify-content:space-between} .now .wlist.grid .pn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--box-text-2)}   /* "style": "grid": short name / value pairs */
+ .now .wlist.grid > div:first-child{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:3px 18px;width:100%} .now .wlist.grid .p{border-top:0;padding:0;justify-content:space-between} .now .wlist.grid .pn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--box-text-2)}   /* "style": "grid": short name / value pairs */
  .now .wlist .pw{flex:none;font-weight:bold;white-space:nowrap}
  .worldmap{width:100%} .cmap{display:block;width:100%;height:auto}   /* the worldmap widget: the bands and the land, the clock's own band and the cities in the box's colour */
  .cmap .band{fill:rgba(255,255,255,.04)} .cmap .band.alt{fill:rgba(255,255,255,.09)} .cmap .band.here{fill:rgba(var(--primary-rgb),.28)}
  .cmap .land{fill:rgba(255,255,255,.34);stroke:rgba(255,255,255,.5);stroke-width:.4}
  .cmap .hr{fill:var(--box-text-2);font-size:8px;text-anchor:middle}
- .cmap .city{fill:var(--primary-l);stroke:#000;stroke-width:.6}
+ .cmap .city{fill:var(--primary-l);stroke:#000;stroke-width:.6} .cmap .here{fill:#fff;stroke:#000;stroke-width:.6}
  /* a main title over more rows (title_rows): the box is a grid of its three rows (top line, title, bottom row); the title has no size of its own (contain: size) so it never
     changes the box's height, and the title's fit() sizes its text. Open, the box is the plain list again. */
  .now[data-title-rows]:not(.open){display:grid;grid-template-columns:100%;grid-template-rows:auto 2.16em auto}
