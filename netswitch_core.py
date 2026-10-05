@@ -60,6 +60,7 @@ WIFI_STALE = 30       # ignore WIFI_STATE when older than this (the service is d
 WIFI_AP_SSID = "DreamPi WiFi Config"
 NET_STATE = "/tmp/dreampi-netswitch.net"   # shared with the LED service
 NET_STALE = 20        # ignore NET_STATE when older than this (web service down)
+POKE_PREFIX = "/tmp/dreampi-netswitch.poke."   # poke(name): "measure it again now", see poke()
 PLAYERS_WATCH = "/tmp/dreampi-netswitch.players"   # {"time", "games": [favourite games being played], "friends": [favourite players online]}, written by the players module for the LEDs
 PLAYERS_WATCH_STALE = 300     # ignore it when older than this (web service down / list not reachable)
 
@@ -783,6 +784,28 @@ def reboot_pending():
         return time.time() - float(read_file(REBOOT_MARK) or "0") < 60
     except ValueError:
         return False
+
+
+def poke(name):
+    """Ask whoever measures `name` ("internet") to do it again now instead of when its timer runs out. Works from any process: the
+    message is a file that is replaced (a new inode), and the receiver looks at poke_stamp() often, which costs next to nothing."""
+    path = POKE_PREFIX + re.sub(r"[^a-z0-9_]", "", str(name).lower())
+    tmp = path + ".tmp%d" % os.getpid()
+    try:
+        with open(tmp, "w") as f:
+            f.write("%f" % time.time())
+        os.rename(tmp, path)
+    except (IOError, OSError):
+        pass
+
+
+def poke_stamp(name):
+    """Changes every time poke(name) is called (None before the first)."""
+    try:
+        st = os.stat(POKE_PREFIX + re.sub(r"[^a-z0-9_]", "", str(name).lower()))
+        return (st.st_mtime, st.st_ino)
+    except OSError:
+        return None
 
 
 def _write_net_state(data):

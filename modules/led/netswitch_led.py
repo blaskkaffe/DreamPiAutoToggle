@@ -26,6 +26,9 @@ import netswitch_led_spi as spi  # noqa: E402  (SPI on/off in config.txt for GPI
 
 FPS = 25           # looks at the clock this often: a blink never needs more, and the CPU belongs to DreamPi
 REFRESH = 0.25     # seconds between re-reading DreamPi's state and led.json
+QUICK_REFRESH = 0.05    # ... and while a state file has just been written (below)
+QUICK_WINDOW = 0.6      # for this long after a state file changed
+QUICK_HOLD = 0.12       # a changed list must stay the same this long before it shows (Steady.HOLD otherwise)
 KEEPALIVE = 3.0    # an unchanged frame is sent again this often, which repairs a garbled one
 
 
@@ -201,9 +204,10 @@ class Steady(object):
     def __init__(self):
         self.current, self.pending, self.since = None, None, 0.0
 
-    def feed(self, messages, now, immediate=False):
+    def feed(self, messages, now, immediate=False, hold=None):
         """immediate: use this list now, without the wait (the selected network was just switched: a change the user made and
-        the service saw itself in a file that is written in one go, which is no half-written reading)."""
+        the service saw itself in a file that is written in one go, which is no half-written reading). hold: the wait for this
+        change instead of HOLD."""
         sig = repr(sorted((m["key"], m.get("effect"), m.get("speed"), m.get("color"), m.get("leds"), m.get("brightness"))
                           for m in messages))
         if immediate:
@@ -217,7 +221,7 @@ class Steady(object):
             return self.current[1]
         if sig != self.pending:
             self.pending, self.since = sig, now
-        elif now - self.since >= self.HOLD:
+        elif now - self.since >= (self.HOLD if hold is None else hold):
             self.current = (sig, messages)
         return self.current[1]
 
@@ -299,6 +303,14 @@ def watched_files():
                                      core.MODULES_STATE, core.WB_TEST))
 
 
+def watched_state_files():
+    """What the files other programs write while they work (DreamPi's state, the network, Wi-Fi setup, updates, the reboot mark, the
+    players, the reminders) look like now. They are written in one go (a rename), so a change shows in the stamp at once: the loop
+    then reads quickly for a moment instead of waiting for the next REFRESH."""
+    return tuple(_stamp(p) for p in (core.STATE, core.STATUS, core.NET_STATE, core.WIFI_STATE, core.UPDATE_STATUS, core.UPDATE_INFO,
+                                     core.REBOOT_MARK, core.PLAYERS_WATCH, core.EVENT_REMINDERS))
+
+
 def main():
     count, gpio = wanted_count(), ledconfig.led_gpio()
     cfg = ledconfig.led_config()
@@ -335,6 +347,7 @@ def main():
     last_frame, last_sent = None, 0.0
     next_read = 0.0
     stamp = watched_files()
+    state_stamp, quick_until = watched_state_files(), 0.0
     while True:
         now = time.time()
         # A change the user makes shows at once: the files the page writes (the selected network, led.json, the palette, the colours of the
@@ -345,11 +358,15 @@ def main():
         fresh = now_stamp != stamp
         if fresh:
             stamp, next_read = now_stamp, 0.0
+        now_state = watched_state_files()
+        if now_state != state_stamp:            # DreamPi, the network ... just wrote its state: look at once, and again soon
+            state_stamp, next_read, quick_until = now_state, 0.0, now + QUICK_WINDOW
+        quick = now < quick_until
         if now >= next_read:
             try:
                 wb_test = ledconfig.wb_test_active()
                 wb_colour = ledconfig.wb_test_colour()
-                messages = steady.feed(ledconfig.active_messages(), now, immediate=fresh)
+                messages = steady.feed(ledconfig.active_messages(), now, immediate=fresh, hold=QUICK_HOLD if quick else None)
                 cfg = ledconfig.led_config()
                 order = drivers.ORDERS.get(cfg.get("order"), drivers.DEFAULT_ORDER)
                 white_balance, gamma = _wb(cfg), cfg.get("gamma", ledconfig.GAMMA)
@@ -361,7 +378,7 @@ def main():
                     out.order = order
             except Exception:   # never let a bad read stop the LED loop
                 pass
-            next_read = now + REFRESH
+            next_read = now + (QUICK_REFRESH if quick else REFRESH)
         if out is None:   # no LEDs configured
             time.sleep(REFRESH)
             continue

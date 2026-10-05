@@ -53,6 +53,27 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
     const out = { long, short: look() }; window.render = realRender; return out; });
   ok(tick.long.sc && tick.long.anim === 'marquee', 'a main title that does not fit scrolls round like a carousel ' + JSON.stringify(tick));
   ok(!tick.short.sc && tick.short.text === 'DCNET', 'and a short one stands still (the text is there once)');
+  // the main title acts the same closed and open: centred while it fits, one scrolling line when it does not (never wrapped, never left-aligned), and
+  // it starts as soon as it is shown, without a click or a data update
+  const title = await page.evaluate(async () => {
+    const box = document.querySelector('.dbox[data-box="network"]'), now = box.querySelector('.now');
+    const look = () => { const b = now.querySelector('b'), c = b.querySelector('.carousel'), t = c.querySelector('.t'), cs = getComputedStyle(c);
+      return { open: now.classList.contains('open'), sc: c.classList.contains('sc'), anim: getComputedStyle(c.querySelector('.trk')).animationName, ws: cs.whiteSpace, align: cs.textAlign,
+               rows: Math.round(b.getBoundingClientRect().height / parseFloat(getComputedStyle(b).lineHeight === 'normal' ? parseFloat(getComputedStyle(b).fontSize) * 1.2 : getComputedStyle(b).lineHeight)),
+               off: Math.abs((t.getBoundingClientRect().left + t.getBoundingClientRect().right) / 2 - (b.getBoundingClientRect().left + b.getBoundingClientRect().right) / 2) }; };
+    const realRender = window.render; window.render = () => {}; const wait = ms => new Promise(r => setTimeout(r, ms)), out = {};
+    const set = (text, colour) => { S.selected = { id: 'dcnet', title: text, parts: [{ text, colour: colour || 'switcher.dcnet' }] }; engineUpdate(); };
+    now.classList.add('open'); fire('layout');
+    set('A very long main title that can never fit in the box'); await wait(200); out.longOpen = look();
+    set('DCNET'); await wait(200); out.shortOpen = look();
+    now.classList.remove('open'); fire('layout'); await wait(200); out.shortClosed = look();
+    box.style.display = 'none'; set('A very long main title that can never fit in the box'); await wait(100);       // not shown yet: nothing to measure
+    box.style.display = ''; await wait(400); out.shown = look();                                                     // shown: no click, no data update
+    set('DCNET'); await wait(100); window.render = realRender; return out; });
+  ok(title.longOpen.open && title.longOpen.sc && title.longOpen.anim === 'marquee' && title.longOpen.ws === 'nowrap' && title.longOpen.rows === 1, 'open, a long main title scrolls on one line like closed ' + JSON.stringify(title.longOpen));
+  ok(title.shortOpen.open && !title.shortOpen.sc && title.shortOpen.align === 'center' && title.shortOpen.off < 3, 'open, a short one is centred, not left-aligned ' + JSON.stringify(title.shortOpen));
+  ok(!title.shortClosed.open && title.shortClosed.align === 'center' && title.shortClosed.off < 3, 'and closed it is centred the same way');
+  ok(title.shown.sc && title.shown.anim === 'marquee', 'a long title in a box that was hidden starts scrolling as soon as the box is shown ' + JSON.stringify(title.shown));
   ok((await boxBg()) !== before, 'the box border takes the DCNET colour');
   ok(await page.evaluate(() => document.body.classList.contains('c-blue')), "the page's primary colour is the selected network's (blue)");
   await page.locator('.pill').nth(0).click(); await settle(1500);

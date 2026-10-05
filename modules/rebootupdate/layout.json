@@ -12,6 +12,7 @@
       "type": "button",
       "label": "Check",
       "post": "/update/check",
+      "reload": "update",
       "disabled": "@update.check_disabled"
      }
     },
@@ -30,6 +31,7 @@
       "type": "button",
       "label": "Update now",
       "post": "/update/start",
+      "reload": "update",
       "pin": true,
       "confirm": "Update the add-on now? It is fetched from GitHub and installed; this page is unavailable for a few seconds."
      }
