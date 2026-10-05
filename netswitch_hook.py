@@ -357,6 +357,17 @@ _MODEM_EVENTS = [
 _speed = [""]
 
 
+POKE_INTERNET = "/tmp/dreampi-netswitch.poke.internet"     # core.poke("internet"): the web service measures the internet again now
+_poked = [0.0]
+
+
+def _poke_internet():
+    """DreamPi has just said it sees no internet: ask the web service to look now instead of at its next check (at most every 5 s)."""
+    if time.time() - _poked[0] >= 5:
+        _poked[0] = time.time()
+        _write_file(POKE_INTERNET, "%f\n" % time.time())
+
+
 def _write_modem(text):
     _write_file(MODEM, "%d %s\n" % (int(time.time()), text))
 
@@ -372,6 +383,8 @@ class _ModemStatusHandler(logging.Handler):
             msg = record.getMessage().strip()
             if msg and not msg.startswith("Rule "):
                 _dtmf_log("dreampi: " + msg)
+            if msg.startswith("Unable to detect an internet connection"):
+                _poke_internet()
             for pattern, text, action in _MODEM_EVENTS:
                 m = re.search(pattern, msg)
                 if m:

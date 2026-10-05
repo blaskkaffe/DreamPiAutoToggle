@@ -1,6 +1,7 @@
 # DreamPi Netswitch add-on - things the web service measures: internet and
 # link checks, Pi health, hang up, versions, modem identification, and the
 # checker() loop that publishes them. Works on Python 3 and 2.7.
+import json
 import os
 import re
 import socket
@@ -13,7 +14,9 @@ import netswitch_core as core
 
 INTERNET_EVERY = 30   # seconds between internet checks while it works
 INTERNET_RETRY = 5    # ... and while it doesn't
-LINK_EVERY = 2        # seconds between checks of cables / Wi-Fi / route
+LINK_EVERY = 0.5      # seconds between checks of cables / Wi-Fi / route and the modem (a few small file reads: next to no CPU)
+HEALTH_EVERY = 2      # ... and of the Pi's temperature and power flags (the slower ones; they change slowly)
+STATE_BEAT = 5        # the file the LED service reads is written when something changed and at least this often (it ignores one older than NET_STALE)
 
 _checks = {"internet": {"state": "checking", "text": "Checking...", "time": 0},
            "pi": {"state": "checking", "text": "Checking...", "problem": False, "undervoltage": False}}
@@ -498,44 +501,66 @@ def modem_compat(usb):
     return None, label
 
 
+def new_checker_state():
+    return {"poke": core.poke_stamp("internet"), "health": 0.0, "pi": None, "sig": None, "written": 0.0}
+
+
+def checker_step(seen, now=None):
+    """One round of checker(): `seen` is what the last rounds saw (new_checker_state())."""
+    now = time.time() if now is None else now
+    links = link_state()
+    if links != _net["links"]:           # plugged/unplugged, Wi-Fi joined/lost
+        _net["links"] = links
+        _net["recheck"].set()
+    stamp = core.poke_stamp("internet")
+    if stamp != seen["poke"]:            # somebody asked for it now
+        seen["poke"] = stamp
+        _net["recheck"].set()
+    if seen["pi"] is None or now - seen["health"] >= HEALTH_EVERY:
+        seen["pi"], seen["health"] = pi_health(), now
+        core.trim_log()
+    pi = seen["pi"]
+    internet = _net["internet"]
+    if not links["network"]:
+        internet = {"state": "bad", "text": "No network connection", "time": int(time.time())}
+    shown = dict(internet)
+    if internet["state"] == "ok" and (links["ethernet"] or links["wifi"]):
+        via = " and ".join(n for n, on in (("Ethernet", links["ethernet"]), ("Wi-Fi", links["wifi"])) if on)
+        shown["text"] = internet["text"].replace("Connected", "Connected via " + via, 1)
+    with _checks_lock:
+        _checks["internet"] = shown
+        _checks["pi"] = pi
+    flags = pi.get("throttled")
+    level = wifi_level() if links["wifi"] else None
+    avg, loss = _net["quality"]
+    data = {"ethernet": links["ethernet"], "wifi": links["wifi"],
+            "network": links["network"], "pi_problem": pi["problem"],
+            "internet": None if internet["state"] == "checking" else internet["state"] == "ok",
+            # what the LED messages are made from (modules/led/netswitch_ledconfig.py)
+            "dns_fail": internet["state"] == "warn",
+            "no_ip": bool((links["ethernet"] or links["wifi"]) and not links["network"]),
+            "wifi_weak": level is not None and level <= WIFI_WEAK_DBM,
+            "slow": is_slow(avg, loss) if internet["state"] == "ok" else False,
+            "modem": modem_plugged(),
+            "undervoltage": bool(pi.get("undervoltage")),
+            "throttled": bool(flags is not None and flags & 0x4),
+            "hot": pi.get("temp") is not None and pi["temp"] >= 80,
+            "warm": pi.get("temp") is not None and pi["temp"] >= 70}
+    sig = json.dumps(data, sort_keys=True)
+    if sig != seen["sig"] or now - seen["written"] >= STATE_BEAT:      # a change goes out at once; otherwise just a sign of life
+        data["time"] = now
+        core._write_net_state(data)
+        seen["sig"], seen["written"] = sig, now
+
+
 def checker():
-    """Cables / Wi-Fi / route every 2 s (cheap, so errors show quickly), and
-    the shared state file for the LED service."""
+    """Cables / Wi-Fi / route and the modem every half second (cheap, so a change shows quickly), the Pi's health every 2 s, and the
+    shared state file for the LED service (written when something changed). core.poke("internet") makes the internet check run
+    now, from any process."""
     t = threading.Thread(target=internet_checker)
     t.daemon = True
     t.start()
+    seen = new_checker_state()
     while True:
-        links = link_state()
-        if links != _net["links"]:           # plugged/unplugged, Wi-Fi joined/lost
-            _net["links"] = links
-            _net["recheck"].set()
-        internet = _net["internet"]
-        if not links["network"]:
-            internet = {"state": "bad", "text": "No network connection", "time": int(time.time())}
-        shown = dict(internet)
-        if internet["state"] == "ok" and (links["ethernet"] or links["wifi"]):
-            via = " and ".join(n for n, on in (("Ethernet", links["ethernet"]), ("Wi-Fi", links["wifi"])) if on)
-            shown["text"] = internet["text"].replace("Connected", "Connected via " + via, 1)
-        pi = pi_health()
-        with _checks_lock:
-            _checks["internet"] = shown
-            _checks["pi"] = pi
-        flags = pi.get("throttled")
-        level = wifi_level() if links["wifi"] else None
-        avg, loss = _net["quality"]
-        core._write_net_state({"ethernet": links["ethernet"], "wifi": links["wifi"],
-                          "network": links["network"], "pi_problem": pi["problem"],
-                          "internet": None if internet["state"] == "checking" else internet["state"] == "ok",
-                          # what the LED messages are made from (modules/led/netswitch_ledconfig.py)
-                          "dns_fail": internet["state"] == "warn",
-                          "no_ip": bool((links["ethernet"] or links["wifi"]) and not links["network"]),
-                          "wifi_weak": level is not None and level <= WIFI_WEAK_DBM,
-                          "slow": is_slow(avg, loss) if internet["state"] == "ok" else False,
-                          "modem": modem_plugged(),
-                          "undervoltage": bool(pi.get("undervoltage")),
-                          "throttled": bool(flags is not None and flags & 0x4),
-                          "hot": pi.get("temp") is not None and pi["temp"] >= 80,
-                          "warm": pi.get("temp") is not None and pi["temp"] >= 70,
-                          "time": time.time()})
-        core.trim_log()
+        checker_step(seen)
         time.sleep(LINK_EVERY)

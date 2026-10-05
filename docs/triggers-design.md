@@ -76,7 +76,8 @@ An announced action may declare variables:
 ]
 ```
 
-- `type` is `text`, `number` or `choice` (with `options`). `required` or optional (`default`).
+- `type` is `text`, `number`, `choice` (with `options`) or `duration`. `required` or optional (`default`). A `duration` is a choice from
+  one shared list, so every action that lasts a while (a notice, a highlight, an LED alert) offers the same times; see section 11, point 3.
 - The row editor draws the fields under the action. A row missing a required variable is marked *incomplete* and skipped
   (logged), never half-run.
 - **Placeholders** are announced by the module that can supply them, in its `module.json`, and any text variable of any action can
@@ -195,14 +196,16 @@ Settled:
 4. **Placeholders** are announced by the modules that can supply them; only the system and the add-on's are there without modules.
 5. **Adding a trigger from the action's side** is allowed (section 3, rule 2).
 
-Still open:
+Settled, with a detail still to confirm:
 
-3. **Events: what ends a reminder.** Today one reminder state drives everything: the banner, the highlight of the Clock and Events
-   boxes and the LED message *Event starting soon* all last "until you dismiss it on the page", or 10 minutes after the start. If the
-   banner, the highlight and the LED each become an action with its own length (a row is "when X happens, do Y", with no "and undo it
-   when X ends"), then dismissing the banner can no longer switch the others off: they end on their own after their seconds. The
-   choices:
-   - (a) **Independent** (simplest, recommended): each action has its own seconds; dismissing the banner closes only the banner.
-   - (b) **Events keeps a reminder state** and exposes it as a state placeholder/condition, so highlight and LED rows can say
-     "while a reminder is active"; that needs a second kind of trigger ("while ...") and an automatic undo, which is a bigger model.
-   - (c) **Keep the hard-wired behaviour for events** (banner + highlight + LED together, dismiss ends all) and add rows later.
+3. **Events: what ends a reminder.** Each action has its own length, so dismissing the banner closes only the banner (choice (a)
+   below). Every action that lasts a while (a notice, a highlight, an LED alert) gets a **turn off automatically after** choice of
+   type `duration`, from one shared list: **Never** (until dismissed or replaced) and the times the automatic refresh settings use
+   (the events module's sync choices: 15 min, 30 min, 1 h, 3 h, 6 h, 12 h).
+   - *To confirm:* those times start at 15 minutes, which is long for a notice. Should the shared list also have **10 s, 30 s, 1 min
+     and 5 min** (and should the sync setting then offer them too, or keep its own list)? I'd add them to the one list.
+   - Why it was a question: today one reminder state drives the banner, the highlight of the Clock and Events boxes and the LED message,
+     all "until you dismiss it, or 10 minutes after the start". A row is "when X happens, do Y" with no "and undo it when X ends", so
+     the three actions can't be switched off together. The alternatives were (b) Events keeps a reminder state that other rows can read
+     ("while a reminder is active"), which needs a second kind of trigger and an automatic undo, and (c) keep the events behaviour
+     hard-wired.
