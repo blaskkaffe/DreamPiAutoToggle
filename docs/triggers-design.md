@@ -196,14 +196,14 @@ Settled:
 4. **Placeholders** are announced by the modules that can supply them; only the system and the add-on's are there without modules.
 5. **Adding a trigger from the action's side** is allowed (section 3, rule 2).
 
-Settled, with a detail still to confirm:
+Settled:
 
 3. **Events: what ends a reminder.** Each action has its own length, so dismissing the banner closes only the banner (choice (a)
    below). Every action that lasts a while (a notice, a highlight, an LED alert) gets a **turn off automatically after** choice of
-   type `duration`, from one shared list: **Never** (until dismissed or replaced) and the times the automatic refresh settings use
-   (the events module's sync choices: 15 min, 30 min, 1 h, 3 h, 6 h, 12 h).
-   - *To confirm:* those times start at 15 minutes, which is long for a notice. Should the shared list also have **10 s, 30 s, 1 min
-     and 5 min** (and should the sync setting then offer them too, or keep its own list)? I'd add them to the one list.
+   type `duration`, from one shared list: **Never** (until dismissed or replaced) and times from 10 seconds to 12 hours (below).
+   - The shared list also has the short times (agreed): **Never, 10 s, 30 s, 1 min, 5 min, 15 min, 30 min, 1 h, 3 h, 6 h, 12 h**.
+     It is for how long something lasts. The events sync setting keeps its own list (15 min and up): syncing with DC99 every 10
+     seconds would be rude.
    - Why it was a question: today one reminder state drives the banner, the highlight of the Clock and Events boxes and the LED message,
      all "until you dismiss it, or 10 minutes after the start". A row is "when X happens, do Y" with no "and undo it when X ends", so
      the three actions can't be switched off together. The alternatives were (b) Events keeps a reminder state that other rows can read

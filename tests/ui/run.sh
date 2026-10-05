@@ -36,4 +36,10 @@ SERVER=$!
 sleep 3
 PORT=8738 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node background.js || RESULT=1
 kill $SERVER 2>/dev/null
+# the update controls: Check shows the Update now row at once, a finished update reloads the page with Settings open
+FAKEUPDATE=1 PORT=8739 python3 demo_server.py > /tmp/dpns-demo-update.log 2>&1 &
+SERVER=$!
+sleep 3
+PORT=8739 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node update.js || RESULT=1
+kill $SERVER 2>/dev/null
 exit $RESULT
