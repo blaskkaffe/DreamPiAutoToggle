@@ -104,7 +104,8 @@ var DATA={};
 function reloadData(name){for(var ns in DATA)if(!name||ns===name)DATA[ns]()}
 // The last answer of every data source is kept in this browser and shown at once when the page opens again (with "busy": true until the
 // new answer is there), so a page never starts with empty lists: what it knew stays until something newer replaces it.
-function restoreData(){var ns;for(ns in (LAY.data||{}))try{var r=JSON.parse(localStorage.getItem("netswitch-data-"+ns));if(r&&typeof r==="object"){r.busy=true;S[ns]=r}}catch(e){}}
+function restoreData(){var ns;for(ns in (LAY.data||{})){try{var r=JSON.parse(localStorage.getItem("netswitch-data-"+ns));if(r&&typeof r==="object"){r.busy=true;S[ns]=r}}catch(e){}
+ if(!S[ns]&&(LAY.data[ns].when!=="settings"))bootPending["data-"+ns]=1}}      // no kept answer: the first draw waits for it (page.js bootDone)
 function keepData(ns,r){try{localStorage.setItem("netswitch-data-"+ns,JSON.stringify(r))}catch(e){}}
 function startData(){var ns;for(ns in (LAY.data||{}))(function(ns,spec){
  var timer=null,seq=0,every=(spec.every||60)*1000,retry=(spec.retry||2)*1000,onlyInSettings=spec.when==="settings";
@@ -113,7 +114,7 @@ function startData(){var ns;for(ns in (LAY.data||{}))(function(ns,spec){
   xhrJson("GET",spec.url,function(r){var again=every;
    if(mine!==seq)return;                      // a newer question was asked meanwhile: its answer counts, this older one must not overwrite it
    if(r){S[ns]=r;keepData(ns,r);engineUpdate();if(spec.retry_if&&getPath(r,spec.retry_if))again=retry}else again=retry;
-   timer=setTimeout(load,again)})}
+   bootDone("data-"+ns);timer=setTimeout(load,again)})}
  DATA[ns]=load;
  document.addEventListener("visibilitychange",function(){if(!document.hidden)load()});
  if(onlyInSettings){hook("settingsOpen",load);hook("settingsClose",function(){clearTimeout(timer)})}

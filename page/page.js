@@ -79,18 +79,44 @@ $("warnings").addEventListener("click",function(e){var b=e.target.closest&&e.tar
 function showSettings(open){$("settings").classList.toggle("open",open);
  if(!open)fire("settingsClose");
  document.body.classList.toggle("settings-open",open);
- if(open)fire("settingsOpen")}
+ if(open){$("settings").classList.add("settling");fire("settingsOpen");whenLoaded(function(){layoutColumns();$("settings").classList.remove("settling")},900)}}
+// Settings is shown once what its boxes ask for has arrived (every GET in flight), or after limit ms, so the rows do not pop in one by one
+// and the boxes do not move while they fill
+var inflight=0;
+function whenLoaded(done,limit){var t0=Date.now();(function check(){if((inflight===0&&Date.now()-t0>=40)||Date.now()-t0>limit)done();else setTimeout(check,30)})()}
+// The settings boxes are placed in columns once (as many ~420px columns as fit, filled top to bottom in order, each as tall as the others)
+// and stay where they are put when their content changes; only a change of the number of columns places them again.
+var colN=0;
+function layoutColumns(force){var cols=$("set-boxes"),W=cols.clientWidth,GAP=20;if(!W)return;
+ var n=Math.max(1,Math.floor((W+GAP)/(420+GAP)));if(n===colN&&!force)return;
+ var boxes=Array.prototype.slice.call(cols.querySelectorAll(".sec[data-box]")),i,w=(W-GAP*(n-1))/n,hs=[],total=0;
+ boxes.forEach(function(b){cols.appendChild(b)});
+ Array.prototype.slice.call(cols.querySelectorAll(":scope > .col")).forEach(function(c){c.parentNode.removeChild(c)});
+ cols.style.display="block";                                    // measured one under the other, each as wide as a column will be
+ boxes.forEach(function(b){b.style.width=w+"px"});
+ boxes.forEach(function(b){var h=b.offsetHeight?b.getBoundingClientRect().height+18:0;hs.push(h);total+=h});
+ boxes.forEach(function(b){b.style.width=""});cols.style.display="";
+ var target=total/n,colEls=[],col=0,used=0;
+ for(i=0;i<n;i++){var c=document.createElement("div");c.className="col";cols.appendChild(c);colEls.push(c)}
+ boxes.forEach(function(b,k){if(col<n-1&&used>0&&used+hs[k]/2>target*(col+1)){col++}used+=hs[k];colEls[col].appendChild(b)});
+ colN=n}
+window.addEventListener("resize",function(){if($("settings").classList.contains("open"))layoutColumns()});
 // The PIN (when one is set with install.sh --pin) is asked for once per page load, before update / restart / Wi-Fi connect.
 var pinNeeded=false,pinValue="";
 function withPin(go){if(!pinNeeded||pinValue)return go();var p=prompt("Enter the PIN");if(p===null)return;pinValue=p;go()}
-function xhrJson(method,url,cb,body){var x=new XMLHttpRequest();x.open(method,url,true);
+function xhrJson(method,url,cb,body){var x=new XMLHttpRequest(),counted=method!=="POST";if(counted)inflight++;x.open(method,url,true);
  if(method=="POST"){x.setRequestHeader("X-Requested-With","netswitch");if(pinValue)x.setRequestHeader("X-Netswitch-Pin",pinValue);
   if(body!==undefined)x.setRequestHeader("Content-Type","application/json")}
- x.onload=function(){var r=null;try{r=JSON.parse(x.responseText)}catch(e){}
+ x.onload=function(){if(counted)inflight--;var r=null;try{r=JSON.parse(x.responseText)}catch(e){}
   if(x.status==401||x.status==429)pinValue="";   // asked again next time
-  cb(x.status==200?r:null,x.status,r)};x.onerror=function(){cb(null,0,null)};x.send(body===undefined?undefined:JSON.stringify(body))}
+  cb(x.status==200?r:null,x.status,r)};x.onerror=function(){if(counted)inflight--;cb(null,0,null)};x.send(body===undefined?undefined:JSON.stringify(body))}
 $("cog").onclick=function(){showSettings(true)};
 $("close-settings").onclick=function(){showSettings(false)};
 document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(!fire("escape"))showSettings(false)}});
 function refresh(){var x=new XMLHttpRequest();x.open("GET","/api",true);
- x.onload=function(){if(x.status==200)render(JSON.parse(x.responseText))};x.send()}
+ x.onload=function(){if(x.status==200)render(JSON.parse(x.responseText));bootDone("api")};x.onerror=function(){bootDone("api")};x.send()}
+// The first draw waits for /api and for the data sources that have no kept answer from an earlier visit (at most BOOT_LIMIT ms), then every
+// box is shown at once: nothing pops in one box after the other
+var BOOT_LIMIT=1500,bootPending={api:1};
+function bootDone(k){if(!(k in bootPending))return;delete bootPending[k];for(var x in bootPending)return;document.body.classList.remove("booting")}
+setTimeout(function(){bootPending={};document.body.classList.remove("booting")},BOOT_LIMIT);

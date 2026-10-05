@@ -202,10 +202,15 @@
  #settings.open{display:block} body.settings-open{overflow:hidden}
  #settings .in{max-width:460px;margin:20px auto 0;padding:0 16px 32px}
  /* Wide screens: the settings sections flow into as many ~420px columns as fit (phones keep the one column) */
- #settings .cols{column-width:420px;column-gap:20px}
+ #settings .cols{display:flex;gap:20px;align-items:flex-start} #settings .cols > .col{flex:1 1 0;min-width:0}   /* the columns are filled by layoutColumns() (page.js) once, so a box stays in its column when its content changes */
  .sec{margin-bottom:18px;break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid}
  .sec > h2:first-child{margin-top:0}
  #settings .cols{padding-top:6px}
+ /* nothing is drawn until /api and the data sources have answered (boot.js), so the boxes appear together and in place; the animation shows the page anyway after 3 s if the script died */
+ body.booting #dash,body.booting #warnings{opacity:0;pointer-events:none;animation:bootshow 0s 3s forwards} #dash,#warnings{transition:opacity .18s}
+ @keyframes bootshow{to{opacity:1;pointer-events:auto}}
+ /* Settings opens when what its boxes load has arrived (page.js showSettings), not box by box */
+ #settings.settling .in{opacity:0}
  @media(min-width:920px){#settings .in{max-width:920px}}
  @media(min-width:1340px){#settings .in{max-width:1340px}}
  @media(min-width:1780px){#settings .in{max-width:1780px}}
