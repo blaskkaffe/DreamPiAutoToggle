@@ -1,5 +1,5 @@
 /* Status LED module: only what the page kit has nothing for - the segmented choices and the lists inside the Edit / Add pop-ups */
- .seg{display:inline-flex;flex-wrap:wrap;gap:6px;justify-content:flex-end} .seg button{padding:6px 12px;font-size:.82em}
+ .seg{display:inline-flex;flex-wrap:wrap;gap:6px;justify-content:flex-end} .seg button{padding:0 12px}
  .seg .sel{background:var(--sel);border-color:var(--sel-line)} .seg button:disabled{opacity:.35;cursor:default}
  .wrapcol.frow{flex-direction:column;align-items:stretch;gap:8px}
  .lvl{display:flex;align-items:center;gap:10px;flex:1;max-width:60%} .lvl input{flex:1;min-width:0;accent-color:var(--primary)} .lvl .rv{width:3em;text-align:right;color:var(--txt2)}
