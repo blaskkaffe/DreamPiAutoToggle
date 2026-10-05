@@ -158,51 +158,61 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await pbox.locator('.ibtn.on').count() === 0, 'the stars on the main page are off again');
   await pbox.click({ position: { x: 20, y: 10 } }); await settle(300);
   await openSettings();
-  // ---- Status LED: rows of colour + animation + level, each with the messages that light it
+  // ---- Status LED: rows of colour + animation + level, each with the messages that light it; the order of the rows is the priority
   const led = page.locator('[data-box="status led"]');
-  const ledRows = led.locator('.srow:has(button[aria-label="Edit this colour"])');
+  const ledRows = led.locator('.wtrig .srow.edit');
+  const editBtn = r => r.locator('button', { hasText: 'Edit' });
   const rows0 = await ledRows.count();
   ok(rows0 === 6, 'the LED box starts with the six default colour rows (' + rows0 + ')');
-  ok(await ledRows.first().locator('.tag', { hasText: 'DCNow! selected' }).count() === 1, 'the first row holds DCNow! selected');
+  ok(await ledRows.first().locator('.tag', { hasText: 'DreamPi not running' }).count() === 1, 'the first (top) row holds DreamPi not running');
   const lookOf = i => ledRows.nth(i).evaluate(e => { const b = e.querySelector('button.pill-s'), t = e.querySelector('.tag'), cs = getComputedStyle(b); return { bg: cs.backgroundColor, border: cs.borderTopColor, tag: t ? getComputedStyle(t).backgroundColor : '', blink: cs.animationName, dot: !!e.querySelector('.gdot') }; });
-  const l0 = await lookOf(0), l4 = await lookOf(3), l5 = await lookOf(4);
+  const l0 = await lookOf(0), l1 = await lookOf(1), l2 = await lookOf(2), l3 = await lookOf(3);
   ok(!l0.dot && l0.bg !== l0.border && l0.bg === l0.tag, 'a row has no dot: its buttons and tags take the colour, with a lighter border (' + l0.bg + ' / ' + l0.border + ')');
-  ok(l4.blink === 'lkblink' && l0.blink === 'none', 'a blinking look makes the row blink like the LED (Starting up blinks, DCNow! does not)');
-  const samples = await ledRows.nth(3).evaluate(async e => { const b = e.querySelector('button.pill-s'), out = []; for (let i = 0; i < 30; i++) { const cs = getComputedStyle(b); out.push([cs.backgroundColor, cs.color, cs.opacity]); await new Promise(r => setTimeout(r, 70)); } return out; });
+  ok(l1.blink === 'lkblink' && l2.blink === 'none', 'a blinking look makes the row blink like the LED (Starting up blinks, the network colour does not)');
+  const samples = await ledRows.nth(1).evaluate(async e => { const b = e.querySelector('button.pill-s'), out = []; for (let i = 0; i < 30; i++) { const cs = getComputedStyle(b); out.push([cs.backgroundColor, cs.color, cs.opacity]); await new Promise(r => setTimeout(r, 70)); } return out; });
   const bgs = Array.from(new Set(samples.map(x => x[0])));
   ok(bgs.length === 2 && bgs.includes('rgba(42, 42, 42, 0.82)'), 'a blinking button goes between its colour and the default dark grey (' + bgs.join(' / ') + ')');
   ok(new Set(samples.map(x => x[1])).size === 1 && samples.every(x => x[2] === '1'), 'and its text keeps the same colour and brightness all the time');
-  ok(l0.bg !== l5.bg, 'rows with different colours look different');
+  ok(l0.bg !== l3.bg, 'rows with different colours look different');
   await led.locator('button', { hasText: 'Add colour' }).click(); await settle(900);
-  ok(await ledRows.count() === rows0 + 1, 'Add colour adds a row');
-  await ledRows.last().locator('button[aria-label="Edit this colour"]').click(); await settle(300);
+  ok(await ledRows.count() === rows0 + 1 && await page.locator('.pop.open').count() === 1, 'Add colour adds a row and opens its editor');
   const lg = await popGeo();
   ok(Math.abs(lg.w - gp1.w) <= 1 && Math.abs(lg.left) <= 1 && Math.abs(lg.right) <= 1, 'the colour pop-up has the same width as the others (' + lg.w + ')');
   await page.locator('.pop.open .swatch[aria-label="Green"]').click(); await settle(900);
   ok(/Green/.test(await ledRows.last().textContent()), 'picking a colour names it in the row');
-  await page.locator('.pop.open button', { hasText: 'Remove' }).click(); await settle(900);
-  ok(await ledRows.count() === rows0 && await page.locator('.pop.open').count() === 0, 'Remove deletes the row and closes the pop-up');
-  await ledRows.first().locator('button[aria-label="Add messages to this colour"]').click(); await settle(300);
-  await page.locator('.pop.open .srow', { hasText: 'Weak Wi-Fi signal' }).locator('button').click(); await settle(900);
+  await page.locator('.pop.open button', { hasText: 'Delete row' }).click(); await settle(900);
+  ok(await ledRows.count() === rows0 && await page.locator('.pop.open').count() === 0, 'Delete row removes the row and closes the pop-up');
+  await editBtn(ledRows.first()).click(); await settle(300);
+  await page.locator('.pop.open [aria-expanded]').click(); await settle(300);
+  await page.locator('.pop.open .poplist .srow', { hasText: 'Weak Wi-Fi signal' }).locator('button').click(); await settle(900);
   ok(await ledRows.first().locator('.tag', { hasText: 'Weak Wi-Fi signal' }).count() === 1, 'a message is added to the row it was added from');
-  ok(await page.locator('.pop.open .srow', { hasText: 'Weak Wi-Fi signal' }).count() === 0, 'and is no longer on offer in the list');
+  ok(await page.locator('.pop.open .poplist .srow', { hasText: 'Weak Wi-Fi signal' }).count() === 0 && await page.locator('.pop.open .poplist').isVisible(), 'and is no longer on offer in the list, which stays open for the next one');
+  await page.locator('.pop.open .tag', { hasText: 'Weak Wi-Fi signal' }).locator('button').click(); await settle(900);
+  ok(await ledRows.first().locator('.tag', { hasText: 'Weak Wi-Fi signal' }).count() === 0, 'a message is taken out of its row with the x in the editor');
   await page.keyboard.press('Escape'); await settle(200);
-  await ledRows.first().locator('.tag', { hasText: 'Weak Wi-Fi signal' }).locator('button').click(); await settle(900);
-  ok(await ledRows.first().locator('.tag', { hasText: 'Weak Wi-Fi signal' }).count() === 0, 'a message is taken out of its row with the x');
-  await led.locator('.infobtn').click(); await settle(300);
+  await led.locator('.wtrig .infobtn').click(); await settle(300);
   ok(await page.locator('.pop.open .infotext').count() === 1 && await page.locator('.pop.open button', { hasText: 'Done' }).count() === 0, 'the LED box has an information pop-up without a Done button');
   await page.keyboard.press('Escape'); await settle(200);
   await led.locator('button', { hasText: 'Add colour' }).click(); await settle(600);
+  await page.keyboard.press('Escape'); await settle(200);
   await led.locator('button', { hasText: 'Restore defaults' }).click(); await settle(900);
   ok(await ledRows.count() === rows0, 'Restore defaults brings the default rows back');
   // every animation of a row: its class says which, the buttons run it between the colour and the grey
-  await ledRows.first().locator('button[aria-label="Edit this colour"]').click(); await settle(300);
+  await editBtn(ledRows.first()).click(); await settle(300);
   for (const [label, cls] of [['Fade', 'lk-fade'], ['Breathe', 'lk-breathe'], ['Short blink', 'lk-blink1'], ['Double blink', 'lk-blink2'], ['Triple blink', 'lk-blink3'], ['Rainbow', 'lk-rainbow']]) {
     await page.locator('.pop.open .optrow button', { hasText: new RegExp('^' + label + '$') }).click(); await settle(500);
     ok(await ledRows.first().evaluate((e, c) => e.classList.contains(c) && getComputedStyle(e.querySelector('button.pill-s')).animationName !== 'none', cls), label + ' makes the row run its animation');
   }
   await page.locator('.pop.open .optrow button', { hasText: /^Solid$/ }).click(); await settle(500);
   ok(await ledRows.first().evaluate(e => !e.classList.contains('lk-fx')), 'Solid stops it');
+  await page.keyboard.press('Escape'); await settle(200);
+  // the level slider: a row gets its own level, and "Use global" takes it back
+  await editBtn(ledRows.first()).click(); await settle(300);
+  await page.locator('.pop.open input[type=range]').focus(); await page.keyboard.press('ArrowRight'); await settle(900);
+  const lv1 = await page.evaluate(async () => (await (await fetch('/ledrows')).json()).rows[0].opts.brightness);
+  ok(lv1 !== null && lv1 > 0, 'moving the level slider gives the row its own level (' + lv1 + ')');
+  await page.locator('.pop.open button', { hasText: 'Use global' }).click(); await settle(900);
+  ok(await page.evaluate(async () => (await (await fetch('/ledrows')).json()).rows[0].opts.brightness) === null, 'Use global takes it back');
   await page.keyboard.press('Escape'); await settle(200);
   // the colours editor: the LED's red need not be the page's red
   await led.locator('button[aria-label="Adjust the colours"]').click(); await settle(600);
@@ -222,21 +232,17 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(led2.led === led2.led_default && led2.ui === led2.ui_default, 'Reset all puts the shipped colours back');
   await page.locator('.pop.open button', { hasText: 'Done' }).click(); await page.waitForLoadState('networkidle'); await settle(2000);
   ok(await page.locator('#settings.open').count() === 1, 'closing it after a change builds the page again with Settings still open');
-  // Priority: put the messages in order, most important first
-  await led.locator('button[aria-label="Edit the message priority"]').click(); await settle(500);
-  const pg = await popGeo();
-  ok(Math.abs(pg.w - gp1.w) <= 1, 'the priority pop-up has the same width as the others (' + pg.w + ')');
-  const prio = () => page.locator('.pop.open .srow[data-id]').evaluateAll(els => els.map(e => e.getAttribute('data-id')));
-  const p0 = await prio();
-  ok(p0.length > 30 && p0[0] === 'reboot' && !p0.includes('off'), 'every message is in the list, most important first (' + p0.length + ', the first is ' + p0[0] + ')');
-  await page.locator('.pop.open .srow[data-id] .grip').first().focus(); await page.keyboard.press('ArrowDown'); await settle(1500);
-  const p1 = await prio();
-  ok(p1[0] === p0[1] && p1[1] === p0[0], 'the arrow keys on a handle move a message down');
-  const saved = await page.evaluate(async () => (await (await fetch('/ledconfig')).json()).config.priority);
-  ok(saved[0] === p0[1] && saved[1] === p0[0], 'and the new order is saved');
-  await page.locator('.pop.open button', { hasText: 'Restore default order' }).click(); await settle(1200);
-  ok(JSON.stringify(await prio()) === JSON.stringify(p0), 'Restore default order puts it back');
-  await page.locator('.pop.open button', { hasText: 'Done' }).click(); await settle(300);
+  // Priority: the order of the rows, the top one wins
+  const ledOrder = () => led.locator('.wtrig .srow[data-id]').evaluateAll(els => els.map(e => e.getAttribute('data-id')));
+  const o0 = await ledOrder();
+  ok(o0.join() === 'g1,g2,g3,g4,g5,g6', 'the rows are in priority order, the top one first (' + o0.join() + ')');
+  await led.locator('.wtrig .srow[data-id] .grip').first().focus(); await page.keyboard.press('ArrowDown'); await settle(1500);
+  const o1 = await ledOrder();
+  ok(o1[0] === o0[1] && o1[1] === o0[0], 'the arrow keys on a handle move a row down');
+  const saved = await page.evaluate(async () => (await (await fetch('/ledrows')).json()).rows.map(r => r.id));
+  ok(saved[0] === o0[1] && saved[1] === o0[0], 'and the new order is saved (the top row has priority)');
+  await led.locator('button', { hasText: 'Restore defaults' }).click(); await settle(1200);
+  ok((await ledOrder()).join() === o0.join(), 'Restore defaults puts the order back');
   // Appearance: a tick box left of each colour picks a coloured or a neutral background
   const appr = page.locator('[data-box="appearance"] .srow', { hasText: 'Online players colour' });
   ok(!(await appr.locator('input[type=checkbox]').isChecked()) && await page.locator('.dbox[data-box="players"].plain').count() === 1, 'a box starts neutral (Highlight off) ' + await page.evaluate(() => JSON.stringify({ c: document.querySelector('.dbox[data-box="players"]').className, t: S.tints && S.tints.players, chk: document.querySelectorAll('[data-box="appearance"] .srow').length })));
@@ -405,7 +411,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
     ok(g.top >= -1 && g.bottom >= -1 && g.left >= -1 && g.right >= -1, 'the ' + what + ' pop-up stays inside its card on a wide screen (' + JSON.stringify(g) + ')');
     await wide.keyboard.press('Escape'); await wide.waitForTimeout(300);
   };
-  await inside('[data-box="status led"] button[aria-label="Edit this colour"]', 'LED colour');
+  await inside('[data-box="status led"] .wtrig .srow.edit button.pill-s', 'LED colour');
   await inside('[data-box="gpio"] button[aria-label="Edit Button 1"]', 'GPIO');
   await inside('[data-box="system"] [data-picker="modules"] button', 'modules');
   await wide.close();

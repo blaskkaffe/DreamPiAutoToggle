@@ -12,5 +12,19 @@
  "primary": "players",
  "tints": {
   "players": false
- }
+ },
+ "led_messages": [
+  {
+   "id": "players-game",
+   "label": "Your game is played",
+   "group": "Online players",
+   "description": "Someone is playing one of your favourite games (Settings > Online players)."
+  },
+  {
+   "id": "players-friend",
+   "label": "A friend came online",
+   "group": "Online players",
+   "description": "One of your favourite players is online (Settings > Online players)."
+  }
+ ]
 }

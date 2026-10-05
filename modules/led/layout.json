@@ -45,9 +45,14 @@
    "items": [
     {
      "type": "custom",
-     "name": "led-groups",
+     "name": "led-tools",
      "show": "@led.installed",
      "html_file": "messages.html"
+    },
+    {
+     "type": "triggers",
+     "source": "/ledrows",
+     "show": "@led.installed"
     }
    ]
   }

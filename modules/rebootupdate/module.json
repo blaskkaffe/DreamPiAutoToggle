@@ -5,5 +5,43 @@
  "visible": true,
  "order": 65,
  "ui": 2,
- "web": "netswitch_rebootupdate"
+ "web": "netswitch_rebootupdate",
+ "led_messages": [
+  {
+   "id": "update-addon",
+   "label": "Add-on update available",
+   "group": "The add-on",
+   "description": "A newer version of this add-on is on GitHub."
+  },
+  {
+   "id": "update-dreampi",
+   "label": "DreamPi update available",
+   "group": "The add-on",
+   "description": "DreamPi has newer scripts than the Pi has."
+  },
+  {
+   "id": "update-running",
+   "label": "Update running",
+   "group": "The add-on",
+   "description": "An update of the add-on is in progress."
+  },
+  {
+   "id": "update-ok",
+   "label": "Update done",
+   "group": "The add-on",
+   "description": "The add-on was updated (for 10 minutes afterwards)."
+  },
+  {
+   "id": "update-failed",
+   "label": "Update failed",
+   "group": "The add-on",
+   "description": "The update of the add-on failed (for 10 minutes afterwards)."
+  },
+  {
+   "id": "reboot",
+   "label": "About to reboot",
+   "group": "The add-on",
+   "description": "A reboot was requested; the Pi goes down in a moment."
+  }
+ ]
 }

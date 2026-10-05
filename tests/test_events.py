@@ -296,7 +296,7 @@ class Reminders(Base):
 
     def test_the_led_message(self):
         self.remind("US Game Night")
-        self.assertIn("event-soon", ledconfig.MESSAGE)
+        self.assertIn("event-soon", [m["key"] for m in ledconfig.messages()])
         ctx = ledconfig.gather(live=False)
         ctx["event"] = core.event_reminder(utc(2026, 10, 9, 1) - 60)
         self.assertIn("event-soon", ledconfig.active_keys(ctx))

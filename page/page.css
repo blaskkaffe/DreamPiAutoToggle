@@ -85,7 +85,7 @@
  .srow.edit{align-items:flex-start}   /* a row with an Edit button: the button is always at the top right, however many lines the text has */
  .optrow{display:flex;gap:8px;flex-wrap:wrap} .optrow .pill-s{flex:1 1 auto;text-align:center} .frow .optrow{justify-content:flex-end} .frow .optrow .pill-s{flex:none}   /* a simple pick: the options as a row of buttons in a pop-up */
  .wpicker .addarea{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
- .wtrig .note{margin:8px 0 0;color:var(--warn)} .wtrig .grip{margin-left:-10px} .wtrig .pop .frow .sub{display:block} .wtrig .pop .tags{margin:8px 0}
+ .wtrig .note{margin:8px 0 0;color:var(--warn)} .wtrig .grip{margin-left:-10px} .wtrig .pop .frow .sub{display:block} .wtrig .pop .tags{margin:8px 0} .pop .frow.stack > span{text-align:left} .stackctl{display:flex;flex-direction:column;gap:8px;align-items:stretch;width:100%} .stackctl .rangev{max-width:none} .stackctl .frow{padding:0}
  .rows.noopen{cursor:default}
  .ibtn{flex:none;width:36px;height:36px;padding:0;border-radius:50%;background:rgba(0,0,0,.25);display:inline-flex;align-items:center;justify-content:center}   /* a round on / off icon button: ui.iconButton() */
  .ibtn svg{width:18px;height:18px;fill:rgba(255,255,255,.45)} .ibtn.on{background:rgba(255,255,255,.9)} .ibtn.on svg{fill:var(--primary)}

@@ -12,5 +12,13 @@
  "web": "netswitch_events",
  "tints": {
   "events": false
- }
+ },
+ "led_messages": [
+  {
+   "id": "event-soon",
+   "label": "Event starting soon",
+   "group": "DC99 events",
+   "description": "A DC99 event you asked to be reminded of starts soon (from the time set in Settings > DC99 events until 10 minutes after the start, or until you dismiss it on the page)."
+  }
+ ]
 }

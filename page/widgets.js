@@ -383,7 +383,8 @@ function editRow(o){var sub=h("span",{"class":"sub"}),title=document.createTextN
   setTitle:function(t){title.nodeValue=t},
   // the row's buttons and tags take a colour ({ui, ui_l}: the fill and its lighter border) and, for effect "blink", blink like the LED
   setLook:function(c,effect,speed){var rgb=function(x){return parseInt(x.slice(1,3),16)+","+parseInt(x.slice(3,5),16)+","+parseInt(x.slice(5,7),16)};
-   row.style.setProperty("--primary-rgb",rgb(c.ui));row.style.setProperty("--primary-l-rgb",rgb(c.ui_l));
+   if(typeof c==="string"){row.style.setProperty("--primary-rgb","var(--c-"+c+"-rgb)");row.style.setProperty("--primary-l-rgb","var(--c-"+c+"-l-rgb)")}      // a palette id: it follows the colour as it is changed
+   else{row.style.setProperty("--primary-rgb",rgb(c.ui));row.style.setProperty("--primary-l-rgb",rgb(c.ui_l))}
    var fx=effect&&effect!=="solid"?"lk-"+effect:"";
    row.classList.add("lk");if(row._fx!==fx){if(row._fx){row.classList.remove(row._fx);row.classList.remove("lk-fx")}if(fx){row.classList.add(fx);row.classList.add("lk-fx")}row._fx=fx}
    row.classList.toggle("lk-fast",speed==="fast")},
@@ -466,69 +467,104 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
  function save(){clearTimeout(timer);paint();timer=setTimeout(function(){var body={};cfg.groups.forEach(function(g){body[g.key]=g.items});
   post(s.source,body,function(r){if(r){cfg=r;paint();ctx.saved();if(s.reload)reloadData(s.reload)}})},100)}      // the data source that shows this list ("reload": its name; the stars of the players box) follows what was saved
  hook("settingsOpen",load);hook("settingsClose",function(){p.close()});return el};
-// ---- rows of "something to do + what triggers it" (phone numbers: an action and the numbers that start it). One short row per entry
-// (its title, a grey line and its triggers as tags) with an Edit button; the pop-up under it has the action (a select, when the answer lists
-// "actions"), the row's options (switches), the triggers with an Add field, Delete row and Done. "Add row" asks for the action first.
-// With rules.sort each row has a drag handle (the top row has priority); the same drag as the module picker.
-// GET source -> {rows:[{id, action, title, sub, items:[text], opts:{key:bool}}], actions:[{value,label,sub,group}], options:[{key,label,sub}],
-//  note, defaults:{rows}, rules:{min,max,allowed,per_row,max_rows,add_row,add_row_title,add_label,add_title,min_msg,help,restore,sort}};
-// POST source {rows:[{id, action, items, opts}]} answers the same. The server writes the texts (title, sub, note), the page only draws them.
-W.triggers=function(s,ctx){var el=h("div",{"class":"wtrig"}),cfg=null,timer=null,editors={},openNew=false,list=h("div"),
+// ---- rows of "something to do + what triggers it" (phone numbers: an action and the numbers that start it; the LED rows: a look and the
+// messages that show it). One short row per entry (its title, a grey line and its triggers as tags) with an Edit button; the pop-up under it has
+// the action (a select, when the answer lists "actions"), the row's options (the same controls as a form: switch, choice, select, number, colour,
+// slider, range), the triggers with an Add field (or, with "choices", a list to pick from) and Delete row, Done. "Add row" asks for the action first.
+// With rules.sort each row has a drag handle and the top row has priority (the same drag as the module picker).
+// GET source -> {rows:[{id, action, title, sub, look:{colour, effect, speed}, items:[text | {value,label}], opts:{key:value}}], actions:[{value,label,sub,group}],
+//  options:[control specs: {key, type, label, sub, options: "list", disabled_if:{key,value}}], lists:{name:[{value,label}]}, choices:[{value,label,sub,group}],
+//  new:{opts}, note, defaults:{rows}, rules:{min,max,allowed,per_row,max_rows,unique,free,sort,add_row,add_row_title,add_label,add_title,min_msg,help,restore,restore_confirm}};
+// POST source {rows:[{id, action, items:[value], opts}]} answers the same. The server writes the texts (title, sub, note), the page only draws them.
+var TRIGGERS={};
+function reloadTriggers(source){if(TRIGGERS[source])TRIGGERS[source]()}
+W.triggers=function(s,ctx){var el=h("div",{"class":"wtrig"}),cfg=null,timer=null,want=0,editors={},openNew=false,rowEls=[],list=h("div"),
  addB=h("button",{type:"button","class":"pill-s",text:"Add row"}),restore=h("button",{type:"button","class":"pill-s"}),foot=footRow([addB,restore]),note=h("div",{"class":"sub note"}),
  pick=h("div"),pickT=h("div",{"class":"t"}),choices=h("div",{"class":"choices"}),pp=null;
  pick.appendChild(pickT);pick.appendChild(choices);el.appendChild(list);el.appendChild(note);el.appendChild(foot.el);el.appendChild(pick);pp=ui.popup(pick);
  function rules(){return cfg.rules||{}}
+ function val(it){return it&&typeof it==="object"?it.value:it}
+ function label(it){return it&&typeof it==="object"?(it.label||it.value):it}
  function editor(row){var ed=editors[row.id];if(ed)return ed;
-  var box=h("div");ed={box:box,p:ui.popup(box)};el.appendChild(box);editors[row.id]=ed;return ed}
+  var box=h("div");ed={box:box,p:ui.popup(box),row:row};el.appendChild(box);editors[row.id]=ed;return ed}
+ function used(value){return cfg.rows.some(function(r){return r.items.some(function(it){return val(it)===value})})}
+ // the choices that are not in a row yet (rules.unique) as a list under a heading per group, each with its grey line
+ function choiceList(row,host){host.innerHTML="";var any=false,last=null;
+  (cfg.choices||[]).forEach(function(c){if(row.items.some(function(it){return val(it)===c.value})||(rules().unique&&used(c.value)))return;any=true;
+   if(c.group&&c.group!==last){last=c.group;host.appendChild(h("div",{"class":"cat",text:c.group}))}
+   var r=editRow({title:c.label,button:rules().add_label||"Add",aria:(rules().add_label||"Add")+" "+c.label});r.setSub(c.sub||"");
+   r.btn.onclick=function(){row.items.push({value:c.value,label:c.label});rebuild(row);save()};host.appendChild(r.el)});
+  if(!any)host.appendChild(h("div",{"class":"sub",text:"Every message is in a row already."}))}
+ function disabledFor(row,box){(cfg.options||[]).forEach(function(o,i){if(!o.disabled_if)return;var c=box._ctl[i],off=(row.opts||{})[o.disabled_if.key]===o.disabled_if.value;
+  Array.prototype.forEach.call(c.querySelectorAll("button,input"),function(x){x.disabled=off})})}
+ // the pop-up of a row: made when it is opened and again when the row's triggers or action change (not for its options: a slider being dragged stays)
+ function rebuild(row){var ed=editors[row.id];if(ed)fillEditor(row)}
  function fillEditor(row){var ed=editor(row),R=rules(),box=ed.box,msg=h("div",{"class":"msg"}),inp=h("input",{type:"text","aria-label":R.add_title||"Add",maxLength:R.max||40}),
   addI=h("button",{type:"button","class":"pill-s",text:R.add_label||"Add"}),del=h("button",{type:"button","class":"pill-s danger",text:"Delete row"}),done=h("button",{type:"button","class":"pill-s",text:"Done"});
-  box.innerHTML="";box.appendChild(h("div",{"class":"t",text:row.title}));
+  ed.row=row;box.innerHTML="";box._ctl=[];box.appendChild(h("div",{"class":"t",text:row.title||""}));
   if(cfg.actions&&cfg.actions.length){var sel=h("select",{"class":"ord","aria-label":"Action"}),groups={},order=[],known=false;
    cfg.actions.forEach(function(a){var g=a.group||"";if(!groups[g]){groups[g]=[];order.push(g)}if(a.value===row.action)known=true;
     groups[g].push('<option value="'+esc(a.value)+'"'+(a.value===row.action?" selected":"")+">"+esc(a.label)+"</option>")});
    sel.innerHTML=(known?"":'<option value="'+esc(row.action)+'" selected>'+esc(row.title)+" (not available)</option>")+order.map(function(g){return order.length>1&&g?'<optgroup label="'+esc(g)+'">'+groups[g].join("")+"</optgroup>":groups[g].join("")}).join("");
    sel.onchange=function(){row.action=sel.value;save()};box.appendChild(h("div",{"class":"frow"},[h("span",{text:"Action"}),sel]))}
-  (cfg.options||[]).forEach(function(o){var cb=h("input",{type:"checkbox","class":"cbox neutral","aria-label":o.label});cb.checked=!!(row.opts||{})[o.key];
-   cb.onchange=function(){row.opts=row.opts||{};row.opts[o.key]=cb.checked;save()};
-   box.appendChild(h("div",{"class":"frow"},[h("span",{},[document.createTextNode(o.label),o.sub?h("span",{"class":"sub",text:o.sub}):null]),cb]))});
-  if(row.items.length)box.appendChild(tagList(row.items,function(i){row.items.splice(i,1);save()}));
+  var F={options:cfg.lists||{}};Object.defineProperty(F,"values",{get:function(){return row.opts=row.opts||{}}});      // always the row's current options (an answer from the server replaces the object)
+  (cfg.options||[]).forEach(function(o,i){var spec=Object.assign({},o,{type:o.type||"toggle"}),c=control(spec,F,function(){disabledFor(row,box);soft(row);save()}),
+   wide=spec.type==="colour"||spec.type==="slider"||spec.type==="range",lab=h("span",{},[document.createTextNode(o.label||o.key)]);
+   if(o.sub)lab.appendChild(h("span",{"class":"sub",text:o.sub}));if(spec.type==="colour")c._labelEl=lab;
+   box._ctl.push(c);c._paint();box.appendChild(h("div",{"class":"frow"+(wide?" stack":"")},[lab,c]))});
+  disabledFor(row,box);
+  if(row.items.length)box.appendChild(tagList(row.items.map(label),function(i){row.items.splice(i,1);rebuild(row);save()}));
   function say(t){setText(msg,t)}
   function add(){var allowed=new RegExp("[^"+(R.allowed||"\\s\\S")+"]","g"),n=inp.value.replace(allowed,"");
    if(n.length<(R.min||1))return say(R.min_msg||"Too short");
-   if(row.items.indexOf(n)>=0)return say(n+" is already in this row");
+   if(row.items.some(function(it){return val(it)===n}))return say(n+" is already in this row");
    if(R.per_row&&row.items.length>=R.per_row)return say("At most "+R.per_row);
-   row.items.push(n);save()}
-  addI.onclick=add;inp.onkeydown=function(e){if(e.key=="Enter"){e.preventDefault();add()}};
-  box.appendChild(h("div",{"class":"fld"},[inp,addI]));box.appendChild(msg);
-  del.onclick=function(){var i=cfg.rows.indexOf(row);ed.p.close();if(i>=0)cfg.rows.splice(i,1);save()};done.onclick=function(){ed.p.close()};
+   row.items.push(n);rebuild(row);save()}
+  if(cfg.choices){var tog=h("button",{type:"button","class":"pill-s",text:R.add_label||"Add","aria-expanded":ed.addOpen?"true":"false"}),pl=h("div",{"class":"poplist"});
+   if(ed.addOpen)choiceList(row,pl);sh(pl,!!ed.addOpen);                       // the list stays open while messages are added one after the other
+   tog.onclick=function(){ed.addOpen=!ed.addOpen;if(ed.addOpen)choiceList(row,pl);sh(pl,ed.addOpen);tog.setAttribute("aria-expanded",ed.addOpen?"true":"false")};
+   box.appendChild(h("div",{"class":"frow"},[h("span",{"class":"sub",text:R.add_title||""}),tog]));box.appendChild(pl)}
+  else{addI.onclick=add;inp.onkeydown=function(e){if(e.key=="Enter"){e.preventDefault();add()}};
+   box.appendChild(h("div",{"class":"fld"},[inp,addI]));box.appendChild(msg)}
+  del.onclick=function(){var i=cfg.rows.indexOf(row);ed.p.close();if(i>=0)cfg.rows.splice(i,1);paint();save()};done.onclick=function(){ed.p.close()};
   box.appendChild(h("div",{"class":"bar end"},[del,done]))}
- function summary(row){return row.sub||""}
+ function lookOf(row){var l=row.look;if(!l)return;var id=colourId(l.colour,"switcher");return id?[id,l.effect,l.speed]:null}
+ // an option changed: the row's own look follows at once (the server writes its title and grey line when it has saved)
+ function soft(row){var re=rowEls[cfg.rows.indexOf(row)];if(!re)return;var o=row.opts||{};
+  if(row.look&&o.colour){row.look={colour:o.colour,effect:o.effect,speed:o.speed};var lk=lookOf(row);if(lk)re.setLook(lk[0],lk[1],lk[2])}}
  function paint(){if(!cfg)return;var R=rules(),ids={};
-  list.innerHTML="";
+  list.innerHTML="";rowEls=[];
   cfg.rows.forEach(function(row){ids[row.id]=1;
-   var e=editRow({title:row.title,button:R.edit_label||"Edit",aria:(R.edit_label||"Edit")+" "+row.title});
-   e.setSub(summary(row));e.setList(row.items);
+   var e=editRow({title:row.title,button:R.edit_label||"Edit",aria:(R.edit_label||"Edit")+" "+row.title});rowEls.push(e);
+   e.setSub(row.sub||"");e.setList(row.items.map(label));var lk=lookOf(row);if(lk)e.setLook(lk[0],lk[1],lk[2]);
    if(R.sort){var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+row.title+": drag, or use the up and down arrow keys",html:"&#8942;&#8942;"});
     e.el.insertBefore(grip,e.el.firstChild);e.el.setAttribute("data-id",row.id)}
-   e.btn.onclick=function(ev){ev.stopPropagation();var p=editor(row).p;if(p.isOpen())p.close();else p.open(e.btn)};list.appendChild(e.el);fillEditor(row);
-   var q=editor(row).p;if(q.isOpen())q.open(e.btn);                       // an open editor follows its row (the row's height changes with its tags)
-   else if(openNew&&row===cfg.rows[cfg.rows.length-1]){openNew=false;q.open(e.btn)}});
+   e.btn.onclick=function(ev){ev.stopPropagation();var ed=editor(row);ed.row=row;if(ed.p.isOpen())ed.p.close();else{fillEditor(row);ed.p.open(e.btn)}};list.appendChild(e.el);
+   var q=editors[row.id];if(q&&q.p.isOpen())q.p.open(e.btn);                       // an open editor follows its row (the row's height changes with its tags)
+   else if(openNew&&row===cfg.rows[cfg.rows.length-1]&&row.id){openNew=false;fillEditor(row);editor(row).p.open(e.btn)}});
   Object.keys(editors).forEach(function(id){if(!ids[id]){editors[id].p.close();if(editors[id].box.parentNode)editors[id].box.parentNode.removeChild(editors[id].box);delete editors[id]}});
-  if(R.sort)sortable(list,function(names){var by={};cfg.rows.forEach(function(r){by[r.id]=r});cfg.rows=names.map(function(n){return by[n]});save()});
+  if(R.sort)sortable(list,function(names){var by={};cfg.rows.forEach(function(r){by[r.id]=r});cfg.rows=names.map(function(n){return by[n]});paint();save()});
   setText(note,cfg.note||"");sh(note,!!cfg.note);
   sh(addB,!R.max_rows||cfg.rows.length<R.max_rows);setText(addB,R.add_row||"Add row");
-  sh(restore,!!R.restore);if(R.restore){setText(restore,R.restore);restore.onclick=function(){if(R.restore_confirm&&!confirm(R.restore_confirm))return;cfg.rows=JSON.parse(JSON.stringify((cfg.defaults||{}).rows||[]));save()}}
+  sh(restore,!!R.restore);if(R.restore){setText(restore,R.restore);restore.onclick=function(){if(R.restore_confirm&&!confirm(R.restore_confirm))return;cfg.rows=JSON.parse(JSON.stringify((cfg.defaults||{}).rows||[]));Object.keys(editors).forEach(function(id){editors[id].p.close()});paint();save()}}
   foot.setInfo(R.help||"")}
- function newRow(action){cfg.rows.push({id:"",action:action||"",title:"",sub:"",items:[],opts:{}});openNew=true;pp.close();save(true)}
+ // what the server answered replaces the rows, but the row objects an open pop-up is working on stay (their texts and ids are updated), so a slider being dragged is not interrupted
+ function adopt(r){var old={};cfg.rows.forEach(function(x){if(x.id)old[x.id]=x});
+  r.rows=r.rows.map(function(x){var o=old[x.id];if(!o)return x;Object.keys(o).forEach(function(k){delete o[k]});return Object.assign(o,x)});
+  cfg=r;paint();Object.keys(editors).forEach(function(id){var ed=editors[id];if(ed.p.isOpen()&&!ed.box.contains(document.activeElement))fillEditor(ed.row)})}
+ function newRow(action){var fresh=(cfg.new&&cfg.new.opts)||{};cfg.rows.push({id:"",action:action||"",title:"",sub:"",items:[],opts:JSON.parse(JSON.stringify(fresh))});openNew=true;pp.close();save(true)}
  addB.onclick=function(e){if(!cfg.actions||!cfg.actions.length){newRow("");return}
   setText(pickT,rules().add_row_title||"Choose an action");choices.innerHTML="";
   cfg.actions.forEach(function(a){var b=h("button",{type:"button","class":"choice"},[document.createTextNode(a.label)]);
    if(a.sub||a.group)b.appendChild(h("span",{"class":"sub",text:a.sub||a.group}));b.onclick=function(){newRow(a.value)};choices.appendChild(b)});
   pp.toggle(addB,e)};
  function load(){xhrJson("GET",s.source,function(r){if(r){cfg=r;paint()}})}
- function save(quiet){clearTimeout(timer);if(!quiet)paint();timer=setTimeout(function(){var body={rows:cfg.rows.map(function(r){return{id:r.id,action:r.action,items:r.items,opts:r.opts}})};
-  post(s.source,body,function(r){if(r){cfg=r;paint();ctx.saved()}})},100)}
- hook("settingsOpen",load);hook("settingsClose",function(){pp.close()});return el};
+ function save(quiet){clearTimeout(timer);want++;if(!quiet)paint();timer=setTimeout(function(){var n=want,body={rows:cfg.rows.map(function(r){return{id:r.id,action:r.action,items:r.items.map(val),opts:r.opts}})};
+  post(s.source,body,function(r){if(r){ctx.saved();if(n===want)adopt(r)}})},100)}      // an answer to an older save is not used while a newer change is waiting
+ TRIGGERS[s.source]=function(){xhrJson("GET",s.source,function(r){if(r&&cfg)adopt(r)})};         // reloadTriggers(source): the texts have changed on the server (the global level of the LED rows)
+ hook("settingsOpen",load);hook("settingsClose",function(){pp.close()});
+ hook("api",function(){if(cfg)cfg.rows.forEach(function(row,i){var lk=lookOf(row);if(lk&&rowEls[i])rowEls[i].setLook(lk[0],lk[1],lk[2])})});      // a row in the colour of the selected network follows the switch
+ return el};
 // ---- a console: lines of text in a box. "lines": "@path" replaces them all; "tail": "/url" adds what is new (GET url?from=N -> {text, size, reset})
 W.console=function(s,ctx){var el=h("div",{"class":"console"+(s.nowrap?" nowrap":""),role:"log","aria-label":s.label||"Log"}),size=0,busy=false,rules=(s.rules||[]).map(function(r){return[new RegExp(r[0],"i"),r[1]]}),
  follow=s.follow?val(s.follow):true;
@@ -579,6 +615,39 @@ function control(spec,F,change){var key=spec.key,el,paint;
  if(spec.type==="number"){el=h("input",{type:"number",min:spec.min,max:spec.max,"aria-label":spec.aria||spec.label||key});
   paint=function(){if(document.activeElement!==el)el.value=F.values[key]==null?"":F.values[key]};
   el.onchange=function(){var n=parseInt(el.value,10);if(!isNaN(n)){F.values[key]=Math.max(spec.min!=null?spec.min:n,Math.min(spec.max!=null?spec.max:n,n));change()}};
+  el._paint=paint;return el}
+ // "colour": the options ([{value,label}], palette ids or the network colours) as balls in the colour they have now; a tap picks
+ if(spec.type==="colour"){el=h("span",{"class":"swatches grid",role:"group","aria-label":spec.aria||spec.label||key});var lastk="",bs=[];
+  paint=function(){var opts=optionList(spec,F),k=JSON.stringify(opts),name="";
+   if(k!==lastk){lastk=k;el.innerHTML="";bs=opts.map(function(o){var id=colourId(o.value,"switcher"),b=h("button",{type:"button","class":"swatch",title:o.label,"aria-label":o.label,style:"--c:var(--c-"+id+");--cl:var(--c-"+id+"-l)"});
+    b.onclick=function(e){e.stopPropagation();F.values[key]=o.value;change()};el.appendChild(b);return b})}
+   opts.forEach(function(o,i){var on=String(o.value)===String(F.values[key]);bs[i].classList.toggle("sel",on);if(on)name=o.label});
+   if(el._labelEl)setText(el._labelEl,(spec.label||"")+": "+name)};
+  el._paint=paint;return el}
+ // "slider": a level 0..1 on a 0-1000 slider ("scale": "log100" = logarithmic, finer near the dark end); null = "uses the default" ("default": the
+ // value shown then, "null_text" / "own_text" the grey line, "null_button" the button that goes back to it)
+ if(spec.type==="slider"){el=h("div",{"class":"stackctl"});
+  var sl=h("input",{type:"range",min:0,max:1000,step:1,"aria-label":spec.aria||spec.label||key}),rv=h("span",{"class":"rv"}),nt=h("span",{"class":"sub"}),nb=spec.null_button?h("button",{type:"button","class":"pill-s",text:spec.null_button}):null,
+   log=spec.scale==="log100",toS=function(b){return log?Math.round(1000*Math.log(1+b*99)/Math.log(100)):Math.round(b*1000)},fromS=function(p){return log?(Math.pow(100,p/1000)-1)/99:p/1000},
+   pct=function(b){var v=b*100;return (v<10&&v>0?String(parseFloat(v.toFixed(1))):Math.round(v))+"%"};
+  el.appendChild(h("span",{"class":"rangev"},[sl,rv]));if(spec.null_text||nb)el.appendChild(h("div",{"class":"frow"},[nt,nb]));
+  paint=function(){var v=F.values[key],own=v!==null&&v!==undefined,x=own?v:(spec.default||0);sl.value=toS(x);setText(rv,pct(x));setText(nt,own?(spec.own_text||""):(spec.null_text||""));if(nb)nb.disabled=!own};
+  sl.oninput=function(){F.values[key]=Math.round(fromS(+sl.value)*1000)/1000;paint();change()};
+  if(nb)nb.onclick=function(e){e.stopPropagation();F.values[key]=null;paint();change()};
+  el._paint=paint;return el}
+ // "range": which LEDs of a strip ("max": how many): all, one or a range [first, last]; null = all
+ if(spec.type==="range"){el=h("div",{"class":"stackctl"});
+  var max=spec.max||1,ra=h("input",{type:"number",min:1,max:max,"aria-label":"First LED"}),rb=h("input",{type:"number",min:1,max:max,"aria-label":"Last LED"}),seg=h("span",{"class":"optrow",role:"group","aria-label":spec.aria||spec.label||key}),
+   segB={},line=h("div",{"class":"frow"}),lab=h("span",{"class":"sub"}),ctl=h("span",{"class":"ctls"}),
+   mode=function(){var v=F.values[key];return !v?"all":v[0]===v[1]?"one":"range"};
+  [["all","All"],["one","One"],["range","Range"]].forEach(function(m){var bt=h("button",{type:"button","class":"pill-s",text:m[1]});segB[m[0]]=bt;seg.appendChild(bt);
+   bt.onclick=function(e){e.stopPropagation();var v=F.values[key],a0=v?v[0]:1,b0=v?v[1]:1;
+    F.values[key]=m[0]==="all"?null:m[0]==="one"?[a0,a0]:[a0,b0>a0?b0:Math.min(max,a0+1)];paint();change()}});
+  var setR=function(){var x=parseInt(ra.value,10),y=parseInt(rb.value,10);if(isNaN(x))x=1;if(isNaN(y)||mode()==="one")y=x;
+   x=Math.max(1,Math.min(max,x));y=Math.max(x,Math.min(max,y));F.values[key]=[Math.min(x,y),Math.max(x,y)];paint();change()};
+  ra.onchange=rb.onchange=setR;line.appendChild(lab);line.appendChild(ctl);el.appendChild(seg);el.appendChild(line);
+  paint=function(){var m=mode(),v=F.values[key];Object.keys(segB).forEach(function(k){segB[k].classList.toggle("pri",k===m)});
+   sh(line,m!=="all");ctl.innerHTML="";if(m==="all")return;ra.value=v[0];rb.value=v[1];setText(lab,m==="one"?"LED number":"From and to");ctl.appendChild(ra);if(m==="range")ctl.appendChild(rb)};
   el._paint=paint;return el}
  if(spec.type==="toggle"){el=h("input",{type:"checkbox","class":"cbox neutral","aria-label":spec.aria||spec.label||key});
   paint=function(){el.checked=!!F.values[key]};el.onchange=function(){F.values[key]=el.checked;change()};el._paint=paint;return el}

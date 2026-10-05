@@ -14,7 +14,7 @@ MIN_LEN, MAX_LEN, MAX_PER_ROW, MAX_ROWS = 3, 12, 10, 30
 _JUNK = re.compile(r"[^0-9*#]")
 _ACTION = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
 OPENMENU = "1111111"     # what openMenu dials; it ends with the default row's 11111
-OPTIONS = [{"key": "hangup", "label": "Hang up after the action",
+OPTIONS = [{"key": "hangup", "type": "toggle", "label": "Hang up after the action",
             "sub": "Don't answer the call: the Dreamcast gets a busy tone, like *70"}]
 
 

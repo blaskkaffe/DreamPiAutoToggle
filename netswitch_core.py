@@ -134,6 +134,24 @@ def module_actions():
     return out
 
 
+def module_led_messages():
+    """The messages the enabled modules announce for the LEDs (module.json "led_messages": [{"id", "label", "group", "description"}]),
+    in picker order, as [{"key", "label", "group", "description", "module"}]. The LED module lists them as the triggers a row can
+    have; a message of a module that is off is not offered and never lights. The first module to announce a key owns it."""
+    out, seen = [], set()
+    for name in module_names():
+        manifest = module_manifest(name) or {}
+        if not module_enabled(name):
+            continue
+        for m in manifest.get("led_messages") or []:
+            key = str((m or {}).get("id") or "") if isinstance(m, dict) else ""
+            if re.match(r"^[a-z][a-z0-9-]*$", key) and key not in seen:
+                seen.add(key)
+                out.append({"key": key, "label": str(m.get("label") or key), "group": str(m.get("group") or module_title(name, manifest)),
+                            "description": str(m.get("description") or ""), "module": name})
+    return out
+
+
 def saved_module_order():
     try:
         with open(MODULE_ORDER) as f:

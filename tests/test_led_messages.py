@@ -6,7 +6,15 @@ import unittest
 from support import ledconfig, core, sandbox, cleanup
 import netswitch_led as led
 
-KEYS = [m[0] for m in ledconfig.MESSAGES]
+def announced():
+    """Every message a module announces (module.json "led_messages"), whether the module is on or not."""
+    out = []
+    for name in core.module_names():
+        out += [dict(m, module=name) for m in (core.module_manifest(name) or {}).get("led_messages", [])]
+    return out
+
+
+KEYS = [m["id"] for m in announced()]
 DEFAULT_ON = {"busy", "ready-dcnow", "ready-dcnet", "notrunning", "call-dcnow", "call-dcnet", "call-other", "sel-dcnow", "sel-dcnet", "event-soon"}
 
 
@@ -27,6 +35,7 @@ def group(gid, colour, messages, **kw):
 class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox()
+        core.save_module_enabled("wifi", True)           # the Wi-Fi setup messages are only offered while its module is on
 
     def tearDown(self):
         cleanup(self.tmp)
@@ -41,17 +50,20 @@ class Base(unittest.TestCase):
 
 
 class CatalogueTests(Base):
-    def test_every_message_has_a_category_a_priority_and_a_description(self):
-        cats = set(c[0] for c in ledconfig.CATEGORIES)
-        for m in ledconfig.MESSAGES:
-            self.assertIn(m[2], cats, m[0])
-            self.assertTrue(m[1] and m[3], m[0])
-            if m[0] != "off":
-                self.assertIn(m[0], ledconfig.PRIORITY_ORDER, m[0])
-        self.assertEqual(sorted(ledconfig.PRIORITY_ORDER), sorted(k for k in KEYS if k != "off"))
+    def test_every_message_is_announced_by_a_module_with_a_group_and_a_description(self):
+        for m in announced():
+            self.assertTrue(m["id"] and m["label"] and m["group"] and m["description"], m["id"])
         self.assertEqual(len(KEYS), len(set(KEYS)))
-        for c in cats:
-            self.assertTrue([m for m in ledconfig.MESSAGES if m[2] == c], c)
+        self.assertEqual([m["key"] for m in ledconfig.messages()], KEYS)            # all of them while every module is on
+
+    def test_a_message_of_a_module_that_is_off_is_not_offered_and_never_lights(self):
+        core.save_module_enabled("wifi", False)
+        self.assertNotIn("wifisetup-ok", [m["key"] for m in ledconfig.messages()])
+        self.groups(group("g1", "red", ["wifisetup-ok"]))
+        self.assertEqual(self.looks(ctx(wifi="ok")), [])
+        self.assertEqual(ledconfig.led_config()["groups"][0]["messages"], ["wifisetup-ok"])      # the row keeps it for when the module is back
+        core.save_module_enabled("wifi", True)
+        self.assertEqual([m["key"] for m in self.looks(ctx(wifi="ok"))], ["g1"])
 
     def test_the_requested_messages_are_there(self):
         for key in ("busy", "ready-dcnow", "ready-dcnet", "notrunning", "unknown", "call-dcnow", "call-dcnet", "call-other", "sel-dcnow", "sel-dcnet", "no-ip",
@@ -62,7 +74,7 @@ class CatalogueTests(Base):
             self.assertIn(key, KEYS)
 
     def test_state_unknown_explains_itself(self):
-        text = ledconfig.MESSAGE["unknown"][3]
+        text = [m["description"] for m in ledconfig.messages() if m["key"] == "unknown"][0]
         self.assertIn("state file", text)
         self.assertIn("last resort", text)
 
@@ -74,13 +86,14 @@ class CatalogueTests(Base):
     def test_the_default_looks(self):
         by = dict((g["id"], g) for g in ledconfig.default_groups())
         self.assertEqual([(g["colour"], g["effect"]) for g in ledconfig.default_groups()],
-                         [("dcnow", "solid"), ("dcnet", "solid"), ("purple", "solid"), ("yellow", "blink"), ("red", "blink"), ("bright-pink", "blink")])
-        self.assertEqual(by["g1"]["messages"], ["sel-dcnow", "ready-dcnow", "call-dcnow"])
+                         [("red", "blink"), ("yellow", "blink"), ("network", "solid"), ("purple", "solid"), ("bright-pink", "blink"), ("network", "solid")])
+        self.assertEqual(by["g6"]["messages"], ["ready-dcnow", "ready-dcnet", "sel-dcnow", "sel-dcnet"])
         for g in by.values():
             self.assertIn(g["colour"], ledconfig.TOKEN_IDS + core.PALETTE_IDS)
 
-    def test_every_message_is_detected(self):
-        self.assertEqual(sorted(m[0] for m in ledconfig.MESSAGES if not m[4]), [])
+    def test_the_default_order_puts_what_matters_most_on_top(self):
+        order = [g["messages"][0] for g in ledconfig.default_groups()]
+        self.assertEqual(order, ["notrunning", "busy", "call-dcnow", "call-other", "event-soon", "ready-dcnow"])
 
     def test_the_effects(self):
         self.assertEqual([e[0] for e in ledconfig.EFFECTS], ["solid", "blink", "fade", "breathe", "blink1", "blink2", "blink3", "rainbow"])
@@ -102,9 +115,29 @@ class ConfigTests(Base):
         got = ledconfig.clean_groups([group("a", "red", [], leds=[5, 2], brightness=4)])[0]
         self.assertEqual((got["leds"], got["brightness"]), ([2, 5], 1.0))
 
-    def test_a_message_can_be_in_one_group_only_and_unknown_ones_are_dropped(self):
-        got = ledconfig.clean_groups([group("a", "red", ["ready", "nonsense", "busy"]), group("b", "blue", ["busy", "error"])])
-        self.assertEqual([g["messages"] for g in got], [["ready-dcnow", "ready-dcnet", "busy"], ["error"]])      # "ready" of an older file is the two that replaced it
+    def test_a_message_can_be_in_one_group_only_and_badly_named_ones_are_dropped(self):
+        got = ledconfig.clean_groups([group("a", "red", ["ready", "Not a key!", "busy", 5]), group("b", "blue", ["busy", "error", "from-a-module-that-is-off"])])
+        self.assertEqual([g["messages"] for g in got], [["ready-dcnow", "ready-dcnet", "busy"], ["error", "from-a-module-that-is-off"]])      # "ready" of an older file is the two that replaced it
+
+    def test_the_order_of_the_groups_is_the_priority_and_is_kept(self):
+        cfg = ledconfig.led_config()
+        cfg["groups"] = list(reversed(cfg["groups"]))
+        ledconfig.save_led_config(cfg)
+        self.assertEqual([g["id"] for g in ledconfig.led_config()["groups"]], ["g6", "g5", "g4", "g3", "g2", "g1"])
+        self.assertNotIn("priority", ledconfig.led_config())
+
+    def test_an_older_file_with_a_message_priority_gets_its_groups_in_that_order(self):
+        groups = [group("a", "red", ["ethernet"]), group("b", "blue", ["error"]), group("c", "green", ["ready-dcnow", "wifi"]), group("d", "pink", ["nothing-ranked"])]
+        got = ledconfig.clean_led_config({"groups": groups, "priority": ["error", "wifi", "ethernet", "ready-dcnow"]})
+        self.assertEqual([g["id"] for g in got["groups"]], ["b", "c", "a", "d"])      # b has error, c its wifi, a ethernet, d none of the ranked
+        self.assertNotIn("priority", got)
+
+    def test_the_old_default_groups_become_the_new_defaults(self):
+        old = ledconfig._old_default_groups()
+        got = ledconfig.clean_led_config({"groups": old, "priority": ["notrunning", "busy", "call-dcnow", "event-soon", "ready-dcnow"]})
+        self.assertEqual(got["groups"], ledconfig.default_groups())                    # the new ones are split so that the order alone does the job
+        mine = [dict(old[0], colour="blue")] + old[1:]
+        self.assertEqual(len(ledconfig.clean_led_config({"groups": mine, "priority": []})["groups"]), 6)      # changed ones are kept as they are
 
     def test_ids_are_made_unique(self):
         got = ledconfig.clean_groups([group("a", "red", []), group("a", "blue", []), {"colour": "green"}])
@@ -224,7 +257,7 @@ class ConditionTests(Base):
 class LookTests(Base):
     def test_idle_with_the_defaults_shows_the_selected_networks_colour(self):
         looks = self.looks(ctx(net=GOOD))
-        self.assertEqual([m["messages"] for m in looks], [["sel-dcnow", "ready-dcnow"]])        # both apply and share the look
+        self.assertEqual([m["messages"] for m in looks], [["ready-dcnow", "sel-dcnow"]])        # both apply and share the look
         self.assertEqual(looks[-1]["color"], core.network_colour("dcnow")["led"])
         open(core.FLAG, "w").close()
         looks = self.looks(ctx(selected="dcnet", net=GOOD))
@@ -257,10 +290,13 @@ class LookTests(Base):
         for m in self.looks(ctx(net={"network": False})):
             self.assertNotIn("no-network", m["messages"])
 
-    def test_priority_decides_which_group_is_on_top(self):
+    def test_the_top_group_is_on_top(self):
         self.groups(group("g1", "red", ["no-network"]), group("g2", "blue", ["ready"]), group("g3", "green", ["warning"]))
         looks = self.looks(ctx(net={"network": False, "wifi_weak": True}))
-        self.assertEqual([m["key"] for m in looks], ["g2", "g3", "g1"])                # ready lowest, then the warning, the error on top
+        self.assertEqual([m["key"] for m in looks], ["g3", "g2", "g1"])                # drawn lowest first: the top row is drawn last, over the others
+        self.groups(group("g3", "green", ["warning"]), group("g2", "blue", ["ready"]), group("g1", "red", ["no-network"]))
+        looks = self.looks(ctx(net={"network": False, "wifi_weak": True}))
+        self.assertEqual([m["key"] for m in looks], ["g1", "g2", "g3"])                # moving a row changes who wins
 
     def test_several_active_messages_of_one_group_give_one_look(self):
         self.groups(group("g1", "red", ["error", "no-network", "undervoltage"]))
@@ -301,7 +337,7 @@ class LookTests(Base):
             f.write("call dcnow 123")
         look = ledconfig.dreampi_look()
         self.assertEqual(look["color"], core.network_colour("dcnow")["led"])                  # the LED gets the calibrated value ...
-        self.assertEqual(ledconfig.dreampi_dot(), {"colour": "dcnow", "effect": "solid", "speed": "slow"})   # ... the dot the palette colour
+        self.assertEqual(ledconfig.dreampi_dot(), {"colour": "network", "effect": "solid", "speed": "slow"})   # ... the dot the palette colour
         os.remove(core.STATE)
         self.groups(group("g1", "red", ["no-network"]))
         self.assertIsNone(ledconfig.dreampi_look())                               # no group for any DreamPi message: no look
@@ -409,47 +445,6 @@ class PaletteCalibrationTests(Base):
         self.assertFalse(ledconfig.wb_test_active())
 
 
-class PriorityOrderTests(Base):
-    def test_the_default_order_is_the_catalogue_order_without_off(self):
-        self.assertEqual(ledconfig.clean_priority(None), ledconfig.PRIORITY_ORDER)
-        self.assertEqual(ledconfig.led_config()["priority"], ledconfig.PRIORITY_ORDER)
-        self.assertNotIn("off", ledconfig.PRIORITY_ORDER)
-
-    def test_a_saved_order_is_kept_and_made_safe(self):
-        order = list(reversed(ledconfig.PRIORITY_ORDER))
-        self.assertEqual(ledconfig.clean_priority(order), order)
-        got = ledconfig.clean_priority(["wifi", "nonsense", "wifi", 5, "error"])
-        self.assertLess(got.index("wifi"), got.index("error"))                         # their order is kept, unknown and repeated entries are dropped
-        self.assertEqual(sorted(got), sorted(ledconfig.PRIORITY_ORDER))                # and everything that is missing is back
-
-    def test_a_missing_message_goes_back_after_the_one_it_follows_by_default(self):
-        order = [k for k in ledconfig.PRIORITY_ORDER if k != "event-soon"]
-        order.reverse()
-        got = ledconfig.clean_priority(order)
-        default = ledconfig.PRIORITY_ORDER
-        prev = default[default.index("event-soon") - 1]
-        self.assertEqual(got[got.index(prev) + 1], "event-soon")
-
-    def test_the_order_decides_which_group_is_on_top(self):
-        self.groups(group("g1", "red", ["no-network"]), group("g2", "blue", ["ready-dcnow"]))
-        looks = self.looks(ctx(net={"network": False}))
-        self.assertEqual([m["key"] for m in looks], ["g2", "g1"])                      # by default the problem is on top
-        cfg = ledconfig.led_config()
-        cfg["priority"] = ["ready-dcnow"] + [k for k in cfg["priority"] if k != "ready-dcnow"]
-        ledconfig.save_led_config(cfg)
-        looks = self.looks(ctx(net={"network": False}))
-        self.assertEqual([m["key"] for m in looks], ["g1", "g2"])                      # and now being ready is
-
-    def test_the_order_comes_back_from_the_endpoint_and_is_saved_through_it(self):
-        import json as _json
-        cfg = ledconfig.led_config()
-        cfg["priority"] = cfg["priority"][1:] + cfg["priority"][:1]
-        got = ledconfig.save_led_config(cfg)
-        self.assertEqual(got["priority"][-1], ledconfig.PRIORITY_ORDER[0])
-        with open(core.LED_CONFIG) as f:
-            self.assertEqual(_json.load(f)["priority"], got["priority"])
-
-
 class WebTests(Base):
     def setUp(self):
         Base.setUp(self)
@@ -464,35 +459,50 @@ class WebTests(Base):
         self.srv.server_close()
         Base.tearDown(self)
 
-    def get(self):
+    def get(self, path="/ledrows"):
         from urllib.request import urlopen
-        return json.loads(urlopen(self.base + "/ledconfig", timeout=10).read().decode())
+        return json.loads(urlopen(self.base + path, timeout=10).read().decode())
 
-    def post(self, cfg):
+    def post(self, body, path="/ledrows"):
         from urllib.request import Request, urlopen
-        req = Request(self.base + "/ledconfig", data=json.dumps(cfg).encode(), method="POST", headers={"X-Requested-With": "x", "Content-Type": "application/json"})
+        req = Request(self.base + path, data=json.dumps(body).encode(), method="POST", headers={"X-Requested-With": "x", "Content-Type": "application/json"})
         return json.loads(urlopen(req, timeout=10).read().decode())
 
-    def test_the_endpoint_has_everything_the_page_needs(self):
+    def test_the_rows_answer_has_everything_the_widget_needs(self):
         r = self.get()
-        self.assertEqual([e[0] for e in r["effects"]], [e[0] for e in ledconfig.EFFECTS])
-        self.assertEqual([m["key"] for m in r["messages"]], KEYS)
-        self.assertEqual([c[0] for c in r["categories"]], [c[0] for c in ledconfig.CATEGORIES])
-        self.assertEqual(len(r["colours"]["palette"]), 16)
-        self.assertEqual([t["id"] for t in r["colours"]["tokens"]], ["dcnow", "dcnet"])
-        self.assertEqual(r["token_ui"]["dcnow"], {"ui": core.network_colour("dcnow")["ui"], "ui_l": core.network_colour("dcnow")["ui_l"]})
-        self.assertEqual(r["config"]["groups"], r["defaults"]["groups"])
-        self.assertEqual(r["defaults"]["priority"], ledconfig.PRIORITY_ORDER)
-        self.assertEqual(r["config"]["priority"], ledconfig.PRIORITY_ORDER)
-        self.assertTrue(all(set(m) == {"key", "label", "category", "description", "detected"} for m in r["messages"]))
+        self.assertEqual([e["value"] for e in r["lists"]["effects"]], [e[0] for e in ledconfig.EFFECTS])
+        self.assertEqual([c["value"] for c in r["choices"]], KEYS)
+        self.assertEqual(len([c for c in r["lists"]["colours"]]), 18)                    # the 16 palette colours and the two networks
+        self.assertEqual([o["key"] for o in r["options"]], ["colour", "effect", "speed", "brightness"])     # no LED range with one LED
+        self.assertEqual([x["id"] for x in r["rows"]], ["g1", "g2", "g3", "g4", "g5", "g6"])
+        self.assertEqual((r["rows"][0]["title"], r["rows"][0]["sub"]), ("Red, slow blink", "Global level 8%"))
+        self.assertEqual(r["rows"][0]["items"], [{"value": "notrunning", "label": "DreamPi not running"}])
+        self.assertEqual([x["id"] for x in r["defaults"]["rows"]], [x["id"] for x in r["rows"]])
+        self.assertTrue(r["rules"]["sort"] and r["rules"]["unique"] and not r["rules"]["free"])
+        self.assertIn("top row", r["rules"]["help"])
 
-    def test_saving_groups_round_trips(self):
-        cfg = self.get()["config"]
-        cfg["groups"].append(group("mine", "bright-cyan", ["error", "ready"], effect="blink", speed="fast", leds=[1, 1]))
-        out = self.post(cfg)
-        mine = [g for g in out["config"]["groups"] if g["id"] == "mine"][0]
-        self.assertEqual((mine["colour"], mine["messages"], mine["leds"]), ("bright-cyan", ["error"], [1, 1]))    # "ready" is in another group already
-        self.assertEqual(ledconfig.led_config()["groups"][-1]["id"], "mine")
+    def test_a_strip_gets_the_led_range_option(self):
+        ledconfig.save_led_count(8)
+        self.assertEqual([o["key"] for o in self.get()["options"]][-1], "leds")
+
+    def test_saving_rows_round_trips_and_the_order_is_the_priority(self):
+        rows = self.get()["rows"]
+        rows.insert(0, {"id": "mine", "items": [{"value": "error", "label": "Error"}, "ready-dcnow"],
+                        "opts": {"colour": "bright-cyan", "effect": "blink", "speed": "fast", "brightness": 0.5, "leds": [1, 1]}})
+        out = self.post({"rows": rows})
+        mine = out["rows"][0]
+        self.assertEqual((mine["id"], mine["opts"]["colour"], mine["opts"]["leds"]), ("mine", "bright-cyan", [1, 1]))
+        self.assertEqual([i["value"] for i in mine["items"]], ["error", "ready-dcnow"])
+        self.assertEqual(ledconfig.led_config()["groups"][0]["id"], "mine")
+        again = [x for x in out["rows"] if x["id"] == "g6"][0]
+        self.assertNotIn("ready-dcnow", [i["value"] for i in again["items"]])              # a message is in one row only: the first (the top) one keeps it
+
+    def test_the_calibration_endpoint_leaves_the_rows_alone(self):
+        before = ledconfig.led_config()["groups"]
+        out = self.post({"max_brightness": 0.5, "white_balance": {"r": 1, "g": 0.5, "b": 1}, "groups": []}, "/ledconfig")
+        self.assertEqual(out["config"]["max_brightness"], 0.5)
+        self.assertEqual(ledconfig.led_config()["groups"], before)
+        self.assertEqual(ledconfig.led_config()["white_balance"]["g"], 0.5)
 
 
 if __name__ == "__main__":

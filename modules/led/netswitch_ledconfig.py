@@ -1,8 +1,9 @@
 # DreamPi Netswitch add-on - LED settings and what the LEDs show now.
 # led.json keeps colour calibration (white balance, brightness, wire order) and the colour GROUPS: each group is one look
-# (colour, effect, speed, level, which LEDs) plus the list of messages that use it. A message is something the add-on can
-# tell happened (MESSAGES below: "Starting up", "No internet", "Update available" ...); active_messages() works out which
-# are true right now, finds their groups and gives the looks the LED service draws.
+# (colour, effect, speed, level, which LEDs) plus the list of messages (triggers) that use it. A message is something the add-on can
+# tell happened ("Starting up", "No internet", "Update available" ...): the modules announce theirs in module.json
+# ("led_messages", see core.module_led_messages()); active_messages() works out which are true right now, finds their groups and
+# gives the looks the LED service draws. The order of the groups is the priority: the top group wins where looks overlap.
 # Also: LED count / output pin and the white-balance test flag. Shared by the web page and the LED service. Works on Python 3 and 2.7.
 import json
 import re
@@ -12,88 +13,18 @@ import time
 import netswitch_core as core
 
 # -------------------------------------------------------------------- the messages
-CATEGORIES = [   # key, heading (the order the page lists them in)
-    ("dreampi", "DreamPi"),
-    ("calls", "Calls"),
-    ("selection", "Network selection"),
-    ("connection", "Connection and link"),
-    ("modem", "Modem"),
-    ("pi", "Raspberry Pi health"),
-    ("wifisetup", "Wi-Fi setup"),
-    ("addon", "The add-on"),
-    ("players", "Online players"),
-    ("events", "DC99 events"),
-    ("general", "General"),
-]
-# key, label (the short name shown as a tag), category, what it means, detected.
-# detected False = the page can offer it, but nothing tells the add-on yet when it happens, so it never lights (not faked).
-MESSAGES = [
-    ("busy", "Starting up", "dreampi", "DreamPi is starting and does not answer calls yet.", True),
-    ("ready-dcnow", "Ready for calls, DCNow!", "dreampi", "DreamPi is waiting for the Dreamcast to dial and DCNow! is the selected network.", True),
-    ("ready-dcnet", "Ready for calls, DCNET", "dreampi", "DreamPi is waiting for the Dreamcast to dial and DCNET is the selected network.", True),
-    ("notrunning", "DreamPi not running", "dreampi", "DreamPi has stopped or crashed.", True),
-    ("unknown", "State unknown", "dreampi", "The add-on cannot tell what DreamPi is doing: its state file is missing or out of date, for example just after DreamPi restarted or while the add-on is not loaded in it. Best used as a last resort (a dim colour, say).", True),
-    ("call-dcnow", "In a call, DCNow!", "calls", "A call is connected through DCNow!.", True),
-    ("call-dcnet", "In a call, DCNET", "calls", "A call is connected through DCNET.", True),
-    ("call-other", "In a call, Netlink or other", "calls", "A call that is neither DCNow! nor DCNET (Netlink, XBAND and so on).", True),
-    ("sel-dcnow", "DCNow! selected", "selection", "DCNow! is the selected network.", True),
-    ("sel-dcnet", "DCNET selected", "selection", "DCNET is the selected network.", True),
-    ("no-ip", "No IP address yet", "connection", "The cable or Wi-Fi is connected, but the Pi has no address from the router yet (DHCP pending).", True),
-    ("no-network", "No network", "connection", "The Pi has no route to the router: a cable is unplugged or Wi-Fi is not connected.", True),
-    ("no-internet", "No internet", "connection", "The Pi reaches the router, but not the internet.", True),
-    ("internet-ok", "Internet OK", "connection", "The Pi can reach the internet.", True),
-    ("dns-fail", "DNS failing", "connection", "The internet answers, but name lookups (DNS) fail.", True),
-    ("ethernet", "Ethernet connected", "connection", "A network cable is connected.", True),
-    ("wifi", "Wi-Fi connected", "connection", "The Pi is connected to a Wi-Fi network.", True),
-    ("wifi-weak", "Weak Wi-Fi signal", "connection", "The Wi-Fi signal is weak (-75 dBm or less).", True),
-    ("net-slow", "Slow connection", "connection", "High latency or packet loss to the internet (an average of 200 ms or more, or 10 % of the packets lost). Measured with ping every 30 seconds.", True),
-    ("modem-ok", "Modem plugged in", "modem", "The modem's USB serial port is there.", True),
-    ("modem-missing", "Modem missing", "modem", "The modem is unplugged or its USB serial port is gone.", True),
-    ("undervoltage", "Under-voltage", "pi", "The Pi is getting too little power right now.", True),
-    ("throttled", "Throttled", "pi", "The Pi is slowing itself down right now (power or heat).", True),
-    ("hot", u"Over 80 \u00b0C", "pi", u"The Pi is 80 \u00b0C or hotter.", True),
-    ("warm", u"70 \u00b0C or warmer", "pi", u"The Pi is 70 \u00b0C or warmer (also true above 80 \u00b0C).", True),
-    ("wifisetup-scan", "Scanning or hosting", "wifisetup", "Wi-Fi setup is looking for networks or hosting its own.", True),
-    ("wifisetup-choose", "Choose a network", "wifisetup", "Wi-Fi setup is waiting for you to pick a network.", True),
-    ("wifisetup-connecting", "Connecting", "wifisetup", "Wi-Fi setup is connecting to the network you picked.", True),
-    ("wifisetup-ok", "Connected", "wifisetup", "Wi-Fi setup connected to the network.", True),
-    ("wifisetup-failed", "Could not connect", "wifisetup", "Wi-Fi setup could not connect.", True),
-    ("update-addon", "Add-on update available", "addon", "A newer version of this add-on is on GitHub.", True),
-    ("update-dreampi", "DreamPi update available", "addon", "DreamPi has newer scripts than the Pi has.", True),
-    ("update-running", "Update running", "addon", "An update of the add-on is in progress.", True),
-    ("update-ok", "Update done", "addon", "The add-on was updated (for 10 minutes afterwards).", True),
-    ("update-failed", "Update failed", "addon", "The update of the add-on failed (for 10 minutes afterwards).", True),
-    ("reboot", "About to reboot", "addon", "A reboot was requested; the Pi goes down in a moment.", True),
-    ("players-game", "Your game is played", "players", "Someone is playing one of your favourite games (Settings > Online players).", True),
-    ("players-friend", "A friend came online", "players", "One of your favourite players is online (Settings > Online players).", True),
-    ("event-soon", "Event starting soon", "events", "A DC99 event you asked to be reminded of starts soon (from the time set in Settings > DC99 events until 10 minutes after the start, or until you dismiss it on the page).", True),
-    ("ok", "Everything OK", "general", "No error and no warning: DreamPi is ready or in a call, and the network and internet work.", True),
-    ("error", "Error", "general", u"Anything critical: DreamPi not running, no network, no internet, under-voltage, over 80 \u00b0C or the modem missing.", True),
-    ("warning", "Warning", "general", "Any warning or important information: DNS failing, slow connection, weak Wi-Fi, no IP address yet, throttled or warm, DCNET unavailable, a failed update, a failed Wi-Fi setup, an update available.", True),
-    ("off", "Off (nothing else applies)", "general", "Used when no other message is showing. Leave it out for dark LEDs, or give it a very dim colour.", True),
-]
-MESSAGE = dict((m[0], m) for m in MESSAGES)
+# The messages themselves are announced by the modules (module.json "led_messages"); the detection of when each is true is
+# active_keys() below. A message whose module is off is not offered and never lights.
+_KEY = re.compile(r"^[a-z][a-z0-9-]*$")
+
+
+def messages():
+    """[{"key", "label", "group", "description", "module"}] of the enabled modules, in picker order (core.module_led_messages())."""
+    return core.module_led_messages()
+
+
 ERRORS = ("notrunning", "no-network", "no-internet", "undervoltage", "hot", "modem-missing")
 WARNINGS = ("dns-fail", "net-slow", "wifi-weak", "no-ip", "throttled", "warm", "wifisetup-failed", "update-failed", "update-addon", "update-dreampi")
-# What wins when several messages apply at once on the same LEDs, most important first: a reboot, Wi-Fi setup, an update,
-# then errors, warnings, what DreamPi is doing, plain information. "off" is not in the list: it only applies when nothing else does.
-PRIORITY_ORDER = [
-    "reboot",
-    "wifisetup-failed", "wifisetup-ok", "wifisetup-connecting", "wifisetup-choose", "wifisetup-scan",
-    "update-failed", "update-ok", "update-running",
-    "error",
-    "notrunning", "undervoltage", "hot", "modem-missing", "no-ip", "no-network", "no-internet",
-    "warning",
-    "dns-fail", "net-slow", "throttled", "wifi-weak", "warm",
-    "busy",
-    "call-dcnow", "call-dcnet", "call-other",
-    "update-addon", "update-dreampi",
-    "event-soon",
-    "players-friend", "players-game",
-    "ready-dcnow", "ready-dcnet", "sel-dcnow", "sel-dcnet",
-    "ethernet", "wifi", "internet-ok", "modem-ok",
-    "ok", "unknown",
-]
 # a message an older led.json has, as the messages that replaced it
 OLD_KEYS = {"ready": ["ready-dcnow", "ready-dcnet"]}
 
@@ -127,10 +58,22 @@ def _group(gid, colour, effect, speed, messages):
 
 
 def default_groups():
-    """The looks the add-on starts with: the networks' colours for their selection and calls, purple for other calls, the network
-    colour while ready (each network has its own message), yellow blinking while starting, red blinking when DreamPi is not running
-    and bright pink blinking while a DC99 event you asked to be reminded of starts soon. Everything else is optional:
-    add it to a group on the page."""
+    """The looks the add-on starts with, most important first (the order is the priority): red blinking when DreamPi is not running,
+    yellow blinking while starting, the network's colour during a call (purple for other calls), bright pink blinking while a DC99
+    event you asked to be reminded of starts soon, and the network's colour while ready or selected. Everything else is optional:
+    add it to a row on the page."""
+    return [
+        _group("g1", "red", "blink", "slow", ["notrunning"]),
+        _group("g2", "yellow", "blink", "slow", ["busy"]),
+        _group("g3", "network", "solid", "slow", ["call-dcnow", "call-dcnet"]),
+        _group("g4", "purple", "solid", "slow", ["call-other"]),
+        _group("g5", "bright-pink", "blink", "slow", ["event-soon"]),
+        _group("g6", "network", "solid", "slow", ["ready-dcnow", "ready-dcnet", "sel-dcnow", "sel-dcnet"]),
+    ]
+
+
+def _old_default_groups():
+    """What the add-on started with before the order of the groups was the priority (it had a separate list of messages in order)."""
     return [
         _group("g1", "dcnow", "solid", "slow", ["sel-dcnow", "ready-dcnow", "call-dcnow"]),
         _group("g2", "dcnet", "solid", "slow", ["sel-dcnet", "ready-dcnet", "call-dcnet"]),
@@ -206,23 +149,18 @@ GAMMA = 2.2
 def default_led_config():
     return {"max_brightness": 0.08, "order": "GRB", "gamma": GAMMA,
             "white_balance": {"r": 1.0, "g": 1.0, "b": 1.0},
-            "groups": default_groups(), "priority": clean_priority(None)}
+            "groups": default_groups()}
 
 
-def clean_priority(data):
-    """The message order the user set (most important first) made safe: every ranked message once. The fallback "off" is not in the
-    order. A message that is missing (an older file, or one added by a newer version) goes back where the default order has it,
-    right after the message it follows there."""
-    default = [k for k in PRIORITY_ORDER if k in MESSAGE and k != "off"]
-    out = []
-    for k in data if isinstance(data, list) else []:
-        if isinstance(k, _TEXT) and k in default and k not in out:
-            out.append(str(k))
-    for i, k in enumerate(default):
-        if k not in out:
-            prev = default[i - 1] if i else None
-            out.insert(out.index(prev) + 1 if prev in out else 0, k)
-    return out
+def order_by_priority(groups, priority):
+    """Groups of an older led.json, which had the message priority as a separate list, put in the order that list gave: a group takes the
+    place of its most important message (groups with no ranked message keep their order, at the end). Groups that are the add-on's
+    own old defaults become the new defaults, which split the groups so that the order can do the same."""
+    if groups == _old_default_groups():
+        return default_groups()
+    rank = dict((k, i) for i, k in enumerate(priority if isinstance(priority, list) else []))
+    big = len(rank) + 1
+    return sorted(groups, key=lambda g: min([rank.get(m, big) for m in g["messages"]] or [big]))
 
 
 def _valid_colour(c):
@@ -231,7 +169,8 @@ def _valid_colour(c):
 
 def clean_groups(data):
     """The saved groups made safe: at most MAX_GROUPS, unique ids, a valid colour / effect / speed / level / LED range, and each
-    known message in at most one group (the first that has it). Returns None when data isn't a list."""
+    message in at most one group (the first that has it; a message of a module that is off stays in its group). Returns None when data
+    isn't a list."""
     if not isinstance(data, list):
         return None
     out, seen_ids, seen_msgs = [], set(), set()
@@ -258,7 +197,7 @@ def clean_groups(data):
         for key in g.get("messages") if isinstance(g.get("messages"), list) else []:
             wanted.extend(OLD_KEYS.get(key, [key]) if isinstance(key, _TEXT) else [])
         for key in wanted:
-            if key in MESSAGE and key not in seen_msgs:
+            if _KEY.match(key) and key not in seen_msgs:
                 seen_msgs.add(key)
                 group["messages"].append(str(key))
         out.append(group)
@@ -290,8 +229,7 @@ def clean_led_config(data):
                 pass
     groups = clean_groups(data.get("groups"))
     if groups is not None:
-        cfg["groups"] = groups
-    cfg["priority"] = clean_priority(data.get("priority"))
+        cfg["groups"] = order_by_priority(groups, data.get("priority")) if "priority" in data else groups
     return cfg
 
 
@@ -441,18 +379,18 @@ def active_keys(ctx):
 
 
 def active_messages(ctx=None):
-    """The looks to draw now, lowest priority first (the LED service draws them in this order, so later ones end up on top). One
-    entry per group that has an active message: key (the group's id), color ("#rrggbb"), effect, speed, brightness (the group's
-    level, or the global one), leds, messages (its active message keys). When nothing applies, the group with "off" gives the look."""
+    """The looks to draw now, lowest priority first (the LED service draws them in this order, so later ones end up on top). The
+    order of the groups is the priority: the top group wins. One entry per group that has an active message: key (the group's id),
+    color ("#rrggbb"), effect, speed, brightness (the group's level, or the global one), leds, messages (its active message keys).
+    Only the messages the enabled modules announce can be active. When nothing applies, the group with "off" gives the look."""
     ctx = ctx or gather()
-    keys = active_keys(ctx)
+    keys = active_keys(ctx) & set(m["key"] for m in messages())
     cfg = led_config()
     entries = []
-    rank = dict((k, len(cfg["priority"]) - i) for i, k in enumerate(cfg["priority"]))      # higher = more important
-    for g in cfg["groups"]:
+    for i, g in enumerate(cfg["groups"]):
         active = [m for m in g["messages"] if m in keys]
         if active:
-            entries.append((max(rank.get(m, 0) for m in active), g, active))
+            entries.append((len(cfg["groups"]) - i, g, active))      # higher = more important
     if not entries:
         for g in cfg["groups"]:
             if "off" in g["messages"]:

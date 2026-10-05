@@ -45,7 +45,7 @@ class ConfigTests(unittest.TestCase):
 
     def test_bad_led_values_fall_back(self):
         got = ledconfig.clean_led_config({"order": "XYZ", "max_brightness": "lots", "gamma": 99,
-                                    "groups": [{"colour": "plaid", "effect": "disco", "speed": "warp", "messages": ["ready", "nonsense"]}]})
+                                    "groups": [{"colour": "plaid", "effect": "disco", "speed": "warp", "messages": ["ready", "Not a key!"]}]})
         d = ledconfig.default_led_config()
         self.assertEqual(got["order"], d["order"])
         g = got["groups"][0]
@@ -234,8 +234,9 @@ class HttpTests(unittest.TestCase):
 
     def test_ledconfig_round_trip(self):
         r = json.loads(self.get("/ledconfig")[2].decode())
-        for key in ("config", "defaults", "messages", "categories", "colours", "effects", "count", "installed"):
+        for key in ("config", "token_ui", "count", "installed"):
             self.assertIn(key, r)
+        self.assertNotIn("groups", r["config"])              # the looks are GET/POST /ledrows
         cfg = r["config"]
         cfg["white_balance"]["g"] = 200 / 255.0
         cfg["order"] = "BGR"                                 # the wire order belongs to the GPIO form: this POST keeps the saved one

@@ -5,8 +5,8 @@
 #
 # What it shows comes from the page's settings (led.json, see netswitch_ledconfig):
 # colour groups (each a colour, an effect, a speed, a brightness and an LED section, with the
-# messages that light it, see ledconfig.MESSAGES). Several groups can show at once on different
-# LEDs; the most important message wins where they overlap, "State unknown" is only a fallback,
+# messages that light it, see the modules' module.json "led_messages"). Several groups can show at once on different
+# LEDs; the top group wins where they overlap, "State unknown" is only a fallback,
 # see netswitch_ledconfig.active_messages().
 # The number of LEDs is in /opt/dreampi-netswitch/led_count (install.sh).
 import colorsys

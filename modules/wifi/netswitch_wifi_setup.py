@@ -26,7 +26,7 @@
 # The current state is written to /tmp/dreampi-netswitch.wifi for the web
 # page (a warning banner and the Settings button) and the LED service
 # (netswitch_led.py, via netswitch_ledconfig.active_messages()) to read; see
-# the "wifisetup-*" messages in netswitch_ledconfig.MESSAGES.
+# the "wifisetup-*" messages the Wi-Fi module announces (module.json "led_messages").
 #
 # This assumes the classic Raspberry Pi OS network stack DreamPi normally
 # runs on: wpa_supplicant + dhcpcd managing the wireless interface, and

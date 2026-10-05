@@ -63,15 +63,12 @@ const AUDIT = () => {
     await page.screenshot({ path: `/tmp/dpns-audit-settings-${w}.png`, fullPage: true });
     await page.click('[data-box="system"] .srow:not([data-id]):has-text("Wi-Fi setup") > button'); await page.waitForTimeout(1500);
     // popups
-    await page.click('[data-box="status led"] button[aria-label="Edit this colour"]'); await page.waitForTimeout(300); await check('LED colour edit pop-up');
+    await page.click('[data-box="status led"] .wtrig .srow.edit button.pill-s'); await page.waitForTimeout(300); await check('LED colour edit pop-up');
+    await page.click('[data-box="status led"] .pop.open [aria-expanded]'); await page.waitForTimeout(300); await check('LED add messages list');
     await page.keyboard.press('Escape');
-    await page.click('[data-box="status led"] button[aria-label="Add messages to this colour"]'); await page.waitForTimeout(300); await check('LED add messages pop-up');
-    await page.keyboard.press('Escape');
-    await page.click('[data-box="special phone numbers"] .wtrig .srow.edit button'); await page.waitForTimeout(300); await check('numbers row pop-up');
+    await page.click('[data-box="special phone numbers"] .wtrig .srow.edit button.pill-s'); await page.waitForTimeout(300); await check('numbers row pop-up');
     await page.keyboard.press('Escape');
     await page.click('[data-box="status led"] .srow:has-text("Calibration") > button'); await page.waitForTimeout(300); await check('calibration pop-up');
-    await page.keyboard.press('Escape');
-    await page.click('[data-box="status led"] button[aria-label="Edit the message priority"]'); await page.waitForTimeout(500); await check('LED priority pop-up');
     await page.keyboard.press('Escape');
     await page.click('[data-box="status led"] button[aria-label="Adjust the colours"]'); await page.waitForTimeout(500); await check('LED colours pop-up');
     await page.keyboard.press('Escape');
