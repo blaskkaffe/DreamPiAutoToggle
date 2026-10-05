@@ -20,6 +20,8 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
     await settle(900);
     await page.screenshot({ path: out + '/' + label + '-' + w + '-dashboard-open.png', fullPage: true });
     await page.click('#cog'); await settle(1500);
+    const tall = await page.evaluate(() => document.querySelector('#settings').scrollHeight);      // the overlay scrolls: make the window as tall as its content
+    await page.setViewportSize({ width: w, height: Math.min(tall, 6000) }); await settle(600);
     await page.locator('#settings .in').screenshot({ path: out + '/' + label + '-' + w + '-settings.png' });
     await page.close();
   }
