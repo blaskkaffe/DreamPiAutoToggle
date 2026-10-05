@@ -183,6 +183,11 @@ W.colourpick=function(s,ctx){var inp=h("input",{type:"color","class":"cp-native"
  (LAY.palette||[]).forEach(function(p){if(p.id===s.id)inp.value=p.ui});
  inp.oninput=function(){var ui=inp.value;applyPaletteVars({id:s.id,ui:ui});clearTimeout(timer);timer=setTimeout(function(){post("/palette",{id:s.id,ui:ui},function(r){if(r)ctx.saved()})},250)};
  return el};
+// a colour well: a Colour button in a colour of any #rrggbb (the LED colour editor); the system's colour chooser lies over it, cb(value) is called on every change
+function colourWell(value,label,cb){var inp=h("input",{type:"color","class":"cp-native",value:value,"aria-label":label}),
+ btn=h("button",{type:"button","class":"pill-s well",text:"Colour",tabindex:"-1","aria-hidden":"true"}),el=h("span",{"class":"colourpick cp-wrap"},[btn,inp]);
+ function paint(){btn.style.setProperty("--well",inp.value);btn.style.setProperty("--well-l",mixWhite(inp.value))}
+ inp.oninput=function(){paint();cb(inp.value)};paint();return el}
 W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri",text:s.label||"Colour","aria-haspopup":"dialog"}),
  grid=h("span",{"class":"swatches grid"}),pop=h("div",{"class":"colours"},[h("div",{"class":"t",text:s.title||"Pick a colour"}),grid]),
  tint=s.tint?h("input",{type:"checkbox","class":"cbox pri",title:"Highlight: a coloured background (off = a neutral one)","aria-label":(s.title||"Colour")+": highlight with a coloured background"}):null,

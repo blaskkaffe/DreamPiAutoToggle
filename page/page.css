@@ -63,7 +63,8 @@
  .wtext.log{font:var(--fs-sm)/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--box-text-2)}
  .now.open b .carousel{text-align:center}
  .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r-box);font-size:1.1em;font-weight:600;letter-spacing:.02em}
- .pill-s.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb));text-shadow:0 1px 2px rgba(0,0,0,.55)}   /* a small button in a palette colour (c-<id>), like the colour pick's */
+ .pill-s.pri,.pill-s.on{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb));text-shadow:0 1px 2px rgba(0,0,0,.55)}   /* a small button in a palette colour (c-<id>), like the colour pick's */
+ .pill-s.well{background:var(--well);border-color:var(--well-l);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55)} .pill-s:disabled{opacity:.35;cursor:default} .pill-s.fixw{min-width:10.5em;text-align:center}
  .pill.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb))}
  .pill.plain{background:var(--card)}   /* "Coloured background" off: a neutral fill, the border keeps the colour */
  .dbox.plain .now{background:var(--card)}
@@ -80,7 +81,7 @@
  .srow.wrap{flex-wrap:wrap} .srow .below{flex-basis:100%}
  .srow.wrap > span:first-child{flex:1 1 0;min-width:0}   /* the text takes the room that is left and wraps; a button never gets pushed down below it */
  .srow.edit{align-items:flex-start}   /* a row with an Edit button: the button is always at the top right, however many lines the text has */
- .optrow{display:flex;gap:8px;flex-wrap:wrap} .optrow .pill-s{flex:1 1 auto;text-align:center}   /* a simple pick: the options as a row of buttons in a pop-up */
+ .optrow{display:flex;gap:8px;flex-wrap:wrap} .optrow .pill-s{flex:1 1 auto;text-align:center} .frow .optrow{justify-content:flex-end} .frow .optrow .pill-s{flex:none}   /* a simple pick: the options as a row of buttons in a pop-up */
  .wpicker .addarea{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
  .rows.noopen{cursor:default}
  .ibtn{flex:none;width:36px;height:36px;padding:0;border-radius:50%;background:rgba(0,0,0,.25);display:inline-flex;align-items:center;justify-content:center}   /* a round on / off icon button: ui.iconButton() */
@@ -162,6 +163,10 @@
  .now[data-title-rows]:not(.open) > .row.main{grid-row:3} .now .wlist .p{align-items:center} .now .wlist .p .ibtn{width:30px;height:30px}
  .now .links{display:flex;flex-wrap:wrap;gap:6px} .now .links a{color:#fff;opacity:.9;padding:6px 0}
  .now .st{display:block;overflow-wrap:anywhere}
+ .frow.stack{flex-direction:column;align-items:stretch;gap:8px}   /* a pop-up row with its control under the label */
+ .rangev{display:flex;align-items:center;gap:10px;flex:1;max-width:60%} .rangev input{flex:1;min-width:0;accent-color:var(--primary)} .rangev .rv{width:3em;text-align:right;color:var(--text-2)}   /* a slider with its value */
+ .poplist{max-height:55vh;overflow-y:auto;overscroll-behavior:contain;margin:0 -4px 8px;padding:0 4px} .poplist .srow.wrap{flex-wrap:nowrap} .poplist .srow > span:first-child{flex:1}   /* a scrolling list in a pop-up, in groups (.cat) */
+ .cat{margin:12px 0 2px;color:var(--text-3);font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.08em} .cat:first-child{margin-top:0} .dim{opacity:.55}
  .pop .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0} .pop .frow > span{color:var(--text-2);font-size:var(--fs-sm)}
  .btns{display:flex;gap:8px;flex:none} .srow.foot{padding:12px 0 8px}
  .srow.lk .pill-s,.srow.lk .tag{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb));text-shadow:0 1px 2px rgba(0,0,0,.55);color:#fff} .srow.lk .tag button{color:#fff}

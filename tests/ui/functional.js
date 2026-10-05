@@ -184,10 +184,10 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   // every animation of a row: its class says which, the buttons run it between the colour and the grey
   await ledRows.first().locator('button[aria-label="Edit this colour"]').click(); await settle(300);
   for (const [label, cls] of [['Fade', 'lk-fade'], ['Breathe', 'lk-breathe'], ['Short blink', 'lk-blink1'], ['Double blink', 'lk-blink2'], ['Triple blink', 'lk-blink3'], ['Rainbow', 'lk-rainbow']]) {
-    await page.locator('.pop.open .seg button', { hasText: new RegExp('^' + label + '$') }).click(); await settle(500);
+    await page.locator('.pop.open .optrow button', { hasText: new RegExp('^' + label + '$') }).click(); await settle(500);
     ok(await ledRows.first().evaluate((e, c) => e.classList.contains(c) && getComputedStyle(e.querySelector('button.pill-s')).animationName !== 'none', cls), label + ' makes the row run its animation');
   }
-  await page.locator('.pop.open .seg button', { hasText: /^Solid$/ }).click(); await settle(500);
+  await page.locator('.pop.open .optrow button', { hasText: /^Solid$/ }).click(); await settle(500);
   ok(await ledRows.first().evaluate(e => !e.classList.contains('lk-fx')), 'Solid stops it');
   await page.keyboard.press('Escape'); await settle(200);
   // the colours editor: the LED's red need not be the page's red

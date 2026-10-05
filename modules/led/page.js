@@ -52,8 +52,8 @@ var LOG_BASE=100;
 function sliderToBright(p){return (Math.pow(LOG_BASE,p/1000)-1)/(LOG_BASE-1)}
 function brightToSlider(b){return Math.round(1000*Math.log(1+b*(LOG_BASE-1))/Math.log(LOG_BASE))}
 function openEdit(g,btn,e){if(pEdit.isOpen()&&editing===g){pEdit.toggle(btn,e);return}editing=g;fillEdit(g);pEdit.toggle(btn,e)}
-function seg(options,current,onPick,disabled){var box=h("span",{"class":"seg"});
- options.forEach(function(o){var b=h("button",{type:"button","class":"pill-s"+(o[0]===current?" sel":""),text:o[1]});b.disabled=!!disabled;b.onclick=function(){onPick(o[0])};box.appendChild(b)});return box}
+function seg(options,current,onPick,disabled){var box=h("span",{"class":"optrow"});
+ options.forEach(function(o){var b=h("button",{type:"button","class":"pill-s"+(o[0]===current?" pri":""),text:o[1]});b.disabled=!!disabled;b.onclick=function(){onPick(o[0])};box.appendChild(b)});return box}
 function fillEdit(g){editPop.innerHTML="";var c=colourOf(g);
  editPop.appendChild(h("div",{"class":"t",text:"Colour, animation and level"}));
  // colour: the palette, then the colours that follow the networks
@@ -62,7 +62,7 @@ function fillEdit(g){editPop.innerHTML="";var c=colourOf(g);
   if(x.id==="network"){var tk=tokenColours().network;ui=tk.ui;ul=tk.ui_l}      // Selected network: the ball shows the network's colour now
   var b=h("button",{type:"button","class":"swatch"+(g.colour===x.id?" sel":""),style:"--c:"+ui+";--cl:"+ul,"aria-label":x.name});
   b.onclick=function(){g.colour=x.id;paintAll();save()};grid.appendChild(b)});
- editPop.appendChild(h("div",{"class":"frow wrapcol"},[h("span",{text:"Colour: "+c.name}),grid]));
+ editPop.appendChild(h("div",{"class":"frow stack"},[h("span",{text:"Colour: "+c.name}),grid]));
  editPop.appendChild(h("div",{"class":"frow"},[h("span",{text:"Or a network colour"}),
   seg(colours.tokens.map(function(t){return [t.id,t.name]}),g.colour,function(v){g.colour=v;paintAll();save()})]));
  editPop.appendChild(h("div",{"class":"frow"},[h("span",{text:"Animation"}),seg(effects.map(function(e){return [e[0],e[1]]}),g.effect,function(v){g.effect=v;paintAll();save()})]));
@@ -72,7 +72,7 @@ function fillEdit(g){editPop.innerHTML="";var c=colourOf(g);
  slider.value=brightToSlider(own?g.brightness:cfg.max_brightness);useGlobal.disabled=!own;
  slider.oninput=function(){g.brightness=Math.round(sliderToBright(slider.value)*1000)/1000;setText(val,pct(g.brightness));useGlobal.disabled=false;paintRow(g,rowOf[g.id]);save()};
  useGlobal.onclick=function(){g.brightness=null;paintAll();save()};
- editPop.appendChild(h("div",{"class":"frow"},[h("span",{text:"Level"}),h("span",{"class":"lvl"},[slider,val])]));
+ editPop.appendChild(h("div",{"class":"frow"},[h("span",{text:"Level"}),h("span",{"class":"rangev"},[slider,val])]));
  editPop.appendChild(h("div",{"class":"frow"},[h("span",{"class":"sub",text:own?"Its own level":"Uses the global level from Calibration"}),useGlobal]));
  if(ledCount>1){   // a strip: which LEDs this look uses
   var mode=!g.leds?"all":g.leds[0]===g.leds[1]?"one":"range",a=h("input",{type:"number",min:1,max:ledCount,"aria-label":"First LED"}),b=h("input",{type:"number",min:1,max:ledCount,"aria-label":"Last LED"});
@@ -88,11 +88,11 @@ function fillEdit(g){editPop.innerHTML="";var c=colourOf(g);
  editPop.appendChild(h("div",{"class":"bar"},[rm,done]))}
 // ---- Add: pick messages for a row (only those that are in no row yet)
 function openAdd(g,btn,e){if(pAdd.isOpen()&&adding===g){pAdd.toggle(btn,e);return}adding=g;fillAdd(g);pAdd.toggle(btn,e)}
-function fillAdd(g){addPop.innerHTML="";var used={},box=h("div",{"class":"addlist"}),any=false;
+function fillAdd(g){addPop.innerHTML="";var used={},box=h("div",{"class":"poplist"}),any=false;
  cfg.groups.forEach(function(x){x.messages.forEach(function(k){used[k]=true})});
  addPop.appendChild(h("div",{"class":"t",text:"Add messages to "+colourOf(g).name+", "+effectName(g)}));
  cats.forEach(function(cat){var free=messages.filter(function(m){return m.category===cat[0]&&!used[m.key]});if(!free.length)return;any=true;
-  box.appendChild(h("div",{"class":"cathead",text:cat[1]}));
+  box.appendChild(h("div",{"class":"cat",text:cat[1]}));
   free.forEach(function(m){var r=editRow({title:m.label,button:"Add",aria:"Add "+m.label});
    r.setSub(m.description+(m.detected?"":" (Not detected yet.)"));
    r.btn.onclick=function(){g.messages.push(m.key);paintAll();save()};box.appendChild(r.el)})});
@@ -134,7 +134,7 @@ function fillPrio(){prioPop.innerHTML="";var used={},catName={},box=h("div",{"cl
  prioPop.appendChild(h("div",{"class":"t",text:"Most important first. Drag the handle (or use the up and down arrow keys on it) to move a message. Dimmed messages are in no colour yet, so they do not light the LED."}));
  cfg.priority.forEach(function(k){var m=byKey[k];if(!m)return;
   var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+m.label+": drag, or use the up and down arrow keys",html:"&#8942;&#8942;"}),
-   left=h("span",{"class":used[k]?"":"prio-off"},[document.createTextNode(m.label),h("span",{"class":"sub",text:catName[m.category]||""})]);
+   left=h("span",{"class":used[k]?"":"dim"},[document.createTextNode(m.label),h("span",{"class":"sub",text:catName[m.category]||""})]);
   box.appendChild(h("div",{"class":"srow","data-id":k},[grip,left]))});
  prioPop.appendChild(box);
  sortable(box,function(order){cfg.priority=order;save()});
@@ -161,15 +161,14 @@ function fillCol(){colPop.innerHTML="";var cur=null;pal.forEach(function(c){if(c
  if(!cur)return;
  if(cur.fixed){colPop.appendChild(h("div",{"class":"sub",text:cur.name+" is the colour of the selected network, DCNow! or DCNET: it follows the switch and has no value of its own (set the network colours in Appearance)."}));
   var d0=h("button",{type:"button","class":"pill-s",text:"Done"});d0.onclick=function(){pCol.close()};colPop.appendChild(h("div",{"class":"bar end"},[d0]));return}
- var uiIn=h("input",{type:"color",value:cur.ui,"aria-label":cur.name+" on screen"}),ledIn=h("input",{type:"color",value:cur.led,"aria-label":cur.name+" on the LED"}),
+ var uiWell=colourWell(cur.ui,cur.name+" on screen",function(v){cur.ui=v;applyVars(cur);colChanged=true;clearTimeout(colTimer);colTimer=setTimeout(function(){colSave({id:cur.id,ui:cur.ui})},250)}),
+  ledWell=colourWell(cur.led,cur.name+" on the LED",function(v){cur.led=v;colChanged=true;if(wbOn&&colPreview.classList.contains("on"))startHold(cur.led);
+   clearTimeout(colTimer);colTimer=setTimeout(function(){colSave({id:cur.id,led:cur.led})},250)}),
   changed=cur.ui!==cur.ui_default||cur.led!==cur.led_default;
- colPreview=h("button",{type:"button","class":"pill-s"+(wbOn&&holdColour===cur.led?" on":""),text:wbOn&&holdColour===cur.led?"Stop preview":"Preview on LED"});
- uiIn.oninput=function(){cur.ui=uiIn.value;applyVars(cur);colChanged=true;clearTimeout(colTimer);colTimer=setTimeout(function(){colSave({id:cur.id,ui:cur.ui})},250)};
- ledIn.oninput=function(){cur.led=ledIn.value;colChanged=true;if(wbOn&&colPreview.classList.contains("on"))startHold(cur.led);
-  clearTimeout(colTimer);colTimer=setTimeout(function(){colSave({id:cur.id,led:cur.led})},250)};
+ colPreview=h("button",{type:"button","class":"pill-s fixw"+(wbOn&&holdColour===cur.led?" on":""),text:wbOn&&holdColour===cur.led?"Stop preview":"Preview on LED"});
  colPreview.onclick=function(){if(wbOn&&colPreview.classList.contains("on")){stopHold();return}startHold(cur.led);colPreview.classList.add("on");colPreview.textContent="Stop preview"};
- colPop.appendChild(h("div",{"class":"frow"},[h("span",{text:cur.name+" on screen"}),uiIn]));
- colPop.appendChild(h("div",{"class":"frow"},[h("span",{text:cur.name+" on the LED"}),h("span",{"class":"ctls"},[ledIn,colPreview])]));
+ colPop.appendChild(h("div",{"class":"frow"},[h("span",{text:cur.name+" on screen"}),uiWell]));
+ colPop.appendChild(h("div",{"class":"frow"},[h("span",{text:cur.name+" on the LED"}),h("span",{"class":"ctls"},[ledWell,colPreview])]));
  var reset=h("button",{type:"button","class":"pill-s",text:"Reset this colour"}),resetAll=h("button",{type:"button","class":"pill-s danger",text:"Reset all"}),done=h("button",{type:"button","class":"pill-s",text:"Done"});
  reset.disabled=!changed;
  reset.onclick=function(){stopHold();colChanged=true;colSave({reset:cur.id},fillCol)};
