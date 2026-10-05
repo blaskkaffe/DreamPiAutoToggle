@@ -35,11 +35,11 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   // the open box: each city with its time on one row, and the map of the real time zone areas
   ok(!(await box.locator('svg.cmap').isVisible()), 'the map is hidden until the box is tapped');
   await box.click({ position: { x: 20, y: 10 } }); await settle(1500);
-  const rows = box.locator('.cwl .cwc');
+  const rows = box.locator('.wlist.grid .p');
   ok(await rows.count() === 10, 'the open box lists the ten default cities (' + await rows.count() + ')');
   const sp = await rows.filter({ hasText: 'São Paulo' }).first().evaluate(e => ({ h: e.getBoundingClientRect().height, line: parseFloat(getComputedStyle(e).lineHeight) || 20, t: e.textContent }));
   ok(sp.h < sp.line * 1.6 && /São Paulo\s*\d{1,2}:\d{2}/.test(sp.t), 'a city and its time stay together on one line (' + sp.t + ')');
-  ok(!(await box.locator('.row.wcar').isVisible()), 'the scrolling line gives way to the list while the box is open');
+  ok(!(await box.locator('.row.x-closed').isVisible()), 'the scrolling line gives way to the list while the box is open');
   ok(await box.locator('svg.cmap').isVisible() && await box.locator('svg.cmap .band').count() === 25, 'a tap opens the map with its 25 time zone bands');
   ok(await box.locator('svg.cmap polygon.land').count() >= 10 && await box.locator('svg.cmap .band.here').count() === 1, 'the land is drawn and the band of the clock\'s own time zone is highlighted');
   ok(await box.locator('svg.cmap .city').count() === 10, 'the cities are dots');
@@ -48,7 +48,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await hrs.evaluateAll(els => new Set(els.map(e => getComputedStyle(e).fontSize)).size === 1), 'the UTC markers are the same size as the hours');
   ok(await box.locator('.cmapnote').count() === 0, 'there is no explaining text under the map');
   ok(await box.locator('svg.cmap .city').first().getAttribute('r') === '3.4', 'the city dots are bigger');
-  const w = await box.evaluate(e => ({ svg: e.querySelector('svg.cmap').getBoundingClientRect().width, row: e.querySelector('.mapw').getBoundingClientRect().width }));
+  const w = await box.evaluate(e => ({ svg: e.querySelector('svg.cmap').getBoundingClientRect().width, row: e.querySelector('.worldmap').parentNode.getBoundingClientRect().width }));
   ok(w.svg > w.row * 0.95, 'the map is as wide as its row (' + Math.round(w.svg) + ' of ' + Math.round(w.row) + ')');
   // removing and adding a city, and the clock's own time zone
   await page.click('#cog'); await settle(900);
@@ -76,11 +76,11 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   const place = await tzRow.evaluate(r => { const b = r.querySelector('button').getBoundingClientRect(), q = r.getBoundingClientRect(), t = r.querySelector('.sub').getBoundingClientRect(); return { top: b.top - q.top, right: q.right - b.right, lines: Math.round(t.height / 16) }; });
   ok(place.top < 14 && place.right < 2 && place.lines >= 2, 'with a long text under it the Edit button stays at the top right of the row, the text wraps (' + Math.round(place.top) + 'px from the top, ' + place.lines + ' lines)');
   await page.click('#close-settings'); await settle(1800);
-  const tokyo = await page.evaluate(() => S.clock.cities.filter(c => c[0] === 'Tokyo').length);
+  const tokyo = await page.evaluate(() => S.clock.cities.filter(c => c.title === 'Tokyo').length);
   const shown = (await time()).replace(/:\d{2} (AM|PM)$/, ' $1');
   const tokyoNow = await page.evaluate(() => new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Tokyo', hour: 'numeric', minute: '2-digit' }));
   ok(shown === tokyoNow, 'the clock shows Tokyo time (' + shown + ' / ' + tokyoNow + ')');
-  ok(tokyo === 1 && await box.locator('.cwl .cwc', { hasText: 'Stockholm' }).count() === 1, 'the list follows the settings');
+  ok(tokyo === 1 && await box.locator('.wlist.grid .p', { hasText: 'Stockholm' }).count() === 1, 'the list follows the settings');
   // the colour
   await page.click('#cog'); await settle(900);
   await page.locator('[data-box="appearance"] .srow', { hasText: 'Clock colour' }).locator('button').first().click(); await settle(300);
@@ -117,7 +117,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await page.click('#close-settings'); await settle(1800);
   ok(await box.locator('.row .carousel .t').count() === 0 && !(await box.locator('svg.cmap').isVisible()), 'with world time off the list and the map are gone');
   // the large clock: the time takes the rows that .beat and world time leave free, and the box never changes height
-  const geo = async () => box.evaluate(e => { const b = e.querySelector(':scope > b'); return { h: Math.round(e.getBoundingClientRect().height), fs: parseFloat(getComputedStyle(b).fontSize), mode: e.getAttribute('data-mode'), open: e.classList.contains('open') }; });
+  const geo = async () => box.evaluate(e => { const b = e.querySelector(':scope > b'); return { h: Math.round(e.getBoundingClientRect().height), fs: parseFloat(getComputedStyle(b).fontSize), mode: e.getAttribute('data-title-rows'), open: e.classList.contains('open') }; });
   const h0 = (await geo()).h, fs0 = (await geo()).fs;
   await page.click('#cog'); await settle(900);
   await sec.locator('.srow', { hasText: 'Large clock' }).locator('input').check(); await settle(900);

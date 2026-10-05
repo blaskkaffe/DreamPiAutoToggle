@@ -349,7 +349,7 @@ class ClockView(unittest.TestCase):
         v = clock.view(t)
         self.assertEqual((v["time"], v["beat"]), ("1:05:09 PM", "@%03d .beats" % clock.beats(t)))
         self.assertEqual(len(v["items"]), len(clock.DEFAULT_CITIES))
-        self.assertEqual(v["cities"][0], ["Los Angeles", "5:05 AM"])       # each city with its time, together
+        self.assertEqual(v["cities"][0], {"title": "Los Angeles", "tag": "5:05 AM"})       # each city with its time, together (the kit list's title and tag)
         self.assertEqual((v["map"]["utc"], v["map"]["here"]), (t, 0.0))
         clock.save_config({"cities": []})
         self.assertEqual((clock.view(t)["world"], clock.view(t)["world_on"]), (False, True))   # nothing to show, the switch stays on

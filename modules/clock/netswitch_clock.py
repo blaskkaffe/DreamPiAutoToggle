@@ -165,7 +165,7 @@ def view(now=None):
     cities = world(cfg, now) if cfg["world"] else []
     return {"time": format_time(cfg["format"], now, off), "beat": "@%03d .beats" % beats(now) if cfg["beat"] else "",
             "items": [{"text": c["name"], "n": c["text"]} for c in cities],
-            "cities": [[c["name"], c["text"]] for c in cities],
+            "cities": [{"title": c["name"], "tag": c["text"]} for c in cities],
             "world": cfg["world"] and bool(cities), "world_on": cfg["world"], "beat_on": cfg["beat"], "large_on": cfg["large"],
             "size": size(cfg, cfg["world"] and bool(cities)), "format": cfg["format"],
             "map": {"cities": cities, "utc": now, "here": off / 3600.0}
