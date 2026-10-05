@@ -254,7 +254,9 @@ W.infobox=function(s,ctx){
   // column, the value takes the whole width; "bleed" = runs out to the box's edges; "tight" = no divider and little room above
   var row=h("div",{"class":"row "+(r.main?"main":"more")+(r.only==="closed"?" x-closed":"")+(r.full?" r-full":"")+(r.bleed?" r-bleed":"")+(r.tight?" r-tight":"")+(r.keep||(r.value&&(r.value.type==="console"||r.value.type==="bar"))?" keep":"")+(r.cls?" "+r.cls:"")});      // "keep": a tap in it does not close the box (buttons, a log you select text in)
   row.appendChild(h("span",{"class":"k",text:r.label||""}));
-  var v=h("span",{"class":"v"+(r.value&&r.value.type==="carousel"?" fill":"")});v.appendChild(build(Object.assign({mod:s.mod},r.value||{type:"text",text:""}),ctx));row.appendChild(v);
+  var spec=r.value||{type:"text",text:""};
+  if(r.main&&spec.type==="text"&&spec.style!=="log")spec=Object.assign({},spec,{type:"carousel"});      // the line that shows while the box is closed is one line: it scrolls like the title when it is too long (a log stays text)
+  var v=h("span",{"class":"v"+(spec.type==="carousel"?" fill":"")});v.appendChild(build(Object.assign({mod:s.mod},spec),ctx));row.appendChild(v);
   // "busy": "@path" - a small spinner at the end of the row while it is true: the row is being refreshed, what it shows stays until the new data is there
   if(r.busy!==undefined){var sp=h("span",{"class":"spin",role:"status","aria-label":"Refreshing"});row.appendChild(sp);bind(r.busy,function(x){sh(sp,!!x)})}
   if(r.show!==undefined)bind(r.show,function(x){sh(row,!!x)});
@@ -281,7 +283,7 @@ W.carousel=function(s){var el=h("span",{"class":"carousel"}),trk=h("span",{"clas
  // Scrolls only when the line is wider than its row. While it fits it is centred like the status row above it;
  // when it scrolls its holder (.v.fill) takes the whole row so the line can run past the edges.
  function fit(){var t=trk.querySelector(".t"),scroll=false,par=el.parentNode,row=el.closest&&el.closest(".row");
-  if(t&&cur&&par&&row)scroll=t.offsetWidth>row.clientWidth-12
+  if(t&&cur&&par&&row){var k=row.querySelector(".k");scroll=t.offsetWidth>row.clientWidth-(k&&k.offsetParent?k.offsetWidth:0)-12}      // the room is the row without its label column (open boxes show the labels)
   if(scroll!==el.classList.contains("sc")){el.classList.toggle("sc",scroll);if(scroll)el.style.setProperty("--d",Math.max(12,Math.round(cur.length*0.28))+"s")}
   if(par)par.classList.toggle("scrolling",scroll)}
  function set(t){if(t===cur&&trk.firstChild){fit();return}cur=t;

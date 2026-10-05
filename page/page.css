@@ -133,7 +133,7 @@
  .srow.drag{position:relative;z-index:5;will-change:transform;background:var(--card);border-radius:var(--r-ctl);box-shadow:0 8px 22px rgba(0,0,0,.65);border-top-color:transparent}
  .pop .srow.drag{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}   /* in a pop-up the lifted row is as wide as the pop-up itself */
  .wtext{margin:6px 0} .wtext.ctr{text-align:center}
- .carousel{display:block;min-width:0} .carousel .dup,.carousel .sp{display:none}
+ .carousel{display:block;min-width:0;white-space:nowrap} .carousel .dup,.carousel .sp{display:none}      /* never wraps: its natural width says whether it fits */
  .carousel.sc{white-space:nowrap;overflow:hidden} .carousel.sc .trk{display:inline-block;animation:marquee var(--d,20s) linear infinite}
  .carousel.sc .dup,.carousel.sc .sp{display:inline}
  .now b .carousel{white-space:nowrap}   /* the main title never wraps, closed or open: centred while it fits, scrolling when it is too long (ticker() in widgets.js) */

@@ -19,8 +19,19 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok((await box.locator('.nlabel').textContent()).includes('Dreamcast (openMenu)'), 'with its own top line');
   ok((await box.locator('b').first().textContent()).trim() === 'Connected', 'the title says the Dreamcast is connected');
   ok(/72 games on the card/.test(await box.textContent()), 'and the note counts the games');
+  // the line under the title is one line, closed or open: it scrolls like the title when it is too long
+  const noteLook = async text => page.evaluate(async t => { const real = window.render; window.render = () => {}; S.openmenu = Object.assign({}, S.openmenu, { note: t }); engineUpdate();
+    await new Promise(r => setTimeout(r, 300)); const c = document.querySelector('.dbox[data-box="openmenu"] .row.main .carousel'), out = { sc: !!c && c.classList.contains('sc'), anim: c ? getComputedStyle(c.querySelector('.trk')).animationName : '', text: c ? c.innerText : '', open: document.querySelector('.dbox[data-box="openmenu"] .now').classList.contains('open'), w: c ? [c.querySelector('.t').offsetWidth, c.parentNode.clientWidth] : 0 };
+    window.render = real; return out; }, text);
+  const longNote = await noteLook('No game list yet. It arrives when openMenu connects with DCNow! on, which can take a little while after the modem link is up.');
+  ok(longNote.sc && longNote.anim === 'marquee', 'a long note under the title scrolls round like a carousel ' + JSON.stringify(longNote).slice(0, 120));
+  const shortNote = await noteLook('72 games on the card');
+  ok(!shortNote.sc && shortNote.text.trim() === '72 games on the card', 'and a short one stands still ' + JSON.stringify(shortNote));
   await box.click({ position: { x: 20, y: 10 } }); await settle(700);
   ok(await box.evaluate(e => e.classList.contains('open')), 'tapping opens the box');
+  const openNote = await noteLook('A long note that can never fit in the box, open or closed, however wide the phone is');
+  ok(openNote.open && openNote.sc, 'and an open box scrolls it the same way ' + JSON.stringify(openNote));
+  await settle(5500);       // the page's own refresh puts the real note back
   const games = box.locator('.wlist').nth(1), join = box.locator('.wlist').nth(0);
   ok(await games.locator('.p').count() === 60, 'the games list stops at 60 rows (' + await games.locator('.p').count() + ')');
   ok(/12 more: use the search/.test(await box.textContent()), 'with a hint to search');

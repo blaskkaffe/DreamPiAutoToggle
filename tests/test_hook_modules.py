@@ -78,3 +78,67 @@ class DebugLogInTheHook(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReadyState(unittest.TestCase):
+    """The state "ready" (the page's "Ready for calls", the LED's green): DreamPi writes it when it starts the dial tone, or, with
+    --disable-dial-tone (it never does), when the modem is opened. It used to stay on "Starting up" for ever in that case."""
+    def setUp(self):
+        import sys
+        self.tmp = sandbox(hook)
+        self.sys = sys
+        self.main = sys.modules["__main__"]
+        self.had = getattr(self.main, "Modem", None)
+        self.argv = list(sys.argv)
+        self.watch = hook._watch_serial
+        hook._watch_serial = lambda modem: None
+
+        class Modem(object):
+            def connect(self):
+                pass
+
+            def start_dial_tone(self):
+                pass
+        self.main.Modem = Modem
+
+        class Netlink(object):
+            def reset_serial(self):
+                pass
+        self.netlink = Netlink
+
+    def tearDown(self):
+        hook._watch_serial = self.watch
+        self.sys.argv[:] = self.argv
+        if self.had is None:
+            del self.main.Modem
+        else:
+            self.main.Modem = self.had
+        cleanup(self.tmp)
+
+    def state(self):
+        with open(hook.STATE) as f:
+            return f.read().rsplit(" ", 1)[0]
+
+    def start(self, argv):
+        self.sys.argv[:] = argv
+        hook._patch_ready_signals(self.netlink)
+        hook._write_state("starting")
+
+    def test_the_dial_tone_makes_it_ready(self):
+        self.start(["dreampi.py"])
+        modem = self.main.Modem()
+        modem.connect()
+        self.assertEqual(self.state(), "starting")                # the modem is open, the dial tone is not on yet
+        modem.start_dial_tone()
+        self.assertEqual(self.state(), "ready")
+
+    def test_without_a_dial_tone_opening_the_modem_makes_it_ready(self):
+        self.start(["dreampi.py", "--disable-dial-tone"])
+        self.main.Modem().connect()
+        self.assertEqual(self.state(), "ready")
+
+    def test_without_a_dial_tone_it_is_ready_again_after_a_call(self):
+        self.start(["dreampi.py", "--disable-dial-tone"])
+        hook._write_state("call dcnow")
+        self.main.Modem().connect()                                # DreamPi opens the modem again when the call is over
+        self.assertEqual(self.state(), "ready")

@@ -440,6 +440,10 @@ def _patch_ready_signals(netlink_cls):
         modem = getattr(main, "Modem", None)
         if modem is None or not _wrap_ready(modem, "start_dial_tone"):
             _write_state("unknown")
+        elif "--disable-dial-tone" in sys.argv:
+            # DreamPi never calls start_dial_tone() then (its own rule: dial_tone_enabled = "--disable-dial-tone" not in sys.argv), so
+            # "ready" would never come, at the start or after a call: it listens as soon as the modem is opened again
+            _wrap_ready(modem, "connect")
         # The USB serial path goes back to idle without a dial tone
         _wrap_ready(netlink_cls, "reset_serial")
     except Exception:
