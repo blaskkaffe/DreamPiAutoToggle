@@ -162,7 +162,7 @@
  .now[data-title-rows="upper"]:not(.open) > b{grid-row:1 / 3}
  .now[data-title-rows="lower"]:not(.open) > b{grid-row:2 / 4}
  .now[data-title-rows]:not(.open) > .row.main{grid-row:3} .now .wlist .p{align-items:center} .now .wlist .p .ibtn{width:30px;height:30px}
- .now .links{display:flex;flex-wrap:wrap;gap:6px} .now .links a{color:#fff;opacity:.9;padding:6px 0}
+ .now .links{display:flex;flex-wrap:wrap;gap:6px} .now .links a{color:#fff;opacity:.9;padding:6px 0} .now .links.btns{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:8px;width:100%} .now .links.btns a.pill-s{display:flex;justify-content:center;align-items:center;min-width:0;padding:0 2px;opacity:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:none}
  .now .st{display:block;overflow-wrap:anywhere}
  .frow.stack{flex-direction:column;align-items:stretch;gap:8px}   /* a pop-up row with its control under the label */
  .rangev{display:flex;align-items:center;gap:10px;flex:1;max-width:60%} .rangev input{flex:1;min-width:0;accent-color:var(--primary)} .rangev .rv{width:3em;text-align:right;color:var(--text-2)}   /* a slider with its value */

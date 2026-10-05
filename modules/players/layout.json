@@ -109,11 +109,13 @@
        }
       },
       {
-       "label": "Links",
+       "label": "",
        "value": {
         "type": "links",
-        "items": "@players.links"
-       }
+        "items": "@players.links",
+        "style": "buttons"
+       },
+       "full": true
       }
      ]
     }

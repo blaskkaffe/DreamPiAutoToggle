@@ -39,11 +39,11 @@ TIMEOUT = 8
 MAX_BYTES = 1000000
 MAX_PLAYERS = 300
 
-LINKS = [
-    ("DC99", "https://dc99.net/"),
-    ("Dreamcast.online", "https://dreamcast.online/"),
-    ("DCNET status", "https://dcnet.flyca.st/status/games.html"),
-    ("Dreamcast Live", "https://dreamcastlive.net/"),
+LINKS = [          # short name (four of them make a row of buttons), address, what it is (the button's tooltip)
+    ("DC99", "https://dc99.net/", "DC99"),
+    ("Online", "https://dreamcast.online/", "Dreamcast.online"),
+    ("DCNET", "https://dcnet.flyca.st/status/games.html", "DCNET status"),
+    ("Live", "https://dreamcastlive.net/", "Dreamcast Live"),
 ]
 
 _NAME_KEYS = ("name", "player", "username", "user", "nick", "nickname", "gamertag", "handle")

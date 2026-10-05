@@ -331,8 +331,10 @@ W.worldmap=function(s){
   else me.style.display="none"}
  UPD.push(paint);paint();return host};
 // ---- a list of things from the server, each with a button that opens a small form (the Wi-Fi networks)
-W.links=function(s){var el=h("span",{"class":"links keep"});
- bind(s.items,function(ls){var html=(ls||[]).map(function(l){return '<a href="'+esc(l[1])+'" target="_blank" rel="noopener noreferrer">'+esc(l[0])+'</a>'}).join("");setHtml(el,html)});return el};
+// "style": "buttons": the links as grey buttons, all in one row (as many columns as links)
+W.links=function(s){var btn=s.style==="buttons",el=h("span",{"class":"links keep"+(btn?" btns":"")});
+ bind(s.items,function(ls){ls=ls||[];if(btn)el.style.setProperty("--n",ls.length||1);
+  var html=ls.map(function(l){return '<a'+(btn?' class="pill-s"':'')+(l[2]?' title="'+esc(l[2])+'" aria-label="'+esc(l[2])+'"':'')+' href="'+esc(l[1])+'" target="_blank" rel="noopener noreferrer">'+esc(l[0])+'</a>'}).join("");setHtml(el,html)});return el};
 // Rows in a box ("style": "compact") or a grid of short name / value pairs ("style": "grid"). "row" says which fields of an item to show:
 //   lead / lead_big  a small line over a bold one in a column at the left (a date and a time)   title, href (the title is a link)   sub   tag, tag_colour
 //   icon  {kind: "star" | "bell", post, on: the item's field, data: the data source the answer replaces, body: fixed fields, fields: {key: item field}}:

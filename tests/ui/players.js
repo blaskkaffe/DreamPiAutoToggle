@@ -18,6 +18,8 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   const state = () => box.evaluate(e => ({ open: e.classList.contains('open'), h: Math.round(e.getBoundingClientRect().height), n: e.querySelectorAll('.wlist .p').length,
     spin: Array.from(e.querySelectorAll('.spin')).filter(s => s.offsetParent).length, busy: !!(window.S.players && S.players.refreshing) }));
   const first = await state();
+  const lk = await page.locator('.dbox[data-box="players"] .links.btns a').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top)));
+  ok(lk.length === 4 && new Set(lk).size === 1, 'the four links are buttons in one row (' + lk.join(',') + ')');
   ok(first.open && first.n >= 5 && first.spin === 0, 'the open box lists the players and shows no spinner while nothing is refreshed (' + first.n + ' rows)');
   let sawSpin = false, minH = first.h, closed = false, fewer = false;
   for (let i = 0; i < 70; i++) {                                   // a minute: at least one refresh happens in it

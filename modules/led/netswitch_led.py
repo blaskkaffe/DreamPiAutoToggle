@@ -29,7 +29,9 @@ REFRESH = 0.25     # seconds between re-reading DreamPi's state and led.json
 QUICK_REFRESH = 0.05    # ... and while a state file has just been written (below)
 QUICK_WINDOW = 0.6      # for this long after a state file changed
 QUICK_HOLD = 0.12       # a changed list must stay the same this long before it shows (Steady.HOLD otherwise)
-KEEPALIVE = 3.0    # an unchanged frame is sent again this often, which repairs a garbled one
+KEEPALIVE = 0.5    # an unchanged frame is sent again this often, which repairs a garbled one
+BURST = 6          # a changed frame is sent this many times in a row (one per loop, 40 ms apart): a frame that did not take (not latched,
+                   # garbled by a pre-emption) is replaced within a frame instead of staying until the next keep-alive
 
 
 # ---------------------------------------------------------------- effects
@@ -311,7 +313,8 @@ def watched_state_files():
                                      core.REBOOT_MARK, core.PLAYERS_WATCH, core.EVENT_REMINDERS))
 
 
-def main():
+def main(halt=None):
+    """The service loop. halt: an object with is_set() (a threading.Event) that ends the loop, for the tests."""
     count, gpio = wanted_count(), ledconfig.led_gpio()
     cfg = ledconfig.led_config()
     order = drivers.ORDERS.get(cfg.get("order"), drivers.DEFAULT_ORDER)
@@ -344,12 +347,13 @@ def main():
     steady = Steady()
     wb_test, wb_colour = False, "#ffffff"
     clocks = {}
-    last_frame, last_sent = None, 0.0
+    last_frame, last_sent, burst = None, 0.0, 0
+    changed_at, slow_said = None, -1e9      # when a file the LED follows changed and has not shown yet; when a slow loop was last reported
     next_read = 0.0
     stamp = watched_files()
     state_stamp, quick_until = watched_state_files(), 0.0
-    while True:
-        now = time.time()
+    while not (halt is not None and halt.is_set()):
+        now = time.monotonic()           # not the wall clock: the Pi has no clock of its own and jumps when it finds the time on the network
         # A change the user makes shows at once: the files the page writes (the selected network, led.json, the palette, the colours of the
         # networks, the LED count and pin, the modules, the white-balance test) are looked at every frame, and when one has changed the state
         # is read now and the list is not held back. Those files are written in one go (a rename), so nothing is half-read; the wait in
@@ -358,9 +362,13 @@ def main():
         fresh = now_stamp != stamp
         if fresh:
             stamp, next_read = now_stamp, 0.0
+            if changed_at is None:
+                changed_at = now
         now_state = watched_state_files()
         if now_state != state_stamp:            # DreamPi, the network ... just wrote its state: look at once, and again soon
             state_stamp, next_read, quick_until = now_state, 0.0, now + QUICK_WINDOW
+            if changed_at is None:
+                changed_at = now
         quick = now < quick_until
         if now >= next_read:
             try:
@@ -390,11 +398,28 @@ def main():
             frame = to_bytes([hex_rgb(wb_colour)] * count, cfg.get("max_brightness", 0.08), white_balance, gamma)
         else:
             frame = render(messages, now, count, clocks, white_balance, gamma)
-        # A frame is sent when it changed, and an unchanged one now and then (KEEPALIVE), which repairs a garbled frame.
-        if frame != last_frame or now - last_sent >= KEEPALIVE:
+        # A frame is sent when it changed (and BURST times in a row, so one that did not take is replaced at once), and an unchanged one
+        # every KEEPALIVE, which repairs a garbled frame. (Sending only on a change, with a keep-alive every 3 s, made a frame that did not
+        # take stay on the LED for seconds.)
+        if frame != last_frame:
+            burst = BURST
+            if changed_at is not None:      # for the debug log (Settings > Debug log > Recording): how long from the file to the LED
+                core.debug_log("LED: a change was shown %d ms after a file changed" % int((time.monotonic() - changed_at) * 1000))
+                changed_at = None
+        elif changed_at is not None and now - changed_at > 1.0:
+            changed_at = None               # a file changed that does not change what the LED shows
+        if burst > 0 or now - last_sent >= KEEPALIVE:
+            shown = time.monotonic()
             out.show(frame)
-            last_frame, last_sent = frame, now
-        time.sleep(max(0.0, 1.0 / FPS - (time.time() - now)))
+            last_frame, last_sent, burst = frame, now, max(0, burst - 1)
+            if time.monotonic() - shown > 0.25 and shown - slow_said > 30:
+                slow_said = shown
+                sys.stderr.write("LED: sending a frame took %d ms (the output is slow)\n" % int((time.monotonic() - shown) * 1000))
+        spent = time.monotonic() - now
+        if spent > 0.3 and now - slow_said > 30:
+            slow_said = now
+            sys.stderr.write("LED: a round of the loop took %d ms (reading the state is slow)\n" % int(spent * 1000))
+        time.sleep(max(0.0, 1.0 / FPS - (time.monotonic() - now)))
 
 
 if __name__ == "__main__":
