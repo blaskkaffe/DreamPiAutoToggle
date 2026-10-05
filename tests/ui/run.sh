@@ -42,4 +42,10 @@ SERVER=$!
 sleep 3
 PORT=8739 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node update.js || RESULT=1
 kill $SERVER 2>/dev/null
+# the openMenu link box: the card's games with a search, the players to join, the events, Start asking first
+OPENMENU=1 FAKEPLAYERS=1 PORT=8740 python3 demo_server.py > /tmp/dpns-demo-openmenu.log 2>&1 &
+SERVER=$!
+sleep 3
+PORT=8740 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node openmenu.js || RESULT=1
+kill $SERVER 2>/dev/null
 exit $RESULT

@@ -1,0 +1,45 @@
+// The openMenu link box (run by run.sh against a demo server started with OPENMENU=1 FAKEPLAYERS=1): the Dreamcast's status, the players who
+// can be joined, the events and the games on the card with a search box; pressing Start asks first and queues the launch.
+const { chromium } = require('playwright');
+const URL = 'http://127.0.0.1:' + (process.env.PORT || 8740) + '/';
+let failed = 0;
+const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if (!cond) failed++; };
+const settle = ms => new Promise(r => setTimeout(r, ms));
+(async () => {
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+  const page = await browser.newPage({ viewport: { width: 420, height: 1400 } });
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 150)); });
+  await page.goto(URL, { waitUntil: 'networkidle' }); await settle(5500);
+  const box = page.locator('.dbox[data-box="openmenu"] .now');
+  ok(await box.count() === 1, 'the openMenu link has a box on the main page');
+  ok((await box.locator('.nlabel').textContent()).includes('Dreamcast (openMenu)'), 'with its own top line');
+  ok((await box.locator('b').first().textContent()).trim() === 'Connected', 'the title says the Dreamcast is connected');
+  ok(/72 games on the card/.test(await box.textContent()), 'and the message counts the games');
+  await box.click({ position: { x: 20, y: 10 } }); await settle(700);
+  ok(await box.evaluate(e => e.classList.contains('open')), 'tapping opens the box');
+  const rowsOf = label => box.locator('.row', { has: page.locator('.k', { hasText: label }) });
+  const games = rowsOf('Games');
+  ok(await games.locator('.srow').count() === 60, 'the games list stops at 60 rows (' + await games.locator('.srow').count() + ')');
+  ok(/12 more: use the search/.test(await games.textContent()), 'with a hint to search');
+  await games.locator('input[aria-label="Search the card"]').fill('crazy'); await settle(300);
+  ok(await games.locator('.srow').count() === 1 && /Crazy Taxi/.test(await games.textContent()), 'the search narrows the list');
+  const join = rowsOf('Join');
+  ok(await join.locator('.srow', { hasText: 'Quake III Arena' }).locator('button', { hasText: 'Join' }).count() === 1, 'a player in a game that is on the card has a Join button');
+  ok(await join.locator('.srow', { hasText: 'Daytona' }).locator('button').count() === 0 && /not on your card/.test(await join.textContent()), 'and one in a game that is not on the card has none');
+  const events = rowsOf('Events');
+  ok(await events.locator('.srow', { hasText: 'Crazy Taxi night' }).locator('button', { hasText: 'Start' }).count() === 1, 'an event that names a game on the card has a Start button');
+  ok(await events.locator('.srow', { hasText: 'Open lobby' }).locator('button').count() === 0, 'and one that does not has none');
+  ok(await events.locator('a[href="https://dc99.net/events/taxi-night"]').count() === 1, 'the event title is a link to DC99');
+  await games.locator('.srow', { hasText: 'Crazy Taxi' }).locator('button', { hasText: 'Start' }).click(); await settle(400);
+  const pop = page.locator('.pop.open');
+  ok(await pop.count() === 1 && /Start Crazy Taxi on the Dreamcast\?/.test(await pop.textContent()), 'Start asks first, naming the game');
+  await pop.locator('button', { hasText: 'Start' }).click(); await settle(2500);
+  ok(await page.locator('.pop.open').count() === 0, 'confirming closes the question');
+  ok(/Waiting for the Dreamcast to start Crazy Taxi|Starting Crazy Taxi/.test(await box.textContent()), 'and the box says the game is on its way');
+  ok(errors.length === 0, 'no JavaScript or console errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+  await browser.close();
+  console.log(failed ? failed + ' check(s) failed' : 'all checks passed');
+  process.exit(failed ? 1 : 0);
+})();
