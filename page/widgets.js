@@ -119,7 +119,8 @@ function startData(){var ns;for(ns in (LAY.data||{}))(function(ns,spec){
  if(onlyInSettings){hook("settingsOpen",load);hook("settingsClose",function(){clearTimeout(timer)})}
  load()})(ns,LAY.data[ns])}
 // ---- text, rows, buttons, links
-W.text=function(s){var el=h("div",{"class":"wtext"+(s.muted?" sub":"")+(s.cls?" "+s.cls:"")});bind(s.text,function(t){setLines(el,t)});return el};
+// "style": "log" = a few lines of small monospace text that never wrap (each is cut with an ellipsis)
+W.text=function(s){var el=h("div",{"class":"wtext"+(s.muted?" sub":"")+(s.style==="log"?" log":"")+(s.cls?" "+s.cls:"")});bind(s.text,function(t){setLines(el,t)});return el};
 W.row=function(s,ctx){var title=h("span"),sub=h("span",{"class":"sub"}),left=h("span",{},[title,sub]),
  el=h("div",{"class":"srow"+(s.below?" wrap":"")},[left]);
  bind(s.title,function(t){setText(title,t==null?"":t)});bind(s.sub,function(t){setLines(sub,t);sh(sub,!!t)});
@@ -232,7 +233,9 @@ W.infobox=function(s,ctx){
  if(tk&&s.parts!==undefined)bind(s.parts,function(ps){tk.set((ps||[]).map(function(p){return '<span class="pln" data-c="'+esc(p.colour||"")+'">'+esc(p.text)+'</span>'}).join(""))});
  else if(tk)bind(s.title,function(t){tk.set(esc(t==null?"":t))});
  (s.rows||[]).forEach(function(r){
-  var row=h("div",{"class":"row "+(r.main?"main":"more")+(r.cls?" "+r.cls:"")});
+  // row options: "main" = shown closed and open (else only open); "only": "closed" = shown only while the box is closed; "full" = no label
+  // column, the value takes the whole width; "bleed" = runs out to the box's edges; "tight" = no divider and little room above
+  var row=h("div",{"class":"row "+(r.main?"main":"more")+(r.only==="closed"?" x-closed":"")+(r.full?" r-full":"")+(r.bleed?" r-bleed":"")+(r.tight?" r-tight":"")+(r.keep||(r.value&&(r.value.type==="console"||r.value.type==="bar"))?" keep":"")+(r.cls?" "+r.cls:"")});      // "keep": a tap in it does not close the box (buttons, a log you select text in)
   row.appendChild(h("span",{"class":"k",text:r.label||""}));
   var v=h("span",{"class":"v"+(r.value&&r.value.type==="carousel"?" fill":"")});v.appendChild(build(Object.assign({mod:s.mod},r.value||{type:"text",text:""}),ctx));row.appendChild(v);
   // "busy": "@path" - a small spinner at the end of the row while it is true: the row is being refreshed, what it shows stays until the new data is there
@@ -272,7 +275,11 @@ W.carousel=function(s){var el=h("span",{"class":"carousel"}),trk=h("span",{"clas
 // ---- a list of things from the server, each with a button that opens a small form (the Wi-Fi networks)
 W.links=function(s){var el=h("span",{"class":"links keep"});
  bind(s.items,function(ls){var html=(ls||[]).map(function(l){return '<a href="'+esc(l[1])+'" target="_blank" rel="noopener noreferrer">'+esc(l[0])+'</a>'}).join("");setHtml(el,html)});return el};
-W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" compact keep":"")}),pop=h("div"),popT=h("div",{"class":"t"}),msg=h("div",{"class":"msg"}),
+// Rows in a box ("style": "compact") or a grid of short name / value pairs ("style": "grid"). "row" says which fields of an item to show:
+//   lead / lead_big  a small line over a bold one in a column at the left (a date and a time)   title, href (the title is a link)   sub   tag, tag_colour
+//   icon  {kind: "star" | "bell", post, on: the item's field, data: the data source the answer replaces, body: fixed fields, fields: {key: item field}}:
+//         a round on / off button at the end that POSTs {...body, ...fields, on} (a favourite, a reminder)
+W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" compact keep":s.style==="grid"?" grid keep":"")}),pop=h("div"),popT=h("div",{"class":"t"}),msg=h("div",{"class":"msg"}),
  fields=[],go=h("button",{type:"button","class":"pill-s"}),cur=null,key="";
  var P=s.popup||{};
  pop.appendChild(popT);
@@ -280,15 +287,16 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
   inp.onkeydown=function(e){if(e.key=="Enter"){e.preventDefault();submit()}};fields.push({f:f,el:inp});pop.appendChild(inp)});
  pop.appendChild(msg);pop.appendChild(h("div",{"class":"bar end"},[go]));
  var inner=h("div"),p;el.appendChild(inner);el.appendChild(pop);p=ui.popup(pop);
- function compactRow(it){var tag=s.row.tag?it[s.row.tag]:"",c=h("span",{"class":"pw",text:tag}),
-  t=h("span",{"class":"pn"},[document.createTextNode(it[s.row.title||"title"]),h("span",{"class":"pg",text:it[s.row.sub||"sub"]||""})]);
-  if(s.row.tag_colour&&it[s.row.tag_colour]){var id=colourId(it[s.row.tag_colour],s.mod);if(id)c.style.color="var(--c-"+id+"-l)"}
-  var kids=[t,c],st=s.row.star;       // "star": {post, kind, on: the item's field, data: the data source the answer replaces}: a star button that sets or clears a favourite
-  if(st){var name=it[st.name||s.row.title||"title"],b=ui.iconButton("star",!!it[st.on],name);
-   b.onclick=function(e){e.stopPropagation();b.disabled=true;
-    post(st.post,{kind:st.kind,name:name,on:b.getAttribute("aria-pressed")!=="true"},function(r){b.disabled=false;if(r){if(st.data)S[st.data]=r;engineUpdate()}})};kids.push(b)}
+ function compactRow(it){var R=s.row,tag=R.tag?it[R.tag]:"",c=h("span",{"class":"pw",text:tag}),title=it[R.title||"title"],
+  tn=R.href&&it[R.href]?h("a",{href:it[R.href],target:"_blank",rel:"noopener noreferrer",text:title}):document.createTextNode(title),
+  t=h("span",{"class":"pn"},[tn,h("span",{"class":"pg",text:it[R.sub||"sub"]||""})]);
+  if(R.tag_colour&&it[R.tag_colour]){var id=colourId(it[R.tag_colour],s.mod);if(id)c.style.color="var(--c-"+id+"-l)"}
+  var kids=[R.lead?h("span",{"class":"pl"},[h("span",{text:it[R.lead]||""}),h("b",{text:it[R.lead_big]||""})]):null,t,R.tag?c:null],ic=R.icon;
+  if(ic){var b=ui.iconButton(ic.kind,!!it[ic.on],title);
+   b.onclick=function(e){e.stopPropagation();b.disabled=true;var body={},k;for(k in (ic.body||{}))body[k]=ic.body[k];for(k in (ic.fields||{}))body[k]=it[ic.fields[k]];body.on=b.getAttribute("aria-pressed")!=="true";
+    post(ic.post,body,function(r){b.disabled=false;if(r){if(ic.data)S[ic.data]=r;engineUpdate()}})};kids.push(b)}
   return h("div",{"class":"p"},kids)}
- function rowFor(it,i,extra){if(s.style==="compact")return compactRow(it);var info=extra?it.sub:it[s.row.sub||"sub"],
+ function rowFor(it,i,extra){if(s.style==="compact"||s.style==="grid")return compactRow(it);var info=extra?it.sub:it[s.row.sub||"sub"],
   title=extra?it.title:it[s.row.title||"title"],b=h("button",{type:"button","class":"pill-s",text:extra?it.button:(s.row.button||"Select"),"aria-label":(extra?it.button:(s.row.button||"Select"))+" "+title});
   var item=extra?it.item:it;
   b.onclick=function(e){open(item,b,e)};
@@ -310,7 +318,7 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
   var items=raw,k=JSON.stringify(items);if(k===key)return;key=k;
   inner.innerHTML="";
   items.forEach(function(it,i){inner.appendChild(rowFor(it,i,false))});
-  if(!items.length&&s.empty)inner.appendChild(s.style==="compact"?h("span",{text:s.empty}):h("div",{"class":"srow"},[h("span",{text:s.empty})]));
+  if(!items.length&&s.empty)inner.appendChild(s.style==="compact"||s.style==="grid"?h("span",{text:s.empty}):h("div",{"class":"srow"},[h("span",{text:s.empty})]));
   (s.extra||[]).forEach(function(x,i){inner.appendChild(rowFor(x,i,true))})}
  UPD.push(function(){var shown=s.when===undefined||!!val(s.when);if(!shown){if(key!==""){key="";inner.innerHTML="";p.close()}return}paint()});
  hook("settingsClose",function(){p.close()});return el};

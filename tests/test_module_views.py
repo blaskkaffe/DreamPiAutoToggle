@@ -209,9 +209,9 @@ class SwitcherView(unittest.TestCase):
         self.assertEqual(h["text"], "hanging up...")
 
     def test_the_led_modules_dot_look_is_kept(self):
-        d = {"dreampi": {"look": {"color": "#123456", "effect": "blink", "speed": "slow"}}}
+        d = {"dreampi": {"look": {"colour": "purple", "effect": "blink", "speed": "slow"}}}
         sw.api(d, [])
-        self.assertEqual(d["dreampi"]["look"]["color"], "#123456")           # the LED module ran first: the switcher does not overwrite it
+        self.assertEqual(d["dreampi"]["look"]["colour"], "purple")           # the LED module ran first: the switcher does not overwrite it
         self.assertIn("state", d["dreampi"])
 
     def test_the_pi_row_has_its_lines(self):

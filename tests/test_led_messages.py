@@ -300,7 +300,8 @@ class LookTests(Base):
         with open(core.STATE, "w") as f:
             f.write("call dcnow 123")
         look = ledconfig.dreampi_look()
-        self.assertEqual(look["color"], core.network_colour("dcnow")["led"])
+        self.assertEqual(look["color"], core.network_colour("dcnow")["led"])                  # the LED gets the calibrated value ...
+        self.assertEqual(ledconfig.dreampi_dot(), {"colour": "dcnow", "effect": "solid", "speed": "slow"})   # ... the dot the palette colour
         os.remove(core.STATE)
         self.groups(group("g1", "red", ["no-network"]))
         self.assertIsNone(ledconfig.dreampi_look())                               # no group for any DreamPi message: no look

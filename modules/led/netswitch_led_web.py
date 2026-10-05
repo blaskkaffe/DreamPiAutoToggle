@@ -119,4 +119,4 @@ def api(d, warnings):
     sel = "dcnet" if os.path.exists(core.FLAG) else "dcnow"
     tokens = dict((t, {"ui": core.network_colour(n)["ui"], "ui_l": core.network_colour(n)["ui_l"]}) for t, n in (("dcnow", "dcnow"), ("dcnet", "dcnet"), ("network", sel)))
     d["led"] = {"installed": count > 0, "count": count, "title": "Status LED" + (" (%d LEDs)" % count if count > 1 else ""), "tokens": tokens}
-    d.setdefault("dreampi", {})["look"] = ledconfig.dreampi_look()
+    d.setdefault("dreampi", {})["look"] = ledconfig.dreampi_dot()

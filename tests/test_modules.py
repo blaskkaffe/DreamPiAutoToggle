@@ -246,7 +246,7 @@ class WithNothing(Base):
         for state, effect in (("ok", "solid"), ("busy", "blink"), ("off", "blink"), ("call-dcnow", "solid")):
             look = switcher._dot_look(state)
             self.assertEqual(look["effect"], effect, state)
-            self.assertRegex(look["color"], r"^#[0-9a-f]{6}$")
+            self.assertRegex(look["colour"], r"^[a-z-]+$")                        # a palette id (or dcnow / dcnet / network), never a hex value
         self.assertIsNone(switcher._dot_look("somethingelse"))
 
     def test_unknown_paths_are_404_not_the_page(self):

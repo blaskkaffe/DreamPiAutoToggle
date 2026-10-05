@@ -41,16 +41,15 @@
       {
        "label": "Games",
        "main": true,
-       "cls": "pgames",
        "busy": "@players.busy",
        "value": {
         "type": "carousel",
         "items": "@players.games"
-       }
+       },
+       "only": "closed"
       },
       {
        "label": "Games",
-       "cls": "pgl",
        "value": {
         "type": "list",
         "style": "compact",
@@ -59,11 +58,17 @@
         "row": {
          "title": "title",
          "sub": "sub",
-         "star": {
+         "icon": {
+          "kind": "star",
           "post": "/players/star",
-          "kind": "game",
           "on": "starred",
-          "data": "players"
+          "data": "players",
+          "body": {
+           "kind": "game"
+          },
+          "fields": {
+           "name": "title"
+          }
          }
         }
        }
@@ -81,11 +86,17 @@
          "sub": "sub",
          "tag": "tag",
          "tag_colour": "colour",
-         "star": {
+         "icon": {
+          "kind": "star",
           "post": "/players/star",
-          "kind": "player",
           "on": "starred",
-          "data": "players"
+          "data": "players",
+          "body": {
+           "kind": "player"
+          },
+          "fields": {
+           "name": "title"
+          }
          }
         }
        }

@@ -1,6 +1,6 @@
 /* DC99 events module: the list of the next two weeks in the open events box */
 .evl .k,.evs .k{display:none} .evl.row .v,.evs.row .v{flex:1;display:block;width:100%}
-.evlist{display:flex;flex-direction:column;gap:2px;font-size:1.05em}
+.evlist{display:flex;flex-direction:column;gap:2px}
 .evr{display:flex;align-items:center;gap:10px;padding:5px 0;border-top:1px solid rgba(255,255,255,.12)} .evr:first-child{border-top:0}
 .evr .evw{flex:none;width:5.6em;color:rgba(255,255,255,.75);font-size:.9em;line-height:1.25;white-space:nowrap}
 .evr .evw b{display:block;font-size:1.15em;color:#fff;font-variant-numeric:tabular-nums}

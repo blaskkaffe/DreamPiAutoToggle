@@ -1,7 +1,7 @@
 /* Clock module: the city list and the time zone map in the open clock box (with world time on). The highlighted band and the city dots take the clock's colour. */
 [data-mod="clock"] .now.open .row.wcar{display:none}
 .cwrow .k,.mapw .k{display:none} .cwrow.row .v,.mapw.row .v{flex:1;display:block;width:100%}
-.cwl{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:3px 18px;font-size:1.05em}
+.cwl{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:3px 18px}
 .cwc{display:flex;justify-content:space-between;gap:8px;white-space:nowrap;min-width:0}
 .cwc .cwn{overflow:hidden;text-overflow:ellipsis;color:rgba(255,255,255,.8)} .cwc .cwt{font-weight:700;font-variant-numeric:tabular-nums}
 .cmap{display:block;width:100%;height:auto}
@@ -12,7 +12,7 @@
 /* Large clock (the infobox's data-mode, set from clock.size): the time spans the rows .beat and world time leave free. The box is a grid of
    its three rows (top line, time, bottom line); the time has no size of its own (contain: size), so it never changes the box's height,
    and page.js fit() sizes its text. Open (world time on, tapped) the box is the plain list and map again. */
-[data-mod="clock"] .now[data-mode]:not(.open){display:grid;grid-template-columns:100%;grid-template-rows:auto 1.6875em auto}
+[data-mod="clock"] .now[data-mode]:not(.open){display:grid;grid-template-columns:100%;grid-template-rows:auto 2.16em auto}
 [data-mod="clock"] .now[data-mode]:not(.open) > .nlabel{grid-row:1}
 [data-mod="clock"] .now[data-mode]:not(.open) > b{grid-column:1;contain:size;align-self:stretch;display:flex;align-items:center;justify-content:center;white-space:nowrap;line-height:1}
 [data-mod="clock"] .now[data-mode="full"]:not(.open) > b{grid-row:1 / 4}

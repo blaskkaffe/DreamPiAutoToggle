@@ -12,14 +12,11 @@ import netswitch_probes as probes
 
 
 def _dot_look(dstate):
-    """What the DreamPi dot previews: a plain look for the state. The LED module replaces it with the look of the
-    LED message that is showing (its api() hook), so the dot still says something without it."""
-    dcnet = os.path.exists(core.FLAG)
-    net = core.network_colour("dcnet" if dcnet else "dcnow")["led"]
-    plain = {"ok": (net, "solid"), "busy": ("#ffd000", "blink"), "off": ("#ff0000", "blink"),
-             "call-dcnow": (core.network_colour("dcnow")["led"], "solid"), "call-dcnet": (core.network_colour("dcnet")["led"], "solid"),
-             "call": ("#aa00ff", "solid"), "unknown": ("#3c3c3c", "solid")}.get(dstate)
-    return {"color": plain[0], "effect": plain[1], "speed": "slow"} if plain else None
+    """What the DreamPi dot previews: a plain look for the state, in palette colours (the page paints them). The LED module replaces
+    it with the look of the LED message that is showing (its api() hook), so the dot still says something without it."""
+    plain = {"ok": ("network", "solid"), "busy": ("yellow", "blink"), "off": ("red", "blink"),
+             "call-dcnow": ("dcnow", "solid"), "call-dcnet": ("dcnet", "solid"), "call": ("purple", "solid")}.get(dstate)
+    return {"colour": plain[0], "effect": plain[1], "speed": "slow"} if plain else None
 
 
 def _ago(since, now):

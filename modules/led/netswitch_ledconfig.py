@@ -459,13 +459,20 @@ def active_messages(ctx=None):
                 entries.append((0, g, ["off"]))
     out = []
     for _prio, g, active in sorted(entries, key=lambda e: e[0]):
-        out.append({"key": g["id"], "color": resolve_colour(g["colour"], ctx["selected"]), "effect": g["effect"], "speed": g["speed"],
+        out.append({"key": g["id"], "colour": g["colour"], "color": resolve_colour(g["colour"], ctx["selected"]), "effect": g["effect"], "speed": g["speed"],
                     "brightness": cfg["max_brightness"] if g.get("brightness") is None else g["brightness"],
                     "leds": g["leds"], "messages": active})
     return out
 
 
 def dreampi_look():
-    """What the status dot on the page previews: the look of what DreamPi is doing (not the network or Pi messages), or None."""
+    """The look of what DreamPi is doing (not the network or Pi messages), or None."""
     looks = active_messages(gather(live=False))
     return looks[-1] if looks else None
+
+
+def dreampi_dot():
+    """What the status dot on the page previews: that look as the page draws it, the group's palette colour (not the LED's calibrated
+    value) with its effect and speed, or None."""
+    look = dreampi_look()
+    return {"colour": look["colour"], "effect": look["effect"], "speed": look["speed"]} if look else None

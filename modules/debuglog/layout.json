@@ -10,15 +10,17 @@
       {
        "label": "Log",
        "main": true,
-       "cls": "dlast",
        "value": {
         "type": "text",
-        "text": "@debuglog.last"
-       }
+        "text": "@debuglog.last",
+        "style": "log"
+       },
+       "only": "closed",
+       "full": true,
+       "tight": true
       },
       {
        "label": "",
-       "cls": "dctl keep",
        "value": {
         "type": "bar",
         "items": [
@@ -47,11 +49,12 @@
           ]
          }
         ]
-       }
+       },
+       "full": true,
+       "tight": true
       },
       {
        "label": "",
-       "cls": "dctl keep",
        "show": "@debug",
        "value": {
         "type": "bar",
@@ -67,11 +70,12 @@
           "href": "/dtmf?all"
          }
         ]
-       }
+       },
+       "full": true,
+       "tight": true
       },
       {
        "label": "",
-       "cls": "dcon keep",
        "value": {
         "type": "console",
         "tail": "/log",
@@ -106,7 +110,9 @@
           "l-mod"
          ]
         ]
-       }
+       },
+       "full": true,
+       "bleed": true
       }
      ]
     }

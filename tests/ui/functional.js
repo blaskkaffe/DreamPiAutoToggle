@@ -124,13 +124,13 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.click('#close-settings'); await settle(400);
   const pbox = page.locator('.dbox[data-box="players"] .now');
   await pbox.click({ position: { x: 20, y: 10 } }); await settle(500);
-  ok(await pbox.locator('.pgl .ibtn').count() >= 2 && !(await pbox.locator('.row.pgames').isVisible()), 'the open players box lists the games, each with a star, instead of the scrolling line');
+  ok(await pbox.locator('.row.more').first().locator('.ibtn').count() >= 2 && !(await pbox.locator('.row.x-closed').isVisible()), 'the open players box lists the games, each with a star, instead of the scrolling line');
   ok(await pbox.locator('.wlist .p .ibtn').count() >= 5, 'and every player has a star');
   const daveRow = pbox.locator('.p', { hasText: 'Dave' }).last();
   await daveRow.locator('.ibtn').click(); await settle(900);
   ok(await daveRow.locator('.ibtn.on[aria-pressed="true"]').count() === 1, 'a star on a player makes them a favorite');
-  await pbox.locator('.pgl .p', { hasText: 'Quake III' }).locator('.ibtn').click(); await settle(900);
-  ok(await pbox.locator('.pgl .p', { hasText: 'Quake III' }).locator('.ibtn.on').count() === 1, 'and a star on a game makes it a favorite');
+  await pbox.locator('.row.more').first().locator('.p', { hasText: 'Quake III' }).locator('.ibtn').click(); await settle(900);
+  ok(await pbox.locator('.row.more').first().locator('.p', { hasText: 'Quake III' }).locator('.ibtn.on').count() === 1, 'and a star on a game makes it a favorite');
   ok(await pbox.evaluate(e => e.classList.contains('open')), 'the box stays open');
   await openSettings();
   ok(await fav.locator('.tag', { hasText: 'Dave' }).count() === 1 && await fav.locator('.tag', { hasText: 'Quake III Arena' }).count() === 1, 'Settings > Online players shows the starred player and game');
@@ -334,16 +334,16 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   // ---- the debug log: an infobox of two rows (Debug log / the last three lines of the log); open, the buttons and the log run out to the box's edges
   const dbg = page.locator('.dbox[data-box="debug log"] .now');
   ok(/Debug log/.test(await dbg.locator('.nlabel').textContent()) && (await dbg.locator('b').textContent()).trim() === '', 'the closed debug log box has the title Debug log and no middle text');
-  ok((await dbg.locator('.row.dlast').textContent()).trim().length > 0 && !(await dbg.locator('.console').isVisible()), 'below it the last log lines (or Recording off), the log itself is hidden');
+  ok((await dbg.locator('.row.x-closed').textContent()).trim().length > 0 && !(await dbg.locator('.console').isVisible()), 'below it the last log lines (or Recording off), the log itself is hidden');
   await dbg.click({ position: { x: 20, y: 10 } }); await settle(500);
-  ok(await dbg.evaluate(e => e.classList.contains('open')) && await dbg.locator('.row.dctl button').first().isVisible() && !(await dbg.locator('.row.dlast').isVisible()), 'a tap opens the same box with the buttons');
-  await dbg.locator('.row.dctl button', { hasText: 'Start recording' }).click(); await settle(1500);
-  ok(await dbg.locator('.row.dctl button', { hasText: 'Stop recording' }).count() === 1 && await dbg.locator('.console').isVisible(), 'Start recording: the button says Stop recording and the log shows inside the box');
+  ok(await dbg.evaluate(e => e.classList.contains('open')) && await dbg.locator('.row.r-full button').first().isVisible() && !(await dbg.locator('.row.x-closed').isVisible()), 'a tap opens the same box with the buttons');
+  await dbg.locator('.row.r-full button', { hasText: 'Start recording' }).click(); await settle(1500);
+  ok(await dbg.locator('.row.r-full button', { hasText: 'Stop recording' }).count() === 1 && await dbg.locator('.console').isVisible(), 'Start recording: the button says Stop recording and the log shows inside the box');
   const gap = await dbg.evaluate(e => { const c = e.querySelector('.console').getBoundingClientRect(), b = e.getBoundingClientRect(); return { l: c.left - b.left, r: b.right - c.right, bt: b.bottom - c.bottom }; });
   ok(gap.l <= 6 && gap.r <= 6 && gap.bt <= 6, 'the log runs out to the left, right and bottom edge of the box (' + Math.round(gap.l) + ', ' + Math.round(gap.r) + ', ' + Math.round(gap.bt) + 'px)');
-  const sz = await dbg.evaluate(e => ({ btn: parseFloat(getComputedStyle(e.querySelector('.row.dctl button')).fontSize), set: parseFloat(getComputedStyle(document.querySelector('#set-boxes .pill-s')).fontSize) }));
+  const sz = await dbg.evaluate(e => ({ btn: parseFloat(getComputedStyle(e.querySelector('.row.r-full button')).fontSize), set: parseFloat(getComputedStyle(document.querySelector('#set-boxes .pill-s')).fontSize) }));
   ok(Math.abs(sz.btn - sz.set) < 2.5, 'the buttons are the size of the settings buttons (' + sz.btn.toFixed(1) + ' / ' + sz.set.toFixed(1) + 'px)');
-  await dbg.locator('.row.dctl button', { hasText: 'Stop recording' }).click(); await settle(900);
+  await dbg.locator('.row.r-full button', { hasText: 'Stop recording' }).click(); await settle(900);
   await dbg.click({ position: { x: 20, y: 10 } }); await settle(300);
   // ---- the same drag with a finger (touch events through the browser's protocol, in a phone-sized touch context)
   const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });

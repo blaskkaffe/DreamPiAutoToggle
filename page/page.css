@@ -26,8 +26,8 @@
  /* a notice: a banner that is not a warning (an event starting soon), in the page's colour, with a dismiss button */
  .notebox{display:flex;align-items:center;gap:12px;background:rgba(var(--primary-rgb),.75);border:var(--bw) solid rgb(var(--primary-l-rgb));padding:10px 12px 10px 20px;border-radius:var(--r-box);margin:0 0 12px;font-size:.95em}
  .notebox span{flex:1;min-width:0} .notebox .nx{flex:none;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.28)}
- .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r-box);text-align:center;background:rgba(var(--primary-rgb),.62);border:var(--bw) solid rgb(var(--primary-l-rgb));line-height:1.35}
- .now b{font-size:1.25em;display:block}
+ .now{font-size:var(--fs-md);margin:0 0 16px;padding:14px 24px;border-radius:var(--r-box);text-align:center;background:rgba(var(--primary-rgb),.62);border:var(--bw) solid rgb(var(--primary-l-rgb));line-height:1.35}
+ .now .nlabel{font-size:1.3em} .now b{font-size:1.6em;display:block}      /* the box's own lines are larger; every row inside it is the size of a settings row */
  /* notification highlight: a module asks for one of its dashboard boxes to stand out for a while (/api "highlight", an event about to
     start, say). A neutral box (class plain: its colour's Highlight switch is off) takes its own colour; a box that is coloured
     already gets the global look of Settings > Appearance > Notification highlight: an animated rainbow edge (body.hl-rainbow) or
@@ -44,17 +44,23 @@
  @media(prefers-reduced-motion:reduce){.dbox.hl:not(.plain) .now,body.hl-rainbow .dbox.hl:not(.plain) .now,body.hl-rainbow .dbox.hl:not(.plain) .now::before{animation:none}}
  /* status rows inside the network box: closed = just the DreamPi status,
     centred under the network name; open = all rows with their labels */
- .now .row{font-size:.62em;line-height:1.35;padding:9px 0;border-top:1px solid rgba(255,255,255,.18);text-align:left}
+ .now .row{font-size:var(--fs-md);line-height:1.35;padding:10px 0;border-top:1px solid rgba(255,255,255,.18);text-align:left}
  .now .row.main{justify-content:center;border-top:0;padding:8px 0 2px}
  .now .row.main .k{display:none} .now .row.main .v{flex:none}
- .now .row .k{color:var(--box-text-3);width:68px} .now .row .v{min-width:0;display:flex;align-items:baseline} .now .row .v > .dot{flex:none} .now .row .v > span:last-child{min-width:0} .now .sub{color:var(--box-text-3)}
+ .now .row .k{color:var(--box-text-3)} .now .row .v{min-width:0;display:flex;align-items:baseline} .now .row .v > .dot{flex:none} .now .row .v > span:last-child{min-width:0} .now .sub{color:var(--box-text-3)}
  .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .now .row.hang{justify-content:center;padding:12px 0 2px}
- .now .row.hang form{width:100%} .now .row.hang .pill-s{display:block;width:100%;padding:9px 12px;font-size:1em;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .now .row.hang form{width:100%} .now .row.hang .pill-s{display:flex;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .now .row.hang .pill-s{background:rgba(160,30,30,.85);border-color:rgb(230,110,110)}
  .now .row.hang .pill-s.arm{background:#d33;border-color:#f99}
  .nw{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sub.blk{display:block}
- .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.18)}
+ .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:10px 0;border-top:1px solid rgba(255,255,255,.18)}
  .now.open .row.main .k{display:block} .now.open .row.main .v{flex:1}
+ .now.open .row.x-closed{display:none}   /* row options (W.infobox): only while closed ... */
+ .now .row.r-full .k{display:none} .now .row.r-full .v{flex:1;display:block;width:100%;min-width:0}   /* ... no label column ... */
+ .now .row.r-bleed{margin:10px -24px -14px;padding:0;border-top:0} .now .row.r-bleed .console{margin:0;border:0;border-radius:0 0 calc(var(--r-box) - var(--bw)) calc(var(--r-box) - var(--bw))}   /* ... out to the box's left, right and bottom edge (24 / 14 px: the box's padding); it is the last row ... */
+ .now .row.r-tight{border-top:0;padding:8px 0 0} .now .row .bar{margin:0;gap:8px}   /* ... and no divider */
+ .wtext.log{font:var(--fs-sm)/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--box-text-2)}
+ .now.open b .carousel{text-align:center}
  .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r-box);font-size:1.1em;font-weight:600;letter-spacing:.02em}
  .pill-s.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb));text-shadow:0 1px 2px rgba(0,0,0,.55)}   /* a small button in a palette colour (c-<id>), like the colour pick's */
  .pill.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb))}
@@ -136,6 +142,8 @@
  .now .wlist.compact{display:block;width:100%;max-height:40vh;overflow-y:auto;overscroll-behavior:contain}
  .now .wlist .p{display:flex;gap:8px;padding:4px 0;border-top:1px solid rgba(255,255,255,.12)} .now .wlist .p:first-child{border-top:0}
  .now .wlist .pn{flex:1;min-width:0;overflow-wrap:anywhere} .now .wlist .pg{display:block;color:var(--box-text-3)}
+ .now .wlist .pl{flex:none;width:5.6em;line-height:1.25;color:var(--box-text-3);white-space:nowrap} .now .wlist .pl b{display:block;font-size:1.15em;color:#fff;font-variant-numeric:tabular-nums} .now .wlist .pn a{color:#fff;text-decoration:none}
+ .now .wlist.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:3px 18px;width:100%} .now .wlist.grid .p{border-top:0;padding:0;justify-content:space-between} .now .wlist.grid .pn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--box-text-2)}   /* "style": "grid": short name / value pairs */
  .now .wlist .pw{flex:none;font-weight:bold;white-space:nowrap} .now .wlist .p{align-items:center} .now .wlist .p .ibtn{width:30px;height:30px}
  .now .links{display:flex;flex-wrap:wrap;gap:6px} .now .links a{color:#fff;opacity:.9;padding:6px 0}
  .now .st{display:block;overflow-wrap:anywhere}
