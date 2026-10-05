@@ -51,25 +51,9 @@
          }
         }
        }
-      },
-      {
-       "label": "",
-       "full": true,
-       "value": {
-        "type": "text",
-        "text": "@events.status",
-        "muted": true,
-        "center": true
-       }
       }
      ],
      "actions": [
-      {
-       "type": "button",
-       "label": "Sync now",
-       "post": "/api/sync",
-       "reload": "events"
-      },
       {
        "type": "link",
        "label": "DC99 calendar",
