@@ -42,6 +42,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await calBtn.evaluate(e => getComputedStyle(e).textAlign) === 'center', 'the text of the DC99 calendar button is centred');
   ok(await box.locator('.arrow, .row.main .arrow').count() === 0, 'no small arrow at the end of the rows');
   ok(await box.locator('.wtext.ctr').count() === 0 && await box.locator('button', { hasText: 'Sync' }).count() === 0, 'the box has no sync button and no "synced" line');
+  ok(await calBtn.evaluate(e => getComputedStyle(e).borderTopColor === 'rgb(80, 80, 80)'), 'the buttons in a box are the normal grey ones, with no coloured border');
   ok(await calBtn.evaluate(e => e.getBoundingClientRect().width > e.closest('.row').getBoundingClientRect().width * 0.95), 'the DC99 calendar link takes the full width');
   // dismissing the banner ends the highlight
   await banner.locator('.nx').click(); await settle(1800);

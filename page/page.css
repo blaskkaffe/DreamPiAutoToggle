@@ -52,7 +52,7 @@
  .now .row .k{color:var(--box-text-3)} .now .row .v{min-width:0;display:flex;align-items:baseline} .now .row .v > .dot{flex:none} .now .row .v > span:last-child{min-width:0} .now .sub{color:var(--box-text-3)}
  .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .now .row.hang{justify-content:center;padding:12px 0 2px}
  .now .row.hang form{width:100%} .now .row.hang .pill-s{display:flex;width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
- .now .row.hang .pill-s{background:rgba(0,0,0,.25);border-color:rgb(var(--primary-l-rgb))} .now .row.hang{gap:10px}   /* the buttons under an open box: neutral ... */
+ .now .row.hang{gap:10px}   /* the buttons under an open box are the normal grey ones ... */
  .now .row.hang .pill-s.danger{background:var(--danger-bg);border-color:var(--danger-line)}   /* ... red for a danger one (Hang up) */
  .now .row.hang .pill-s.arm{background:var(--danger-on);border-color:var(--danger-on-line)}
  .nw{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sub.blk{display:block}
