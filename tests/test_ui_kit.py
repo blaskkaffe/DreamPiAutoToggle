@@ -51,6 +51,22 @@ class KitTests(unittest.TestCase):
             if "var(--bw)" in decl or decl.startswith("border-color"):
                 self.assertNotIn("rgba(", decl, decl)
 
+    def test_radii_are_the_kits_three_or_round(self):
+        """Boxes, fields and checkboxes, and buttons and chips have one radius each (--r-box, --r-ctl, --r-pill); round things are 50%."""
+        css = strip_comments(read(CSS))
+        for m in re.finditer(r"border-radius:([^;}]*)", css):
+            value = m.group(1).strip()
+            if value.startswith("var(--r-") or value in ("50%", "inherit", "0") or value.startswith("0 0 calc(var(--r"):
+                continue
+            if value in ("4px",):               # the inside of the system's own colour well (input[type=color])
+                continue
+            self.fail("border-radius: %s is not a token (use var(--r-box), var(--r-ctl), var(--r-pill) or 50%%)" % value)
+
+    def test_the_kit_defines_its_tokens_once(self):
+        css = strip_comments(read(CSS))
+        for token in ("--r-box", "--r-ctl", "--r-pill", "--h-ctl", "--text-1", "--text-2", "--text-3", "--fs-xs", "--fs-sm", "--fs-md", "--fs-lg", "--fs-xl"):
+            self.assertEqual(len(re.findall(re.escape(token) + r":", css)), 1, token)
+
     def test_every_module_declares_the_kit_version_it_was_written_for(self):
         for path in glob.glob(os.path.join(MODULES, "*", "module.json")):
             m = json.loads(read(path))

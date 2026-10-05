@@ -1,36 +1,38 @@
 
- :root{--r:29px;--bw:4px;--primary:#e8761c;--primary-l:#f6b27a;--primary-rgb:232,118,28;--primary-l-rgb:246,178,122;   /* the page's primary colour: the palette (core.colours_css(), put before this file) and the .c-<id> classes change it per module */
-         --card:#1b1b1b;--line:#2a2a2a;--muted:#999;
-         --ctl:#1a1a1a;--ctl-line:#555;--pop:#262626;--sel:#5b6b7e;--sel-line:#9fb0c4;--dim:#777;--txt2:#ccc;--console:#0b0b0b}
+ :root{--r-box:29px;--r-ctl:12px;--r-pill:999px;--h-ctl:36px;--r:var(--r-box);--bw:4px;   /* the page kit's tokens: radii (boxes / fields and checkboxes / buttons and chips; round things are 50%), one control height, three text levels, a type scale */
+         --text-1:#eee;--text-2:#ccc;--text-3:#999;--box-text-2:rgba(255,255,255,.8);--box-text-3:rgba(255,255,255,.65);   /* page text, and the same levels on the coloured boxes */
+         --fs-xs:.75em;--fs-sm:.85em;--fs-md:1em;--fs-lg:1.25em;--fs-xl:1.9em;
+         --primary:#e8761c;--primary-l:#f6b27a;--primary-rgb:232,118,28;--primary-l-rgb:246,178,122;   /* the page's primary colour: the palette (core.colours_css(), put before this file) and the .c-<id> classes change it per module */
+         --card:#1b1b1b;--line:#2a2a2a;--muted:var(--text-3);
+         --ctl:#1a1a1a;--ctl-line:#555;--pop:#262626;--sel:#5b6b7e;--sel-line:#9fb0c4;--dim:var(--text-3);--txt2:var(--text-2);--console:#0b0b0b}
  *{box-sizing:border-box}
  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}   /* iOS Safari must not enlarge wide, scrolling lines on its own */
  body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#111;color:#eee;max-width:460px;margin:24px auto;padding:0 16px}
  header{position:relative;margin-bottom:16px} h1{text-align:center;margin:0;font-size:1.9em}
  h2{font-size:.8em;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 4px 8px;font-weight:600}
- .card{background:var(--card);border-radius:var(--r);padding:8px 16px;margin-bottom:12px}
- .sub{color:#888;font-size:.85em} .note{color:var(--muted);font-size:.85em;margin:6px 4px 10px} a{color:#8bf}
+ .card{background:var(--card);border-radius:var(--r-box);padding:8px 16px;margin-bottom:12px}
+ .sub{color:var(--text-3);font-size:var(--fs-sm)} .note{color:var(--text-3);font-size:var(--fs-sm);margin:6px 4px 10px} a{color:#8bf}
  button{font:inherit;cursor:pointer;border:0;color:#fff}
  .rows{cursor:pointer;user-select:none}
  .row{display:flex;align-items:baseline;padding:11px 0;border-top:1px solid var(--line)} .row:first-child{border-top:0}
  .row .k{width:84px;color:var(--muted);flex:none} .row .v{flex:1}
  .rows .more{display:none} .rows.open .more{display:flex}
- .arrow{color:#aaa;flex:none;margin-left:8px;transition:transform .15s}
  .dot{display:inline-block;width:.65em;height:.65em;border-radius:50%;margin-right:8px;background:#888}
  @keyframes blink{50%{opacity:.12}} @keyframes breathe{50%{opacity:.45}}
  @keyframes dotb1{0%{opacity:1}9%,100%{opacity:.12}} @keyframes dotb2{0%,18%{opacity:1}9%,27%,100%{opacity:.12}} @keyframes dotb3{0%,18%,36%{opacity:1}9%,27%,45%,100%{opacity:.12}}
  @keyframes dotrainbow{0%,100%{background:#e33}17%{background:#dd3}33%{background:#3c5}50%{background:#3cc}67%{background:#46f}83%{background:#c4c}}   /* the status dot's preview of the LED effects */
  .ok{background:#2c2} .busy,.warn{background:#e0b400} .call{background:#b04cff} .bad,.off{background:#d33}
- .warnbox{background:#7a1f1f;border:var(--bw) solid #a84a4a;padding:10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.9em}
+ .warnbox{background:#7a1f1f;border:var(--bw) solid #a84a4a;padding:10px 20px;border-radius:var(--r-box);margin:0 0 12px;font-size:.9em}
  /* a notice: a banner that is not a warning (an event starting soon), in the page's colour, with a dismiss button */
- .notebox{display:flex;align-items:center;gap:12px;background:rgba(var(--primary-rgb),.75);border:var(--bw) solid rgb(var(--primary-l-rgb));padding:10px 12px 10px 20px;border-radius:var(--r);margin:0 0 12px;font-size:.95em}
+ .notebox{display:flex;align-items:center;gap:12px;background:rgba(var(--primary-rgb),.75);border:var(--bw) solid rgb(var(--primary-l-rgb));padding:10px 12px 10px 20px;border-radius:var(--r-box);margin:0 0 12px;font-size:.95em}
  .notebox span{flex:1;min-width:0} .notebox .nx{flex:none;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.28)}
- .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r);text-align:center;background:rgba(var(--primary-rgb),.62);border:var(--bw) solid rgb(var(--primary-l-rgb));line-height:1.35}
+ .now{font-size:1.3em;margin:0 0 16px;padding:14px 24px;border-radius:var(--r-box);text-align:center;background:rgba(var(--primary-rgb),.62);border:var(--bw) solid rgb(var(--primary-l-rgb));line-height:1.35}
  .now b{font-size:1.25em;display:block}
  /* notification highlight: a module asks for one of its dashboard boxes to stand out for a while (/api "highlight", an event about to
     start, say). A neutral box (class plain: its colour's Highlight switch is off) takes its own colour; a box that is coloured
     already gets the global look of Settings > Appearance > Notification highlight: an animated rainbow edge (body.hl-rainbow) or
     a glow in one palette colour (--hl-rgb). */
- .dbox.hl.plain .now,.dbox.hl.plain .wide{background:rgba(var(--primary-rgb),.62);border-color:rgb(var(--primary-l-rgb))}
+ .dbox.hl.plain .now{background:rgba(var(--primary-rgb),.62);border-color:rgb(var(--primary-l-rgb))}
  .dbox.hl:not(.plain) .now{border-color:rgb(var(--hl-rgb));animation:hlglow 1.6s ease-in-out infinite}
  @keyframes hlglow{0%,100%{box-shadow:0 0 4px 0 rgba(var(--hl-rgb),.45)}50%{box-shadow:0 0 22px 4px rgba(var(--hl-rgb),.95)}}
  body.hl-rainbow .dbox.hl:not(.plain) .now{position:relative;border-color:transparent;animation:hlwhite 1.6s ease-in-out infinite}
@@ -45,7 +47,7 @@
  .now .row{font-size:.62em;line-height:1.35;padding:9px 0;border-top:1px solid rgba(255,255,255,.18);text-align:left}
  .now .row.main{justify-content:center;border-top:0;padding:8px 0 2px}
  .now .row.main .k{display:none} .now .row.main .v{flex:none}
- .now .row .k{color:rgba(255,255,255,.65);width:68px} .now .row .v{min-width:0;display:flex;align-items:baseline} .now .row .v > .dot{flex:none} .now .row .v > span:last-child{min-width:0} .now .sub{color:rgba(255,255,255,.65)}
+ .now .row .k{color:var(--box-text-3);width:68px} .now .row .v{min-width:0;display:flex;align-items:baseline} .now .row .v > .dot{flex:none} .now .row .v > span:last-child{min-width:0} .now .sub{color:var(--box-text-3)}
  .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .now .row.hang{justify-content:center;padding:12px 0 2px}
  .now .row.hang form{width:100%} .now .row.hang .pill-s{display:block;width:100%;padding:9px 12px;font-size:1em;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .now .row.hang .pill-s{background:rgba(160,30,30,.85);border-color:rgb(230,110,110)}
@@ -53,15 +55,15 @@
  .nw{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sub.blk{display:block}
  .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.18)}
  .now.open .row.main .k{display:block} .now.open .row.main .v{flex:1}
- .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r);font-size:1.1em;font-weight:600;letter-spacing:.02em}
+ .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r-box);font-size:1.1em;font-weight:600;letter-spacing:.02em}
  .pill-s.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb));text-shadow:0 1px 2px rgba(0,0,0,.55)}   /* a small button in a palette colour (c-<id>), like the colour pick's */
  .pill.pri{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb))}
  .pill.plain{background:var(--card)}   /* "Coloured background" off: a neutral fill, the border keeps the colour */
- .dbox .wide{background:rgba(var(--primary-rgb),.62);border-color:rgb(var(--primary-l-rgb))} .dbox.plain .now,.dbox.plain .wide{background:var(--card)}
+ .dbox.plain .now{background:var(--card)}
  .colourpick{display:inline-flex;align-items:center;gap:12px}
  .cp-wrap{position:relative} .cp-wrap .cp-native{position:absolute;left:0;top:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer}   /* the colour chooser laid over the Colour button */
  .pill:active{filter:brightness(1.1)}
- .pill-s{display:inline-block;padding:7px 16px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgb(80,80,80);color:#eee;font-size:.88em}
+ .pill-s{display:inline-flex;align-items:center;justify-content:center;min-height:var(--h-ctl);padding:0 16px;border-radius:var(--r-pill);background:rgba(42,42,42,.82);border:var(--bw) solid rgb(80,80,80);color:var(--text-1);font-size:var(--fs-sm)}
  .srow .pill-s{white-space:nowrap}
  .pill-s.danger{background:rgba(160,30,30,.85);border-color:rgb(230,110,110)}
  a.pill-s{text-decoration:none}
@@ -79,35 +81,35 @@
  .spin{flex:none;display:inline-block;width:.8em;height:.8em;margin-left:8px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spin .8s linear infinite}   /* "refreshing": next to a row whose data is being fetched again, the old data stays */
  @keyframes spin{to{transform:rotate(360deg)}} @media(prefers-reduced-motion:reduce){.spin{animation:none}}
  .srow > span:first-child{min-width:0;overflow-wrap:anywhere} .srow .pill-s{flex:none}
- input[type=number]{width:54px;box-sizing:border-box;height:36px;padding:0 6px;border-radius:8px;border:var(--bw) solid var(--ctl-line);background:var(--ctl);color:#eee;font:inherit;font-size:.85em}
+ input[type=number]{width:54px;box-sizing:border-box;height:var(--h-ctl);padding:0 6px;border-radius:var(--r-ctl);border:var(--bw) solid var(--ctl-line);background:var(--ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm)}
  input[type=range]{min-height:28px}
  .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range > span:first-child{white-space:nowrap} .range input{flex:1;min-width:60px;accent-color:var(--primary)}
  .range.grid{display:grid;grid-template-columns:5.6em minmax(0,1fr) 3.1em;gap:12px} .range.grid span:last-child{text-align:right}   /* equal slider lengths */
  .tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
- .tag{display:inline-flex;align-items:center;gap:2px;padding:3px 4px 3px 12px;border-radius:999px;background:rgba(42,42,42,.82);border:var(--bw) solid rgb(80,80,80);font-size:.88em}
- .tag button{background:none;color:#aaa;font-size:1.05em;line-height:1;min-width:36px;min-height:32px;padding:0;margin:-6px 0} .tag button:hover{color:#fff}
- .empty{color:var(--muted);font-size:.85em;margin:8px 0 0}
+ .tag{display:inline-flex;align-items:center;gap:2px;min-height:var(--h-ctl);padding:0 4px 0 12px;border-radius:var(--r-pill);background:rgba(42,42,42,.82);border:var(--bw) solid rgb(80,80,80);font-size:var(--fs-sm)}
+ .tag button{background:none;color:var(--text-3);font-size:1.05em;line-height:1;min-width:32px;min-height:28px;padding:0;margin:0} .tag button:hover{color:#fff}
+ .empty{color:var(--text-3);font-size:var(--fs-sm);margin:8px 0 0}
  .swatches{display:flex;gap:8px;flex:none} .swatch{width:34px;height:34px;padding:0;border-radius:50%;border:var(--bw) solid var(--cl,transparent);background:var(--c);box-shadow:0 0 0 1px rgba(255,255,255,.25) inset}
  .swatches.grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;width:100%;margin-top:6px} .pop .swatches.grid{margin-top:0;gap:10px} .pop .swatches.grid .swatch{max-width:52px} .swatches.grid .swatch{width:100%;height:auto;aspect-ratio:1/1;max-width:36px;justify-self:center}
  .swatch.sel{border-color:#fff} .swatch:focus-visible{outline-offset:3px}
  @media(max-width:420px){.pop .swatches.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}   /* eight across would make the balls too small to tap on a phone */
- .msg{color:#f99;font-size:.82em} .msg:empty{display:none}
- .pop{display:none;position:absolute;z-index:20;left:16px;right:16px;box-sizing:border-box;padding:12px 16px;border-radius:var(--r);background:var(--pop);box-shadow:0 6px 24px rgba(0,0,0,.6)}
+ .msg{color:#f99;font-size:var(--fs-sm)} .msg:empty{display:none}
+ .pop{display:none;position:absolute;z-index:20;left:16px;right:16px;box-sizing:border-box;padding:12px 16px;border-radius:var(--r-box);background:var(--pop);box-shadow:0 6px 24px rgba(0,0,0,.6)}
  .pop.open{display:block}   /* its width and left edge are set when it opens (ui.popup): the card's content width, the same for every pop-up */
- .pop .t{font-size:.85em;color:var(--txt2);margin-bottom:8px;overflow-wrap:anywhere}
+ .pop .t{font-size:var(--fs-sm);color:var(--text-2);margin-bottom:8px;overflow-wrap:anywhere}
  .pop .fld{display:flex;gap:8px;align-items:center} .pop .fld input{flex:1;min-width:0;margin:0}
- .pop input[type=text],.pop input[type=password]{margin:0 0 8px;padding:7px 12px} .pop .fld input[type=text]{margin:0}
+ .pop input[type=text],.pop input[type=password]{margin:0 0 8px} .pop .fld input[type=text]{margin:0}
  .pop .choices{display:flex;flex-direction:column;gap:2px;max-height:40vh;overflow-y:auto;margin-top:8px} .pop .choices:empty{display:none}
- .pop .choice{display:flex;justify-content:space-between;gap:10px;align-items:baseline;width:100%;box-sizing:border-box;padding:8px 10px;border:0;border-radius:var(--r);background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
- .pop .choice:hover:not(:disabled){background:var(--sel)} .pop .choice:disabled{opacity:.45;cursor:default} .pop .choice .sub{font-size:.8em;color:var(--txt2);white-space:nowrap}
+ .pop .choice{display:flex;justify-content:space-between;gap:10px;align-items:baseline;width:100%;box-sizing:border-box;padding:8px 10px;border:0;border-radius:var(--r-ctl);background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+ .pop .choice:hover:not(:disabled){background:var(--sel)} .pop .choice:disabled{opacity:.45;cursor:default} .pop .choice .sub{font-size:var(--fs-sm);color:var(--text-2);white-space:nowrap}
  .pop .msg{margin:6px 0 8px} .pop .bar{margin:0;justify-content:space-between} .pop .bar.end{justify-content:flex-end}
  .pop .bar.center{justify-content:center;margin:6px 0 8px}
  .pop .pill-s{white-space:nowrap}
  .cbox.neutral:checked,.cbox.neutral.on{background-color:var(--c-global);border-color:var(--c-global)}   /* a tick box in Global main (by default a bluish grey, instead of the network colour); it follows the Global main picker */
- input[type=color]{-webkit-appearance:none;appearance:none;flex:none;width:34px;height:34px;padding:0;border:var(--bw) solid var(--ctl-line);border-radius:7px;background:none;vertical-align:middle;cursor:pointer}
+ input[type=color]{-webkit-appearance:none;appearance:none;flex:none;width:var(--h-ctl);height:var(--h-ctl);padding:0;border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl);background:none;vertical-align:middle;cursor:pointer}
  input[type=color]::-webkit-color-swatch-wrapper{padding:0} input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
  input[type=color]::-moz-color-swatch{border:0;border-radius:4px}
- .console{margin:2px 0 12px;padding:8px 10px;background:var(--console);border:1px solid var(--line);border-radius:12px;font:.72em/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#bbb;max-height:11.5em;overflow:auto;overscroll-behavior:contain}
+ .console{margin:2px 0 12px;padding:8px 10px;background:var(--console);border:1px solid var(--line);border-radius:var(--r-ctl);font:var(--fs-xs)/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--text-2);max-height:11.5em;overflow:auto;overscroll-behavior:contain}
  .console div{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;padding:1px 0 1px 12px;text-indent:-12px}
  .console.nowrap div{white-space:pre;overflow-wrap:normal;word-break:normal;padding:0;text-indent:0}   /* one entry per row, long ones scroll sideways */
  .console .l-err{color:#f08a8a} .console .l-ok{color:#8fe09a} .console .l-dim{color:#777} .console .l-hd{color:#eee}
@@ -115,10 +117,10 @@
  .dbox{margin:0} .dbox > h2{margin-top:6px}
  .ctls{display:flex;gap:8px;align-items:center}
  .srow.wrap > .ctls{margin-left:auto}
- .grip{flex:none;width:40px;height:44px;margin:-6px 0 -6px -10px;padding:0;background:none;color:#777;font-size:1.2em;letter-spacing:-.15em;line-height:1;cursor:grab;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none} .grip:hover,.grip:focus-visible{color:#ccc}
+ .grip{flex:none;width:40px;height:44px;margin:-6px 0 -6px -10px;padding:0;background:none;color:var(--text-3);font-size:1.2em;letter-spacing:-.15em;line-height:1;cursor:grab;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none} .grip:hover,.grip:focus-visible{color:#ccc}
  .mlist .srow:first-child{border-top:0} .pop .mlist{margin:0 0 8px} .srow[data-id] > span:nth-child(2){flex:1} .srow[data-id] > .fixed{flex:none;white-space:nowrap}
  .dragging,.dragging *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none} .dragging .grip{cursor:grabbing}
- .srow.drag{position:relative;z-index:5;will-change:transform;background:var(--card);border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.65);border-top-color:transparent}
+ .srow.drag{position:relative;z-index:5;will-change:transform;background:var(--card);border-radius:var(--r-ctl);box-shadow:0 8px 22px rgba(0,0,0,.65);border-top-color:transparent}
  .pop .srow.drag{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}   /* in a pop-up the lifted row is as wide as the pop-up itself */
  .wtext{margin:6px 0}
  .carousel{display:block;min-width:0} .carousel .dup,.carousel .sp{display:none}
@@ -128,16 +130,16 @@
  .now.open .carousel{white-space:normal;overflow:visible} .now.open .carousel .trk{animation:none;display:inline} .now.open .carousel .dup,.now.open .carousel .sp{display:none}
  @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
  @media(prefers-reduced-motion:reduce){.carousel.sc .trk{animation:none}.carousel.sc .dup,.carousel.sc .sp{display:none}}
- .now .row.main .v.fill.scrolling{flex:1;min-width:0;overflow:hidden} .carousel{min-height:1.35em} .carousel .cn{color:rgba(255,255,255,.65)} .carousel{text-align:center} .carousel.sc,.now.open .carousel{text-align:left}
+ .now .row.main .v.fill.scrolling{flex:1;min-width:0;overflow:hidden} .carousel{min-height:1.35em} .carousel .cn{color:var(--box-text-3)} .carousel{text-align:center} .carousel.sc,.now.open .carousel{text-align:left}
  .now .status{display:flex;align-items:baseline;min-width:0} .now .status > .dot{flex:none} .now .status > span:last-child{min-width:0}
  .now .pln{white-space:nowrap} .now .pln+.pln{margin-left:.6em}
  .now .wlist.compact{display:block;width:100%;max-height:40vh;overflow-y:auto;overscroll-behavior:contain}
  .now .wlist .p{display:flex;gap:8px;padding:4px 0;border-top:1px solid rgba(255,255,255,.12)} .now .wlist .p:first-child{border-top:0}
- .now .wlist .pn{flex:1;min-width:0;overflow-wrap:anywhere} .now .wlist .pg{display:block;color:rgba(255,255,255,.65)}
+ .now .wlist .pn{flex:1;min-width:0;overflow-wrap:anywhere} .now .wlist .pg{display:block;color:var(--box-text-3)}
  .now .wlist .pw{flex:none;font-weight:bold;white-space:nowrap} .now .wlist .p{align-items:center} .now .wlist .p .ibtn{width:30px;height:30px}
  .now .links{display:flex;flex-wrap:wrap;gap:6px} .now .links a{color:#fff;opacity:.9;padding:6px 0}
  .now .st{display:block;overflow-wrap:anywhere}
- .pop .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0} .pop .frow > span{color:var(--txt2);font-size:.9em}
+ .pop .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0} .pop .frow > span{color:var(--text-2);font-size:var(--fs-sm)}
  .btns{display:flex;gap:8px;flex:none} .srow.foot{padding:12px 0 8px}
  .srow.lk .pill-s,.srow.lk .tag{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb));text-shadow:0 1px 2px rgba(0,0,0,.55);color:#fff} .srow.lk .tag button{color:#fff}
  /* a row that shows an LED look: coloured buttons and tags that run the effect between the row's colour and the default dark grey of a
@@ -157,15 +159,13 @@
  .srow.lk-blink3{--lkn:lkb3;--lkd:1.6s;--lkt:steps(1)} .srow.lk-blink3.lk-fast{--lkd:.8s}
  .srow.lk-rainbow{--lkn:lkrainbow;--lkd:6s;--lkt:linear} .srow.lk-rainbow.lk-fast{--lkd:2s}
  @media(prefers-reduced-motion:reduce){.srow.lk-fx .pill-s,.srow.lk-fx .tag{animation:none}}
- .infobtn{flex:none;width:34px;height:34px;padding:0;border-radius:50%;background:rgba(42,42,42,.82);border:var(--bw) solid rgb(80,80,80);color:#ddd;font:italic 600 1.05em Georgia,serif;line-height:1}
- .pop .infotext{font-size:.9em;color:var(--txt2);margin-bottom:10px}
+ .infobtn{flex:none;width:var(--h-ctl);height:var(--h-ctl);padding:0;border-radius:50%;background:rgba(42,42,42,.82);border:var(--bw) solid rgb(80,80,80);color:var(--text-2);font:italic 600 1.05em Georgia,serif;line-height:1}
+ .pop .infotext{font-size:var(--fs-sm);color:var(--text-2);margin-bottom:10px}
  .tgl{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:4px}
  .bar .bar{margin:0}
  .bgpart.part{position:fixed;left:0;right:0;z-index:-1;pointer-events:none} .bgpart.part.top{top:0} .bgpart.part.bottom{bottom:0}   /* a background that fills only an area: its module sets the height */
  /* ===== end of the page kit ===== */
  :focus-visible{outline:3px solid #8bf;outline-offset:2px}
- .wide{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 20px;border-radius:var(--r);background:var(--card);border:var(--bw) solid #3a3a3a;color:#eee;font-size:1em;text-align:left}
- .wide .arrow{margin-left:8px} .wide.open .arrow{transform:rotate(90deg)}
  .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 0}
  .cog{position:absolute;right:0;top:50%;transform:translateY(-50%);padding:6px;background:transparent;color:#3a3a3a;line-height:0}
  .cog svg{width:30px;height:30px;fill:currentColor;display:block} .cog:hover{color:#5a5a5a}
@@ -182,18 +182,18 @@
  @media(min-width:1780px){#settings .in{max-width:1780px}}
  .srow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);margin:0}
  .card > .srow:first-child,.card > :first-child .srow:first-child{border-top:0} .card .after > .srow:first-child{border-top:1px solid var(--line)} .srow .sub{display:block;margin-top:2px}   /* a divider above every row of a box except its very first, whichever widget (form, table, list) the row comes from; a list that follows another row is marked .after */
- .cbox{-webkit-appearance:none;appearance:none;flex:none;display:inline-block;width:30px;height:30px;margin:0;padding:0;border-radius:8px;
-       border:var(--bw) solid #777;background:transparent center/18px no-repeat;vertical-align:middle;cursor:pointer}
+ .cbox{-webkit-appearance:none;appearance:none;flex:none;display:inline-block;width:var(--h-ctl);height:var(--h-ctl);margin:0;padding:0;border-radius:var(--r-ctl);
+       border:var(--bw) solid var(--text-3);background:transparent center/18px no-repeat;vertical-align:middle;cursor:pointer}
  .cbox.on,.cbox:checked{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
  .cbox.on.pri,.cbox.pri:checked{background-color:var(--primary);border-color:var(--primary)}
- table{width:100%;border-collapse:collapse;font-size:.88em}
+ table{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
  td,th{padding:10px 3px;border-top:1px solid var(--line);vertical-align:top;text-align:left;font-weight:normal}
  tr:first-child td{border-top:0}
  td.n{color:#eee;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;width:1%;padding-right:14px}
- select.ord{box-sizing:border-box;height:36px;padding:0 26px 0 10px;border-radius:8px;border:var(--bw) solid #555;color:#eee;font:inherit;font-size:.85em;
+ select.ord{box-sizing:border-box;height:var(--h-ctl);padding:0 26px 0 10px;border-radius:var(--r-ctl);border:var(--bw) solid var(--ctl-line);color:var(--text-1);font:inherit;font-size:var(--fs-sm);
              -webkit-appearance:none;appearance:none;
              background:#1a1a1a url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23ccc' stroke-width='1.6'/></svg>") no-repeat right 9px center}   /* one height on every device: phones draw native selects at their own size */
  .in{position:relative}
- input[type=password],input[type=text]{width:100%;padding:10px 12px;margin:0 0 10px;border-radius:12px;border:var(--bw) solid #555;background:#1a1a1a;color:#eee;font:inherit;font-size:.9em}
+ input[type=password],input[type=text]{width:100%;height:var(--h-ctl);padding:0 12px;margin:0 0 10px;border-radius:var(--r-ctl);border:var(--bw) solid var(--ctl-line);background:var(--ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm)}
  .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
  body.settings-open > :not(#settings):not(.keep-visible){visibility:hidden}

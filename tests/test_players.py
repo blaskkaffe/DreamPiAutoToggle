@@ -3,12 +3,21 @@ and the HTTP endpoint (no network: fetch is faked)."""
 import json
 import os
 import threading
+import time
 import unittest
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
 from support import core, web, sandbox, cleanup
 import netswitch_players as pl
+
+
+def wait_for_background_refresh():
+    """A page request that finds the list old starts a refresh in a thread (as it should); a test must not start while one is still
+    running, or its own refresh() returns at once (one runs at a time) and sees the thread's answer."""
+    end = time.time() + 5
+    while pl._cache["refreshing"] and time.time() < end:
+        time.sleep(0.01)
 
 
 class ParseTests(unittest.TestCase):
@@ -101,8 +110,10 @@ class ShapeTests(unittest.TestCase):
 
 class SourceTests(unittest.TestCase):
     def setUp(self):
+        wait_for_background_refresh()
         self.tmp = sandbox()
         self._fetch = pl.fetch
+        pl.fetch = lambda url: "{}"             # a refresh a page request starts in the background never reaches the network
         pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": []})
 
     def tearDown(self):
@@ -238,8 +249,10 @@ class FavoritesTests(unittest.TestCase):
              {"title": "Dead Game", "colour": "red"}, {"name": "Mystery"}]
 
     def setUp(self):
+        wait_for_background_refresh()
         self.tmp = sandbox()
         self._fetch = pl.fetch
+        pl.fetch = lambda url: "{}"             # a refresh a page request starts in the background never reaches the network
         pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": [], "games": [], "games_time": 0, "games_live": False, "restored": False})
         pl._disk["tried"] = True
 
@@ -352,7 +365,7 @@ class FavoritesTests(unittest.TestCase):
         self.assertFalse(pl.star("player", "One too many", True))             # a full list says no
 
     def test_the_view_has_the_games_list_and_what_is_starred(self):
-        pl._cache.update({"time": 5, "players": [{"player": "Ana", "game": "Quake III Arena", "network": "DCNow!"},
+        pl._cache.update({"time": int(time.time()), "players": [{"player": "Ana", "game": "Quake III Arena", "network": "DCNow!"},
                                                  {"player": "Bo", "game": "Quake III Arena", "network": "DCNow!"},
                                                  {"player": "Cy", "game": "", "network": "DCNET"}]})
         pl.star("player", "Bo", True)
@@ -362,7 +375,7 @@ class FavoritesTests(unittest.TestCase):
         self.assertEqual(v["games_list"], [{"title": "Quake III Arena", "sub": "2 playing", "starred": True}])
 
     def test_the_star_endpoint_answers_with_the_new_view(self):
-        pl._cache.update({"time": 5, "players": [{"player": "Ana", "game": "", "network": "DCNow!"}]})
+        pl._cache.update({"time": int(time.time()), "players": [{"player": "Ana", "game": "", "network": "DCNow!"}]})
         class H(object):
             body = {"kind": "player", "name": "Ana", "on": True}
             def send(self, body, ctype, status=200):
@@ -377,7 +390,7 @@ class FavoritesTests(unittest.TestCase):
         self.assertEqual(h.sent[1], 400)
 
     def test_the_status_is_about_the_player_feeds_not_the_game_list(self):
-        pl._cache.update({"time": 5, "players": [], "sources": [{"name": "Dreamcast Live", "ok": False, "count": 0, "error": "no games found", "kind": "games"},
+        pl._cache.update({"time": int(time.time()), "players": [], "sources": [{"name": "Dreamcast Live", "ok": False, "count": 0, "error": "no games found", "kind": "games"},
                                                                   {"name": "DC99", "ok": True, "count": 0, "error": None, "sections": []}]})
         self.assertNotIn("Dreamcast Live", pl.view()["status"])
         self.assertNotIn("DreamPi on GitHub", [x[0] for x in pl.LINKS])
@@ -438,6 +451,7 @@ class GameTableTests(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox()
         self._fetch = pl.fetch
+        pl.fetch = lambda url: "{}"             # a refresh a page request starts in the background never reaches the network
         pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": [], "games": [], "games_time": 0, "games_live": False})
 
     def tearDown(self):
