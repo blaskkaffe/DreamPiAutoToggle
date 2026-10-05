@@ -341,13 +341,14 @@ W.links=function(s){var btn=s.style==="buttons",el=h("span",{"class":"links keep
 //   icon  {kind: "star" | "bell", post, on: the item's field, data: the data source the answer replaces, body: fixed fields, fields: {key: item field}}:
 //         a round on / off button at the end that POSTs {...body, ...fields, on} (a favourite, a reminder)
 W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" compact keep":s.style==="grid"?" grid keep":"")}),pop=h("div"),popT=h("div",{"class":"t"}),msg=h("div",{"class":"msg"}),
- fields=[],go=h("button",{type:"button","class":"pill-s"}),cur=null,key="";
+ fields=[],go=h("button",{type:"button","class":"pill-s"}),cur=null,key="",
+ find=s.search?h("input",{type:"text",placeholder:s.search,"aria-label":s.search,autocomplete:"off"}):null;      // "search": a box that narrows the rows by their title and grey line, "limit": at most that many rows are drawn
  var P=s.popup||{};
  pop.appendChild(popT);
  (P.fields||[]).forEach(function(f){var inp=h("input",{type:f.type==="password"?"password":"text",placeholder:f.label||"","aria-label":f.label||f.key,autocomplete:"off"});
   inp.onkeydown=function(e){if(e.key=="Enter"){e.preventDefault();submit()}};fields.push({f:f,el:inp});pop.appendChild(inp)});
  pop.appendChild(msg);pop.appendChild(h("div",{"class":"bar end"},[go]));
- var inner=h("div"),p;el.appendChild(inner);el.appendChild(pop);p=ui.popup(pop);
+ var inner=h("div"),p;if(find)el.appendChild(find);el.appendChild(inner);el.appendChild(pop);p=ui.popup(pop);
  function compactRow(it){var R=s.row,tag=R.tag?it[R.tag]:"",c=h("span",{"class":"pw",text:tag}),title=it[R.title||"title"],
   tn=R.href&&it[R.href]?h("a",{href:it[R.href],target:"_blank",rel:"noopener noreferrer",text:title}):document.createTextNode(title),
   t=h("span",{"class":"pn"},[tn,h("span",{"class":"pg",text:it[R.sub||"sub"]||""})]);
@@ -359,9 +360,11 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
   return h("div",{"class":"p"},kids)}
  function rowFor(it,i,extra){if(s.style==="compact"||s.style==="grid")return compactRow(it);var info=extra?it.sub:it[s.row.sub||"sub"],
   title=extra?it.title:it[s.row.title||"title"],b=h("button",{type:"button","class":"pill-s",text:extra?it.button:(s.row.button||"Select"),"aria-label":(extra?it.button:(s.row.button||"Select"))+" "+title});
-  var item=extra?it.item:it;
+  var item=extra?it.item:it,link=!extra&&s.row.href&&it[s.row.href],sub=info?h("span",{"class":"sub"}):null;      // row.href: the title is a link; row.button_if: a field of the item that must be set for the button to show
+  if(sub)setLines(sub,info);
   b.onclick=function(e){open(item,b,e)};
-  return h("div",{"class":"srow"},[h("span",{},[document.createTextNode(title),info?h("span",{"class":"sub",text:info}):null]),b])}
+  return h("div",{"class":"srow"},[h("span",{},[link?h("a",{href:link,target:"_blank",rel:"noopener noreferrer",text:title}):document.createTextNode(title),sub]),
+   !extra&&s.row.button_if&&!it[s.row.button_if]?null:b])}
  function open(it,b,e){if(p.isOpen()&&p.anchor===b){p.close();return}cur=it;
   setText(popT,((it.other&&P.title_other)||P.title||"").replace(/\{(\w+)\}/g,function(m,k){return it[k]!=null?it[k]:""}));setText(msg,"");
   var first=null;fields.forEach(function(x){var f=x.f,showIt=!f.show_if||!!it[f.show_if];x.el.style.display=showIt?"block":"none";
@@ -373,14 +376,19 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
   withPin(function(){go.disabled=true;setText(go,P.busy||"Working...");
    post(P.post,body,function(r,st,b){go.disabled=false;setText(go,P.submit||"OK");
     if(st==401||st==429){setText(msg,(b&&b.message)||"PIN refused");return}
-    p.close();refresh()})})}
+    if(st>=400&&b&&b.message){setText(msg,b.message);return}      // the server refused and says why: it stays in the pop-up
+    p.close();refresh();if(P.reload)reloadData(P.reload)})})}      // popup.reload: a data source of the module that is read again at once
  setText(go,P.submit||"OK");go.onclick=submit;
  function paint(){var raw=val(s.items);if(raw==null){if(key!==null){key=null;inner.innerHTML=""}return}      // null: not known yet, nothing is said about it (no "Nobody ...")
-  var items=raw,k=JSON.stringify(items);if(k===key)return;key=k;
+  var q=find?find.value.trim().toLowerCase():"",items=raw,k=JSON.stringify(items)+"|"+q;if(k===key)return;key=k;
+  if(q)items=items.filter(function(it){return (String(it[s.row.title||"title"]||"")+" "+String(it[s.row.sub||"sub"]||"")).toLowerCase().indexOf(q)>=0});
+  var more=s.limit&&items.length>s.limit?items.length-s.limit:0;if(more)items=items.slice(0,s.limit);
   inner.innerHTML="";
   items.forEach(function(it,i){inner.appendChild(rowFor(it,i,false))});
+  if(more)inner.appendChild(h("div",{"class":"sub",text:more+" more: use the search"}));
   if(!items.length&&s.empty)inner.appendChild(s.style==="compact"||s.style==="grid"?h("span",{text:s.empty}):h("div",{"class":"srow"},[h("span",{text:s.empty})]));
   (s.extra||[]).forEach(function(x,i){inner.appendChild(rowFor(x,i,true))})}
+ if(find)find.oninput=function(){paint()};
  UPD.push(function(){var shown=s.when===undefined||!!val(s.when);if(!shown){if(key!==""){key="";inner.innerHTML="";p.close()}return}paint()});
  hook("settingsClose",function(){p.close()});return el};
 // ---- the standard "edit row": the title and a grey line on the left, a small button on the right (Edit, Add ...), and - once there is
