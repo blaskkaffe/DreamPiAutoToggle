@@ -67,7 +67,7 @@ const AUDIT = () => {
     await page.keyboard.press('Escape');
     await page.click('[data-box="status led"] button[aria-label="Add messages to this colour"]'); await page.waitForTimeout(300); await check('LED add messages pop-up');
     await page.keyboard.press('Escape');
-    await page.evaluate(() => { const b = document.querySelector('.wpicker button[aria-label^="Add"]'); if (b) b.click(); }); await page.waitForTimeout(300); await check('numbers add pop-up');
+    await page.click('[data-box="special phone numbers"] .wtrig .srow.edit button'); await page.waitForTimeout(300); await check('numbers row pop-up');
     await page.keyboard.press('Escape');
     await page.click('[data-box="status led"] .srow:has-text("Calibration") > button'); await page.waitForTimeout(300); await check('calibration pop-up');
     await page.keyboard.press('Escape');

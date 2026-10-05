@@ -15,5 +15,23 @@
   "selector": false
  },
  "web": "netswitch_switcher",
- "primary": "selector"
+ "primary": "selector",
+ "hook": "netswitch_switcher_hook",
+ "actions": [
+  {
+   "id": "toggle",
+   "label": "Toggle network",
+   "sub": "Switch to the other network"
+  },
+  {
+   "id": "dcnow",
+   "label": "DCNow!",
+   "sub": "Select DCNow!"
+  },
+  {
+   "id": "dcnet",
+   "label": "DCNET",
+   "sub": "Select DCNET"
+  }
+ ]
 }

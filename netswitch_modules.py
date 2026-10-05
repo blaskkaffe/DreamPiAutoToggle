@@ -37,7 +37,7 @@ import netswitch_core as core
 UI_KIT = 2       # the version of the page kit (ui in page/page.js, the kit block in page.css); a module may ask for an older one
 _PAGE_FILES = ("page.css", "page.js")
 # the standard widgets the page can draw from a layout (docs/modules.md, "Layout"); "custom" hands a box to the module's own page.js
-WIDGETS = ("text", "row", "button", "toggle", "swatches", "colourpick", "link", "form", "infobox", "status", "bar", "carousel", "worldmap",
+WIDGETS = ("text", "row", "button", "toggle", "swatches", "colourpick", "link", "form", "infobox", "status", "bar", "carousel", "worldmap", "triggers",
            "picker", "list", "links", "console", "info", "custom")
 CONTROLS = ("select", "choice", "number", "text", "toggle")      # what a form field may hold (W.form, control() in page/widgets.js)
 SECTIONS = ("dashboard", "settings")

@@ -118,6 +118,22 @@ def module_default_enabled(manifest):
     return bool(manifest.get("enabled", manifest.get("default", True)))
 
 
+def module_actions():
+    """The actions the enabled modules announce (module.json "actions": [{"id", "label", "sub"}]), in picker order, as
+    [{"value": "<module>.<id>", "label", "sub", "group": <the module's title>}]. A module's hook file does them inside DreamPi
+    (see netswitch_hook.py); the phone numbers module offers them in its rows."""
+    out = []
+    for name in module_names():
+        manifest = module_manifest(name) or {}
+        if not module_enabled(name):
+            continue
+        for a in manifest.get("actions") or []:
+            if isinstance(a, dict) and re.match(r"^[a-z][a-z0-9_]*$", str(a.get("id") or "")):
+                out.append({"value": "%s.%s" % (name, a["id"]), "label": str(a.get("label") or a["id"]),
+                            "sub": str(a.get("sub") or ""), "group": module_title(name, manifest)})
+    return out
+
+
 def saved_module_order():
     try:
         with open(MODULE_ORDER) as f:

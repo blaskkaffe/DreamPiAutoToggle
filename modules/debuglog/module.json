@@ -12,5 +12,6 @@
  "primary": "debuglog",
  "tints": {
   "debuglog": false
- }
+ },
+ "hook": "netswitch_hookdebug"
 }

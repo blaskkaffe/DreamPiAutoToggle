@@ -19,10 +19,10 @@ class DebugLogInTheHook(unittest.TestCase):
         self.tmp = sandbox(hook, hookdebug)
         shutil.copytree(os.path.join(ROOT, "modules", "debuglog"), os.path.join(hook.MODULES_DIR, "debuglog"),
                         ignore=shutil.ignore_patterns("__pycache__"))
-        hook._debug_module[0] = None
+        hook._parts.clear()
 
     def tearDown(self):
-        hook._debug_module[0] = None
+        hook._parts.clear()
         cleanup(self.tmp)
 
     def log(self):

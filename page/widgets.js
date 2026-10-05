@@ -388,12 +388,13 @@ function editRow(o){var sub=h("span",{"class":"sub"}),title=document.createTextN
    row.classList.add("lk");if(row._fx!==fx){if(row._fx){row.classList.remove(row._fx);row.classList.remove("lk-fx")}if(fx){row.classList.add(fx);row.classList.add("lk-fx")}row._fx=fx}
    row.classList.toggle("lk-fast",speed==="fast")},
   setSub:function(t){setLines(sub,t);sh(sub,!!t)},
-  setList:function(items,onRemove){below.innerHTML="";items=items||[];sh(below,items.length>0);if(!items.length)return;
-   var tags=h("div",{"class":"tags"});
-   items.forEach(function(it,i){var t=h("span",{"class":"tag"},[document.createTextNode(it)]);
-    if(onRemove){var x=h("button",{type:"button","aria-label":"Remove "+it,html:"&#10005;"});x.onclick=function(e){e.stopPropagation();onRemove(i)};t.appendChild(x)}
-    else t.style.paddingRight="12px";
-    tags.appendChild(t)});below.appendChild(tags)}}}
+  setList:function(items,onRemove){below.innerHTML="";items=items||[];sh(below,items.length>0);if(!items.length)return;below.appendChild(tagList(items,onRemove))}}}
+// the tags of a list (phone numbers, LED messages): with onRemove(i) each has a remove button, without it they are only shown
+function tagList(items,onRemove){var tags=h("div",{"class":"tags"});
+ items.forEach(function(it,i){var t=h("span",{"class":"tag"},[document.createTextNode(it)]);
+  if(onRemove){var x=h("button",{type:"button","aria-label":"Remove "+it,html:"&#10005;"});x.onclick=function(e){e.stopPropagation();onRemove(i)};t.appendChild(x)}
+  else t.style.paddingRight="12px";
+  tags.appendChild(t)});return tags}
 // ---- the standard foot of a settings table: buttons on the left (Add, Restore ...), an (i) button on the right that opens a read-only
 // pop-up with the information text (no Done button: nothing in it is saved). f.setInfo(text) sets or, when empty, hides it.
 function footRow(buttons){var info=h("button",{type:"button","class":"infobtn",text:"i",title:"Information","aria-label":"Information"}),
@@ -465,6 +466,69 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
  function save(){clearTimeout(timer);paint();timer=setTimeout(function(){var body={};cfg.groups.forEach(function(g){body[g.key]=g.items});
   post(s.source,body,function(r){if(r){cfg=r;paint();ctx.saved();if(s.reload)reloadData(s.reload)}})},100)}      // the data source that shows this list ("reload": its name; the stars of the players box) follows what was saved
  hook("settingsOpen",load);hook("settingsClose",function(){p.close()});return el};
+// ---- rows of "something to do + what triggers it" (phone numbers: an action and the numbers that start it). One short row per entry
+// (its title, a grey line and its triggers as tags) with an Edit button; the pop-up under it has the action (a select, when the answer lists
+// "actions"), the row's options (switches), the triggers with an Add field, Delete row and Done. "Add row" asks for the action first.
+// With rules.sort each row has a drag handle (the top row has priority); the same drag as the module picker.
+// GET source -> {rows:[{id, action, title, sub, items:[text], opts:{key:bool}}], actions:[{value,label,sub,group}], options:[{key,label,sub}],
+//  note, defaults:{rows}, rules:{min,max,allowed,per_row,max_rows,add_row,add_row_title,add_label,add_title,min_msg,help,restore,sort}};
+// POST source {rows:[{id, action, items, opts}]} answers the same. The server writes the texts (title, sub, note), the page only draws them.
+W.triggers=function(s,ctx){var el=h("div",{"class":"wtrig"}),cfg=null,timer=null,editors={},openNew=false,list=h("div"),
+ addB=h("button",{type:"button","class":"pill-s",text:"Add row"}),restore=h("button",{type:"button","class":"pill-s"}),foot=footRow([addB,restore]),note=h("div",{"class":"sub note"}),
+ pick=h("div"),pickT=h("div",{"class":"t"}),choices=h("div",{"class":"choices"}),pp=null;
+ pick.appendChild(pickT);pick.appendChild(choices);el.appendChild(list);el.appendChild(note);el.appendChild(foot.el);el.appendChild(pick);pp=ui.popup(pick);
+ function rules(){return cfg.rules||{}}
+ function editor(row){var ed=editors[row.id];if(ed)return ed;
+  var box=h("div");ed={box:box,p:ui.popup(box)};el.appendChild(box);editors[row.id]=ed;return ed}
+ function fillEditor(row){var ed=editor(row),R=rules(),box=ed.box,msg=h("div",{"class":"msg"}),inp=h("input",{type:"text","aria-label":R.add_title||"Add",maxLength:R.max||40}),
+  addI=h("button",{type:"button","class":"pill-s",text:R.add_label||"Add"}),del=h("button",{type:"button","class":"pill-s danger",text:"Delete row"}),done=h("button",{type:"button","class":"pill-s",text:"Done"});
+  box.innerHTML="";box.appendChild(h("div",{"class":"t",text:row.title}));
+  if(cfg.actions&&cfg.actions.length){var sel=h("select",{"class":"ord","aria-label":"Action"}),groups={},order=[],known=false;
+   cfg.actions.forEach(function(a){var g=a.group||"";if(!groups[g]){groups[g]=[];order.push(g)}if(a.value===row.action)known=true;
+    groups[g].push('<option value="'+esc(a.value)+'"'+(a.value===row.action?" selected":"")+">"+esc(a.label)+"</option>")});
+   sel.innerHTML=(known?"":'<option value="'+esc(row.action)+'" selected>'+esc(row.title)+" (not available)</option>")+order.map(function(g){return order.length>1&&g?'<optgroup label="'+esc(g)+'">'+groups[g].join("")+"</optgroup>":groups[g].join("")}).join("");
+   sel.onchange=function(){row.action=sel.value;save()};box.appendChild(h("div",{"class":"frow"},[h("span",{text:"Action"}),sel]))}
+  (cfg.options||[]).forEach(function(o){var cb=h("input",{type:"checkbox","class":"cbox neutral","aria-label":o.label});cb.checked=!!(row.opts||{})[o.key];
+   cb.onchange=function(){row.opts=row.opts||{};row.opts[o.key]=cb.checked;save()};
+   box.appendChild(h("div",{"class":"frow"},[h("span",{},[document.createTextNode(o.label),o.sub?h("span",{"class":"sub",text:o.sub}):null]),cb]))});
+  if(row.items.length)box.appendChild(tagList(row.items,function(i){row.items.splice(i,1);save()}));
+  function say(t){setText(msg,t)}
+  function add(){var allowed=new RegExp("[^"+(R.allowed||"\\s\\S")+"]","g"),n=inp.value.replace(allowed,"");
+   if(n.length<(R.min||1))return say(R.min_msg||"Too short");
+   if(row.items.indexOf(n)>=0)return say(n+" is already in this row");
+   if(R.per_row&&row.items.length>=R.per_row)return say("At most "+R.per_row);
+   row.items.push(n);save()}
+  addI.onclick=add;inp.onkeydown=function(e){if(e.key=="Enter"){e.preventDefault();add()}};
+  box.appendChild(h("div",{"class":"fld"},[inp,addI]));box.appendChild(msg);
+  del.onclick=function(){var i=cfg.rows.indexOf(row);ed.p.close();if(i>=0)cfg.rows.splice(i,1);save()};done.onclick=function(){ed.p.close()};
+  box.appendChild(h("div",{"class":"bar end"},[del,done]))}
+ function summary(row){return row.sub||""}
+ function paint(){if(!cfg)return;var R=rules(),ids={};
+  list.innerHTML="";
+  cfg.rows.forEach(function(row){ids[row.id]=1;
+   var e=editRow({title:row.title,button:R.edit_label||"Edit",aria:(R.edit_label||"Edit")+" "+row.title});
+   e.setSub(summary(row));e.setList(row.items);
+   if(R.sort){var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+row.title+": drag, or use the up and down arrow keys",html:"&#8942;&#8942;"});
+    e.el.insertBefore(grip,e.el.firstChild);e.el.setAttribute("data-id",row.id)}
+   e.btn.onclick=function(ev){ev.stopPropagation();var p=editor(row).p;if(p.isOpen())p.close();else p.open(e.btn)};list.appendChild(e.el);fillEditor(row);
+   var q=editor(row).p;if(q.isOpen())q.open(e.btn);                       // an open editor follows its row (the row's height changes with its tags)
+   else if(openNew&&row===cfg.rows[cfg.rows.length-1]){openNew=false;q.open(e.btn)}});
+  Object.keys(editors).forEach(function(id){if(!ids[id]){editors[id].p.close();if(editors[id].box.parentNode)editors[id].box.parentNode.removeChild(editors[id].box);delete editors[id]}});
+  if(R.sort)sortable(list,function(names){var by={};cfg.rows.forEach(function(r){by[r.id]=r});cfg.rows=names.map(function(n){return by[n]});save()});
+  setText(note,cfg.note||"");sh(note,!!cfg.note);
+  sh(addB,!R.max_rows||cfg.rows.length<R.max_rows);setText(addB,R.add_row||"Add row");
+  sh(restore,!!R.restore);if(R.restore){setText(restore,R.restore);restore.onclick=function(){if(R.restore_confirm&&!confirm(R.restore_confirm))return;cfg.rows=JSON.parse(JSON.stringify((cfg.defaults||{}).rows||[]));save()}}
+  foot.setInfo(R.help||"")}
+ function newRow(action){cfg.rows.push({id:"",action:action||"",title:"",sub:"",items:[],opts:{}});openNew=true;pp.close();save(true)}
+ addB.onclick=function(e){if(!cfg.actions||!cfg.actions.length){newRow("");return}
+  setText(pickT,rules().add_row_title||"Choose an action");choices.innerHTML="";
+  cfg.actions.forEach(function(a){var b=h("button",{type:"button","class":"choice"},[document.createTextNode(a.label)]);
+   if(a.sub||a.group)b.appendChild(h("span",{"class":"sub",text:a.sub||a.group}));b.onclick=function(){newRow(a.value)};choices.appendChild(b)});
+  pp.toggle(addB,e)};
+ function load(){xhrJson("GET",s.source,function(r){if(r){cfg=r;paint()}})}
+ function save(quiet){clearTimeout(timer);if(!quiet)paint();timer=setTimeout(function(){var body={rows:cfg.rows.map(function(r){return{id:r.id,action:r.action,items:r.items,opts:r.opts}})};
+  post(s.source,body,function(r){if(r){cfg=r;paint();ctx.saved()}})},100)}
+ hook("settingsOpen",load);hook("settingsClose",function(){pp.close()});return el};
 // ---- a console: lines of text in a box. "lines": "@path" replaces them all; "tail": "/url" adds what is new (GET url?from=N -> {text, size, reset})
 W.console=function(s,ctx){var el=h("div",{"class":"console"+(s.nowrap?" nowrap":""),role:"log","aria-label":s.label||"Log"}),size=0,busy=false,rules=(s.rules||[]).map(function(r){return[new RegExp(r[0],"i"),r[1]]}),
  follow=s.follow?val(s.follow):true;

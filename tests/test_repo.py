@@ -1,6 +1,7 @@
 """Repo-level guards: the DreamPi hook must stay Python 2.7 compatible, the
 shell scripts must parse, and every Python file must compile."""
 import ast
+import json
 import glob
 import os
 import py_compile
@@ -12,7 +13,20 @@ import unittest
 from support import ROOT
 
 
-HOOK_FILES = [os.path.join(ROOT, "netswitch_hook.py"), os.path.join(ROOT, "modules", "debuglog", "netswitch_hookdebug.py")]
+def module_hook_files():
+    """Every module's "hook" file (module.json): it runs inside DreamPi like netswitch_hook.py."""
+    out = {}
+    for name in sorted(os.listdir(os.path.join(ROOT, "modules"))):
+        path = os.path.join(ROOT, "modules", name, "module.json")
+        if os.path.exists(path):
+            with open(path) as f:
+                hook = json.load(f).get("hook")
+            if hook:
+                out[name] = os.path.join(ROOT, "modules", name, hook + ".py")
+    return out
+
+
+HOOK_FILES = [os.path.join(ROOT, "netswitch_hook.py")] + sorted(module_hook_files().values())
 
 
 class HookCompatTests(unittest.TestCase):
@@ -48,6 +62,26 @@ class HookCompatTests(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
                 top.add(node.module.split(".")[0])
         self.assertFalse(top & {"pathlib", "typing", "asyncio", "subprocess32", "dataclasses", "enum", "secrets"}, top)
+
+
+class ActionTests(unittest.TestCase):
+    def test_every_announced_action_is_done_by_the_modules_hook_file(self):
+        import importlib
+        import support  # noqa: F401  (puts every module folder on the path)
+        files = module_hook_files()
+        for name in sorted(os.listdir(os.path.join(ROOT, "modules"))):
+            path = os.path.join(ROOT, "modules", name, "module.json")
+            if not os.path.exists(path):
+                continue
+            with open(path) as f:
+                actions = json.load(f).get("actions") or []
+            if not actions:
+                continue
+            self.assertIn(name, files, "%s announces actions but has no hook file" % name)
+            part = importlib.import_module(os.path.basename(files[name])[:-3])
+            for a in actions:
+                self.assertTrue(callable(part.ACTIONS.get(a["id"])), "%s.%s has no function in %s" % (name, a["id"], files[name]))
+                self.assertTrue(a.get("label"), "%s.%s has no label" % (name, a["id"]))
 
 
 class LayeringTests(unittest.TestCase):
