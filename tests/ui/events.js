@@ -55,6 +55,16 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await ev.locator('.srow', { hasText: /^Time zone/ }).count() === 0 && await ev.locator('.infobtn:visible').count() === 0, 'the time zone is the global one (About), and the reminder list has no info button');
   ok(await page.locator('section[data-box="about"] .srow', { hasText: /^Time zone/ }).count() === 1, 'About has the time zone');
   await page.click('#close-settings'); await settle(500);
+  // a long main title scrolls from the start, without the box being opened and closed first (here: the data the page kept from the last visit
+  // is what builds the box, and the server is slow to answer)
+  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('netswitch-data-events')));
+  kept.next.title = 'Game Night UK: Power Smash Tennis with a title that is far too long for the box';
+  const p2 = await browser.newPage({ viewport: { width: 420, height: 1100 } });
+  await p2.addInitScript(k => { try { localStorage.setItem('netswitch-data-events', JSON.stringify(k)); } catch (e) {} }, kept);
+  await p2.route('**/events/view', r => setTimeout(() => r.continue().catch(() => {}), 4000));
+  await p2.goto(URL, { waitUntil: 'domcontentloaded' }); await settle(1800);
+  ok(await p2.locator('.dbox[data-box="events"] .now b .carousel.sc').count() === 1, 'a long main title scrolls from the start, without the box being opened and closed first');
+  await p2.close();
   ok(errors.length === 0, 'no JavaScript or console errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await browser.close();
   console.log(failed ? failed + ' check(s) failed' : 'all checks passed');

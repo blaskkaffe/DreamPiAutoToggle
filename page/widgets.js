@@ -218,7 +218,8 @@ function ticker(host,mod){var el=h("span",{"class":"carousel"}),trk=h("span",{"c
   if(t&&box&&!box.classList.contains("open")&&!box.hasAttribute("data-mode")){      // the line never wraps while the box is closed (page.css), so its width says if it fits
    var sp=t.querySelector(".sp");need=t.offsetWidth-(sp?sp.offsetWidth:0)>host.clientWidth+1}
   if(need!==scrolling){scrolling=need;el.classList.toggle("sc",scrolling);if(scrolling)el.style.setProperty("--d",Math.max(10,Math.round((el.textContent||"").length*0.28))+"s");show()}}
- hook("layout",fit);window.addEventListener("resize",fit);UPD.push(paint);
+ hook("layout",fit);window.addEventListener("resize",fit);UPD.push(function(){paint();fit()});AFTER.push(fit);      // measured again on every update (the first time the box may not be laid out yet, or its text may come from the data the page kept) and once the page is built
+ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);
  return {set:function(next){if(next===html)return;html=next;show();fit()},paint:paint,fit:fit}}
 // "mode": "@path" puts the text on the box as data-mode (a module's page.css lays the box out differently for it); "open_if": "@path" -
 // while that is false the box has nothing to show when tapped, so it does not open (and is not a button)
