@@ -79,8 +79,23 @@ An announced action may declare variables:
 - `type` is `text`, `number` or `choice` (with `options`). `required` or optional (`default`).
 - The row editor draws the fields under the action. A row missing a required variable is marked *incomplete* and skipped
   (logged), never half-run.
-- A source can offer **placeholders** to text variables: `{number}` (phone numbers), `{event}` (events), `{player}` / `{game}`
-  (players). *"Reminder: {event}"* becomes the event's name.
+- **Placeholders** are announced by the module that can supply them, in its `module.json`, and any text variable of any action can
+  use the placeholders of the modules that are loaded. The editor lists them as chips to tap, grouped by module. With no optional
+  module loaded only the base's own are offered: the system (`{time}`, `{date}`, `{hostname}`) and the add-on (`{version}`).
+  A module that is off or removed takes its placeholders with it. A placeholder that is still in a saved text but no longer
+  announced is shown as written and the row says *"{event}: its module is off"*.
+- Two kinds, both announced the same way:
+  - **state** placeholders are always available while the module is on (the network switcher: `{network}`, the selected network);
+  - **trigger** placeholders only have a value when that module's trigger fired the action (numbers: `{number}`, the number that
+    matched; events: `{event}`, `{event_time}`; players: `{player}`, `{game}`; buttons: `{button}`, `{button_event}`). Used in a
+    row of another source they come out empty, and the editor warns *"{event} only has a value when an event fires this row"*.
+```json
+"placeholders": [{"id": "number", "label": "The number that was dialed", "kind": "trigger"},
+                 {"id": "network", "label": "The selected network", "kind": "state"}]
+```
+  The module's hook file supplies the values (`PLACEHOLDERS = {"number": fn(call)}`), so they work in any process.
+  A placeholder id is owned by the first module (picker order) that announces it; the base's ids are reserved. A text variable is
+  filled in when the action runs, never stored filled in.
 - Variables belong to the **row** (numbers) or the **binding** (buttons, events), so the same action can appear twice with different
   texts. In the action's view they are groups: *"Show a notice 'Hi'"* with its chips.
 
@@ -114,7 +129,7 @@ do these yet.
 | Module | Source of triggers? | Chips look like | Options of its rows | Announces actions? |
 |---|---|---|---|---|
 | **Special phone numbers** | yes (exists) | `11111` | Hang up | no |
-| **Buttons** (new module, owns the pins, takes them out of the switcher's GPIO form) | yes | `Button 1 · closed`, `Button 1 · opened`, `Button 1 · held 3 s`, `Buttons 1+2 · held` | the button's type (see 8) | no |
+| **Buttons** (new module, owns the pins, takes them out of the switcher's GPIO form) | yes | `Button 1 · short press`, `Button 1 · held 3 s`, `Button 2 · switched on`, `Buttons 1+2 · held` | the button's type and a *Normally closed* checkbox (see 8) | no |
 | **DC99 events** | yes | `Event reminder due` | none | no |
 | **Online players** | yes | `Favourite game played`, `Favourite player online` | none | no |
 | **Reboot and Update** | yes | `Update available`, `Update failed` | none | Check for updates |
@@ -135,16 +150,20 @@ do these yet.
 
 ## 8. Buttons in detail
 
-A button has a pin and a **type**:
+Buttons (the physical GPIO buttons) are a module like the others: they announce their triggers, have rows, and their chips show up
+under the actions in the other modules. The pins and the type are the module's own settings (taken out of the network switcher's
+GPIO form). A button has a pin, a **type** and a checkbox:
 
-- **Toggle** (a switch that stays in its position): events **Closed** and **Opened**; its current position is applied once when the
-  service starts (as the "On = DCNET" functions do today).
-- **Momentary** (a push button): events **Short press** (fires on release, unless the press became a hold) and **Held** (3 s). A
-  setting *contact: normally open / normally closed* says which level is the rest position, so a normally-closed button works.
+| Type | Events (chips) | Checkbox |
+|---|---|---|
+| **Momentary** (a push button) | **Short press** (fires on release, unless the press became a hold), **Held** (3 s) | **Normally closed**: tick it for a contact that is closed at rest and opens when pressed |
+| **Toggle** (a switch that stays in its position) | **Switched on**, **Switched off** (the position is applied once when the service starts, as "On = DCNET" does today) | **Inverted**: tick it when "on" is the open position |
 
-Plus the trigger *Buttons 1 and 2 held together* (replaces the Wi-Fi button assignment). Debounce and hold timing stay hard-wired
-in the service. Every event is a chip with an action, shown in the owning module like any other chip. Clearing an event removes its
-chip from both views. The old `button*_function` and `wifi_button` settings are converted once, on update.
+So normally-open and normally-closed hardware are handled by one checkbox and the events keep their meaning. Plus the trigger
+*Buttons 1 and 2 held together* (replaces the Wi-Fi button assignment). Debounce and hold timing stay hard-wired in the service. Every
+event is a chip with an action, shown in the owning module like any other chip; clearing an event removes its chip from both views.
+The old `button*_function` and `wifi_button` settings are converted once, on update. Placeholders: `{button}` (which one) and
+`{button_event}`.
 
 ## 9. What stays hard-wired, and why
 
@@ -167,11 +186,23 @@ chip from both views. The old `button*_function` and `wifi_button` settings are 
 Each step is its own commit with tests, README and `docs/` updated, and the Python 2.7 hook files syntax-checked. Everything that
 runs inside DreamPi stays **unverified on hardware** until you try it on a Pi.
 
-## 11. Decisions needed (my recommendation first)
+## 11. Decisions
 
-1. **Momentary buttons**: *Short press + Held* with a normally-open/closed setting (recommended: it matches how the buttons work
-   today and a hold doesn't also fire a press), or *Closed + Opened + Held* for both types (a hold would also fire Closed).
-2. **Buttons as a module of their own** (recommended: the switcher then only announces actions), or keep them in the switcher.
-3. **Events**: OK that dismissing the banner no longer ends the highlight (each ends after its own seconds)?
-4. **Placeholders** (`{number}`, `{event}`, `{player}`, `{game}`) in text variables: yes?
-5. **Adding from the action's side** (section 3, rule 2): should it be allowed, or view and remove only? Allowed is what you described.
+Settled:
+
+1. **Momentary buttons**: Short press and Held; a *Normally closed* checkbox (and *Inverted* for toggles) covers the hardware.
+2. **Buttons are a module of their own**, working like every other module (section 8).
+4. **Placeholders** are announced by the modules that can supply them; only the system and the add-on's are there without modules.
+5. **Adding a trigger from the action's side** is allowed (section 3, rule 2).
+
+Still open:
+
+3. **Events: what ends a reminder.** Today one reminder state drives everything: the banner, the highlight of the Clock and Events
+   boxes and the LED message *Event starting soon* all last "until you dismiss it on the page", or 10 minutes after the start. If the
+   banner, the highlight and the LED each become an action with its own length (a row is "when X happens, do Y", with no "and undo it
+   when X ends"), then dismissing the banner can no longer switch the others off: they end on their own after their seconds. The
+   choices:
+   - (a) **Independent** (simplest, recommended): each action has its own seconds; dismissing the banner closes only the banner.
+   - (b) **Events keeps a reminder state** and exposes it as a state placeholder/condition, so highlight and LED rows can say
+     "while a reminder is active"; that needs a second kind of trigger ("while ...") and an automatic undo, which is a bigger model.
+   - (c) **Keep the hard-wired behaviour for events** (banner + highlight + LED together, dismiss ends all) and add rows later.
