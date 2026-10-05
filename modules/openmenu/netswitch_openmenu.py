@@ -10,7 +10,13 @@
 #   GET  /openmenu/games                          the game list for the games widget (read again when the hash changes).
 #   POST /openmenu/launch  {"product": "..."}     asks openMenu to start that game the next time it polls.
 # Events are not handled here: the events module owns them (GET /api/events/upcoming). Nothing is pushed to the Dreamcast:
-# a launch waits until openMenu asks. Works on Python 3 and 2.7.
+# a launch waits until openMenu asks. The answer to a poll also carries two short lines of live info for the Dreamcast:
+#   NET dcnet|dcnow                               the network that is selected
+#   PLAYING game02 game07                         the folders of the card's games that someone plays online right now (left out when none)
+# The module announces itself to the rest of the add-on in module.json ("launcher"): the card's games that are in the online game table
+# (GET /openmenu/games, "online": true) and how to start one, so the Online players and DC99 events lists can show a Start button.
+# The online players and the table of online games are read from the Online players module's file (core.PLAYERS_CACHE), never from its
+# code. Works on Python 3 and 2.7.
 import json
 import os
 import re
@@ -23,9 +29,13 @@ SEEN_WINDOW = 15          # seconds: openMenu polls every 3, so it is "connected
 LAUNCH_TTL = 60           # a launch nobody collected within this time is dropped
 MAX_BODY = 2000000
 MAX_GAMES = 5000
+PLAYERS_FRESH = 300       # the Online players module's list counts as current for this long
+PLAYERS_ASK = 45          # a Dreamcast that is polling asks for a new list when the old one is older than this ...
+PLAYERS_ASK_EVERY = 30    # ... at most this often
+MAX_PLAYING = 16          # folders in the PLAYING line
 
 _lock = threading.Lock()
-_state = {"seen": 0.0, "pending": None, "pending_time": 0.0, "launched": None, "launched_time": 0.0, "games": None}
+_state = {"seen": 0.0, "pending": None, "pending_time": 0.0, "launched": None, "launched_time": 0.0, "games": None, "asked": 0.0}
 
 
 # ------------------------------------------------------------------ game list
@@ -93,6 +103,79 @@ def save_games(h, glist):
         _state["games"] = data
 
 
+# ------------------------------------------------------------------ the online players and the table of online games
+def _norm(text):
+    return re.sub(r"[^a-z0-9]+", "", (text or u"").lower().replace(u"\u00d7", "x"))
+
+
+def same_game(a, b):
+    """Two spellings of a game: equal, or one inside the other (Sonic Adventure 2 / Sonic Adventure 2 (USA))."""
+    a, b = _norm(a), _norm(b)
+    if not a or not b:
+        return False
+    return a == b or (min(len(a), len(b)) >= 6 and (a in b or b in a))
+
+
+def match_game(title, glist):
+    """The game on the card that a game title means, or None: the same normalised name first, else the shortest name that contains it
+    or is inside it."""
+    want = _norm(title)
+    if len(want) < 3:
+        return None
+    exact = [g for g in glist if _norm(g["name"]) == want]
+    if exact:
+        return exact[0]
+    loose = [g for g in glist if len(_norm(g["name"])) >= 3 and (want in _norm(g["name"]) or _norm(g["name"]) in want)]
+    loose.sort(key=lambda g: len(_norm(g["name"])))
+    return loose[0] if loose else None
+
+
+def players_file():
+    """(players, table, age): who is in a game now and the table of games that work online, as the Online players module last wrote them
+    (core.PLAYERS_CACHE). players is [] while the list is older than PLAYERS_FRESH; table is a list of game names that are online or
+    work in progress, [] when the table has none, None when there is no table (that module is off or has not read it yet); age is
+    the list's age in seconds, None without a file."""
+    if not core.module_enabled("players"):
+        return [], None, None
+    try:
+        with open(core.PLAYERS_CACHE) as f:
+            data = json.load(f)
+        age = time.time() - float(data.get("time") or 0)
+        players = [p for p in data.get("players") or [] if isinstance(p, dict) and p.get("player") and p.get("game")] if age <= PLAYERS_FRESH else []
+        raw = data.get("games")
+        table = [g["name"] for g in raw if isinstance(g, dict) and g.get("name") and g.get("status") in ("online", "wip")] if isinstance(raw, list) and raw else None
+        return players, table, age
+    except (IOError, OSError, ValueError, TypeError, AttributeError):
+        return [], None, None
+
+
+def is_online(name, table):
+    """Does this card game work online? Without a table nothing is known, so every game counts."""
+    return table is None or any(same_game(name, t) for t in table)
+
+
+def ident(game):
+    """What the Dreamcast calls the game in the live info: its folder as openMenu uploaded it (game02), else the product code."""
+    folder = game.get("folder") or ""
+    return folder if re.match(r"^[A-Za-z0-9_.-]+$", folder) else game["product"]
+
+
+def playing_now(players):
+    """The ident() of the card's games that the players (players_file()[0]) play online right now, each once, in the order of the list."""
+    glist = games()["games"]
+    out = []
+    for p in players:
+        g = match_game(p["game"], glist)
+        if g and ident(g) not in out:
+            out.append(ident(g))
+    return out[:MAX_PLAYING]
+
+
+def network():
+    """'dcnet' when DCNET is the selected network and DreamPi can use it, else 'dcnow'."""
+    return "dcnet" if core.tag() == "DCNET" else "dcnow"
+
+
 # ------------------------------------------------------------------ the launch handshake
 def poll_reply(headers_query):
     """What openMenu is told. headers_query: the query string of GET /openmenu/poll."""
@@ -110,7 +193,25 @@ def poll_reply(headers_query):
     have = games()
     if q.get("h", "") != have.get("hash", "") or not have["games"]:
         lines.append("NEED games")
+    lines.append("NET " + network())
+    players, _table, age = players_file()
+    playing = playing_now(players)
+    if playing:
+        lines.append("PLAYING " + " ".join(playing))
+    _ask_for_players(age, now)
     return "\n".join(lines) + "\n"
+
+
+def _ask_for_players(age, now):
+    """A Dreamcast is on the line: have the Online players module read its list again when it is old (core.poke), so the live info is
+    current without a page being open. Only when that module is on."""
+    if not core.module_enabled("players") or (age is not None and age <= PLAYERS_ASK):
+        return
+    with _lock:
+        if now - _state["asked"] < PLAYERS_ASK_EVERY:
+            return
+        _state["asked"] = now
+    core.poke("players")
 
 
 def request_launch(product):
@@ -164,8 +265,17 @@ def _view_get(h):
     h.send(json.dumps(view()), "application/json")
 
 
+def games_view():
+    """GET /openmenu/games: the card's games, each with "online": whether it is in the table of games that work online (true for all
+    when that table is not known, "filtered": false then). The Online players and events lists show Start only for the online ones."""
+    table = players_file()[1]
+    have = games()
+    return {"hash": have.get("hash", ""), "filtered": table is not None,
+            "games": [dict(g, online=is_online(g["name"], table)) for g in have["games"]]}
+
+
 def _games_get(h):
-    h.send(json.dumps({"hash": games().get("hash", ""), "games": games()["games"]}), "application/json")
+    h.send(json.dumps(games_view()), "application/json")
 
 
 def _games_post(h):

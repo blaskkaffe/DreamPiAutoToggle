@@ -342,6 +342,22 @@ W.links=function(s){var btn=s.style==="buttons",el=h("span",{"class":"links keep
 //   lead / lead_big  a small line over a bold one in a column at the left (a date and a time)   title, href (the title is a link)   sub   tag, tag_colour
 //   icon  {kind: "star" | "bell", post, on: the item's field, data: the data source the answer replaces, body: fixed fields, fields: {key: item field}}:
 //         a round on / off button at the end that POSTs {...body, ...fields, on} (a favourite, a reminder)
+// ---- games a module that can start games on the Dreamcast announces (module.json "launcher": the openMenu link; LAY.launcher): a list row with
+// "start": {"game": field, "text": field} gets a play button when its game is among them. The game field holds a game's name (same name, or one
+// inside the other); with "text" too, the row is a free text (an event) and the card game whose name appears in the two fields is meant.
+// Only games that work online are announced, so the buttons are the games that can be played with others.
+function launcherNorm(t){return String(t||"").toLowerCase().replace(/\u00d7/g,"x").replace(/[^a-z0-9]+/g,"")}
+function launcherGames(){var L=LAY.launcher,d=L&&S[L.games];return d&&d.games?d.games.filter(function(g){return g.online!==false}):[]}
+function launcherGame(spec,it){var all=launcherGames(),i,g,n,w,best=null;if(!all.length)return null;
+ if(spec.text){var hay=launcherNorm((it[spec.game]||"")+" "+(it[spec.text]||""));
+  for(i=0;i<all.length;i++){g=all[i];n=launcherNorm(g.name);if(n.length>=5&&hay.indexOf(n)>=0&&(!best||n.length>launcherNorm(best.name).length))best=g}
+  return best}
+ w=launcherNorm(it[spec.game]);if(w.length<3)return null;
+ for(i=0;i<all.length;i++)if(launcherNorm(all[i].name)===w)return all[i];
+ for(i=0;i<all.length;i++){g=all[i];n=launcherNorm(g.name);if(n.length>=3&&(w.indexOf(n)>=0||n.indexOf(w)>=0)&&(!best||n.length<launcherNorm(best.name).length))best=g}
+ return best}
+// what the buttons of all lists depend on: the games announced and whether the Dreamcast can start one now
+function launcherSig(){var L=LAY.launcher;if(!L)return "";var st=S[L.state]||{},d=S[L.games]||{};return [d.hash,(d.games||[]).length,!!st.connected,!!st.busy].join("|")}
 W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" compact keep":s.style==="grid"?" grid keep":"")}),pop=h("div"),popT=h("div",{"class":"t"}),msg=h("div",{"class":"msg"}),
  fields=[],go=h("button",{type:"button","class":"pill-s"}),cur=null,key="";
  var P=s.popup||{};
@@ -358,6 +374,11 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
   if(ic){var b=ui.iconButton(ic.kind,!!it[ic.on],title);
    b.onclick=function(e){e.stopPropagation();b.disabled=true;var body={},k;for(k in (ic.body||{}))body[k]=ic.body[k];for(k in (ic.fields||{}))body[k]=it[ic.fields[k]];body.on=b.getAttribute("aria-pressed")!=="true";
     post(ic.post,body,function(r){b.disabled=false;if(r){if(ic.data)S[ic.data]=r;engineUpdate()}})};kids.push(b)}
+  var g=R.start?launcherGame(R.start,it):null;      // R.start: a play button when a module that can start games on the Dreamcast announces this game
+  if(g){var pb=ui.iconButton("play",false,g.name),L=LAY.launcher,st=S[L.state]||{};pb.disabled=!st.connected||!!st.busy;
+   pb.title=pb.disabled?"The Dreamcast is not connected, or busy":"Start "+g.name+" on the Dreamcast";
+   pb.onclick=function(e){e.stopPropagation();if(!confirm("Start "+g.name+" on the Dreamcast?"))return;pb.disabled=true;
+    post(L.start,{product:g.product},function(r,s2,b2){pb.disabled=false;if(!r&&b2&&b2.message)alert(b2.message);reloadData(L.state)})};kids.push(pb)}
   return h("div",{"class":"p"},kids)}
  function rowFor(it,i,extra){if(s.style==="compact"||s.style==="grid")return compactRow(it);var info=extra?it.sub:it[s.row.sub||"sub"],
   title=extra?it.title:it[s.row.title||"title"],b=h("button",{type:"button","class":"pill-s",text:extra?it.button:(s.row.button||"Select"),"aria-label":(extra?it.button:(s.row.button||"Select"))+" "+title});
@@ -378,7 +399,7 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
     p.close();refresh()})})}
  setText(go,P.submit||"OK");go.onclick=submit;
  function paint(){var raw=val(s.items);if(raw==null){if(key!==null){key=null;inner.innerHTML=""}return}      // null: not known yet, nothing is said about it (no "Nobody ...")
-  var items=raw,k=JSON.stringify(items);if(k===key)return;key=k;
+  var items=raw,k=JSON.stringify(items)+(s.row&&s.row.start?launcherSig():"");if(k===key)return;key=k;
   inner.innerHTML="";
   items.forEach(function(it,i){inner.appendChild(rowFor(it,i,false))});
   if(!items.length&&s.empty)inner.appendChild(s.style==="compact"||s.style==="grid"?h("span",{text:s.empty}):h("div",{"class":"srow"},[h("span",{text:s.empty})]));

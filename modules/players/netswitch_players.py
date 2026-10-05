@@ -716,18 +716,35 @@ def _post_star(h):
     return True
 
 
+POKE_MIN_AGE = 20      # a poke (core.poke("players"), e.g. from the openMenu link module) reads the list again when it is older than this
+
+
+def _watch_step(seen, last):
+    """One look of the watcher: (the poke stamp seen, when the favourites were last checked). A poke reads the list again when it is older
+    than POKE_MIN_AGE; otherwise, every WATCH_EVERY / 2 s, the list is read again when it is old and there are favourites to watch."""
+    stamp = core.poke_stamp("players")
+    poked = stamp != seen
+    now = time.time()
+    with _lock:
+        age = now - _cache["time"]
+    if poked and age > POKE_MIN_AGE:
+        refresh()
+    elif now - last >= WATCH_EVERY / 2:
+        last = now
+        favs = favorites()
+        if (favs["games"] or favs["players"]) and age > WATCH_EVERY:
+            refresh()
+    return stamp, last
+
+
 def _watch_loop():
+    seen, last = core.poke_stamp("players"), 0.0
     while True:
         try:
-            favs = favorites()
-            if favs["games"] or favs["players"]:
-                with _lock:
-                    stale = time.time() - _cache["time"] > WATCH_EVERY
-                if stale:
-                    refresh()
+            seen, last = _watch_step(seen, last)
         except Exception:
             pass
-        time.sleep(WATCH_EVERY / 2)
+        time.sleep(1)
 
 
 def start():

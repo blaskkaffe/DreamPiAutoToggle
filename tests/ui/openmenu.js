@@ -32,13 +32,11 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   const openNote = await noteLook('A long note that can never fit in the box, open or closed, however wide the phone is');
   ok(openNote.open && openNote.sc, 'and an open box scrolls it the same way ' + JSON.stringify(openNote));
   await settle(5500);       // the page's own refresh puts the real note back
-  const games = box.locator('.wlist').nth(1), join = box.locator('.wlist').nth(0);
+  const games = box.locator('.wlist').nth(0);
   ok(await games.locator('.p').count() === 60, 'the games list stops at 60 rows (' + await games.locator('.p').count() + ')');
   ok(/12 more: use the search/.test(await box.textContent()), 'with a hint to search');
   await box.locator('input[aria-label="Search the card"]').fill('crazy'); await settle(300);
   ok(await games.locator('.p').count() === 1 && /Crazy Taxi/.test(await games.textContent()), 'the search narrows the list');
-  ok(await join.locator('.p', { hasText: 'Dave' }).locator('button', { hasText: 'Join' }).count() === 1, 'a player in a game that is on the card has a Join button');
-  ok(await join.locator('.p', { hasText: 'Eve' }).count() === 0, 'and one in a game that is not on the card is not listed');
   await page.evaluate(() => { S.openmenu = Object.assign({}, S.openmenu, { connected: false }); engineUpdate(); });
   ok(await games.locator('button').first().isDisabled(), 'while the Dreamcast is not connected the buttons are off');
   await page.evaluate(() => { S.openmenu = Object.assign({}, S.openmenu, { connected: true }); engineUpdate(); });
@@ -47,6 +45,23 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await games.locator('.p', { hasText: 'Crazy Taxi' }).locator('button', { hasText: 'Start' }).click(); await settle(2500);
   ok(questions.length === 1 && /Start Crazy Taxi on the Dreamcast\?/.test(questions[0]), 'Start asks first, naming the game (' + questions.join('|') + ')');
   ok(/Waiting for the Dreamcast to start Crazy Taxi|Starting Crazy Taxi|Sent\./.test(await box.textContent()), 'and the box says the game is on its way');
+  // the Online players box gets a play button for the games the openMenu link announces: on the card AND in the table of games that work online
+  await page.evaluate(() => reloadData('om_games')); await settle(1500);
+  const announced = await page.evaluate(() => launcherGames().map(g => g.name).sort());
+  ok(announced.includes('Quake III Arena') && !announced.includes('Crazy Taxi'), 'only the card games that are in the online table are announced (' + announced.length + ': ' + announced.slice(0, 3).join(', ') + ')');
+  const pbox = page.locator('.dbox[data-box="players"] .now');
+  await pbox.click({ position: { x: 20, y: 10 } }); await settle(700);
+  const quakeRows = pbox.locator('.wlist .p', { hasText: 'Quake III Arena' });
+  ok(await quakeRows.count() >= 2 && await quakeRows.locator('.ibtn.play').count() === await quakeRows.count(), 'the game and the player in it have a play button (' + await quakeRows.count() + ' rows)');
+  ok(await pbox.locator('.wlist .p', { hasText: 'Daytona' }).locator('.ibtn.play').count() === 0, 'a game that is not on the card has none');
+  ok(await pbox.locator('.wlist .p', { hasText: 'Dead Game' }).locator('.ibtn.play').count() === 0, 'and neither has one the table lists as offline');
+  const matches = await page.evaluate(() => ({ name: (launcherGame({ game: 'title' }, { title: 'Quake III Arena Ver.2' }) || {}).name, none: launcherGame({ game: 'title' }, { title: 'Crazy Taxi' }),
+    text: (launcherGame({ game: 'title', text: 'sub' }, { title: 'Friday night', sub: 'Come and play Quake III Arena with us' }) || {}).name, textNone: launcherGame({ game: 'title', text: 'sub' }, { title: 'Movie night', sub: 'Discord' }) }));
+  ok(matches.name === 'Quake III Arena' && matches.none === null && matches.text === 'Quake III Arena' && matches.textNone === null, 'a name is matched like the card does, and an event by the game named in its text ' + JSON.stringify(matches));
+  questions.length = 0;
+  await quakeRows.first().locator('.ibtn.play').click(); await settle(2500);
+  ok(questions.length === 1 && /Start Quake III Arena on the Dreamcast\?/.test(questions[0]), 'the play button asks first (' + questions.join('|') + ')');
+  ok(/Waiting for the Dreamcast to start Quake III Arena|Starting Quake III Arena/.test(await page.locator('.dbox[data-box="openmenu"] .now').textContent()), 'and the openMenu box says it is on its way');
   ok(errors.length === 0, 'no JavaScript or console errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await browser.close();
   console.log(failed ? failed + ' check(s) failed' : 'all checks passed');

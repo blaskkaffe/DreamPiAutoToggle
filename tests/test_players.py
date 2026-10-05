@@ -240,6 +240,44 @@ class IntegrationTests(unittest.TestCase):
             web.refresh_page(force=True)
 
 
+class WatcherPokeTests(unittest.TestCase):
+    """core.poke("players") (the openMenu link asks when a Dreamcast is polling) reads the list again, with no page open and no favourites."""
+    def setUp(self):
+        wait_for_background_refresh()
+        self.tmp = sandbox()
+        self.refresh = pl.refresh
+        self.calls = []
+        pl.refresh = lambda: self.calls.append(1)
+        pl._cache.update({"time": time.time() - 100, "refreshing": False})
+
+    def tearDown(self):
+        pl.refresh = self.refresh
+        cleanup(self.tmp)
+
+    def test_a_poke_reads_the_list_again_when_it_is_old(self):
+        seen, last = pl._watch_step(core.poke_stamp("players"), time.time())          # nothing asked for, and the favourites were just looked at
+        self.assertEqual(self.calls, [])
+        core.poke("players")
+        seen, last = pl._watch_step(seen, last)
+        self.assertEqual(self.calls, [1])
+        pl._watch_step(seen, last)
+        self.assertEqual(self.calls, [1])                                              # once per poke
+
+    def test_a_poke_leaves_a_recent_list_alone(self):
+        pl._cache["time"] = time.time() - 2
+        seen = core.poke_stamp("players")
+        core.poke("players")
+        pl._watch_step(seen, time.time())
+        self.assertEqual(self.calls, [])
+
+    def test_without_a_poke_only_favourites_keep_the_list_fresh(self):
+        pl._watch_step(core.poke_stamp("players"), 0.0)
+        self.assertEqual(self.calls, [])                                               # no favourites, no page: nobody needs it
+        pl.save_favorites({"games": ["Quake III Arena"], "players": []})
+        pl._watch_step(core.poke_stamp("players"), 0.0)
+        self.assertEqual(self.calls, [1])
+
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -246,10 +246,27 @@ def _add_box(out, boxes, sec, key, title, name):
     return b
 
 
+def _launcher_of(name, manifest, lay):
+    """The module's "launcher" announcement made safe, or None: {"state": data source, "games": data source, "start": "/path", "title"};
+    both data sources must be ones of its own layout and the path must be an absolute one."""
+    spec = manifest.get("launcher")
+    data = lay.get("data") or {}
+    if not isinstance(spec, dict) or spec.get("state") not in data or spec.get("games") not in data:
+        return None
+    start = spec.get("start")
+    if not (isinstance(start, str) and start.startswith("/")):
+        return None
+    return {"mod": name, "title": str(spec.get("title") or core.module_title(name, manifest)), "state": spec["state"], "games": spec["games"], "start": start}
+
+
 def layout():
     """What the page draws, from the enabled modules in picker order:
     {"modules": [names], "dashboard": [box], "settings": [box], "backgrounds": [{"mod", "type", ...}],
-     "data": {namespace: {"url", "every", "mod"}}, "primary": {name: palette id}, "colours": {name: {key: id}}}
+     "data": {namespace: {"url", "every", "mod"}}, "primary": {name: palette id}, "colours": {name: {key: id}},
+     "launcher": {"mod", "title", "state", "games", "start"} or absent}
+    "launcher" is a module that can start games on the Dreamcast (the openMenu link): its module.json says so, with the data sources that
+    hold its state and the games it announces and the path that starts one. Lists in other modules show a Start button for the games
+    it announces (row "start", page/widgets.js); with no such module enabled they show nothing.
     box = {"id": lower-case name, "title", "mods": [names], "items": [widget + "mod"]}.
     A module whose module.json has "toggle_box": "appearance" also gets a row with its on/off switch in that Settings box,
     even while it is off (a switched-off module has no layout of its own to put one in): the Dreamcast background does."""
@@ -293,6 +310,9 @@ def layout():
                     b["items"].append(w)
         for ns, spec in (lay.get("data") or {}).items():
             out["data"].setdefault(ns, dict(spec, mod=name))      # the first module to ask for a name keeps it
+        launcher = _launcher_of(name, m["manifest"], lay)
+        if launcher and "launcher" not in out:                    # the first module in the picker order that announces one
+            out["launcher"] = launcher
     out["settings"].sort(key=lambda b: b["id"] == "system")   # System (the module picker, Wi-Fi, update, reboot) is always the last box of Settings, whatever the picker order (a stable sort: the others keep theirs)
     return out
 

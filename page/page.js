@@ -38,12 +38,12 @@ ui.popup=function(el){
  el.addEventListener("click",function(e){e.stopPropagation()});
  ui._pops.push(p);return p};
 document.addEventListener("click",function(){ui.closePopups()});
-// Round icon buttons that are on or off: a bell (remind me) and a star (favourite). ui.iconButtonHtml(kind, on, what, attrs) is the markup
+// Round icon buttons that are on or off: a bell (remind me), a star (favourite) and a play button (start the game on the Dreamcast; never "on"). ui.iconButtonHtml(kind, on, what, attrs) is the markup
 // (a module that builds its rows as HTML puts attrs, such as a data-id, on the button); ui.iconButton(kind, on, what) the element.
 // The look is .ibtn in page.css; the state is .on and aria-pressed; what is the name of the thing it is about (a screen reader's label).
-ui.icons={bell:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.4-2h-4.8A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5.5-6.8V3a1.5 1.5 0 0 0-3 0v1.2A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>',
+ui.icons={play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',bell:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.4-2h-4.8A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5.5-6.8V3a1.5 1.5 0 0 0-3 0v1.2A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>',
  star:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 17.9 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg>'};
-ui.iconTexts={bell:["Reminder on: tap to clear","Remind me","Clear the reminder for ","Remind me of "],star:["Favorite: tap to remove","Add to favorites","Remove from favorites: ","Add to favorites: "]};
+ui.iconTexts={play:["Starting on the Dreamcast","Start on the Dreamcast","Starting ","Start on the Dreamcast: "],bell:["Reminder on: tap to clear","Remind me","Clear the reminder for ","Remind me of "],star:["Favorite: tap to remove","Add to favorites","Remove from favorites: ","Add to favorites: "]};
 ui.iconButtonHtml=function(kind,on,what,attrs){var t=ui.iconTexts[kind];
  return '<button type="button" class="ibtn '+kind+(on?' on':'')+'" '+(attrs||'')+' aria-pressed="'+(on?'true':'false')+'" title="'+(on?t[0]:t[1])+'" aria-label="'+(on?t[2]:t[3])+esc(what||"")+'">'+ui.icons[kind]+'</button>'};
 ui.iconButton=function(kind,on,what){var d=document.createElement("div");d.innerHTML=ui.iconButtonHtml(kind,on,what);return d.firstChild};

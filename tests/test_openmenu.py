@@ -2,6 +2,7 @@
 import json
 import os
 import threading
+import time
 import unittest
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -19,7 +20,7 @@ POLL = "/openmenu/poll?v=1&n=3&h=abc12345"
 PAGE = {"X-Requested-With": "netswitch"}
 
 
-class OpenMenu(unittest.TestCase):
+class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox()
         self.saved = dict(om._state)
@@ -53,13 +54,16 @@ class OpenMenu(unittest.TestCase):
     def view(self):
         return json.loads(self.call("GET", "/openmenu/view")[1])
 
+
+
+class OpenMenu(Base):
     # ---- what openMenu does
     def test_poll_asks_for_games_then_stops(self):
         status, text = self.call("GET", "/openmenu/poll?v=1&n=0&h=00000000")
         self.assertEqual(status, 200)
-        self.assertEqual(text.splitlines(), ["openmenu 1", "NEED games"])
+        self.assertEqual(text.splitlines(), ["openmenu 1", "NEED games", "NET dcnow"])
         self.assertEqual(self.upload()[0], 200)
-        self.assertEqual(self.call("GET", POLL)[1].splitlines(), ["openmenu 1"])
+        self.assertEqual(self.call("GET", POLL)[1].splitlines(), ["openmenu 1", "NET dcnow"])
         self.assertIn("NEED games", self.call("GET", "/openmenu/poll?v=1&n=3&h=other")[1])
 
     def test_upload_parsed_sorted_and_kept(self):
@@ -93,8 +97,8 @@ class OpenMenu(unittest.TestCase):
         self.upload()
         self.call("GET", POLL)
         self.launch("MK51035")
-        self.assertEqual(self.call("GET", POLL)[1].splitlines(), ["openmenu 1", "LAUNCH MK51035"])
-        self.assertEqual(self.call("GET", POLL)[1].splitlines(), ["openmenu 1"])
+        self.assertEqual(self.call("GET", POLL)[1].splitlines(), ["openmenu 1", "LAUNCH MK51035", "NET dcnow"])
+        self.assertEqual(self.call("GET", POLL)[1].splitlines(), ["openmenu 1", "NET dcnow"])
 
     def test_old_launch_dropped(self):
         self.upload()
@@ -133,6 +137,98 @@ class OpenMenu(unittest.TestCase):
         first = self.view()["hash"]
         self.call("POST", "/openmenu/games", UPLOAD.replace("abc12345", "def67890").encode(), {"X-Requested-With": "openMenu"})
         self.assertNotEqual(self.view()["hash"], first)
+
+
+class LiveInfo(Base):
+    """What goes back to the Dreamcast (NET, PLAYING) and which games are announced as online."""
+    UPLOAD2 = ("#openmenu-games 1 abc12345 4\n"
+               "T1234N\t1\t1/1\tU\tgame01\tSonic Adventure 2 (USA)\n"
+               "MK51035\t2\t1/2\tU\tgame02\tCrazy Taxi\n"
+               "T9999N\t3\t1/1\tU\tgame03\tQuake III Arena\n"
+               "HDR-0001\t4\t1/1\tJ\tRacing games\tDeath Crimson 2\n")
+
+    def players_file(self, players, games=None, age=0):
+        with open(core.PLAYERS_CACHE, "w") as f:
+            json.dump({"time": int(time.time()) - age, "players": players,
+                       "games": [{"name": "Sonic Adventure 2", "status": "online"}, {"name": "Quake III Arena", "status": "wip"},
+                                 {"name": "Death Crimson 2", "status": "offline"}] if games is None else games}, f)
+
+    def upload2(self):
+        self.call("POST", "/openmenu/games", self.UPLOAD2.encode(), {"X-Requested-With": "openMenu"})
+
+    def poll_lines(self):
+        return self.call("GET", POLL)[1].splitlines()
+
+    def test_the_selected_network_goes_back_to_the_dreamcast(self):
+        from unittest import mock
+        self.upload2()
+        self.assertIn("NET dcnow", self.poll_lines())
+        with mock.patch.object(core, "tag", return_value="DCNET"):               # DCNET is selected and DreamPi can use it
+            self.assertIn("NET dcnet", self.poll_lines())
+        with mock.patch.object(core, "tag", return_value="DCNET_OFF"):           # selected, but calls go to DCNow! anyway
+            self.assertIn("NET dcnow", self.poll_lines())
+
+    def test_the_games_played_online_go_back_as_folders(self):
+        self.upload2()
+        self.players_file([{"player": "Dave", "game": "Crazy Taxi", "network": "DCNow!"}, {"player": "Eve", "game": "Quake III Arena", "network": "DCNET"},
+                           {"player": "Fay", "game": "Quake III Arena", "network": "DCNow!"}, {"player": "Gus", "game": "Not On The Card", "network": "DCNow!"},
+                           {"player": "Idle", "game": "", "network": "DCNow!"}])
+        lines = self.poll_lines()
+        self.assertIn("PLAYING game02 game03", lines)              # once each, in the order of the players; unknown and idle ones are left out
+        self.players_file([])
+        self.assertFalse([l for l in self.poll_lines() if l.startswith("PLAYING")])     # nobody: no line
+
+    def test_a_folder_that_is_not_one_word_is_replaced_by_the_product_code(self):
+        self.upload2()
+        self.players_file([{"player": "Dave", "game": "Death Crimson 2", "network": "DCNow!"}])
+        self.assertIn("PLAYING HDR-0001", self.poll_lines())
+
+    def test_an_old_players_list_says_nobody_plays(self):
+        self.upload2()
+        self.players_file([{"player": "Dave", "game": "Crazy Taxi", "network": "DCNow!"}], age=om.PLAYERS_FRESH + 5)
+        self.assertFalse([l for l in self.poll_lines() if l.startswith("PLAYING")])
+
+    def test_only_games_in_the_online_table_are_announced_as_online(self):
+        self.upload2()
+        self.players_file([])
+        got = json.loads(self.call("GET", "/openmenu/games")[1])
+        self.assertTrue(got["filtered"])
+        self.assertEqual(dict((g["name"], g["online"]) for g in got["games"]),
+                         {"Sonic Adventure 2 (USA)": True, "Crazy Taxi": False, "Quake III Arena": True, "Death Crimson 2": False})      # work in progress counts, offline does not
+
+    def test_without_a_table_every_game_counts(self):
+        self.upload2()
+        self.assertFalse(json.loads(self.call("GET", "/openmenu/games")[1])["filtered"])               # no players file at all
+        self.players_file([], games=[])
+        got = json.loads(self.call("GET", "/openmenu/games")[1])
+        self.assertTrue(not got["filtered"] and all(g["online"] for g in got["games"]))
+        self.players_file([])
+        core.save_module_enabled("players", False)                                                    # the module that knows the table is off
+        got = json.loads(self.call("GET", "/openmenu/games")[1])
+        self.assertTrue(not got["filtered"] and all(g["online"] for g in got["games"]))
+
+    def test_a_polling_dreamcast_asks_for_a_new_players_list_when_it_is_old(self):
+        self.upload2()
+        self.players_file([], age=om.PLAYERS_ASK + 10)
+        self.assertIsNone(core.poke_stamp("players"))
+        self.poll_lines()
+        first = core.poke_stamp("players")
+        self.assertIsNotNone(first)
+        self.poll_lines()
+        self.assertEqual(core.poke_stamp("players"), first)                     # not on every poll
+        om._state["asked"] -= om.PLAYERS_ASK_EVERY + 1
+        self.players_file([], age=1)
+        self.poll_lines()
+        self.assertEqual(core.poke_stamp("players"), first)                     # a fresh list: nothing to ask for
+
+    def test_the_module_announces_a_launcher_and_the_page_gets_it(self):
+        import netswitch_modules as mods
+        lay = mods.layout()
+        self.assertEqual(lay["launcher"], {"mod": "openmenu", "title": "openMenu", "state": "openmenu", "games": "om_games", "start": "/openmenu/launch"})
+        self.assertIn("om_games", lay["data"])
+        core.save_module_enabled("openmenu", False)
+        web.refresh_page(force=True)
+        self.assertNotIn("launcher", mods.layout())                              # off: no launcher, no buttons anywhere
 
 
 if __name__ == "__main__":

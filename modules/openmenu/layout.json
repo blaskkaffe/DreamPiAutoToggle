@@ -4,6 +4,10 @@
    "url": "/openmenu/view",
    "every": 5,
    "retry": 3
+  },
+  "om_games": {
+   "url": "/openmenu/games",
+   "every": 60
   }
  },
  "dashboard": [
