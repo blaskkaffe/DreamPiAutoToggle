@@ -63,7 +63,6 @@
  .now .row.r-bleed{margin:10px -24px -14px;padding:0;border-top:0} .now .row.r-bleed .console{margin:0;border:0;border-radius:0 0 calc(var(--r-box) - var(--bw)) calc(var(--r-box) - var(--bw))}   /* ... out to the box's left, right and bottom edge (24 / 14 px: the box's padding); it is the last row ... */
  .now .row.r-tight{border-top:0;padding:8px 0 0} .now .row .bar{margin:0;gap:8px}   /* ... and no divider */
  .wtext.log{font:var(--fs-sm)/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--box-text-2)}
- .now.open b .carousel{text-align:center}
  .pill{display:block;width:100%;margin:0 0 12px;padding:13px;border-radius:var(--r-box);font-size:1.1em;font-weight:600;letter-spacing:.02em}
  .pill-s.pri,.pill-s.on{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb));text-shadow:0 1px 2px rgba(0,0,0,.55)}   /* a small button in a palette colour (c-<id>), like the colour pick's */
  .pill-s.well{background:var(--well);border-color:var(--well-l);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55)} .pill-s:disabled{opacity:.35;cursor:default} .pill-s.fixw{min-width:10.5em;text-align:center}
@@ -137,11 +136,10 @@
  .carousel{display:block;min-width:0} .carousel .dup,.carousel .sp{display:none}
  .carousel.sc{white-space:nowrap;overflow:hidden} .carousel.sc .trk{display:inline-block;animation:marquee var(--d,20s) linear infinite}
  .carousel.sc .dup,.carousel.sc .sp{display:inline}
- .now b .carousel{white-space:nowrap}   /* the main title does not wrap while the box is closed: it scrolls when it is too long (ticker() in widgets.js) */
- .now.open .carousel{white-space:normal;overflow:visible} .now.open .carousel .trk{animation:none;display:inline} .now.open .carousel .dup,.now.open .carousel .sp{display:none}
+ .now b .carousel{white-space:nowrap}   /* the main title never wraps, closed or open: centred while it fits, scrolling when it is too long (ticker() in widgets.js) */
  @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
  @media(prefers-reduced-motion:reduce){.carousel.sc .trk{animation:none}.carousel.sc .dup,.carousel.sc .sp{display:none}}
- .now .row.main .v.fill.scrolling{flex:1;min-width:0;overflow:hidden} .carousel{min-height:1.35em} .carousel .cn{color:var(--box-text-3)} .carousel{text-align:center} .carousel.sc,.now.open .carousel{text-align:left}
+ .now .row.main .v.fill.scrolling{flex:1;min-width:0;overflow:hidden} .carousel{min-height:1.35em} .carousel .cn{color:var(--box-text-3)} .carousel{text-align:center} .carousel.sc{text-align:left}
  .now .status{display:flex;align-items:baseline;min-width:0} .now .status > .dot{flex:none} .now .status > span:last-child{min-width:0}
  .now .pln{white-space:nowrap} .now .pln+.pln{margin-left:.6em}
  .now .wlist.compact{display:block;width:100%;max-height:40vh;overflow-y:auto;overscroll-behavior:contain}

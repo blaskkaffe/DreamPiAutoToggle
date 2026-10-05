@@ -226,12 +226,17 @@ function ticker(host,mod){var el=h("span",{"class":"carousel"}),trk=h("span",{"c
   host.style.fontSize=Math.max(10,Math.min(hh*0.8,w*0.96*100/(cv.measureText(t).width||1)))+"px"}
  function fit(){var box=host.closest&&host.closest(".now"),t=trk.querySelector(".t"),need=false,big=!!box&&box.hasAttribute("data-title-rows")&&!box.classList.contains("open");
   if(big)fitBig();else if(host.style.fontSize){host.style.fontSize="";lastBig=""}
-  if(t&&box&&!box.classList.contains("open")&&!big){      // the line never wraps while the box is closed (page.css), so its width says if it fits
+  if(t&&box&&!big){      // the line never wraps, closed or open (page.css), so its width says if it fits
    var sp=t.querySelector(".sp");need=t.offsetWidth-(sp?sp.offsetWidth:0)>host.clientWidth+1}
   if(need!==scrolling){scrolling=need;el.classList.toggle("sc",scrolling);if(scrolling)el.style.setProperty("--d",Math.max(10,Math.round((el.textContent||"").length*0.28))+"s");show()}}
  hook("layout",fit);window.addEventListener("resize",fit);UPD.push(function(){paint();fit()});AFTER.push(fit);      // measured again on every update (the first time the box may not be laid out yet, or its text may come from the data the page kept) and once the page is built
  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);
- return {set:function(next){if(next===html)return;html=next;show();fit()},paint:paint,fit:fit}}
+ watchSize(host,fit);      // and whenever the line's room changes or it is first shown (a hidden box has no width), so it never waits for a click
+ return {set:function(next){if(next===html)return;html=next;show();fit();later(fit)},paint:paint,fit:fit}}
+// Calls fn when el's size changes, which includes the moment it is first laid out (it had no size while hidden or not yet in the page).
+function watchSize(el,fn){if(window.ResizeObserver)try{new ResizeObserver(function(){fn()}).observe(el)}catch(e){}}
+// Once more after the next paint: a measurement taken right after the DOM changed can precede the final layout (fonts, scrollbars).
+function later(fn){if(window.requestAnimationFrame)requestAnimationFrame(function(){requestAnimationFrame(fn)});else setTimeout(fn,50)}
 // "title_rows": "@path" = "full" | "upper" | "lower": the main title takes more of the box's three rows (the top line, the title, the
 // bottom row) instead of one - the large clock - and is sized to fill them (data-title-rows, page.css); "open_if": "@path" -
 // while that is false the box has nothing to show when tapped, so it does not open (and is not a button)
@@ -275,14 +280,14 @@ W.carousel=function(s){var el=h("span",{"class":"carousel"}),trk=h("span",{"clas
  // Scrolls only when the line is wider than its row. While it fits it is centred like the status row above it;
  // when it scrolls its holder (.v.fill) takes the whole row so the line can run past the edges.
  function fit(){var t=trk.querySelector(".t"),scroll=false,par=el.parentNode,row=el.closest&&el.closest(".row");
-  if(t&&cur&&par&&row&&!(el.closest(".now.open")))scroll=t.offsetWidth>row.clientWidth-12
+  if(t&&cur&&par&&row)scroll=t.offsetWidth>row.clientWidth-12
   if(scroll!==el.classList.contains("sc")){el.classList.toggle("sc",scroll);if(scroll)el.style.setProperty("--d",Math.max(12,Math.round(cur.length*0.28))+"s")}
   if(par)par.classList.toggle("scrolling",scroll)}
  function set(t){if(t===cur&&trk.firstChild){fit();return}cur=t;
   var half='<span class="t">'+body()+'<span class="sp">\u00a0\u00a0\u2022\u00a0\u00a0</span></span>';
   setHtml(trk,t?half+half.replace('class="t"','class="t dup" aria-hidden="true"'):"");el.classList.remove("sc");fit()}
- UPD.push(function(){set(text())});set(text());
- hook("layout",function(){fit()});window.addEventListener("resize",fit);return el};
+ UPD.push(function(){set(text())});set(text());later(fit);
+ hook("layout",function(){fit()});window.addEventListener("resize",fit);watchSize(el,fit);return el};
 // ---- a map of the time zones: a hand-drawn world on 24 bands (one per hour), the hour it is in each band along the top and its UTC offset along
 // the bottom, the band of the clock's own time zone highlighted and a dot for every city. "map": "@path" = {cities: [{name, lon, lat, text}],
 // utc (unix time), here (the clock's offset in hours)}, "format": "@path" ("24h", or a 12-hour form).
