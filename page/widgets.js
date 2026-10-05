@@ -119,8 +119,8 @@ function startData(){var ns;for(ns in (LAY.data||{}))(function(ns,spec){
  if(onlyInSettings){hook("settingsOpen",load);hook("settingsClose",function(){clearTimeout(timer)})}
  load()})(ns,LAY.data[ns])}
 // ---- text, rows, buttons, links
-// "style": "log" = a few lines of small monospace text that never wrap (each is cut with an ellipsis)
-W.text=function(s){var el=h("div",{"class":"wtext"+(s.muted?" sub":"")+(s.style==="log"?" log":"")+(s.cls?" "+s.cls:"")});bind(s.text,function(t){setLines(el,t)});return el};
+// "style": "log" = a few lines of small monospace text that never wrap (each is cut with an ellipsis); "center": true = centred
+W.text=function(s){var el=h("div",{"class":"wtext"+(s.muted?" sub":"")+(s.center?" ctr":"")+(s.style==="log"?" log":"")+(s.cls?" "+s.cls:"")});bind(s.text,function(t){setLines(el,t)});return el};
 W.row=function(s,ctx){var title=h("span"),sub=h("span",{"class":"sub"}),left=h("span",{},[title,sub]),
  el=h("div",{"class":"srow"+(s.below?" wrap":"")},[left]);
  bind(s.title,function(t){setText(title,t==null?"":t)});bind(s.sub,function(t){setLines(sub,t);sh(sub,!!t)});

@@ -50,7 +50,8 @@
  .now .row .k{color:var(--box-text-3)} .now .row .v{min-width:0;display:flex;align-items:baseline} .now .row .v > .dot{flex:none} .now .row .v > span:last-child{min-width:0} .now .sub{color:var(--box-text-3)}
  .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .now .row.hang{justify-content:center;padding:12px 0 2px}
  .now .row.hang form{width:100%} .now .row.hang .pill-s{display:flex;width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
- .now .row.hang .pill-s{background:rgba(160,30,30,.85);border-color:rgb(230,110,110)}
+ .now .row.hang .pill-s{background:rgba(0,0,0,.25);border-color:rgb(var(--primary-l-rgb))} .now .row.hang{gap:10px}   /* the buttons under an open box: neutral ... */
+ .now .row.hang .pill-s.danger{background:rgba(160,30,30,.85);border-color:rgb(230,110,110)}   /* ... red for a danger one (Hang up) */
  .now .row.hang .pill-s.arm{background:#d33;border-color:#f99}
  .nw{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sub.blk{display:block}
  .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:10px 0;border-top:1px solid rgba(255,255,255,.18)}
@@ -128,7 +129,7 @@
  .dragging,.dragging *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none} .dragging .grip{cursor:grabbing}
  .srow.drag{position:relative;z-index:5;will-change:transform;background:var(--card);border-radius:var(--r-ctl);box-shadow:0 8px 22px rgba(0,0,0,.65);border-top-color:transparent}
  .pop .srow.drag{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}   /* in a pop-up the lifted row is as wide as the pop-up itself */
- .wtext{margin:6px 0}
+ .wtext{margin:6px 0} .wtext.ctr{text-align:center}
  .carousel{display:block;min-width:0} .carousel .dup,.carousel .sp{display:none}
  .carousel.sc{white-space:nowrap;overflow:hidden} .carousel.sc .trk{display:inline-block;animation:marquee var(--d,20s) linear infinite}
  .carousel.sc .dup,.carousel.sc .sp{display:inline}

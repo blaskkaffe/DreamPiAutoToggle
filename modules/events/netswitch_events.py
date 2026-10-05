@@ -478,7 +478,8 @@ def view(now=None):
                       "day": when_text(r["start_utc"], now, zone).rsplit(" ", 1)[0],
                       "hm": time.strftime("%H:%M", time.gmtime(r["start_utc"] + zone_offset(zone, r["start_utc"]))), "game": r["game"],
                       "source": SOURCE_LABELS.get(r["source"], r["source"]), "url": r["url"],
-                      "reminded": reminded(r, cfg), "series": r["title"] in cfg["series"]} for r in soon],
+                      "reminded": reminded(r, cfg), "series": r["title"] in cfg["series"],
+                      "sub": SOURCE_LABELS.get(r["source"], r["source"]) + (" \u00b7 every one" if r["title"] in cfg["series"] else "")} for r in soon],
             "status": line, "syncing": st["syncing"], "busy": st["syncing"], "zone": tz.utc_text(zone_offset(zone, now)) if not zone else tz.zone_name(zone)}
 
 
