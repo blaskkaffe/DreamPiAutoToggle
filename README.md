@@ -179,7 +179,7 @@ The cogwheel in the top right corner opens the settings. Changes are saved strai
   - **Updates** (Reboot and Update module): checks GitHub for a newer version of this add-on and for newer DreamPi scripts, with an **Update now** button (when installed from a git checkout).
   - **Reboot DreamPi** (Reboot and Update module; the last row): reboots the whole Raspberry Pi after a confirmation; a call in progress is cut. The page comes back by itself when the Pi is up again (about a minute).
 
-The selected network is DCNow! after every reboot (there is no default-network setting; to go back to DCNow! by phone use a **Toggle DCNow!** or **Call DCNow!** number).
+The selected network is DCNow! after every reboot (there is no default-network setting; to go back to DCNow! by phone use a **DCNow!** row, with or without *Hang up*; the default `11111` row connects).
 
 The status dot next to DreamPi on the main page previews that status's colour and effect. Network problems show as red warning boxes at the top of the page instead.
 

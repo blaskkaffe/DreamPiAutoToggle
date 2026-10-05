@@ -130,7 +130,7 @@ class HttpSecurityTests(unittest.TestCase):
 
     def test_cross_site_posts_are_refused(self):
         evil = {"Host": "127.0.0.1:%d" % self.port, "Origin": "http://evil.example.com"}
-        for path in ("/dcnet", "/numbers", "/wificonnect", "/ledconfig", "/reboot", "/update/start"):
+        for path in ("/dcnet", "/numbers", "/wificonnect", "/ledconfig", "/ledrows", "/reboot", "/update/start"):
             for extra in ({}, {"X-Requested-With": "x"}, {"Content-Type": "text/plain"}):
                 status, _b, _r = self.req("POST", path, dict(evil, **extra), b"{}")
                 self.assertEqual(status, 403, (path, extra))

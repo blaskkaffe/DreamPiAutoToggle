@@ -122,10 +122,10 @@ def module_actions():
     """The actions the enabled modules announce (module.json "actions": [{"id", "label", "sub"}]), in picker order, as
     [{"value": "<module>.<id>", "label", "sub", "group": <the module's title>}]. A module's hook file does them inside DreamPi
     (see netswitch_hook.py); the phone numbers module offers them in its rows."""
-    out = []
+    out, state = [], modules_state()
     for name in module_names():
         manifest = module_manifest(name) or {}
-        if not module_enabled(name):
+        if not module_enabled(name, state):
             continue
         for a in manifest.get("actions") or []:
             if isinstance(a, dict) and re.match(r"^[a-z][a-z0-9_]*$", str(a.get("id") or "")):
@@ -138,10 +138,10 @@ def module_led_messages():
     """The messages the enabled modules announce for the LEDs (module.json "led_messages": [{"id", "label", "group", "description"}]),
     in picker order, as [{"key", "label", "group", "description", "module"}]. The LED module lists them as the triggers a row can
     have; a message of a module that is off is not offered and never lights. The first module to announce a key owns it."""
-    out, seen = [], set()
+    out, seen, state = [], set(), modules_state()
     for name in module_names():
         manifest = module_manifest(name) or {}
-        if not module_enabled(name):
+        if not module_enabled(name, state):
             continue
         for m in manifest.get("led_messages") or []:
             key = str((m or {}).get("id") or "") if isinstance(m, dict) else ""
