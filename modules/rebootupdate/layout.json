@@ -19,8 +19,7 @@
      "type": "text",
      "text": "@update.dreampi_text",
      "muted": true,
-     "show": "@update.dreampi_text",
-     "cls": "updnote"
+     "show": "@update.dreampi_text"
     },
     {
      "type": "row",

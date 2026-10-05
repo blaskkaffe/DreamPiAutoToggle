@@ -51,6 +51,17 @@ class KitTests(unittest.TestCase):
             if "var(--bw)" in decl or decl.startswith("border-color"):
                 self.assertNotIn("rgba(", decl, decl)
 
+    def test_modules_ship_no_css_of_their_own_and_no_class_hooks(self):
+        """A module is a function and an interface for it (layout.json and data): the look is the kit's. Only a theme (the background)
+        may restyle the page, and a layout names no CSS class of its own (the widgets take options for what a class used to do)."""
+        for folder in sorted(glob.glob(os.path.join(MODULES, "*"))):
+            name = os.path.basename(folder)
+            if name not in THEME_MODULES:
+                self.assertFalse(os.path.exists(os.path.join(folder, "page.css")), "%s has CSS of its own" % name)
+            layout = os.path.join(folder, "layout.json")
+            if os.path.exists(layout):
+                self.assertNotIn('"cls"', read(layout), "%s names a CSS class in its layout" % name)
+
     def test_radii_are_the_kits_three_or_round(self):
         """Boxes, fields and checkboxes, and buttons and chips have one radius each (--r-box, --r-ctl, --r-pill); round things are 50%."""
         css = strip_comments(read(CSS))
@@ -61,6 +72,14 @@ class KitTests(unittest.TestCase):
             if value in ("4px",):               # the inside of the system's own colour well (input[type=color])
                 continue
             self.fail("border-radius: %s is not a token (use var(--r-box), var(--r-ctl), var(--r-pill) or 50%%)" % value)
+
+    def test_the_fixed_colours_are_tokens_and_not_repeated(self):
+        """The neutral button, the danger and state colours and the link colour are defined once, in :root, and used by name."""
+        css = strip_comments(read(CSS))
+        root, body = css.split("}", 1)
+        for literal in ("rgba(42,42,42,.82)", "rgb(80,80,80)", "rgba(160,30,30,.85)", "rgb(230,110,110)", "#2c2", "#e0b400", "#b04cff", "#7a1f1f", "#a84a4a", "#8bf"):
+            self.assertIn(literal, root, literal)
+            self.assertNotIn(literal, body, "%s is used raw; use its token" % literal)
 
     def test_the_kit_defines_its_tokens_once(self):
         css = strip_comments(read(CSS))

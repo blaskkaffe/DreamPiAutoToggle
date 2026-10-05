@@ -1,5 +1,7 @@
 
  :root{--r-box:29px;--r-ctl:12px;--r-pill:999px;--h-ctl:36px;--r:var(--r-box);--bw:4px;   /* the page kit's tokens: radii (boxes / fields and checkboxes / buttons and chips; round things are 50%), one control height, three text levels, a type scale */
+         --btn-bg:rgba(42,42,42,.82);--btn-line:rgb(80,80,80);--danger-bg:rgba(160,30,30,.85);--danger-line:rgb(230,110,110);--danger-on:#d33;--danger-on-line:#f99;   /* a neutral button, a danger one and an armed one */
+         --ok:#2c2;--warn:#e0b400;--bad:#d33;--call:#b04cff;--notice-bg:#7a1f1f;--notice-line:#a84a4a;--link:#8bf;   /* the fixed state colours: status dots and the warning banner, links and the focus ring */
          --text-1:#eee;--text-2:#ccc;--text-3:#999;--box-text-2:rgba(255,255,255,.8);--box-text-3:rgba(255,255,255,.65);   /* page text, and the same levels on the coloured boxes */
          --fs-xs:.75em;--fs-sm:.85em;--fs-md:1em;--fs-lg:1.25em;--fs-xl:1.9em;
          --primary:#e8761c;--primary-l:#f6b27a;--primary-rgb:232,118,28;--primary-l-rgb:246,178,122;   /* the page's primary colour: the palette (core.colours_css(), put before this file) and the .c-<id> classes change it per module */
@@ -11,7 +13,7 @@
  header{position:relative;margin-bottom:16px} h1{text-align:center;margin:0;font-size:1.9em}
  h2{font-size:.8em;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 4px 8px;font-weight:600}
  .card{background:var(--card);border-radius:var(--r-box);padding:8px 16px;margin-bottom:12px}
- .sub{color:var(--text-3);font-size:var(--fs-sm)} .note{color:var(--text-3);font-size:var(--fs-sm);margin:6px 4px 10px} a{color:#8bf}
+ .sub{color:var(--text-3);font-size:var(--fs-sm)} .note{color:var(--text-3);font-size:var(--fs-sm);margin:6px 4px 10px} a{color:var(--link)}
  button{font:inherit;cursor:pointer;border:0;color:#fff}
  .rows{cursor:pointer;user-select:none}
  .row{display:flex;align-items:baseline;padding:11px 0;border-top:1px solid var(--line)} .row:first-child{border-top:0}
@@ -21,10 +23,10 @@
  @keyframes blink{50%{opacity:.12}} @keyframes breathe{50%{opacity:.45}}
  @keyframes dotb1{0%{opacity:1}9%,100%{opacity:.12}} @keyframes dotb2{0%,18%{opacity:1}9%,27%,100%{opacity:.12}} @keyframes dotb3{0%,18%,36%{opacity:1}9%,27%,45%,100%{opacity:.12}}
  @keyframes dotrainbow{0%,100%{background:#e33}17%{background:#dd3}33%{background:#3c5}50%{background:#3cc}67%{background:#46f}83%{background:#c4c}}   /* the status dot's preview of the LED effects */
- .ok{background:#2c2} .busy,.warn{background:#e0b400} .call{background:#b04cff} .bad,.off{background:#d33}
- .warnbox{background:#7a1f1f;border:var(--bw) solid #a84a4a;padding:10px 20px;border-radius:var(--r-box);margin:0 0 12px;font-size:.9em}
+ .ok{background:var(--ok)} .busy,.warn{background:var(--warn)} .call{background:var(--call)} .bad,.off{background:var(--bad)}
+ .warnbox{background:var(--notice-bg);border:var(--bw) solid var(--notice-line);padding:10px 20px;border-radius:var(--r-box);margin:0 0 12px;font-size:var(--fs-md)}
  /* a notice: a banner that is not a warning (an event starting soon), in the page's colour, with a dismiss button */
- .notebox{display:flex;align-items:center;gap:12px;background:rgba(var(--primary-rgb),.75);border:var(--bw) solid rgb(var(--primary-l-rgb));padding:10px 12px 10px 20px;border-radius:var(--r-box);margin:0 0 12px;font-size:.95em}
+ .notebox{display:flex;align-items:center;gap:12px;background:rgba(var(--primary-rgb),.75);border:var(--bw) solid rgb(var(--primary-l-rgb));padding:10px 12px 10px 20px;border-radius:var(--r-box);margin:0 0 12px;font-size:var(--fs-md)}
  .notebox span{flex:1;min-width:0} .notebox .nx{flex:none;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.28)}
  .now{font-size:var(--fs-md);margin:0 0 16px;padding:14px 24px;border-radius:var(--r-box);text-align:center;background:rgba(var(--primary-rgb),.62);border:var(--bw) solid rgb(var(--primary-l-rgb));line-height:1.35}
  .now .nlabel{font-size:1.3em} .now b{font-size:1.6em;display:block}      /* the box's own lines are larger; every row inside it is the size of a settings row */
@@ -51,8 +53,8 @@
  .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .now .row.hang{justify-content:center;padding:12px 0 2px}
  .now .row.hang form{width:100%} .now .row.hang .pill-s{display:flex;width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .now .row.hang .pill-s{background:rgba(0,0,0,.25);border-color:rgb(var(--primary-l-rgb))} .now .row.hang{gap:10px}   /* the buttons under an open box: neutral ... */
- .now .row.hang .pill-s.danger{background:rgba(160,30,30,.85);border-color:rgb(230,110,110)}   /* ... red for a danger one (Hang up) */
- .now .row.hang .pill-s.arm{background:#d33;border-color:#f99}
+ .now .row.hang .pill-s.danger{background:var(--danger-bg);border-color:var(--danger-line)}   /* ... red for a danger one (Hang up) */
+ .now .row.hang .pill-s.arm{background:var(--danger-on);border-color:var(--danger-on-line)}
  .nw{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sub.blk{display:block}
  .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:10px 0;border-top:1px solid rgba(255,255,255,.18)}
  .now.open .row.main .k{display:block} .now.open .row.main .v{flex:1}
@@ -71,9 +73,9 @@
  .colourpick{display:inline-flex;align-items:center;gap:12px}
  .cp-wrap{position:relative} .cp-wrap .cp-native{position:absolute;left:0;top:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer}   /* the colour chooser laid over the Colour button */
  .pill:active{filter:brightness(1.1)}
- .pill-s{display:inline-flex;align-items:center;justify-content:center;min-height:var(--h-ctl);padding:0 16px;border-radius:var(--r-pill);background:rgba(42,42,42,.82);border:var(--bw) solid rgb(80,80,80);color:var(--text-1);font-size:var(--fs-sm)}
+ .pill-s{display:inline-flex;align-items:center;justify-content:center;min-height:var(--h-ctl);padding:0 16px;border-radius:var(--r-pill);background:var(--btn-bg);border:var(--bw) solid var(--btn-line);color:var(--text-1);font-size:var(--fs-sm)}
  .srow .pill-s{white-space:nowrap}
- .pill-s.danger{background:rgba(160,30,30,.85);border-color:rgb(230,110,110)}
+ .pill-s.danger{background:var(--danger-bg);border-color:var(--danger-line)}
  a.pill-s{text-decoration:none}
  /* ===== The page kit: the building blocks every module uses (docs/modules.md, "The page kit"). The standard widgets of
     page/widgets.js (rows, buttons, forms, boxes, tables, lists, consoles ...) are made of these classes; a module only adds
@@ -94,14 +96,14 @@
  .range{display:flex;align-items:center;gap:12px;padding:12px 0} .range > span:first-child{white-space:nowrap} .range input{flex:1;min-width:60px;accent-color:var(--primary)}
  .range.grid{display:grid;grid-template-columns:5.6em minmax(0,1fr) 3.1em;gap:12px} .range.grid span:last-child{text-align:right}   /* equal slider lengths */
  .tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
- .tag{display:inline-flex;align-items:center;gap:2px;min-height:var(--h-ctl);padding:0 4px 0 12px;border-radius:var(--r-pill);background:rgba(42,42,42,.82);border:var(--bw) solid rgb(80,80,80);font-size:var(--fs-sm)}
+ .tag{display:inline-flex;align-items:center;gap:2px;min-height:var(--h-ctl);padding:0 4px 0 12px;border-radius:var(--r-pill);background:var(--btn-bg);border:var(--bw) solid var(--btn-line);font-size:var(--fs-sm)}
  .tag button{background:none;color:var(--text-3);font-size:1.05em;line-height:1;min-width:32px;min-height:28px;padding:0;margin:0} .tag button:hover{color:#fff}
  .empty{color:var(--text-3);font-size:var(--fs-sm);margin:8px 0 0}
  .swatches{display:flex;gap:8px;flex:none} .swatch{width:34px;height:34px;padding:0;border-radius:50%;border:var(--bw) solid var(--cl,transparent);background:var(--c);box-shadow:0 0 0 1px rgba(255,255,255,.25) inset}
  .swatches.grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;width:100%;margin-top:6px} .pop .swatches.grid{margin-top:0;gap:10px} .pop .swatches.grid .swatch{max-width:52px} .swatches.grid .swatch{width:100%;height:auto;aspect-ratio:1/1;max-width:36px;justify-self:center}
  .swatch.sel{border-color:#fff} .swatch:focus-visible{outline-offset:3px}
  @media(max-width:420px){.pop .swatches.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}   /* eight across would make the balls too small to tap on a phone */
- .msg{color:#f99;font-size:var(--fs-sm)} .msg:empty{display:none}
+ .msg{color:var(--danger-on-line);font-size:var(--fs-sm)} .msg:empty{display:none}
  .pop{display:none;position:absolute;z-index:20;left:16px;right:16px;box-sizing:border-box;padding:12px 16px;border-radius:var(--r-box);background:var(--pop);box-shadow:0 6px 24px rgba(0,0,0,.6)}
  .pop.open{display:block}   /* its width and left edge are set when it opens (ui.popup): the card's content width, the same for every pop-up */
  .pop .t{font-size:var(--fs-sm);color:var(--text-2);margin-bottom:8px;overflow-wrap:anywhere}
@@ -121,7 +123,7 @@
  .console div{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;padding:1px 0 1px 12px;text-indent:-12px}
  .console.nowrap div{white-space:pre;overflow-wrap:normal;word-break:normal;padding:0;text-indent:0}   /* one entry per row, long ones scroll sideways */
  .console .l-err{color:#f08a8a} .console .l-ok{color:#8fe09a} .console .l-dim{color:#777} .console .l-hd{color:#eee}
- .console .l-info{color:#8bf} .console .l-warn{color:#e0b400} .console .l-mod{color:#aaa} .console .l-b{font-weight:bold}
+ .console .l-info{color:var(--link)} .console .l-warn{color:var(--warn)} .console .l-mod{color:#aaa} .console .l-b{font-weight:bold}
  .dbox{margin:0} .dbox > h2{margin-top:6px}
  .ctls{display:flex;gap:8px;align-items:center}
  .srow.wrap > .ctls{margin-left:auto}
@@ -172,11 +174,11 @@
  .srow.lk .pill-s,.srow.lk .tag{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb));text-shadow:0 1px 2px rgba(0,0,0,.55);color:#fff} .srow.lk .tag button{color:#fff}
  /* a row that shows an LED look: coloured buttons and tags that run the effect between the row's colour and the default dark grey of a
     button (the LED "off"); the text keeps its colour. Periods as in modules/led/netswitch_led.py (PERIOD), slow and fast. */
- @keyframes lkblink{50%{background:rgba(42,42,42,.82);border-color:rgb(80,80,80)}}
- @keyframes lkfade{0%,100%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}50%{background:rgba(42,42,42,.82);border-color:rgb(80,80,80)}}
- @keyframes lkb1{0%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}9%,100%{background:rgba(42,42,42,.82);border-color:rgb(80,80,80)}}
- @keyframes lkb2{0%,18%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}9%,27%,100%{background:rgba(42,42,42,.82);border-color:rgb(80,80,80)}}
- @keyframes lkb3{0%,18%,36%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}9%,27%,45%,100%{background:rgba(42,42,42,.82);border-color:rgb(80,80,80)}}
+ @keyframes lkblink{50%{background:var(--btn-bg);border-color:var(--btn-line)}}
+ @keyframes lkfade{0%,100%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}50%{background:var(--btn-bg);border-color:var(--btn-line)}}
+ @keyframes lkb1{0%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}9%,100%{background:var(--btn-bg);border-color:var(--btn-line)}}
+ @keyframes lkb2{0%,18%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}9%,27%,100%{background:var(--btn-bg);border-color:var(--btn-line)}}
+ @keyframes lkb3{0%,18%,36%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}9%,27%,45%,100%{background:var(--btn-bg);border-color:var(--btn-line)}}
  @keyframes lkrainbow{0%,100%{background:hsla(0,75%,45%,.82);border-color:hsla(0,80%,70%,.82)}17%{background:hsla(60,75%,40%,.82);border-color:hsla(60,80%,65%,.82)}33%{background:hsla(120,65%,38%,.82);border-color:hsla(120,70%,65%,.82)}50%{background:hsla(180,75%,38%,.82);border-color:hsla(180,80%,65%,.82)}67%{background:hsla(240,75%,52%,.82);border-color:hsla(240,80%,75%,.82)}83%{background:hsla(300,65%,45%,.82);border-color:hsla(300,70%,72%,.82)}}
  .srow.lk-fx .pill-s,.srow.lk-fx .tag{animation:var(--lkn) var(--lkd) var(--lkt) infinite}
  .srow.lk-blink{--lkn:lkblink;--lkd:1s;--lkt:steps(1)} .srow.lk-blink.lk-fast{--lkd:.4s}
@@ -187,13 +189,13 @@
  .srow.lk-blink3{--lkn:lkb3;--lkd:1.6s;--lkt:steps(1)} .srow.lk-blink3.lk-fast{--lkd:.8s}
  .srow.lk-rainbow{--lkn:lkrainbow;--lkd:6s;--lkt:linear} .srow.lk-rainbow.lk-fast{--lkd:2s}
  @media(prefers-reduced-motion:reduce){.srow.lk-fx .pill-s,.srow.lk-fx .tag{animation:none}}
- .infobtn{flex:none;width:var(--h-ctl);height:var(--h-ctl);padding:0;border-radius:50%;background:rgba(42,42,42,.82);border:var(--bw) solid rgb(80,80,80);color:var(--text-2);font:italic 600 1.05em Georgia,serif;line-height:1}
+ .infobtn{flex:none;width:var(--h-ctl);height:var(--h-ctl);padding:0;border-radius:50%;background:var(--btn-bg);border:var(--bw) solid var(--btn-line);color:var(--text-2);font:italic 600 1.05em Georgia,serif;line-height:1}
  .pop .infotext{font-size:var(--fs-sm);color:var(--text-2);margin-bottom:10px}
  .tgl{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;margin-left:4px}
  .bar .bar{margin:0}
  .bgpart.part{position:fixed;left:0;right:0;z-index:-1;pointer-events:none} .bgpart.part.top{top:0} .bgpart.part.bottom{bottom:0}   /* a background that fills only an area: its module sets the height */
  /* ===== end of the page kit ===== */
- :focus-visible{outline:3px solid #8bf;outline-offset:2px}
+ :focus-visible{outline:3px solid var(--link);outline-offset:2px}
  .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 0}
  .cog{position:absolute;right:0;top:50%;transform:translateY(-50%);padding:6px;background:transparent;color:#3a3a3a;line-height:0}
  .cog svg{width:30px;height:30px;fill:currentColor;display:block} .cog:hover{color:#5a5a5a}
