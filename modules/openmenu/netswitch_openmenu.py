@@ -14,7 +14,8 @@
 #   NET dcnet|dcnow                               the network calls go to now (dcnet only when it is selected and DreamPi can use it)
 #   DCNET ok | DCNET off <why>                    whether DCNET works: why = config (netlink_config.ini not found), disabled ([DCNet] enabled =
 #                                                 yes missing), noupdates (/boot/noautoupdates.txt) or inactive (DreamPi is not running the add-on)
-#   PLAYING 2:3 7:1                               the card's games (slot:players) that someone plays online right now (left out when none)
+#   PLY 2 1 27                                    the slots of the card's games that someone plays online right now, the most played first
+#                                                 (left out when none)
 #   EVENT <unix start> <due 0|1> <title>          the DC99 event to show: the one whose reminder is due (due 1), else the soonest (left out when none)
 # The module announces itself to the rest of the add-on in module.json ("launcher"): the card's games that are in the online game table
 # (GET /openmenu/games, "online": true) and how to start one, so the Online players and DC99 events lists can show a Start button.
@@ -35,7 +36,7 @@ MAX_GAMES = 5000
 PLAYERS_FRESH = 300       # the Online players module's list counts as current for this long
 PLAYERS_ASK = 45          # a Dreamcast that is polling asks for a new list when the old one is older than this ...
 PLAYERS_ASK_EVERY = 30    # ... at most this often
-MAX_PLAYING = 16          # games in the PLAYING line
+MAX_PLAYING = 16          # games in the PLY line
 
 _lock = threading.Lock()
 _state = {"seen": 0.0, "pending": None, "pending_time": 0.0, "launched": None, "launched_time": 0.0, "games": None, "asked": 0.0}
@@ -158,7 +159,8 @@ def is_online(name, table):
 
 
 def playing_now(players):
-    """[(slot, count)]: the card's games that the players (players_file()[0]) play online right now, each with how many play it, most first."""
+    """[(slot, count)]: the card's games that the players (players_file()[0]) play online right now, each with how many play it, most first
+    (the PLY line sends the slots only)."""
     glist = games()["games"]
     counts = {}
     for p in players:
@@ -209,7 +211,7 @@ def poll_reply(headers_query):
     players, _table, age = players_file()
     playing = playing_now(players)
     if playing:
-        lines.append("PLAYING " + " ".join("%d:%d" % kv for kv in playing))
+        lines.append("PLY " + " ".join(str(slot) for slot, _count in playing))
     event = event_line(now)
     if event:
         lines.append(event)
