@@ -17,12 +17,6 @@
      }
     },
     {
-     "type": "text",
-     "text": "@update.dreampi_text",
-     "muted": true,
-     "show": "@update.dreampi_text"
-    },
-    {
      "type": "row",
      "title": "Update the add-on",
      "sub": "@update.do_sub",
@@ -62,8 +56,8 @@
     },
     {
      "type": "row",
-     "title": "Reboot DreamPi",
-     "sub": "Restarts the Raspberry Pi\nA call in progress is cut",
+     "title": "Reboot",
+     "sub": "Restarts the Raspberry Pi",
      "control": {
       "type": "button",
       "style": "danger",

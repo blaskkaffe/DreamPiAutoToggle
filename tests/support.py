@@ -17,11 +17,10 @@ for _name in sorted(os.listdir(_MODULES)):
         sys.path.insert(0, os.path.join(_MODULES, _name))
 
 import netswitch_core as core  # noqa: E402
-import netswitch_ledconfig as ledconfig  # noqa: E402
 import netswitch_probes as probes  # noqa: E402
 import netswitch_web as web  # noqa: E402
 
-__all__ = ['ROOT', 'core', 'ledconfig', 'probes', 'web', 'sandbox', 'cleanup']
+__all__ = ['ROOT', 'core', 'probes', 'web', 'sandbox', 'cleanup']
 
 
 _ORIGINAL = {}   # module -> {name: original string value}, taken the first time a module is sandboxed
@@ -30,13 +29,13 @@ ORIGINAL_BASE = core.BASE_DIR
 
 def sandbox(*modules):
     """Redirect every path constant of the add-on modules (and any extra
-    module given, e.g. the hook, which keeps its own copies) into a fresh
+    module given, e.g. a module that keeps its own copies) into a fresh
     temp dir. Always maps from the original values, so repeated sandboxes
     never see an earlier test's deleted directory. Returns the dir; the
     caller removes it with cleanup()."""
     tmp = tempfile.mkdtemp(prefix="dpns-test-")
     base = ORIGINAL_BASE
-    for mod in (core, ledconfig, probes, web) + tuple(m for m in modules if m not in (core, ledconfig, probes, web)):
+    for mod in (core, probes, web) + tuple(m for m in modules if m not in (core, probes, web)):
         if mod not in _ORIGINAL:
             _ORIGINAL[mod] = dict((n, getattr(mod, n)) for n in dir(mod)
                                   if isinstance(getattr(mod, n), str) and not n.startswith("__") and n != "STATIC_DIR")

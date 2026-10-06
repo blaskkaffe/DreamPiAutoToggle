@@ -124,29 +124,29 @@ class HttpSecurityTests(unittest.TestCase):
 
     def test_foreign_host_name_is_refused(self):                      # DNS rebinding
         for method in ("GET", "POST"):
-            status, _body, _r = self.req(method, "/api" if method == "GET" else "/dcnet",
+            status, _body, _r = self.req(method, "/api" if method == "GET" else "/checkin/toggle",
                                          {"Host": "evil.example.com", "X-Requested-With": "x"})
             self.assertEqual(status, 421)
 
     def test_cross_site_posts_are_refused(self):
         evil = {"Host": "127.0.0.1:%d" % self.port, "Origin": "http://evil.example.com"}
-        for path in ("/dcnet", "/numbers", "/wificonnect", "/ledconfig", "/ledrows", "/reboot", "/update/start"):
+        for path in ("/checkin/toggle", "/checkin/status", "/contacts/import", "/wificonnect", "/reboot", "/update/start"):
             for extra in ({}, {"X-Requested-With": "x"}, {"Content-Type": "text/plain"}):
                 status, _b, _r = self.req("POST", path, dict(evil, **extra), b"{}")
                 self.assertEqual(status, 403, (path, extra))
         self.assertEqual(self.spawned, [])
-        self.assertFalse(os.path.exists(core.FLAG))
+        self.assertFalse(os.path.exists(core.CHECKIN))
 
     def test_post_without_header_or_origin_is_refused(self):
-        self.assertEqual(self.req("POST", "/dcnet")[0], 403)
-        self.assertFalse(os.path.exists(core.FLAG))
+        self.assertEqual(self.req("POST", "/checkin/toggle")[0], 403)
+        self.assertFalse(os.path.exists(core.CHECKIN))
 
     def test_same_site_form_post_still_works_without_javascript(self):
-        status, _b, r = self.req("POST", "/dcnet", {"Origin": "http://127.0.0.1:%d" % self.port,
-                                                    "Host": "127.0.0.1:%d" % self.port})
-        self.assertEqual(status, 303)
-        self.assertTrue(os.path.exists(core.FLAG))
-        os.remove(core.FLAG)
+        status, _b, r = self.req("POST", "/wifitoggle", {"Origin": "http://127.0.0.1:%d" % self.port,
+                                                         "Host": "127.0.0.1:%d" % self.port})
+        self.assertEqual(status, 303)                      # a module's POST that does not answer itself is followed by a redirect to the page
+        self.assertTrue(os.path.exists(core.WIFI_START))
+        os.remove(core.WIFI_START)
 
     def test_reboot_form_post_is_never_enough(self):
         status, _b, _r = self.req("POST", "/reboot", {"Origin": "http://127.0.0.1:%d" % self.port,
@@ -166,10 +166,9 @@ class HttpSecurityTests(unittest.TestCase):
         status, body, _r = self.req("POST", "/reboot", dict(h, **{"X-Netswitch-Pin": "4821"}))
         self.assertEqual((status, json.loads(body.decode())["started"]), (200, True))
         self.assertEqual(self.spawned, [1])
-        # the check for updates and everyday switches need no PIN
+        # the check for updates and everyday check-ins need no PIN
         self.assertEqual(self.req("POST", "/update/check", h)[0], 200)
-        self.assertEqual(self.req("POST", "/dcnet", h)[0], 204)
-        os.path.exists(core.FLAG) and os.remove(core.FLAG)
+        self.assertNotEqual(self.req("POST", "/checkin/toggle", h, b"{}")[0], 401)
 
     def test_api_says_whether_a_pin_is_needed(self):
         self.assertFalse(json.loads(self.req("GET", "/api")[1].decode())["pin"])
@@ -190,7 +189,7 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertEqual(r.getheader("X-Content-Type-Options"), "nosniff")
 
     def test_negative_content_length_does_not_hang(self):
-        status, _b, _r = self.req("POST", "/numbers", {"X-Requested-With": "x", "Content-Length": "-5"})
+        status, _b, _r = self.req("POST", "/contacts/import", {"X-Requested-With": "x", "Content-Length": "-5"})
         self.assertEqual(status, 400)
 
     def test_wifi_connect_cuts_long_values(self):

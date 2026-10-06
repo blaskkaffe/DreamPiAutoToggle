@@ -137,7 +137,7 @@ class KitTests(unittest.TestCase):
                 for row in rows(json.loads(read(path))):
                     found += 1
                     self.assertIn(row.get("sub"), ("Network", "Module"), "%s: %s" % (name, row.get("title")))
-        self.assertGreaterEqual(found, 3)
+        self.assertGreaterEqual(found, 1)
 
     def test_module_css_does_not_redefine_a_base_class(self):
         """`.srow{...}` in a module would change every row in the app. Scoped rules (`#wifi-list .srow`) and a module's own

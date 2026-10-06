@@ -1,8 +1,7 @@
 # Wi-Fi setup module - sourced by install.sh while this module is in the folder. every install makes sure what the temporary
 # access point needs (hostapd and dnsmasq) is installed; --wifi switches the module on; --no-wifi switches it off; --wifi-demo runs it on
 # dummy networks. Without a flag the module keeps whatever the Modules menu says. Setup itself runs in
-# this module's own service (dreampi-netswitch-wifi), which idles while the module is off; the buttons service in the base only touches
-# wifi_start / wifi_stop.
+# this module's own service (dreampi-netswitch-wifi), which idles while the module is off.
 if [ -f "$DEST/wifi_enabled" ]; then       # an older install used a marker file
     ns_module_enable wifi on
     rm -f "$DEST/wifi_enabled"
@@ -23,7 +22,7 @@ if ! command -v hostapd >/dev/null 2>&1 || ! command -v dnsmasq >/dev/null 2>&1;
 fi
 if [ "$WIFI" = on ]; then
     ns_module_enable wifi on
-    echo "Wi-Fi setup module on (choose which button holds to start it in Settings > GPIO)"
+    echo "Wi-Fi setup module on (start it from Settings > System)"
 elif [ "$WIFI" = off ]; then
     ns_module_enable wifi off
     rm -f "$DEST/wifi_button" "$DEST/wifi_hostapd.conf" "$DEST/wifi_dnsmasq.conf"

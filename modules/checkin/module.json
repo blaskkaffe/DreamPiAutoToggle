@@ -1,0 +1,16 @@
+{
+ "name": "Check-in board",
+ "description": "Who is in and who is out: a button per person from the Contacts module, with a status, in step on every screen.",
+ "enabled": true,
+ "visible": true,
+ "order": 10,
+ "ui": 2,
+ "colours": {
+  "checkin": "green"
+ },
+ "primary": "checkin",
+ "web": "netswitch_checkin",
+ "tints": {
+  "checkin": false
+ }
+}

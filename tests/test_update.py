@@ -25,7 +25,7 @@ def fake_github(head=REMOTE, status="ahead", compare_error=False, down=False):
             if compare_error:
                 raise IOError("404")
             return json.dumps({"status": status, "ahead_by": 3})
-        return "#dreampi.py_version=202701010000\n"
+        return ""
     return fetch
 
 
@@ -37,7 +37,7 @@ class CheckTests(unittest.TestCase):
             f.write(LOCAL)
         with open(probes.ADDON_VERSION, "w") as f:
             f.write("2026-09-30 12:00 (aaaaaaa)")
-        up._info.update({"time": 0, "started": 0, "checking": False, "addon": None, "dreampi": None, "error": None})
+        up._info.update({"time": 0, "started": 0, "checking": False, "addon": None, "error": None})
 
     def tearDown(self):
         up.fetch = self._fetch
@@ -116,25 +116,6 @@ class CheckTests(unittest.TestCase):
         with open(core.UPDATE_STATUS, "w") as f:                  # a later update announces itself again
             f.write("failed\n")
         self.assertEqual(up.update_state(), "failed")
-
-    def test_dreampi_versions(self):
-        dp = os.path.join(self.tmp, "dreampi")
-        os.mkdir(dp)
-        probes.DREAMPI_DIR = dp
-        with open(os.path.join(dp, "dreampi.py"), "w") as f:
-            f.write("#!/usr/bin/env python\n#dreampi.py_version=202601010000\n")
-        with open(os.path.join(dp, "netlink.py"), "w") as f:
-            f.write("#netlink_version=202801010000\n")          # newer than the fake remote
-        up.fetch = lambda url: "#%s_version=202701010000\n" % os.path.basename(url)[:-3] if "netlink" not in url else "#netlink_version=202701010000\n"
-        r = up.check_dreampi()
-        by = dict((f["name"], f) for f in r["files"])
-        self.assertTrue(by["dreampi.py"]["newer"])
-        self.assertEqual(by["dreampi.py"]["current"], "2026-01-01 00:00")
-        self.assertFalse(by["netlink.py"]["newer"])
-        self.assertEqual(by["dcnow.py"]["current"], "not found")
-        self.assertFalse(by["dcnow.py"]["newer"])
-        self.assertTrue(r["newer"])
-
 
     def test_nothing_checks_for_updates_by_itself(self):
         calls = []

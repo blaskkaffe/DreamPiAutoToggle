@@ -1,4 +1,4 @@
-# DreamPi Netswitch add-on - Reboot and Update module, web side:
+# Check-in add-on - Reboot and Update module, web side:
 #   GET  /update          the cached update check (netswitch_update.status())
 #   POST /update/check    run a check now
 #   POST /update/start    fetch and install the new version (needs the PIN when one is set)
@@ -23,21 +23,19 @@ def _spawn_reboot():
 
 
 def start_reboot():
-    """Reboot the whole Raspberry Pi (DreamPi starts again with it). Returns (started, message)."""
-    in_call = core.dreampi_state()[0].startswith("call")
+    """Reboot the whole Raspberry Pi (the add-on starts again with it). Returns (started, message)."""
     try:
         _spawn_reboot()
     except OSError as e:
         return False, "Could not reboot (%s)" % e
-    core.mark_reboot()                                    # the LEDs say so while the Pi goes down
-    core.debug_log("web page: reboot requested%s" % (" (a call was in progress)" if in_call else ""))
+    core.log("web page: reboot requested")
     return True, "Rebooting"
 
 
 def view(r):
-    """The status of the update check as the widgets in layout.json show it: text, dreampi_text, show_update, do_sub,
+    """The status of the update check as the widgets in layout.json show it: text, show_update, do_sub,
     check_disabled, busy (the page asks again soon while it is true)."""
-    a, d, state = r.get("addon"), r.get("dreampi"), r.get("state")
+    a, state = r.get("addon"), r.get("state")
     running = state == "running"
     if running:
         msg = "Updating... the page is unavailable for a few seconds while the services restart."
@@ -62,11 +60,7 @@ def view(r):
         msg = (a and a.get("note")) or "Couldn't tell if the add-on is current."
     if a and a.get("note") and a.get("available") is not None and not running and state == "idle":
         msg += " " + a["note"]
-    dp = ""
-    if d and d.get("newer") and state == "idle":
-        dp = "DreamPi has newer scripts: " + ", ".join("%s %s \u2192 %s" % (f["name"], f["current"], f["latest"]) for f in d["files"] if f.get("newer")) + (
-            ". It updates itself when the Pi restarts with internet." if d.get("auto_updates") else ". Automatic updates are off (/boot/noautoupdates.txt exists).")
-    return {"text": msg, "dreampi_text": dp,
+    return {"text": msg,
             "show_update": bool(a and a.get("available") and r.get("can_update") and state == "idle"),
             "do_sub": "Fetches the new version from GitHub and installs it (%s branch). Settings are kept." % (r.get("branch") or "main"),
             "check_disabled": bool(r.get("checking") or running), "busy": bool(r.get("checking") or running)}
@@ -100,9 +94,8 @@ def _post_update(h):
 
 
 def api(d, warnings):
-    """The text the Reboot button asks to confirm (it says so when a call is in progress)."""
-    in_call = core.dreampi_state()[0].startswith("call")
-    d["reboot"] = {"confirm": ("A call is in progress and will be cut. " if in_call else "") + "Reboot the Raspberry Pi now? It is back in about a minute."}
+    """The text the Reboot button asks to confirm."""
+    d["reboot"] = {"confirm": "Reboot the Raspberry Pi now? The boards are back in about a minute."}
 
 
 GET = {"/update": _get_update}

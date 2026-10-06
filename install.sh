@@ -1,36 +1,25 @@
 #!/bin/sh
-# DreamPi Netswitch add-on - installer. Changes no DreamPi files.
+# Check-in add-on - installer.
 #
 #   sudo ./install.sh              install or update (web page on port 80)
 #   sudo ./install.sh 8080         use another port for the web page
 #   sudo ./install.sh --https-port=8443   HTTPS on another port (default 443)
 #   sudo ./install.sh --no-https   plain HTTP only
-#   sudo ./install.sh --leds=30    NeoPixels on GPIO18: starting count 30 (a strip). The status
-#                                  LED is on by default with 1 LED; --leds=0 turns it off and
-#                                  hides the LED settings on the page
-#   sudo ./install.sh --led-gpio=21   use GPIO10, 12, 18 (default) or 21 instead
-#   (--led, --led=N and --no-led still work: same as the default, --leds=N and --leds=0)
-#   The LED, Wi-Fi setup, phone numbers, online players and debug log parts are optional modules, one folder each
-#   in modules/ (see "Optional parts" in the README): a folder that is not there is not installed (and one that was
-#   installed before is removed), and the LED / Wi-Fi options below do nothing without their module.
+#   The check-in board, the contacts, the clock, Wi-Fi setup and the system controls are modules, one folder each in
+#   modules/ (see docs/modules.md): a folder that is not there is not installed (and one that was installed before is
+#   removed). Which modules are on is the page's Settings > System > Modules.
 #   sudo ./install.sh --wifi       add Wi-Fi setup (a temporary access point for joining a network
-#                                  without a keyboard; hostapd + dnsmasq are installed with every install): its page controls
-#                                  and the button hold that starts it
-#   sudo ./install.sh --no-wifi    remove Wi-Fi setup again
+#                                  without a keyboard; hostapd + dnsmasq are installed with every install)
+#   sudo ./install.sh --no-wifi    switch Wi-Fi setup off again
 #   sudo ./install.sh --wifi-demo  try Wi-Fi setup on dummy networks (no hostapd, nothing is changed on the
 #                                  Pi's network; password "demo" connects); --no-wifi-demo ends it
 #   sudo ./install.sh --pin        ask for a PIN that the page then wants before it updates, restarts
-#                                  the Pi or connects Wi-Fi (--pin=1234 gives it on the command line,
+#                                  the Pi, joins Wi-Fi or imports contacts (--pin=1234 gives it on the command line,
 #                                  which shows in the shell history); --no-pin removes it. It is kept
 #                                  across updates. Without a PIN anybody on your network can use those.
 #
-# The two GPIO buttons (GPIO17/pin11 toggles the network, GPIO4/pin7 is off by
-# default) are always installed; their pins and functions are editable from the
-# page's Settings > GPIO. Which modules are on is the page's Settings > Modules (--wifi, --no-wifi and
-# --wifi-demo set the Wi-Fi one from here); the LED count is kept too. The LED count, output pin, wire order and white
-# balance can all be changed later from the page's Settings, without
-# --leds=N/--led-gpio=N or a reinstall. Choosing GPIO10 switches the Pi's SPI on in
-# config.txt by itself (the LED service does that; a reboot may be needed once).
+# One computer runs this (the host); every other screen opens its address in a browser, in kiosk mode if you like
+# (kiosk/kiosk-browser.sh). Everything the screens show is kept by the host, so they are all in step.
 set -e
 DEST=/opt/dreampi-netswitch
 SRC="$(cd "$(dirname "$0")" && pwd)"
@@ -42,22 +31,11 @@ if [ -f "$DEST/install_ports" ]; then
     case "$OLD_PORT" in ''|*[!0-9]*) ;; *) PORT=$OLD_PORT ;; esac
     case "$OLD_HTTPS" in ''|*[!0-9]*) ;; *) HTTPS_PORT=$OLD_HTTPS ;; esac
 fi
-LED_COUNT=
-LED_GPIO=
 WIFI=keep
 WIFI_DEMO=keep
 PIN=keep
-BUTTON1_GPIO_DEFAULT=17   # GPIO17 / physical pin 11; editable later from the page's Settings > GPIO
-BUTTON2_GPIO_DEFAULT=4    # GPIO4 / physical pin 7
 for arg in "$@"; do
     case "$arg" in
-        --led) ;;   # old option: the LED is on by default now
-        --leds=*|--led=*) LED_COUNT="${arg#*=}"
-                  case "$LED_COUNT" in ''|*[!0-9]*) echo "--leds needs a number, e.g. --leds=30"; exit 1 ;; esac
-                  if [ "$LED_COUNT" -gt 300 ]; then echo "--leds must be 0 to 300"; exit 1; fi ;;
-        --led-gpio=*) LED_GPIO="${arg#--led-gpio=}"
-                  case "$LED_GPIO" in 10|12|18|21) ;; *) echo "--led-gpio must be 10, 12, 18 or 21"; exit 1 ;; esac ;;
-        --no-led) LED_COUNT=0 ;;
         --wifi) WIFI=on ;;
         --no-wifi) WIFI=off ;;
         --pin) PIN=ask ;;
@@ -73,18 +51,30 @@ for arg in "$@"; do
     esac
 done
 
-if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--leds=N|--led-gpio=N] [--wifi|--no-wifi|--wifi-demo|--no-wifi-demo]"; exit 1; fi
+if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--wifi|--no-wifi|--wifi-demo|--no-wifi-demo]"; exit 1; fi
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
-cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_modules.py" "$SRC/netswitch_security.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_tz.py" "$SRC/netswitch_web.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" \
+cp "$SRC/netswitch_core.py" "$SRC/netswitch_modules.py" "$SRC/netswitch_security.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_tz.py" "$SRC/netswitch_web.py" \
    "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
-mkdir -p "$DEST/page" "$DEST/static"
+mkdir -p "$DEST/page" "$DEST/kiosk"
 cp "$SRC"/page/index.html "$SRC"/page/page.css "$SRC"/page/page.js "$SRC"/page/widgets.js "$SRC"/page/boot.js "$DEST/page/"
-cp "$SRC"/static/*.png "$DEST/static/"
-# Files an older layout kept next to the base (the features are folders in modules/ now)
-rm -f "$DEST/netswitch_update.py" "$DEST/static/three.min.js" "$DEST/static/dc-background.js" "$DEST/static/LICENSES.txt" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" \
-      "$DEST/netswitch_players.py" "$DEST/netswitch_wifi_setup.py" "$DEST/page/led.html" "$DEST/page/led.js" "$DEST/page/led.css" "$DEST/page/players.js"
+cp "$SRC"/kiosk/* "$DEST/kiosk/"
+chmod +x "$DEST/kiosk/kiosk-browser.sh"
+# Files of the DreamPi add-on this one grew out of (an install over it is cleaned up: the hook, the buttons and the LED service are gone)
+for ns_old in dreampi-netswitch-led dreampi-netswitch-buttons; do
+    if [ -f "/etc/systemd/system/$ns_old.service" ]; then
+        systemctl disable --now "$ns_old.service" 2>/dev/null || true
+        rm -f "/etc/systemd/system/$ns_old.service"
+    fi
+done
+rm -f "$DEST/netswitch_hook.py" "$DEST/netswitch_gpio.py" "$DEST/netswitch_buttons.py" "$DEST/netswitch_update.py" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" \
+      "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" "$DEST/netswitch_players.py" "$DEST/netswitch_wifi_setup.py" "$DEST/wifi_button" "$DEST/wifi_button_enabled"
+rm -rf "$DEST/static"
+if [ -f "$DEST/pth_locations" ]; then       # the hook was loaded into every Python through .pth files
+    while read -r ns_pth; do rm -f "$ns_pth"; done < "$DEST/pth_locations"
+    rm -f "$DEST/pth_locations"
+fi
 
 # >>> sync_modules
 # The optional features: every folder in modules/ is copied to $DEST/modules/. A folder that was installed before but
@@ -147,18 +137,6 @@ case "$PIN" in
 esac
 PIN=
 
-# Tell every installed Python to load the hook at startup (.pth file)
-: > "$DEST/pth_locations"
-for PY in python python2 python3; do
-    command -v "$PY" >/dev/null 2>&1 || continue
-    SITE=$("$PY" -c "import site; print(site.getsitepackages()[0])" 2>/dev/null) || continue
-    [ -n "$SITE" ] || continue
-    mkdir -p "$SITE"
-    printf '%s\nimport netswitch_hook\n' "$DEST" > "$SITE/dreampi_netswitch.pth"
-    grep -qx "$SITE/dreampi_netswitch.pth" "$DEST/pth_locations" || echo "$SITE/dreampi_netswitch.pth" >> "$DEST/pth_locations"
-    echo "Hook registered for $PY ($SITE)"
-done
-
 # Self-signed certificate for the HTTPS page. Kept on updates, renewed when it
 # expires within 30 days. 820 days: Apple devices refuse certificates valid
 # for more than 825 days.
@@ -169,12 +147,12 @@ fi
 if [ "$HTTPS_PORT" != 0 ] && [ ! -f "$DEST/https.crt" ]; then
     if command -v openssl >/dev/null 2>&1; then
         HOST=$(hostname)
-        SAN="DNS:dreampi.local,DNS:$HOST.local,DNS:$HOST,DNS:localhost,IP:127.0.0.1"
+        SAN="DNS:$HOST.local,DNS:$HOST,DNS:localhost,IP:127.0.0.1"
         for IP in $(hostname -I 2>/dev/null); do
             case "$IP" in *:*) ;; *) SAN="$SAN,IP:$IP" ;; esac
         done
         CNF=$(mktemp)
-        printf '[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=dreampi.local\nO=DreamPi Netswitch\n[ext]\nsubjectAltName=%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n' "$SAN" > "$CNF"
+        printf '[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=$HOST.local\nO=Check-in\n[ext]\nsubjectAltName=%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n' "$SAN" > "$CNF"
         if openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 820 \
                 -keyout "$DEST/https.key" -out "$DEST/https.crt" -config "$CNF" >/dev/null 2>&1; then
             chmod 600 "$DEST/https.key"
@@ -192,7 +170,7 @@ fi
 WEBPY=$(command -v python3 || command -v python)
 cat > /etc/systemd/system/dreampi-netswitch.service <<EOF
 [Unit]
-Description=DreamPi Netswitch web page
+Description=Check-in web page
 After=network.target
 # never give up restarting (the default stops after 5 quick failures)
 StartLimitIntervalSec=0
@@ -215,39 +193,9 @@ ProtectKernelModules=yes
 WantedBy=multi-user.target
 EOF
 
-# ------------------------------------------------------------------ buttons
-# Always installed: two GPIO buttons with a short-press function each (pins and
-# functions editable from the page). Wi-Fi setup is not part of it: that is the Wi-Fi module's own service.
-[ -f "$DEST/button1_gpio" ] || echo "$BUTTON1_GPIO_DEFAULT" > "$DEST/button1_gpio"
-[ -f "$DEST/button2_gpio" ] || echo "$BUTTON2_GPIO_DEFAULT" > "$DEST/button2_gpio"
-echo "Buttons on GPIO$(cat "$DEST/button1_gpio") and GPIO$(cat "$DEST/button2_gpio") (pins and functions editable from the page's Settings > GPIO)"
-# Older versions had one service for both buttons and Wi-Fi setup, enabled only
-# by --wifi (marker wifi_button_enabled): carry that over (modules/wifi/install.sh turns it into the module's switch).
-if [ -f "$DEST/wifi_button_enabled" ]; then mv "$DEST/wifi_button_enabled" "$DEST/wifi_enabled"; fi
-# (and a service of that name from then, running netswitch_wifi.py, is replaced by the Wi-Fi module's own service, or removed if the module is absent)
-if [ -f /etc/systemd/system/dreampi-netswitch-wifi.service ] && [ ! -d "$DEST/modules/wifi" ]; then
-    systemctl disable --now dreampi-netswitch-wifi.service 2>/dev/null || true
-    rm -f /etc/systemd/system/dreampi-netswitch-wifi.service
-fi
-rm -f "$DEST/netswitch_wifi.py" "$DEST/wifi_button_gpio"
-cat > /etc/systemd/system/dreampi-netswitch-buttons.service <<EOF
-[Unit]
-Description=DreamPi Netswitch buttons
-After=network.target
-StartLimitIntervalSec=0
-
-[Service]
-ExecStart=$(command -v python3) $DEST/netswitch_buttons.py
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
 # ------------------------------------------------------------------ modules
-# Each installed module may have an install.sh, sourced here (it sees $DEST, $SRC, $LED_COUNT, $LED_GPIO, $WIFI, $WIFI_DEMO)
-# and adds the systemd units it needs to NS_SERVICES. See modules/led and modules/wifi.
+# Each installed module may have an install.sh, sourced here (it sees $DEST, $SRC, $WIFI, $WIFI_DEMO)
+# and adds the systemd units it needs to NS_SERVICES. See modules/wifi.
 NS_SERVICES=
 for ns_dir in "$DEST"/modules/*/; do
     [ -f "$ns_dir/install.sh" ] && . "$ns_dir/install.sh"
@@ -255,24 +203,19 @@ done
 for ns_flag in "$WIFI$WIFI_DEMO"; do
     case "$ns_flag" in *on*|*off*) [ -d "$DEST/modules/wifi" ] || echo "Wi-Fi options ignored: the Wi-Fi setup module is not in this folder." ;; esac
 done
-if [ -n "$LED_COUNT$LED_GPIO" ] && [ ! -d "$DEST/modules/led" ]; then
-    echo "LED options ignored: the status LED module is not in this folder."
-fi
 
 systemctl daemon-reload
 systemctl enable dreampi-netswitch.service >/dev/null 2>&1
 systemctl restart dreampi-netswitch.service
-systemctl enable dreampi-netswitch-buttons.service >/dev/null 2>&1
-systemctl restart dreampi-netswitch-buttons.service
 for ns_service in $NS_SERVICES; do      # the services of the installed modules
     systemctl enable "$ns_service" >/dev/null 2>&1
     systemctl restart "$ns_service"
 done
-systemctl restart dreampi.service 2>/dev/null || echo "Could not restart DreamPi, please reboot."
 
 echo
-echo "Installed. Open http://dreampi.local$( [ "$PORT" = 80 ] || echo ":$PORT" )"
+echo "Installed. Open http://$(hostname).local$( [ "$PORT" = 80 ] || echo ":$PORT" )"
 if [ "$HTTPS_PORT" != 0 ] && [ -f "$DEST/https.crt" ]; then
-    echo "      or https://dreampi.local$( [ "$HTTPS_PORT" = 443 ] || echo ":$HTTPS_PORT" )  (accept the certificate warning once)"
+    echo "      or https://$(hostname).local$( [ "$HTTPS_PORT" = 443 ] || echo ":$HTTPS_PORT" )  (accept the certificate warning once)"
 fi
+echo "Import the people in Settings > Contacts. Other screens: open the same address (see kiosk/kiosk-browser.sh)."
 echo "Uninstall any time with: sudo $DEST/uninstall.sh"

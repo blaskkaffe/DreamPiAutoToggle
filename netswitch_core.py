@@ -1,22 +1,17 @@
-# DreamPi Netswitch add-on - shared state and settings.
-# Everything the web page, the LED service and the buttons service all read or
-# write: file paths, the DreamPi/modem/network/Wi-Fi state files, the debug log,
-# button settings and the paths of everything else. No server, no probing, so the
-# small services can import it cheaply. Works on Python 3 and 2.7.
+# Check-in add-on - shared state and settings.
+# Everything the web service and the modules read or write: file paths, the module state, the colour palette, the time
+# zone and the Wi-Fi setup state files. No server, no probing, so small services can import it cheaply. Python 3.
 import json
 import os
 import re
+import sys
 import time
 
 BASE_DIR = "/opt/dreampi-netswitch"
-FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb", "led": "#rrggbb"}}: palette colours the user changed (on screen, on the LED)
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
-MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"switcher": {"dcnow": "orange", ...}}: the global-palette colours each module uses
+MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"checkin": {"checkin": "green", ...}}: the global-palette colours each module uses
 MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["switcher", "numbers", ...]: the order set in the module picker (top = first, wins)
-BOOT_ID = os.path.join(BASE_DIR, "boot_id")              # the kernel's id of the boot the selection was last reset for
-KERNEL_BOOT_ID = "/proc/sys/kernel/random/boot_id"
-DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
 ADDON_COMMIT = os.path.join(BASE_DIR, "version_commit")  # full commit hash of the checkout that was installed (install.sh)
 ADDON_SRC = os.path.join(BASE_DIR, "src_dir")            # that checkout's folder, used by the web update
 INSTALL_PORTS = os.path.join(BASE_DIR, "install_ports")  # "<http port> <https port>", so an update keeps them
@@ -25,45 +20,23 @@ ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the op
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
 UPDATE_STATUS = "/tmp/dreampi-netswitch.update"          # running / ok / failed, written by the update script
 UPDATE_LOG = "/tmp/dreampi-netswitch.update.log"
-UPDATE_INFO = "/tmp/dreampi-netswitch.updateinfo"        # {"addon": bool|None, "dreampi": bool, "time"}: the latest check, written by the update module for the LEDs
-REBOOT_MARK = "/tmp/dreampi-netswitch.reboot"            # unix time a reboot was asked for (the LEDs show "about to reboot")
-PLAYERS_SOURCES = os.path.join(BASE_DIR, "players_sources.json")   # JSON addresses for the optional online-players list
-PLAYERS_CACHE = os.path.join(BASE_DIR, "players_cache.json")   # the last list the players module read (shown again after a restart while the new one loads)
-PLAYERS_FAVORITES = os.path.join(BASE_DIR, "players_favorites.json")   # {"games": [names], "players": [names]} the user watches
-OPENMENU_GAMES = os.path.join(BASE_DIR, "openmenu_games.json")   # {"hash", "time", "games": [...]}: the game list the Dreamcast's openMenu uploaded (openMenu link module)
-NUMBERS = os.path.join(BASE_DIR, "numbers.json")     # phone numbers per action, edited on the page, read by the hook
-CLOCK_MODE = os.path.join(BASE_DIR, "clock_mode")    # older versions: "24h", "12h" or "beat" (read once to carry the choice over to clock.json)
 HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id: how a highlighted box looks (Settings > Appearance)
-EVENTS_DB = os.path.join(BASE_DIR, "events.db")        # SQLite: the DC99 events imported by the events module
-EVENTS_CONFIG = os.path.join(BASE_DIR, "events.json")   # its settings: reminder lead time, time zone, sync interval, picked events, series
-EVENT_REMINDERS = os.path.join(BASE_DIR, "event_reminders.json")   # the DC99 events the user asked to be reminded of (events module, read by the LEDs)
+CONTACTS = os.path.join(BASE_DIR, "contacts.json")     # {"people": [{id, name, department, role, phone, location, restrictToLocation, active, order}]}: the contacts module's roster (imported from a CSV)
+CHECKIN = os.path.join(BASE_DIR, "checkin.json")       # {"rev", "config", "statuses", "people": {id: {in, status, detail, at}}}: the check-in module's live state, shared by every screen
 CLOCK_CONFIG = os.path.join(BASE_DIR, "clock.json")  # {"format": "24h"|"12h"|"12h-ampm", "beat": bool, "world": bool, "large": bool, "cities": [...]}: the clock module's settings
 TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the Pi's own (Settings > About)
-LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness, colours, wire order, white balance
-LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs, editable from the page
-LED_GPIO = os.path.join(BASE_DIR, "led_gpio")        # output pin (10, 12, 18 or 21), likewise
-SPI_ADDED = os.path.join(BASE_DIR, "spi_added")      # the config.txt this add-on put dtparam=spi=on into (so it can take it out again)
-STATUS = "/tmp/dreampi-netswitch.active"
-STATE = "/tmp/dreampi-netswitch.state"
-MODEM = "/tmp/dreampi-netswitch.modem"
-DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
-# Wi-Fi setup (netswitch_buttons.py, install.sh --wifi); the buttons themselves are always installed
+# Wi-Fi setup (the wifi module, install.sh --wifi)
 WIFI_DEMO = os.path.join(BASE_DIR, "wifi_demo")        # exists = Wi-Fi setup runs on dummy networks (install.sh --wifi-demo)
-WIFI_START = os.path.join(BASE_DIR, "wifi_start")   # touched to ask netswitch_buttons.py to start
+WIFI_START = os.path.join(BASE_DIR, "wifi_start")   # touched to ask the Wi-Fi service to start
 WIFI_STOP = os.path.join(BASE_DIR, "wifi_stop")     # touched to ask it to stop / cancel
 WIFI_CONNECT = os.path.join(BASE_DIR, "wifi_connect")   # {"ssid":..., "password":...}, an alternative
                                                          # to the setup access point's own /connect -
                                                          # lets the regular page pick a network too,
                                                          # useful when it's reachable some other way
                                                          # (e.g. Ethernet) while Wi-Fi is being set up
-WIFI_STATE = "/tmp/dreampi-netswitch.wifi"          # written by netswitch_buttons.py
+WIFI_STATE = "/tmp/dreampi-netswitch.wifi"          # written by the Wi-Fi service
 WIFI_STALE = 30       # ignore WIFI_STATE when older than this (the service is down)
-WIFI_AP_SSID = "DreamPi WiFi Config"
-NET_STATE = "/tmp/dreampi-netswitch.net"   # shared with the LED service
-NET_STALE = 20        # ignore NET_STATE when older than this (web service down)
-POKE_PREFIX = "/tmp/dreampi-netswitch.poke."   # poke(name): "measure it again now", see poke()
-PLAYERS_WATCH = "/tmp/dreampi-netswitch.players"   # {"time", "games": [favourite games being played], "friends": [favourite players online]}, written by the players module for the LEDs
-PLAYERS_WATCH_STALE = 300     # ignore it when older than this (web service down / list not reachable)
+WIFI_AP_SSID = "CheckIn WiFi Config"
 
 
 # ------------------------------------------------------------------ modules
@@ -73,12 +46,12 @@ PLAYERS_WATCH_STALE = 300     # ignore it when older than this (web service down
 #   "description"  the text under it in the picker
 #   "enabled"      on by default when it is first loaded           (older files: "default"); the picker's own choice
 #                  (modules.json) overrides it
-#   "visible"      false = not in the picker and always on (the network switcher, say)   (default true)
+#   "visible"      false = not in the picker and always on (the system / About module, say)   (default true)
 #   optional: "web" (Python entry for the web service), "ui" (page kit version), "order" (where it starts out in the
 #   list), "colours" / "primary" (see the colour section below)
 # A module is *installed* when its folder is there and *enabled* when it is on in the picker. Its place in the picker
 # (module_order.json) is its priority: the first one shows first and wins where two modules want the same thing.
-# Everything that has to know - the web page, the LED service, the buttons service - asks here.
+# Everything that has to know - the web service and the services of the modules - asks here.
 MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules")
 MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"led": true, "wifi": false, ...} set from the module picker
 
@@ -118,40 +91,6 @@ def module_visible(name, manifest=None):
 
 def module_default_enabled(manifest):
     return bool(manifest.get("enabled", manifest.get("default", True)))
-
-
-def module_actions():
-    """The actions the enabled modules announce (module.json "actions": [{"id", "label", "sub"}]), in picker order, as
-    [{"value": "<module>.<id>", "label", "sub", "group": <the module's title>}]. A module's hook file does them inside DreamPi
-    (see netswitch_hook.py); the phone numbers module offers them in its rows."""
-    out, state = [], modules_state()
-    for name in module_names():
-        manifest = module_manifest(name) or {}
-        if not module_enabled(name, state):
-            continue
-        for a in manifest.get("actions") or []:
-            if isinstance(a, dict) and re.match(r"^[a-z][a-z0-9_]*$", str(a.get("id") or "")):
-                out.append({"value": "%s.%s" % (name, a["id"]), "label": str(a.get("label") or a["id"]),
-                            "sub": str(a.get("sub") or ""), "group": module_title(name, manifest)})
-    return out
-
-
-def module_led_messages():
-    """The messages the enabled modules announce for the LEDs (module.json "led_messages": [{"id", "label", "group", "description"}]),
-    in picker order, as [{"key", "label", "group", "description", "module"}]. The LED module lists them as the triggers a row can
-    have; a message of a module that is off is not offered and never lights. The first module to announce a key owns it."""
-    out, seen, state = [], set(), modules_state()
-    for name in module_names():
-        manifest = module_manifest(name) or {}
-        if not module_enabled(name, state):
-            continue
-        for m in manifest.get("led_messages") or []:
-            key = str((m or {}).get("id") or "") if isinstance(m, dict) else ""
-            if re.match(r"^[a-z][a-z0-9-]*$", key) and key not in seen:
-                seen.add(key)
-                out.append({"key": key, "label": str(m.get("label") or key), "group": str(m.get("group") or module_title(name, manifest)),
-                            "description": str(m.get("description") or ""), "module": name})
-    return out
 
 
 def saved_module_order():
@@ -225,45 +164,14 @@ def save_module_enabled(name, on):
     return True
 
 
-def wifi_enabled():
-    """Wi-Fi setup module installed and on (the buttons and the Wi-Fi service ask)."""
-    return module_enabled("wifi")
-
-
-def reset_network_after_boot():
-    """DCNow! is the selected network after every reboot: the first service that starts in a boot (web page or
-    buttons) removes dcnet_mode; later calls in the same boot, and restarts of a service, leave the selection alone (so does
-    the first run after an install).
-    Uses the kernel's boot id, not the clock, because a Pi without a clock has a wrong time at boot."""
-    try:
-        with open(KERNEL_BOOT_ID) as f:
-            now = f.read().strip()
-    except (IOError, OSError):
-        return False
-    before = read_file(BOOT_ID)
-    if not now or before == now:
-        return False
-    try:
-        if before is not None and os.path.exists(FLAG):     # no record yet = the add-on was just installed: keep the selection
-            os.remove(FLAG)
-        with open(BOOT_ID, "w") as f:
-            f.write(now + "\n")
-    except OSError:
-        return False
-    if before is not None:
-        debug_log("new boot: DCNow! selected")
-    return before is not None
-
-
 # ---------------------------------------------------------------- colours
 # The page's colours: one global palette of 16 named colours (8 hues, each normal and bright, like a terminal's 16),
 # defined only here. A module never writes a colour of its own; it names one from the palette by its id ("orange",
-# "bright-blue" ...), either in module.json  "colours": {"dcnow": "orange", ...}  (the user can change these in the
+# "bright-blue" ...), either in module.json  "colours": {"checkin": "green", ...}  (the user can change these in the
 # module's own settings, see module_colour()) or as its  "primary"  colour, the one used on its borders and buttons.
 # id, name, hue group, page colour, its lighter variant (borders, text), LED colour (the LED's own tuning: a screen
-# colour looks different lit on a NeoPixel).
-# Two of the 16 are not fixed colours: "global" (Global main, one colour the user picks in Appearance, for boxes that should
-# share it) and "network" (Selected network: whichever colour DCNow! or DCNET has right now, it follows the switch).
+# colour looks different lit on a strip of LEDs; no module uses it at the moment).
+# "global" is not a fixed colour: Global main, one colour the user picks in Appearance, for boxes that should share it.
 PALETTE = (
     ("global", "Global main", "global", "#6f7d99", "#b0b7c7", "#8090ff"),
     ("red", "Red", "red", "#d9363e", "#ef8a8f", "#ff0000"),
@@ -273,7 +181,7 @@ PALETTE = (
     ("cyan", "Cyan", "cyan", "#1fb5c9", "#7fdbe6", "#00c8ff"),
     ("blue", "Blue", "blue", "#1c6fe8", "#80b1f6", "#0046ff"),
     ("purple", "Purple", "purple", "#8a4fd6", "#bf9ae8", "#aa00ff"),
-    ("network", "Selected network", "network", "#e8761c", "#f6b27a", "#ff8c00"),
+    ("teal", "Teal", "cyan", "#17a398", "#7fd9d0", "#00d0a0"),
     ("white", "White", "white", "#b8bec9", "#e6e9ee", "#ffffff"),
     ("bright-red", "Bright red", "red", "#ff5a5f", "#ffa6a9", "#ff5050"),
     ("bright-green", "Bright green", "green", "#4cd964", "#a6efb6", "#50ff70"),
@@ -286,13 +194,6 @@ PALETTE_IDS = tuple(c[0] for c in PALETTE)
 # colours that were in the palette once: what a saved choice of them becomes
 LEGACY_COLOURS = {"bright-orange": "orange", "bright-yellow": "yellow", "pink": "bright-pink"}
 DEFAULT_COLOUR = "orange"
-# The switcher's two network colours (module.json "colours" keys "dcnow" / "dcnet"). Only these are real colours (never "Selected
-# network", which would be a circle) and, with "colours_unique", never the same; the module's other colour keys are free.
-NETWORKS = ("dcnow", "dcnet")
-
-
-def _network_key(name, key):
-    return name == "switcher" and key in NETWORKS
 
 
 _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -316,7 +217,7 @@ def palette_overrides():
         return {}
     out = {}
     for ident, v in (data.items() if isinstance(data, dict) else []):
-        if ident in PALETTE_IDS and ident != "network" and isinstance(v, dict):
+        if ident in PALETTE_IDS and isinstance(v, dict):
             keep = dict((k, str(v[k]).lower()) for k in ("ui", "led") if isinstance(v.get(k), _STR) and _HEX.match(v[k]))
             if keep:
                 out[ident] = keep
@@ -331,20 +232,13 @@ def colours():
         ui = o.get("ui", c[3])
         out.append({"id": c[0], "name": c[1], "group": c[2], "ui": ui, "ui_l": lighter(ui) if "ui" in o else c[4],
                     "led": o.get("led", c[5]), "ui_default": c[3], "led_default": c[5]})
-    # "Selected network" is the colour of the selected network, as it is now (the network switcher's pick for it)
-    sel = "dcnet" if os.path.exists(FLAG) else "dcnow"
-    pick = module_colours("switcher").get(sel) or {"dcnow": "orange", "dcnet": "blue"}[sel]
-    base = [c for c in out if c["id"] == (pick if pick != "network" else DEFAULT_COLOUR)][0]
-    for i, c in enumerate(out):
-        if c["id"] == "network":
-            out[i] = dict(base, id="network", name=c["name"], group="network", ui_default=base["ui"], led_default=base["led"])
     return out
 
 
 def set_palette_colour(ident, ui=None, led=None):
     """Change a palette colour on screen (ui) and / or on the LED (led), "#rrggbb". A value equal to the default is not kept.
     Returns False for an unknown id or a value that is not a colour."""
-    if ident not in PALETTE_IDS or ident == "network" or any(v is not None and not (isinstance(v, _STR) and _HEX.match(v)) for v in (ui, led)):
+    if ident not in PALETTE_IDS or any(v is not None and not (isinstance(v, _STR) and _HEX.match(v)) for v in (ui, led)):
         return False
     base = [c for c in PALETTE if c[0] == ident][0]
     over = palette_overrides()
@@ -419,9 +313,8 @@ def module_colours(name):
     wanted = manifest.get("colours")
     if not isinstance(wanted, dict):
         return {}
-    def ok(k, v):       # the network colours cannot be "the selected network's" (that would be a circle)
-        v = LEGACY_COLOURS.get(v, v)
-        return v in PALETTE_IDS and not (_network_key(name, k) and v == "network")
+    def ok(k, v):
+        return LEGACY_COLOURS.get(v, v) in PALETTE_IDS
     out = dict((k, LEGACY_COLOURS.get(v, v) if ok(k, v) else DEFAULT_COLOUR) for k, v in wanted.items())
     mine = _saved_module_colours().get(name)
     if isinstance(mine, dict):
@@ -429,15 +322,14 @@ def module_colours(name):
             if ok(k, mine.get(k)):
                 out[k] = LEGACY_COLOURS.get(mine[k], mine[k])
     if manifest.get("colours_unique"):
-        uniq = [k for k in out if _network_key(name, k)] or list(out)
-        if len(set(out[k] for k in uniq)) < len(uniq):
-            for k in uniq:
+        if len(set(out.values())) < len(out):
+            for k in out:
                 out[k] = LEGACY_COLOURS.get(wanted[k], wanted[k]) if ok(k, wanted[k]) else DEFAULT_COLOUR
     return out
 
 
 # ---- highlight: a module can ask for one of its dashboard boxes to stand out for a while (an event starts soon, say): /api
-# "highlight" {box id: why}. A grey box (the Dreamcast background) turns its own colour; a coloured box takes the highlight look
+# "highlight" {box id: why}. A neutral box turns its own colour; a coloured box takes the highlight look
 # set here, the same for every module: an animated rainbow edge or one palette colour that glows.
 HIGHLIGHT_STYLES = ("rainbow",) + PALETTE_IDS
 DEFAULT_HIGHLIGHT = "rainbow"
@@ -465,12 +357,11 @@ def set_module_colour(name, key, ident):
     module, key or colour is unknown."""
     cur = module_colours(name)
     ident = LEGACY_COLOURS.get(ident, ident)
-    if key not in cur or ident not in PALETTE_IDS or (_network_key(name, key) and ident == "network"):
+    if key not in cur or ident not in PALETTE_IDS:
         return None
     if (module_manifest(name) or {}).get("colours_unique"):
-        uniq = [k for k in cur if _network_key(name, k)] or list(cur)
         for k, v in list(cur.items()):
-            if k != key and v == ident and key in uniq and k in uniq:
+            if k != key and v == ident:
                 cur[k] = cur[key]
     cur[key] = ident
     data = _saved_module_colours()
@@ -485,7 +376,7 @@ def set_module_colour(name, key, ident):
 def module_tints(name):
     """{colour key: True | False} for a module: whether the background of what has that colour is highlighted, i.e. coloured (True) or
     neutral (False). The default is the module's manifest "tints" ({"clock": false}); anything it does not name is highlighted
-    (the network buttons and similar buttons), the boxes on the main page start neutral."""
+    (the buttons and similar), the boxes on the main page start neutral."""
     manifest = module_manifest(name) or {}
     defaults = manifest.get("tints") if isinstance(manifest.get("tints"), dict) else {}
     try:
@@ -547,15 +438,12 @@ def save_time_zone(value):
     return value
 
 
-def network_colour(net):
-    """The palette entry (dict: id, name, group, ui, ui_l, led) the network switcher gave "dcnow" or "dcnet". The LED
-    service and the page's status dot ask for the network colours here; without the switcher module they are orange
-    and blue."""
-    ident = module_colours("switcher").get(net) or {"dcnow": "orange", "dcnet": "blue"}.get(net, DEFAULT_COLOUR)
-    return colour(ident)
-
-
 # ---------------------------------------------------------------- file state
+
+def log(text):
+    """A line in the service's log (journalctl -u dreampi-netswitch)."""
+    sys.stderr.write(text.rstrip("\n") + "\n")
+
 
 def read_file(path):
     try:
@@ -565,160 +453,12 @@ def read_file(path):
         return None
 
 
-def hook_problem():
-    """None when DreamPi is running with the hook loaded, else a reason."""
-    status = read_file(STATUS)
-    if status is None:
-        return "DreamPi has not loaded the add-on yet (restart DreamPi or reboot)"
-    if not status.startswith("active"):
-        return status
-    m = re.search(r"pid=(\d+)", status)
-    if m and not os.path.exists("/proc/" + m.group(1)):
-        return "DreamPi is not running"
-    return None
 
 
-def _dcnet_check():
-    """(code, reason): (None, None) when DreamPi's DCNET support is switched on, else why not: code "noupdates" (/boot/noautoupdates.txt
-    exists), "config" (netlink_config.ini is not found) or "disabled" ([DCNet] enabled = yes is missing)."""
-    if os.path.exists("/boot/noautoupdates.txt"):
-        return "noupdates", ("/boot/noautoupdates.txt exists, so DreamPi skips netlink_config.ini "
-                             "and DCNET stays off")
-    for path in ("/boot/netlink_config.ini", "/home/pi/dreampi/netlink_config.ini"):
-        if os.path.isfile(path):
-            break
-    else:
-        return "config", "netlink_config.ini not found, so DCNET is off"
-    text = read_file(path) or ""
-    section = re.search(r"^\[DCNet\](.*?)(?=^\[|\Z)", text, re.M | re.S)
-    if not section or not re.search(r"^\s*enabled\s*=\s*yes\s*$", section.group(1), re.M):
-        return "disabled", "DCNET is not enabled in " + path + " ([DCNet] enabled = yes)"
-    return None, None
-
-
-def dcnet_problem():
-    """None when DreamPi's DCNET support is switched on, else a reason."""
-    return _dcnet_check()[1]
-
-
-def dcnet_code():
-    """"ok" when DreamPi's DCNET support is switched on, else a short code for why not (see _dcnet_check()), "inactive" when DreamPi is
-    not running the add-on (nothing is being switched then). openMenu gets it in the DCNET line of the poll."""
-    if hook_problem():
-        return "inactive"
-    return _dcnet_check()[0] or "ok"
-
-
-# The short tag served at GET /tag for openMenu (docs/openmenu.md): which network this
-# DreamPi is running. openMenu keeps its own list of what each code means; the texts
-# here are only a suggestion and what /tag?text returns.
-TAGS = (("DCNET", "Running DCNet!"), ("DCNOW", "Running DCNow!"),
-        ("DCNET_OFF", "DCNet is selected but not available"), ("INACTIVE", ""))
-
-
-def tag():
-    """One of the codes in TAGS for the current state of this DreamPi."""
-    if hook_problem():
-        return "INACTIVE"          # DreamPi isn't running the add-on: nothing is being switched
-    if os.path.exists(FLAG):
-        return "DCNET_OFF" if dcnet_problem() else "DCNET"
-    return "DCNOW"
-
-
-def dreampi_state():
-    """(state, text) for what DreamPi is doing right now."""
-    if hook_problem() == "DreamPi is not running":
-        return "off", "Not running"
-    parts = (read_file(STATE) or "").split()
-    if len(parts) < 2:
-        return "unknown", "State unknown"
-    state = " ".join(parts[:-1])
-    if state == "starting":
-        return "busy", "Starting up, not answering calls yet"
-    if state == "ready":
-        return "ok", "Ready for calls"
-    if state.startswith("call "):
-        kind = state[5:]
-        net = {"dcnow": "DCNow!", "dcnet": "DCNET"}.get(kind, kind)
-        return ("call-" + kind if kind in ("dcnow", "dcnet") else "call"), "In a call: " + net
-    return "unknown", "State unknown"
-
-
-def modem_state():
-    """(text, unix time) of the latest modem event DreamPi logged."""
-    if hook_problem() == "DreamPi is not running":
-        return "DreamPi not running", 0
-    raw = read_file(MODEM)
-    if not raw or " " not in raw:
-        return "Unknown", 0
-    since, text = raw.split(" ", 1)
-    try:
-        return text, int(since)
-    except ValueError:
-        return text, 0
-
-
-def debug_log(text):
-    """Add a line to the debug timeline (same format as the hook)."""
-    if not os.path.exists(DEBUG_DTMF) or not module_enabled("debuglog"):
-        return
-    try:
-        now = time.time()
-        with open(DTMF_LOG, "a") as f:
-            f.write("%s.%03d %9s  %s\n" % (time.strftime("%H:%M:%S", time.localtime(now)),
-                                          int(now * 1000) % 1000, "", text))
-    except IOError:
-        pass
-
-
-LOG_MAX = 1000000     # the debug log is trimmed to its newest LOG_KEEP bytes
-LOG_KEEP = 500000     # when it grows past LOG_MAX
-
-
-def trim_log():
-    """Keep the debug log from growing without limit while recording.
-    The hook opens the file for every line, so replacing it is safe."""
-    try:
-        if os.path.getsize(DTMF_LOG) <= LOG_MAX:
-            return
-        with open(DTMF_LOG, "rb") as f:
-            f.seek(-LOG_KEEP, 2)
-            data = f.read()
-        data = data[data.find(b"\n") + 1:]      # start at a whole line
-        tmp = DTMF_LOG + ".tmp"
-        with open(tmp, "wb") as f:
-            f.write(data)
-        os.rename(tmp, DTMF_LOG)
-    except (IOError, OSError):
-        pass
-
-
-def network_state():
-    """Latest link + internet state written by the web service, or None."""
-    try:
-        with open(NET_STATE) as f:
-            data = json.load(f)
-        if time.time() - data.get("time", 0) > NET_STALE:
-            return None
-        return data
-    except (IOError, OSError, ValueError):
-        return None
-
-
-def players_watch():
-    """{"games": [...], "friends": [...]} of favourites that are online now, written by the players module; empty when stale."""
-    try:
-        with open(PLAYERS_WATCH) as f:
-            data = json.load(f)
-        if time.time() - data.get("time", 0) > PLAYERS_WATCH_STALE:
-            return {"games": [], "friends": []}
-        return {"games": list(data.get("games") or []), "friends": list(data.get("friends") or [])}
-    except (IOError, OSError, ValueError, AttributeError, TypeError):
-        return {"games": [], "friends": []}
 
 
 def wifi_state():
-    """Latest Wi-Fi setup state written by netswitch_buttons.py: state (idle /
+    """Latest Wi-Fi setup state written by the Wi-Fi service: state (idle /
     scanning / hosting / connecting / ok / failed), ssid, networks (scan
     results while hosting) and time. {"state": "idle"} when the service
     hasn't run yet, or hasn't updated the file in a while (it isn't
@@ -735,7 +475,7 @@ def wifi_state():
 
 def update_status():
     """running / ok / failed, or idle. A finished result is only reported for 10 minutes, so an old update isn't
-    announced for ever (the update module and the LEDs both ask)."""
+    announced for ever."""
     text = (read_file(UPDATE_STATUS) or "").strip()
     if text not in ("running", "ok", "failed"):
         return "idle"
@@ -745,199 +485,3 @@ def update_status():
     except OSError:
         return "idle"
     return text
-
-
-def write_update_info(addon, dreampi):
-    """The update module tells the LEDs what its latest check found (addon: True = a newer add-on exists)."""
-    tmp = UPDATE_INFO + ".tmp"
-    try:
-        with open(tmp, "w") as f:
-            json.dump({"addon": addon, "dreampi": bool(dreampi), "time": time.time()}, f)
-        os.rename(tmp, UPDATE_INFO)
-    except (IOError, OSError):
-        pass
-
-
-def update_info():
-    """{"addon": bool|None, "dreampi": bool} from the latest manual check, {} when there is none (the file is in /tmp: a reboot clears
-    it). Nothing checks for updates by itself, so the answer is kept until the next check."""
-    try:
-        with open(UPDATE_INFO) as f:
-            data = json.load(f)
-        return data
-    except (IOError, OSError, ValueError, AttributeError):
-        return {}
-
-
-def event_reminder(now=None):
-    """The reminded DC99 event that is due now, or None: {"id", "title", "start"}. The events module writes EVENT_REMINDERS
-    ({"lead": minutes before, "after": minutes after the start, "items": [{"id", "title", "start"}], "dismissed": [ids]}) whenever
-    it changes, so the LEDs know without the page being open. Due = from lead minutes before the start until after minutes after it."""
-    now = time.time() if now is None else now
-    try:
-        with open(EVENT_REMINDERS) as f:
-            data = json.load(f)
-        lead, after = float(data.get("lead", 15)) * 60, float(data.get("after", 10)) * 60
-        gone = set(data.get("dismissed") or [])
-        due = [i for i in data.get("items") or [] if i.get("id") not in gone and i["start"] - lead <= now < i["start"] + after]
-    except (IOError, OSError, ValueError, AttributeError, KeyError, TypeError):
-        return None
-    return min(due, key=lambda i: i["start"]) if due else None
-
-
-def next_event(now=None):
-    """The soonest DC99 event that has not ended its reminder window yet, or None: {"id", "title", "start"}. The events module writes the
-    next few into EVENT_REMINDERS ("upcoming", soonest first) whenever it changes, so the openMenu answer needs no page and no events code."""
-    now = time.time() if now is None else now
-    try:
-        with open(EVENT_REMINDERS) as f:
-            data = json.load(f)
-        after = float(data.get("after", 10)) * 60
-        coming = [i for i in data.get("upcoming") or [] if i["start"] + after > now]
-    except (IOError, OSError, ValueError, AttributeError, KeyError, TypeError):
-        return None
-    return min(coming, key=lambda i: i["start"]) if coming else None
-
-
-def mark_reboot():
-    try:
-        with open(REBOOT_MARK, "w") as f:
-            f.write("%f" % time.time())
-    except (IOError, OSError):
-        pass
-
-
-def reboot_pending():
-    """True for a minute after a reboot was asked for (the Pi is about to go down)."""
-    try:
-        return time.time() - float(read_file(REBOOT_MARK) or "0") < 60
-    except ValueError:
-        return False
-
-
-def poke(name):
-    """Ask whoever measures `name` ("internet") to do it again now instead of when its timer runs out. Works from any process: the
-    message is a file that is replaced (a new inode), and the receiver looks at poke_stamp() often, which costs next to nothing."""
-    path = POKE_PREFIX + re.sub(r"[^a-z0-9_]", "", str(name).lower())
-    tmp = path + ".tmp%d" % os.getpid()
-    try:
-        with open(tmp, "w") as f:
-            f.write("%f" % time.time())
-        os.rename(tmp, path)
-    except (IOError, OSError):
-        pass
-
-
-def poke_stamp(name):
-    """Changes every time poke(name) is called (None before the first)."""
-    try:
-        st = os.stat(POKE_PREFIX + re.sub(r"[^a-z0-9_]", "", str(name).lower()))
-        return (st.st_mtime, st.st_ino)
-    except OSError:
-        return None
-
-
-def _write_net_state(data):
-    tmp = NET_STATE + ".tmp"
-    try:
-        with open(tmp, "w") as f:
-            json.dump(data, f)
-        os.rename(tmp, NET_STATE)
-    except (IOError, OSError):
-        pass
-
-
-# ------------------------------------------------------------------ buttons
-# Up to two physical GPIO buttons (netswitch_buttons.py, always installed),
-# each independently wired to a pin and a short-press function; which one
-# (or both held together) triggers Wi-Fi setup on a 3-second hold is also
-# configurable. Unlike the LED output pins, a button needs no special
-# peripheral, so any header GPIO is allowed.
-BUTTON1_GPIO = os.path.join(BASE_DIR, "button1_gpio")
-BUTTON2_GPIO = os.path.join(BASE_DIR, "button2_gpio")
-BUTTON1_FUNCTION = os.path.join(BASE_DIR, "button1_function")
-BUTTON2_FUNCTION = os.path.join(BASE_DIR, "button2_function")
-WIFI_BUTTON_FILE = os.path.join(BASE_DIR, "wifi_button")   # "1", "2" or "12": which button(s) hold-to-start Wi-Fi setup
-
-BUTTON_GPIO_PINS = tuple(range(2, 28))   # BCM GPIO2-27 (0/1 are reserved for the ID EEPROM)
-BUTTON_DEFAULT_GPIO1 = 17
-BUTTON_DEFAULT_GPIO2 = 4
-# What a button does. Push buttons act on a short press. A toggle switch is wired
-# between the pin and GND and acts on its position: closed (pin low) = "on",
-# open = "off"; the position is also applied once at start.
-# (name, label, group, needs Wi-Fi setup installed, the line under the button's row on the page; "{pin}" becomes "GPIO17" for its pin)
-BUTTON_FUNCTIONS = (
-    ("off", "Off", "Push button", False, "{pin} is not used"),
-    ("toggle", "Toggle network", "Push button", False, "{pin} toggles DCNow! and DCNET"),
-    ("dcnow", "Select DCNow!", "Push button", False, "{pin} selects DCNow!"),
-    ("dcnet", "Select DCNET", "Push button", False, "{pin} selects DCNET"),
-    ("sw_dcnet", "On = DCNET", "Toggle switch", False, "{pin} closed: DCNET, open: DCNow!"),
-    ("sw_dcnow", "On = DCNow!", "Toggle switch", False, "{pin} closed: DCNow!, open: DCNET"),
-    ("sw_wifi", "On = Wi-Fi setup", "Toggle switch", True, "{pin} closed: Wi-Fi setup, open: normal mode"),
-    ("sw_wifi_off", "Off = Wi-Fi setup", "Toggle switch", True, "{pin} open: Wi-Fi setup, closed: normal mode"),
-)
-_BUTTON_FUNCTION_NAMES = tuple(f[0] for f in BUTTON_FUNCTIONS)
-BUTTON_DEFAULT_FUNCTION1 = "toggle"
-BUTTON_DEFAULT_FUNCTION2 = "off"
-WIFI_BUTTON_CHOICES = (("1", "Button 1"), ("2", "Button 2"), ("12", "Button 1 + 2"))
-_WIFI_BUTTON_NAMES = tuple(c[0] for c in WIFI_BUTTON_CHOICES)
-WIFI_BUTTON_DEFAULT = "1"
-
-
-def button_gpio(which):
-    """which: 1 or 2."""
-    path = BUTTON1_GPIO if which == 1 else BUTTON2_GPIO
-    default = BUTTON_DEFAULT_GPIO1 if which == 1 else BUTTON_DEFAULT_GPIO2
-    try:
-        n = int((read_file(path) or "").strip())
-        return n if n in BUTTON_GPIO_PINS else default
-    except ValueError:
-        return default
-
-
-def save_button_gpio(which, n):
-    try:
-        n = int(n)
-    except (TypeError, ValueError):
-        return
-    if n not in BUTTON_GPIO_PINS:
-        return
-    path = BUTTON1_GPIO if which == 1 else BUTTON2_GPIO
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        f.write(str(n))
-    os.rename(tmp, path)
-
-
-def button_function(which):
-    path = BUTTON1_FUNCTION if which == 1 else BUTTON2_FUNCTION
-    default = BUTTON_DEFAULT_FUNCTION1 if which == 1 else BUTTON_DEFAULT_FUNCTION2
-    v = (read_file(path) or "").strip()
-    return v if v in _BUTTON_FUNCTION_NAMES else default
-
-
-def save_button_function(which, v):
-    if v not in _BUTTON_FUNCTION_NAMES:
-        return
-    path = BUTTON1_FUNCTION if which == 1 else BUTTON2_FUNCTION
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        f.write(v)
-    os.rename(tmp, path)
-
-
-def wifi_button():
-    v = (read_file(WIFI_BUTTON_FILE) or "").strip()
-    return v if v in _WIFI_BUTTON_NAMES else WIFI_BUTTON_DEFAULT
-
-
-def save_wifi_button(v):
-    if v not in _WIFI_BUTTON_NAMES:
-        return
-    tmp = WIFI_BUTTON_FILE + ".tmp"
-    with open(tmp, "w") as f:
-        f.write(v)
-    os.rename(tmp, WIFI_BUTTON_FILE)
-
-
-WB_TEST = "/tmp/dreampi-netswitch.wbtest"   # unix time, touched while the white-balance test is on

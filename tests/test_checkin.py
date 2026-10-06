@@ -1,0 +1,269 @@
+"""The contacts module (CSV import) and the check-in board (who is in, statuses, colours, the same state for every screen)."""
+import json
+import os
+import threading
+import unittest
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+from support import web, core, sandbox, cleanup
+import netswitch_contacts as contacts
+import netswitch_checkin as checkin
+
+CSV = u"""# a comment line
+name,department,role,phone,location,restrictToLocation
+Anna Svensson,Kök,Kökschef,070-1,Område A,
+Erik Lindqvist,Kök,Kock,,Område A,
+Maja Berg,Servering,,,Område B,x
+Ola Nordin,,Chef,,,
+"""
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self.tmp = sandbox()
+
+    def tearDown(self):
+        cleanup(self.tmp)
+
+    def people(self):
+        return dict((p["name"], p) for g in checkin.snapshot()["groups"] for p in g["people"])
+
+
+class ImportTests(Base):
+    def test_a_csv_makes_people_and_a_second_import_changes_nothing(self):
+        r = contacts.import_csv(CSV)
+        self.assertEqual((r["added"], r["changed"], r["unchanged"], r["skipped"]), (4, 0, 0, 0))
+        again = contacts.import_csv(CSV)
+        self.assertEqual((again["added"], again["changed"], again["unchanged"]), (0, 0, 4))
+        self.assertEqual(len(contacts.read()["people"]), 4)
+
+    def test_a_person_without_a_department_gets_a_name_for_it(self):
+        contacts.import_csv(CSV)
+        ola = [p for p in contacts.read()["people"] if p["name"] == "Ola Nordin"][0]
+        self.assertEqual(ola["department"], contacts.NO_DEPARTMENT)
+
+    def test_the_restrict_flag_and_changed_rows(self):
+        contacts.import_csv(CSV)
+        maja = [p for p in contacts.read()["people"] if p["name"] == "Maja Berg"][0]
+        self.assertTrue(maja["restrictToLocation"])
+        r = contacts.import_csv(CSV.replace("Kökschef", "Chef kök"))
+        self.assertEqual((r["added"], r["changed"], r["unchanged"]), (0, 1, 3))
+
+    def test_a_reimport_keeps_who_is_in(self):
+        contacts.import_csv(CSV)
+        anna = self.people()["Anna Svensson"]["id"]
+        checkin.toggle(anna)
+        contacts.import_csv(CSV.replace("Kökschef", "Chef kök"))
+        self.assertTrue(self.people()["Anna Svensson"]["in"])
+
+    def test_replace_switches_off_people_that_are_not_in_the_file(self):
+        contacts.import_csv(CSV)
+        r = contacts.import_csv(u"name,department,location\nAnna Svensson,Kök,Område A\n", replace=True)
+        self.assertEqual(r["deactivated"], 3)
+        self.assertEqual(sorted(self.people()), ["Anna Svensson"])          # the others are gone from the board, but still on file
+        self.assertEqual(len(contacts.read()["people"]), 4)
+
+    def test_delimiters_swedish_headers_and_bad_files(self):
+        r = contacts.import_csv(u"namn;avdelning;telefon\nSara Ek;Lager;123\n")
+        self.assertEqual(r["added"], 1)
+        p = contacts.read()["people"][0]
+        self.assertEqual((p["name"], p["department"], p["phone"]), ("Sara Ek", "Lager", "123"))
+        with self.assertRaises(ValueError):
+            contacts.import_csv(u"foo,bar\n1,2\n")
+        self.assertEqual(contacts.import_csv(u"")["added"], 0)
+
+    def test_the_view_counts_and_the_export_round_trips(self):
+        contacts.import_csv(CSV)
+        v = contacts.view()
+        self.assertEqual(v["count"], 4)
+        self.assertIn("4 people in 3 departments and 2 buildings", v["text"])
+        out = contacts.export_csv()
+        self.assertTrue(out.startswith("name,department,role,phone,location,restrictToLocation"))
+        os.remove(core.CONTACTS)
+        self.assertEqual(contacts.import_csv(out)["added"], 4)
+
+
+class BoardTests(Base):
+    def setUp(self):
+        Base.setUp(self)
+        contacts.import_csv(CSV)
+
+    def test_everyone_starts_out_and_grey(self):
+        snap = checkin.snapshot()
+        self.assertEqual((snap["total"], snap["in"]), (4, 0))
+        self.assertEqual([g["title"] for g in snap["groups"]], ["Kök", "No department", "Servering"])
+        for p in self.people().values():
+            self.assertEqual((p["in"], p["colour"], p["state"]), (False, "", "Out"))
+
+    def test_a_tap_switches_in_and_out_and_the_colour_follows_the_department(self):
+        anna, erik = self.people()["Anna Svensson"], self.people()["Erik Lindqvist"]
+        checkin.toggle(anna["id"])
+        a = self.people()["Anna Svensson"]
+        self.assertTrue(a["in"])
+        self.assertIn(a["colour"], core.PALETTE_IDS)
+        checkin.toggle(erik["id"])
+        self.assertEqual(self.people()["Erik Lindqvist"]["colour"], a["colour"])        # same department, same colour
+        checkin.toggle(anna["id"])
+        self.assertEqual(self.people()["Anna Svensson"]["colour"], "")
+        self.assertEqual(checkin.snapshot()["in"], 1)
+
+    def test_colour_by_building_and_own_picks(self):
+        checkin.save_config({"colour_by": "building"})
+        for n in ("Anna Svensson", "Erik Lindqvist", "Maja Berg"):
+            checkin.toggle(self.people()[n]["id"])
+        got = self.people()
+        self.assertEqual(got["Anna Svensson"]["colour"], got["Erik Lindqvist"]["colour"])       # both in Område A
+        self.assertNotEqual(got["Anna Svensson"]["colour"], got["Maja Berg"]["colour"])
+        checkin.set_group_colour("building", "Område B", "purple")
+        self.assertEqual(self.people()["Maja Berg"]["colour"], "purple")
+        checkin.set_group_colour("building", "Område B", "")                                    # back to the automatic one
+        self.assertNotEqual(self.people()["Maja Berg"]["colour"], "purple")
+        self.assertIsNone(checkin.set_group_colour("building", "Område B", "network"))          # not a palette colour
+        self.assertIsNone(checkin.set_group_colour("floor", "x", "red"))
+
+    def test_grouping_by_building(self):
+        checkin.save_config({"group_by": "building"})
+        self.assertEqual([g["title"] for g in checkin.snapshot()["groups"]], ["No building", "Område A", "Område B"])
+
+    def test_a_status_takes_its_colour_and_name_and_checks_out(self):
+        anna = self.people()["Anna Svensson"]["id"]
+        checkin.toggle(anna)
+        checkin.set_status(anna, "SICK")
+        a = self.people()["Anna Svensson"]
+        self.assertEqual((a["status"], a["text"], a["colour"], a["in"], a["state"]), ("SICK", "Sjuk", "red", False, "Status"))
+        checkin.set_status(anna, "FYS")                      # a neutral status keeps in / out
+        checkin.set_status(anna, "IN")
+        self.assertEqual((self.people()["Anna Svensson"]["status"], self.people()["Anna Svensson"]["in"]), ("", True))
+
+    def test_statuses_that_need_a_time_a_date_or_a_note(self):
+        anna = self.people()["Anna Svensson"]["id"]
+        checkin.set_status(anna, "LATE", "8:15")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "Kommer sent · 8:15")
+        checkin.set_status(anna, "LATE", "soon")             # not a time: the status' own default
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "Kommer sent · 07:30")
+        checkin.set_status(anna, "TRAVEL", "2026-12-24")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "Tjänsteresa · tillbaka 24/12")
+        checkin.set_status(anna, "OTHER", "  Dentist   at   3 ")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "Annat · Dentist at 3")
+        checkin.set_status(anna, "OTHER", "x" * 200)
+        self.assertEqual(len(self.people()["Anna Svensson"]["detail"]), checkin.DETAIL_MAX)
+
+    def test_a_tap_clears_a_status(self):
+        anna = self.people()["Anna Svensson"]["id"]
+        checkin.set_status(anna, "SICK")
+        checkin.toggle(anna)
+        a = self.people()["Anna Svensson"]
+        self.assertEqual((a["status"], a["in"]), ("", True))
+
+    def test_unknown_people_and_statuses_are_refused(self):
+        anna = self.people()["Anna Svensson"]["id"]
+        self.assertIsNone(checkin.toggle("nobody"))
+        self.assertIsNone(checkin.set_status("nobody", "SICK"))
+        self.assertIsNone(checkin.set_status(anna, "NOPE"))
+        self.assertEqual(checkin.snapshot()["in"], 0)
+
+    def test_all_in_and_all_out(self):
+        checkin.set_status(self.people()["Anna Svensson"]["id"], "SICK")
+        self.assertEqual(checkin.set_all(True)["in"], 4)
+        self.assertEqual(self.people()["Anna Svensson"]["status"], "")
+        self.assertEqual(checkin.set_all(False)["in"], 0)
+
+    def test_every_change_bumps_the_revision(self):
+        anna = self.people()["Anna Svensson"]["id"]
+        before = checkin.snapshot()["rev"]
+        checkin.toggle(anna)
+        self.assertEqual(int(checkin.snapshot()["rev"].split(".")[0]), int(before.split(".")[0]) + 1)
+
+    def test_an_import_changes_the_revision_too(self):
+        before = checkin.snapshot()["rev"]
+        contacts.import_csv(u"name,department\nNy Person,Lager\n")
+        self.assertNotEqual(checkin.snapshot()["rev"], before)          # so every screen draws the new person
+
+    def test_default_statuses_use_only_palette_colours(self):
+        for s in checkin.statuses():
+            self.assertIn(s["colour"], core.PALETTE_IDS, s)
+        self.assertGreaterEqual(len(checkin.statuses()), 10)
+
+    def test_a_damaged_state_file_starts_over(self):
+        with open(core.CHECKIN, "w") as f:
+            f.write("{oops")
+        self.assertEqual(checkin.snapshot()["in"], 0)
+        self.assertEqual(checkin.snapshot()["total"], 4)
+
+
+class HttpTests(Base):
+    """Two 'screens' (two clients) see the same board: a change made by one is in the other's next /api answer."""
+    def setUp(self):
+        Base.setUp(self)
+        contacts.import_csv(CSV)
+        self.srv = web.Server(("127.0.0.1", 0), web.Handler)
+        self.base = "http://127.0.0.1:%d" % self.srv.server_address[1]
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+
+    def tearDown(self):
+        self.srv.shutdown()
+        self.srv.server_close()
+        Base.tearDown(self)
+
+    def get(self, path):
+        return json.loads(urlopen(self.base + path, timeout=10).read().decode())
+
+    def post(self, path, body):
+        req = Request(self.base + path, data=json.dumps(body).encode(), method="POST",
+                      headers={"X-Requested-With": "x", "Content-Type": "application/json"})
+        return json.loads(urlopen(req, timeout=10).read().decode())
+
+    def test_the_api_carries_the_board_and_a_tap_shows_in_the_next_answer(self):
+        board = self.get("/api")["checkin"]
+        self.assertEqual(board["total"], 4)
+        anna = [p for g in board["groups"] for p in g["people"] if p["name"] == "Anna Svensson"][0]["id"]
+        r = self.post("/checkin/toggle", {"id": anna})
+        self.assertEqual(r["checkin"]["in"], 1)
+        after = self.get("/api")["checkin"]                  # what the other screen reads a second later
+        self.assertEqual((after["in"], after["rev"]), (1, r["checkin"]["rev"]))
+        self.post("/checkin/status", {"id": anna, "code": "VACATION", "detail": "2026-07-01"})
+        text = [p["text"] for g in self.get("/api")["checkin"]["groups"] for p in g["people"] if p["id"] == anna][0]
+        self.assertEqual(text, "Semester · tillbaka 1/7")
+
+    def test_bad_requests(self):
+        for path, body in (("/checkin/toggle", {"id": "nobody"}), ("/checkin/status", {"id": "x", "code": "SICK"}), ("/checkin/colour", {"kind": "floor", "name": "x"})):
+            with self.assertRaises(HTTPError) as e:
+                self.post(path, body)
+            self.assertEqual(e.exception.code, 400, path)
+        req = Request(self.base + "/checkin/toggle", data=b"{}", method="POST")          # not from the page
+        with self.assertRaises(HTTPError) as e:
+            urlopen(req, timeout=10)
+        self.assertEqual(e.exception.code, 403)
+
+    def test_settings_and_colour_endpoints(self):
+        r = self.get("/checkin/config")
+        self.assertEqual(r["values"], {"style": "buttons", "group_by": "department", "colour_by": "department"})
+        self.assertEqual([x["key"] for x in r["colours"]["department"]], ["Kök", "No department", "Servering"])
+        r = self.post("/checkin/config", {"values": {"style": "boxes", "colour_by": "building", "group_by": "nonsense"}})
+        self.assertEqual(r["values"], {"style": "boxes", "group_by": "department", "colour_by": "building"})
+        self.assertEqual(self.get("/api")["checkin"]["style"], "boxes")
+        r = self.post("/checkin/colour", {"kind": "department", "name": "Kök", "colour": "bright-pink"})
+        self.assertEqual([x for x in r["colours"]["department"] if x["key"] == "Kök"][0]["colour"], "bright-pink")
+
+    def test_import_over_http(self):
+        r = self.post("/contacts/import", {"csv": u"name,department\nNy Person,Lager\n"})
+        self.assertTrue(r["ok"])
+        self.assertIn("1 new", r["message"])
+        self.assertEqual(self.get("/contacts")["count"], 5)
+        with self.assertRaises(HTTPError) as e:
+            self.post("/contacts/import", {"csv": u"nothing useful"})
+        self.assertEqual(e.exception.code, 400)
+        self.assertIn("Ny Person", urlopen(self.base + "/contacts.csv", timeout=10).read().decode())
+
+    def test_the_board_works_with_the_contacts_module_off(self):
+        core.save_module_enabled("contacts", False)
+        web.refresh_page(force=True)
+        self.assertEqual(self.get("/api")["checkin"]["total"], 4)           # the roster stays; only its import box is gone
+        with self.assertRaises(HTTPError) as e:
+            self.get("/contacts")
+        self.assertEqual(e.exception.code, 404)
+
+
+if __name__ == "__main__":
+    unittest.main()

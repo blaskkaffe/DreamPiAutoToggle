@@ -1,0 +1,209 @@
+# Check-in add-on - the contacts module (web service side): the roster the check-in board is built from.
+# People come from a CSV file (the columns of CheckinChicken's people.csv: name, department, role, phone, location,
+# restrictToLocation; "location" is the building / area). Importing again updates people in place and never deletes anyone
+# (unless "replace" is asked for, which deactivates the ones that are not in the file). A person's id comes from
+# location + department + name, so their check-in state survives a re-import. The roster is core.CONTACTS; the check-in module
+# reads that file, this module is the only one that writes it. Runs in the web service (Python 3).
+import csv
+import hashlib
+import io
+import json
+import os
+import re
+import threading
+
+import netswitch_core as core
+
+MAX_BYTES = 1000000
+MAX_PEOPLE = 2000
+COLUMNS = ("name", "department", "role", "phone", "location", "restrictToLocation")
+ALIASES = {"namn": "name", "avdelning": "department", "roll": "role", "telefon": "phone", "omrade": "location", "område": "location",
+           "building": "location", "byggnad": "location", "restricttolocation": "restrictToLocation"}
+NO_DEPARTMENT = "No department"
+_lock = threading.Lock()
+
+
+def _slug(s):
+    s = str(s or "").strip().lower()
+    for a, b in (("å", "a"), ("ä", "a"), ("ö", "o")):
+        s = s.replace(a, b)
+    return re.sub(r"[^a-z0-9]+", "-", s).strip("-") or "x"
+
+
+def person_id(name, department, location):
+    key = "%s|%s|%s" % (_slug(location), _slug(department), _slug(name))
+    return "p" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:10]
+
+
+def _flag(s):
+    return str(s or "").strip().lower() in ("1", "true", "yes", "ja", "x")
+
+
+def read():
+    """{"people": [person]} as saved (an empty roster when there is none)."""
+    try:
+        with io.open(core.CONTACTS, encoding="utf-8") as f:
+            data = json.load(f)
+    except (IOError, OSError, ValueError):
+        data = None
+    people = data.get("people") if isinstance(data, dict) else None
+    return {"people": [p for p in (people or []) if isinstance(p, dict) and p.get("id") and p.get("name")]}
+
+
+def _write(data):
+    tmp = core.CONTACTS + ".tmp"
+    with io.open(tmp, "w", encoding="utf-8") as f:
+        f.write(json.dumps(data, ensure_ascii=False, indent=1))
+    os.rename(tmp, core.CONTACTS)
+
+
+def parse_csv(text):
+    """The rows of a CSV text as dicts keyed by the canonical column names. Blank lines and lines that start with # are skipped;
+    the delimiter (comma, semicolon or tab) is found from the header line. ValueError when there is no name column."""
+    if text.startswith(u"﻿"):
+        text = text[1:]
+    lines = [l for l in text.splitlines() if l.strip() and not l.strip().startswith("#")]
+    if not lines:
+        return []
+    head = lines[0]
+    delim = max((",", ";", "\t"), key=lambda d: head.count(d))
+    rows = list(csv.reader(lines, delimiter=delim))
+    names = []
+    for h in rows[0]:
+        k = h.strip()
+        k = ALIASES.get(k.lower(), k)
+        names.append(next((c for c in COLUMNS if c.lower() == k.lower()), k))
+    if "name" not in names:
+        raise ValueError('The first line must name the columns, and one of them must be "name" (%s)' % ", ".join(COLUMNS))
+    out = []
+    for r in rows[1:]:
+        out.append(dict((names[i], r[i].strip()) for i in range(min(len(names), len(r)))))
+    return out
+
+
+def import_csv(text, replace=False):
+    """Merge a CSV into the roster. Returns {"added", "changed", "unchanged", "deactivated", "skipped"}. ValueError for a file
+    that can't be read as a roster."""
+    rows = parse_csv(text)
+    with _lock:
+        data = read()
+        by_id = dict((p["id"], p) for p in data["people"])
+        seen, added, changed, skipped = set(), 0, 0, 0
+        for i, row in enumerate(rows):
+            name = row.get("name", "").strip()
+            if not name:
+                skipped += 1
+                continue
+            department = row.get("department", "").strip() or NO_DEPARTMENT
+            location = row.get("location", "").strip()
+            pid = person_id(name, department, location)
+            prev = by_id.get(pid)
+            new = {"id": pid, "name": name, "department": department, "role": row.get("role", ""),
+                   "phone": row.get("phone", "") or (prev or {}).get("phone", ""), "location": location,
+                   "restrictToLocation": _flag(row["restrictToLocation"]) if "restrictToLocation" in row else bool((prev or {}).get("restrictToLocation")),
+                   "active": True, "order": (prev or {}).get("order", i)}
+            if prev is None:
+                added += 1
+            elif any(prev.get(k) != new[k] for k in new):
+                changed += 1
+            by_id[pid] = new
+            seen.add(pid)
+        if len(by_id) > MAX_PEOPLE:
+            raise ValueError("Too many people (at most %d)" % MAX_PEOPLE)
+        off = 0
+        if replace:
+            for pid, p in by_id.items():
+                if pid not in seen and p.get("active", True):
+                    p["active"] = False
+                    off += 1
+        data["people"] = sorted(by_id.values(), key=lambda p: (p.get("order", 0), p["name"].lower()))
+        _write(data)
+    return {"added": added, "changed": changed, "unchanged": len(seen) - added - changed, "deactivated": off, "skipped": skipped}
+
+
+def set_active(pid, active):
+    with _lock:
+        data = read()
+        for p in data["people"]:
+            if p["id"] == pid:
+                p["active"] = bool(active)
+                _write(data)
+                return True
+    return False
+
+
+def export_csv():
+    out = io.StringIO()
+    w = csv.writer(out, lineterminator="\n")
+    w.writerow(COLUMNS)
+    for p in read()["people"]:
+        if p.get("active", True):
+            w.writerow([p["name"], p["department"], p.get("role", ""), p.get("phone", ""), p.get("location", ""),
+                        "1" if p.get("restrictToLocation") else ""])
+    return out.getvalue()
+
+
+def view():
+    """What the Settings box shows: counts and the people (inactive ones are greyed in the list and can be brought back)."""
+    people = read()["people"]
+    active = [p for p in people if p.get("active", True)]
+    deps = sorted(set(p["department"] for p in active), key=str.lower)
+    locs = sorted(set(p["location"] for p in active if p["location"]), key=str.lower)
+    if people:
+        text = "%d people in %d department%s%s" % (len(active), len(deps), "" if len(deps) == 1 else "s",
+                                                   " and %d building%s" % (len(locs), "" if len(locs) == 1 else "s") if locs else "")
+        if len(active) != len(people):
+            text += " (%d switched off)" % (len(people) - len(active))
+    else:
+        text = "No people yet: import a CSV file."
+    return {"text": text, "count": len(active), "columns": ", ".join(COLUMNS),
+            "people": [{"id": p["id"], "title": p["name"], "tag": p["department"] + (" / " + p["location"] if p["location"] else ""),
+                        "active": p.get("active", True)} for p in people]}
+
+
+def _get_view(h):
+    h.send(json.dumps(view()), "application/json")
+
+
+def _get_csv(h):
+    h.send(export_csv(), "text/csv; charset=utf-8")
+
+
+def _post_import(h):
+    try:
+        body = json.loads(h._body(MAX_BYTES).decode("utf-8"))
+        result = import_csv(str(body.get("csv", "")), replace=bool(body.get("replace")))
+    except (ValueError, UnicodeDecodeError, AttributeError) as e:
+        h.send(json.dumps({"ok": False, "message": str(e) or "That is not a CSV file"}), "application/json", status=400)
+        return True
+    r = result
+    msg = "Imported: %d new, %d changed, %d unchanged" % (r["added"], r["changed"], r["unchanged"])
+    if r["deactivated"]:
+        msg += ", %d switched off" % r["deactivated"]
+    if r["skipped"]:
+        msg += ", %d rows without a name skipped" % r["skipped"]
+    h.send(json.dumps(dict(result, ok=True, message=msg)), "application/json")
+    return True
+
+
+def _post_active(h):
+    try:
+        body = json.loads(h._body(4096).decode("utf-8"))
+        ok = set_active(str(body.get("id", "")), bool(body.get("active")))
+    except (ValueError, UnicodeDecodeError, AttributeError):
+        ok = False
+    h.send(json.dumps({"ok": ok}), "application/json", status=200 if ok else 400)
+    return True
+
+
+GET = {"/contacts": _get_view, "/contacts.csv": _get_csv}
+POST = {"/contacts/import": _post_import, "/contacts/active": _post_active}
+PROTECTED = ("/contacts/import", "/contacts/active")
+
+
+if __name__ == "__main__":      # python3 netswitch_contacts.py people.csv [--replace]: the same import from a shell
+    import sys
+    if len(sys.argv) < 2:
+        sys.exit("usage: netswitch_contacts.py people.csv [--replace]")
+    with io.open(sys.argv[1], encoding="utf-8") as f:
+        print(import_csv(f.read(), replace="--replace" in sys.argv[2:]))

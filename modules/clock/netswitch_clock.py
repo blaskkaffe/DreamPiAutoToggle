@@ -1,4 +1,4 @@
-# DreamPi Netswitch add-on - the dashboard clock (web service side).
+# Check-in add-on - the dashboard clock (web service side).
 # The middle line is the time in 24-hour, 12-hour or 12-hour AM/PM form, in the common time zone (core.time_zone(), Settings > About;
 # the Pi's own when none is set); the top line is empty or the .beat time; the bottom line is empty or a scrolling list of world
 # times (cities the user picks, up to 12). With "large" on the time takes the rows that .beat and world time leave free (view()
@@ -45,16 +45,6 @@ def _cities(value):
     return out[:MAX_CITIES]
 
 
-def _legacy():
-    """The choice of an older version (clock_mode: 24h, 12h or beat) as a config, or None."""
-    try:
-        with open(core.CLOCK_MODE) as f:
-            old = f.read().strip().lower()
-    except (IOError, OSError):
-        return None
-    return {"format": _format(old), "beat": old == "beat", "world": False}
-
-
 def read_config():
     """{"format": "24h"|"12h"|"12h-ampm", "beat": bool, "world": bool, "large": bool, "zone": the common time zone (read only here),
     "cities": [names]}."""
@@ -64,7 +54,7 @@ def read_config():
     except (IOError, OSError, ValueError):
         data = None
     if not isinstance(data, dict):
-        data = _legacy() or {}
+        data = {}
     return {"format": _format(data.get("format")), "beat": _flag(data.get("beat")), "world": _flag(data.get("world")),
             "large": _flag(data.get("large")), "zone": core.time_zone(), "cities": _cities(data.get("cities"))}
 

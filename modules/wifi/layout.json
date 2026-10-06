@@ -62,31 +62,6 @@
      }
     }
    ]
-  },
-  {
-   "box": "gpio",
-   "title": "GPIO",
-   "items": [
-    {
-     "type": "form",
-     "get": "/wifibutton",
-     "post": "/wifibutton",
-     "fields": [
-      {
-       "title": "Wi-Fi setup",
-       "sub_text": "wifi_button",
-       "controls": [
-        {
-         "type": "select",
-         "key": "wifi_button",
-         "options": "choices",
-         "label": "Hold button"
-        }
-       ]
-      }
-     ]
-    }
-   ]
   }
  ]
 }

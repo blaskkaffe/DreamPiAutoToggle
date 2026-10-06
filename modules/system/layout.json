@@ -1,13 +1,79 @@
 {
  "settings": [
-  {"box": "about", "title": "About", "items": [
-   {"type": "info", "source": "/about"},
-   {"type": "form", "get": "/timezone", "post": "/timezone", "fields": [
-    {"title": "Time zone", "sub_text": "zone",
-     "controls": [{"type": "select", "key": "zone", "options": "zones", "label": "Time zone"}]}]},
-   {"type": "row", "title": "GitHub", "sub": "Source, instructions and updates",
-    "control": {"type": "link", "label": "Open", "href": "https://github.com/blaskkaffe/DreamPiAutoToggle", "aria": "Open the project on GitHub"}},
-   {"type": "row", "title": "DreamPi on GitHub", "sub": "The DreamPi project this add-on extends",
-    "control": {"type": "link", "label": "Open", "href": "https://github.com/Kazade/dreampi", "aria": "Open DreamPi on GitHub"}}]}
+  {
+   "box": "colours",
+   "title": "Global colours",
+   "items": [
+    {
+     "type": "row",
+     "title": "Global main colour",
+     "sub": "Pick Global main for a box or a button to give it this colour",
+     "control": {
+      "type": "colourpick",
+      "id": "global",
+      "label": "Global main colour"
+     }
+    },
+    {
+     "type": "form",
+     "get": "/highlight",
+     "post": "/highlight",
+     "fields": [
+      {
+       "title": "Notification highlight",
+       "sub_text": "highlight",
+       "controls": [
+        {
+         "type": "select",
+         "key": "style",
+         "options": "styles",
+         "label": "Look"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "box": "about",
+   "title": "About",
+   "items": [
+    {
+     "type": "info",
+     "source": "/about"
+    },
+    {
+     "type": "form",
+     "get": "/timezone",
+     "post": "/timezone",
+     "fields": [
+      {
+       "title": "Time zone",
+       "sub_text": "zone",
+       "controls": [
+        {
+         "type": "select",
+         "key": "zone",
+         "options": "zones",
+         "label": "Time zone"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "row",
+     "title": "GitHub",
+     "sub": "Source, instructions and updates",
+     "control": {
+      "type": "link",
+      "label": "Open",
+      "href": "https://github.com/blaskkaffe/DreamPiAutoToggle",
+      "aria": "Open the project on GitHub"
+     }
+    }
+   ]
+  }
  ]
 }

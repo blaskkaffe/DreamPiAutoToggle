@@ -6,75 +6,10 @@ import time
 import unittest
 
 from support import core, sandbox, cleanup
-import netswitch_players as pl
 import netswitch_wifi_web as wifi
 import netswitch_rebootupdate as ru
-import netswitch_switcher as sw
-import netswitch_probes as probes
 import netswitch_clock as clock
 import netswitch_tz as tzmod
-
-
-class PlayersView(unittest.TestCase):
-    def setUp(self):
-        self.tmp = sandbox()
-        self.saved = dict(pl._cache)
-        self.saved_fetch = pl.fetch
-
-    def tearDown(self):
-        pl._cache.clear()
-        pl._cache.update(self.saved)
-        pl.fetch = self.saved_fetch
-        cleanup(self.tmp)
-
-    def prime(self, players, sources=None, refreshing=False, when=None):
-        pl._cache.update({"time": time.time() if when is None else when, "refreshing": refreshing, "players": players, "sources": sources or []})
-
-    def p(self, name, game, net):
-        return {"player": name, "game": game, "network": net, "country": "", "source": "x"}
-
-    def test_games_most_played_first_with_counts(self):
-        self.assertEqual(pl.games_line([self.p("a", "Quake", "DCNow!"), self.p("b", "Daytona", "DCNow!"), self.p("c", "Daytona", "DCNET"), self.p("d", "", "DCNow!")]),
-                         [{"text": "Daytona", "n": 2}, {"text": "Quake", "n": 1}])
-        self.assertEqual(pl.games_line([]), [])
-
-    def test_counts_are_per_network_and_follow_the_switcher_colours(self):
-        self.prime([self.p("a", "Q", "DCNow!"), self.p("b", "Q", "DCNow!"), self.p("c", "D", "DCNET")], [{"name": "S", "ok": True, "count": 3, "error": None}])
-        v = pl.view()
-        self.assertEqual(v["parts"], [{"text": "DCNow! 2", "colour": "switcher.dcnow"}, {"text": "DCNET 1", "colour": "switcher.dcnet"}])
-        self.assertEqual(v["games"], [{"text": "Q", "n": 2}, {"text": "D", "n": 1}])
-        self.assertEqual([(x["title"], x["sub"], x["tag"], x["colour"]) for x in v["list"]][0], ("a", "Q", "DCNow!", "switcher.dcnow"))
-        self.assertFalse(v["retry"])
-
-    def test_empty_states_have_a_sentence(self):
-        self.prime([], [{"name": "S", "ok": True, "count": 0, "error": None}])
-        self.assertEqual(pl.view()["games"], ["Nobody is online"])
-        self.prime([self.p("a", "", "DCNow!")], [{"name": "S", "ok": True, "count": 1, "error": None}])
-        v = pl.view()
-        self.assertEqual(v["games"], ["Nobody is in a game"])
-        self.assertEqual(v["list"][0]["sub"], "(Idle)")
-
-    def test_loading_and_refreshing_ask_again_soon(self):
-        self.prime([], when=0)
-        v = pl.view()
-        self.assertEqual(v["games"], ["Loading..."])
-        self.assertTrue(v["retry"])
-        self.prime([self.p("a", "Q", "DCNow!")], [{"name": "S", "ok": True, "count": 1, "error": None}], refreshing=True)
-        self.assertTrue(pl.view()["retry"])
-
-    def test_no_source_says_how_to_add_one(self):
-        with open(core.PLAYERS_SOURCES, "w") as f:
-            f.write("[]")
-        v = pl.view()
-        self.assertEqual(v["games"], ["No player list source is set up"])
-        self.assertIn("players_sources.json", v["status"])
-        self.assertFalse(v["retry"])
-
-    def test_the_status_line_names_each_source_and_its_errors(self):
-        self.prime([self.p("a", "Q", "DCNow!")], [
-            {"name": "DC99", "ok": True, "count": 3, "error": None, "sections": [{"section": "dreampi", "shown": 3, "listed": 340, "offline": False}]},
-            {"name": "Other", "ok": False, "count": 0, "error": "timed out"}])
-        self.assertEqual(pl.view()["status"], "Other: timed out  ·  DC99: dreampi 3/340")
 
 
 class WifiView(unittest.TestCase):
@@ -123,7 +58,7 @@ class WifiView(unittest.TestCase):
 
 class UpdateView(unittest.TestCase):
     def base(self, **kw):
-        r = {"state": "idle", "checking": False, "time": 1, "error": None, "addon": {"available": False, "current": "v1"}, "dreampi": None,
+        r = {"state": "idle", "checking": False, "time": 1, "error": None, "addon": {"available": False, "current": "v1"},
              "can_update": True, "branch": "main"}
         r.update(kw)
         return r
@@ -149,158 +84,10 @@ class UpdateView(unittest.TestCase):
         self.assertEqual(ru.view(self.base(time=0))["text"], "Not checked yet")
         self.assertEqual(ru.view(self.base(error="offline"))["text"], "offline")
 
-    def test_newer_dreampi_scripts_are_named(self):
-        d = {"newer": True, "auto_updates": True, "files": [{"name": "dreampi.py", "current": "1", "latest": "2", "newer": True}, {"name": "netlink.py", "newer": False}]}
-        text = ru.view(self.base(dreampi=d))["dreampi_text"]
-        self.assertTrue(text.startswith("DreamPi has newer scripts: dreampi.py 1 → 2."))
-        self.assertIn("updates itself", text)
-        self.assertNotIn("netlink.py", text)
-        self.assertEqual(ru.view(self.base())["dreampi_text"], "")
-
-    def test_reboot_confirm_mentions_a_call_in_progress(self):
-        tmp = sandbox()
-        try:
-            d = {}
-            ru.api(d, [])
-            self.assertNotIn("call", d["reboot"]["confirm"])
-            with open(core.STATE, "w") as f:
-                f.write("call dcnow 123")
-            ru.api(d, [])
-            self.assertIn("A call is in progress", d["reboot"]["confirm"])
-        finally:
-            cleanup(tmp)
-
-
-class SwitcherView(unittest.TestCase):
-    def setUp(self):
-        self.tmp = sandbox()
-
-    def tearDown(self):
-        probes._hangup.update(busy=False, text="")
-        cleanup(self.tmp)
-
-    def api(self):
-        d, w = {}, []
-        sw.api(d, w)
-        return d, w
-
-    def test_ago(self):
-        self.assertEqual([sw._ago(100, 130), sw._ago(100, 400), sw._ago(100, 7300), sw._ago(0, 5)], ["30s ago", "5 min ago", "2 h ago", ""])
-
-    def test_the_selected_network_and_the_primary_colour(self):
-        d, _ = self.api()
-        self.assertEqual((d["network"], d["selected"]), ("dcnow", {"id": "dcnow", "title": "DCNow!", "parts": [{"text": "DCNow!", "colour": "switcher.dcnow"}]}))     # parts: the name in its network's colour
-        self.assertEqual(d["primary"]["switcher"], "orange")
-        open(core.FLAG, "w").close()
-        d, _ = self.api()
-        self.assertEqual((d["network"], d["selected"]["title"], d["primary"]["switcher"]), ("dcnet", "DCNET", "blue"))
-        core.set_module_colour("switcher", "dcnet", "bright-cyan")
-        self.assertEqual(self.api()[0]["primary"]["switcher"], "bright-cyan")
-
-    def test_hang_up_only_shows_in_a_call_or_while_hanging_up(self):
-        self.assertFalse(self.api()[0]["hangup"]["visible"])
-        with open(core.STATE, "w") as f:
-            f.write("call dcnow 123")
-        self.assertTrue(self.api()[0]["hangup"]["visible"])
-        os.remove(core.STATE)
-        probes._hangup.update(busy=True, text="")
-        h = self.api()[0]["hangup"]
-        self.assertTrue(h["visible"] and h["busy"])
-        self.assertEqual(h["text"], "hanging up...")
-
-    def test_the_led_modules_dot_look_is_kept(self):
-        d = {"dreampi": {"look": {"colour": "purple", "effect": "blink", "speed": "slow"}}}
-        sw.api(d, [])
-        self.assertEqual(d["dreampi"]["look"]["colour"], "purple")           # the LED module ran first: the switcher does not overwrite it
-        self.assertIn("state", d["dreampi"])
-
-    def test_the_pi_row_has_its_lines(self):
-        with probes._checks_lock:
-            old = dict(probes._checks)
-            probes._checks["pi"] = {"state": "ok", "text": "t", "line1": "Pi 3, 40°C", "line2": "up 2 h", "warn": "slowed down"}
-        try:
-            pi = self.api()[0]["pi"]
-            self.assertEqual(pi["lines"], ["Pi 3, 40°C", "up 2 h", "slowed down"])
-            with probes._checks_lock:
-                probes._checks["pi"] = {"state": "ok", "text": "Fine"}
-            self.assertEqual(self.api()[0]["pi"]["lines"], ["Fine"])
-        finally:
-            with probes._checks_lock:
-                probes._checks.clear()
-                probes._checks.update(old)
-
-
-class InternetRow(unittest.TestCase):
-    """The Internet row: the ping and the Pi's IP address are its subtitle (the Pi row no longer has the IP)."""
-    def setUp(self):
-        self.tmp = sandbox()
-        with probes._checks_lock:
-            self.old = dict(probes._checks)
-
-    def tearDown(self):
-        with probes._checks_lock:
-            probes._checks.clear()
-            probes._checks.update(self.old)
-        cleanup(self.tmp)
-
-    def row(self, internet, pi):
-        with probes._checks_lock:
-            probes._checks["internet"], probes._checks["pi"] = internet, pi
+    def test_reboot_confirm_names_the_pi(self):
         d = {}
-        sw.api(d, [])
-        return d["internet"]
-
-    def test_the_ping_and_the_ip_are_the_subtitle(self):
-        r = self.row({"state": "ok", "text": "Connected via Ethernet", "ms": 23}, {"state": "ok", "text": "t", "ip": "192.168.1.20"})
-        self.assertEqual((r["text"], r["sub"]), ("Connected via Ethernet", "Ping 23 ms \u2022 IP 192.168.1.20"))
-
-    def test_without_internet_there_is_no_ping_but_the_ip_is_still_shown(self):
-        r = self.row({"state": "bad", "text": "No internet connection"}, {"state": "ok", "text": "t", "ip": "192.168.1.20"})
-        self.assertEqual(r["sub"], "IP 192.168.1.20")
-        r = self.row({"state": "bad", "text": "No network connection"}, {"state": "ok", "text": "t", "ip": None})
-        self.assertEqual(r["sub"], "No IP address")
-
-    def test_nothing_is_said_before_the_pi_has_been_measured(self):
-        self.assertEqual(self.row({"state": "checking", "text": "Checking..."}, {"state": "checking", "text": "Checking..."})["sub"], "")
-
-    def test_the_check_keeps_the_ping_out_of_the_text(self):
-        from unittest import mock
-        with mock.patch.object(probes.socket, "create_connection", return_value=mock.Mock()), mock.patch.object(probes.socket, "gethostbyname", return_value="1.2.3.4"):
-            r = probes.check_internet()
-        self.assertEqual((r["state"], r["text"]), ("ok", "Connected"))
-        self.assertIsInstance(r["ms"], int)
-
-    def test_the_pi_row_has_no_ip_any_more(self):
-        pi = probes.pi_health()
-        self.assertNotIn("IP", pi["line2"])
-        self.assertNotIn("IP", pi["text"])
-        self.assertIn("ip", pi)                                                # it is still measured: the Internet row shows it
-
-
-class ModemDot(unittest.TestCase):
-    def test_the_modem_row_has_a_dot_in_the_states_of_the_other_rows(self):
-        import netswitch_switcher as sw
-        self.assertEqual(sw._modem_dot("ok", True, True), "ok")
-        self.assertEqual(sw._modem_dot("ok", True, None), "ok")
-        self.assertEqual(sw._modem_dot("ok", True, False), "warn")       # plugged in, but a modem known not to work well
-        self.assertEqual(sw._modem_dot("ok", False, None), "bad")        # the serial port is gone
-        self.assertEqual(sw._modem_dot("off", True, True), "bad")        # DreamPi is not running
-        self.assertEqual(sw._modem_dot("unknown", None, None), "unknown")
-
-
-class ModemCompat(unittest.TestCase):
-    def usb(self, manufacturer, product):
-        return {"vendor": "0572", "product": "1340", "manufacturer": manufacturer, "product_name": product, "serial": ""}
-
-    def test_the_conexant_usb_modem_is_known_to_work(self):
-        self.assertEqual(probes.modem_compat(self.usb("Conexant", "USB Modem")), (True, "Conexant USB Modem"))
-
-    def test_the_others_are_unchanged(self):
-        self.assertTrue(probes.modem_compat(self.usb("USRobotics", "5637"))[0])
-        self.assertFalse(probes.modem_compat(self.usb("Conceptronic", "C56U"))[0])         # the original, not the -v2
-        self.assertTrue(probes.modem_compat(self.usb("Conceptronic", "C56U-V2"))[0])
-        self.assertIsNone(probes.modem_compat(self.usb("Acme", "Fax Thing"))[0])
-        self.assertEqual(probes.modem_compat(None), (None, None))
+        ru.api(d, [])
+        self.assertIn("Reboot the Raspberry Pi", d["reboot"]["confirm"])
 
 
 class ClockView(unittest.TestCase):
@@ -370,14 +157,6 @@ class ClockView(unittest.TestCase):
         self.assertTrue(all("now" in o["sub"] for o in r["groups"][0]["choices"]))
         clock.save_config({"cities": many})
         self.assertEqual(clock._cities_reply()["groups"][0]["choices"], [])               # full: nothing more to add
-
-    def test_an_older_mode_file_is_carried_over(self):
-        with open(core.CLOCK_MODE, "w") as f:
-            f.write("beat")
-        self.assertEqual((clock.read_config()["format"], clock.read_config()["beat"]), ("24h", True))
-        with open(core.CLOCK_MODE, "w") as f:
-            f.write("12h")
-        self.assertEqual((clock.read_config()["format"], clock.read_config()["beat"]), ("12h", False))
 
     def test_beat_is_biel_mean_time_not_the_pi_time_zone(self):
         self.assertEqual(clock.format_time("beat", 0), "@041")             # 00:00 UTC = 01:00 BMT

@@ -1,34 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# DreamPi Netswitch add-on - Wi-Fi setup (optional, install.sh --wifi).
-# Library for netswitch_wifi_service.py (service dreampi-netswitch-wifi): the
-# button thread in netswitch_buttons.py (base), or the page's Settings > Network > Wi-Fi setup button
-# (POST /wifitoggle), touches wifi_start / wifi_stop and the service calls this module's
+# Check-in add-on - Wi-Fi setup (optional, install.sh --wifi).
+# Library for netswitch_wifi_service.py (service dreampi-netswitch-wifi): the page's Settings > System > Wi-Fi setup
+# button (POST /wifitoggle) touches wifi_start / wifi_stop and the service calls this module's
 # setup_cycle(), which does the rest. The original design notes follow.
 #
-# Wi-Fi setup is the optional part (install.sh --wifi, or the Modules menu): a 3-second hold of the
-# button(s) assigned to it in Settings > GPIO, or the page's "Wi-Fi setup"
-# button in Settings > Network (POST /wifitoggle, which just touches
+# Wi-Fi setup is the optional part (install.sh --wifi, or the Modules menu): the page's "Wi-Fi setup"
+# button in Settings > System (POST /wifitoggle, which just touches
 # wifi_start / wifi_stop under /opt/dreampi-netswitch - the same files this
 # service watches), starts:
 #   1. Scans for Wi-Fi networks on the wireless interface and keeps the list
 #      in memory for the length of the setup session.
-#   2. Hosts an open access point named "DreamPi WiFi Config" (192.168.4.1)
+#   2. Hosts an open access point named "CheckIn WiFi Config" (192.168.4.1)
 #      with hostapd + dnsmasq, and a small web page (styled like the main
 #      page) listing the scanned networks plus a manual SSID/password entry.
 #   3. When a network is chosen, tears the access point down, writes it into
 #      wpa_supplicant.conf (via wpa_passphrase) and waits for the Pi to
 #      associate and reach the internet.
-#   4. On success the LED (if installed) goes solid green for a few seconds,
-#      then Wi-Fi setup ends and everything returns to normal. On failure it
-#      goes red for a few seconds and the whole cycle repeats (rescans and
-#      re-hosts the access point) until the page or the button cancels it.
-# The current state is written to /tmp/dreampi-netswitch.wifi for the web
-# page (a warning banner and the Settings button) and the LED service
-# (netswitch_led.py, via netswitch_ledconfig.active_messages()) to read; see
-# the "wifisetup-*" messages the Wi-Fi module announces (module.json "led_messages").
+#   4. On success Wi-Fi setup ends and everything returns to normal. On failure the
+#      whole cycle repeats (rescans and re-hosts the access point) until the page cancels it.
+# The current state is written to /tmp/dreampi-netswitch.wifi for the web page (a warning banner and the Settings button) to read.
 #
-# This assumes the classic Raspberry Pi OS network stack DreamPi normally
+# This assumes the classic Raspberry Pi OS network stack Raspberry Pi OS normally
 # runs on: wpa_supplicant + dhcpcd managing the wireless interface, and
 # hostapd + dnsmasq available to host the setup access point (install.sh
 # installs them with apt if missing, and disables their own systemd units
@@ -96,7 +89,7 @@ def output(cmd, timeout=10):
 # has no Wi-Fi. A connect succeeds for open networks and for the password "demo"
 # (anything else fails after a short wait, to show the failure state).
 DEMO_NETWORKS = [
-    {"ssid": "DreamCast-Home", "signal": -45, "secured": True},
+    {"ssid": "Office-Wifi", "signal": -45, "secured": True},
     {"ssid": "Neighbour 5G", "signal": -62, "secured": True},
     {"ssid": "CoffeeShop Free", "signal": -70, "secured": False},
     {"ssid": "A_Very_Long_Network_Name_To_See_How_The_List_Copes", "signal": -78, "secured": True},
@@ -192,7 +185,7 @@ def scan_networks(iface):
     signal first, one entry per SSID. Empty (not None) on any failure - the
     setup page still offers a manual SSID/password field."""
     if demo():
-        core.debug_log("wifi demo: scanning (dummy networks)")
+        core.log("wifi demo: scanning (dummy networks)")
         if wait_or_stop(SCAN_WAIT):
             return []
         return [dict(n) for n in DEMO_NETWORKS]
@@ -239,7 +232,7 @@ _procs = {}
 
 def start_ap(iface):
     if demo():
-        core.debug_log("wifi demo: access point not started")
+        core.log("wifi demo: access point not started")
         return
     run(["systemctl", "stop", "wpa_supplicant@%s.service" % iface])
     run(["systemctl", "stop", "wpa_supplicant.service"])
@@ -326,7 +319,7 @@ def try_connect(iface, ssid, password):
     if demo():
         known = dict((n["ssid"], n) for n in DEMO_NETWORKS).get(ssid)
         ok = (known is not None and not known["secured"]) or password == DEMO_PASSWORD
-        core.debug_log("wifi demo: connecting to %s %s" % (ssid, "(will succeed)" if ok else "(will fail)"))
+        core.log("wifi demo: connecting to %s %s" % (ssid, "(will succeed)" if ok else "(will fail)"))
         return not wait_or_stop(DEMO_CONNECT_SECONDS) and ok
     restore_client(iface)
     save_network(ssid, password)
@@ -392,7 +385,7 @@ $("connect").onclick=function(){
  x.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
  x.onload=function(){$("msg").className="msg ok";$("msg").style.display="block";
   $("msg").textContent="Trying to connect the Pi to \\u201c"+ssid+"\\u201d. This Wi-Fi network will close now; "+
-   "check the Pi's normal status page or its LED to see if it worked."};
+   "check the Pi's normal page to see if it worked."};
  x.onerror=function(){}; x.send("ssid="+encodeURIComponent(ssid)+"&password="+encodeURIComponent($("pass").value))};
 $("stop").onclick=function(){
  var x=new XMLHttpRequest(); x.open("POST","/stop",true); x.send();
@@ -403,9 +396,9 @@ renderList();
 
 AP_PAGE_TMPL = """<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DreamPi WiFi Config</title>
+<title>CheckIn WiFi Config</title>
 <style>%(style)s</style></head><body>
-<h1>DreamPi WiFi Config</h1>
+<h1>CheckIn WiFi Config</h1>
 <div class="note">Choose the Wi-Fi network for the Pi to use, then enter its password.</div>
 <div id="msg" class="msg" style="display:none"></div>
 <div class="card" id="list"></div>
@@ -503,7 +496,7 @@ def run_ap_server(networks):
                 if stop_requested():
                     return ("stop", None, None)
                 if ap_expired(deadline):
-                    core.debug_log("wifi setup: nobody chose a network, the access point is closed")
+                    core.log("wifi setup: nobody chose a network, the access point is closed")
                     return ("stop", None, None)
                 external = check_external_connect()
                 if external:
@@ -521,8 +514,7 @@ _active_iface = [None]   # set while an access point may be up, for graceful_exi
 def graceful_exit(*_):
     """A service stop (uninstall, restart, reboot) mid-setup must not leave
     the Wi-Fi interface stuck in access-point mode; tear it down and hand
-    it back to normal client networking, like netswitch_led.py does for
-    its LEDs on the same signals."""
+    it back to normal client networking."""
     iface = _active_iface[0]
     if iface:
         try:
@@ -556,23 +548,23 @@ def _setup_cycle(iface):
         try:
             start_ap(iface)
         except Exception:
-            core.debug_log("wifi setup: could not start the access point")
+            core.log("wifi setup: could not start the access point")
             break
         action, ssid, password = run_ap_server(networks)
         stop_ap(iface)
         if action != "connect":
             break
         set_state("connecting", ssid=ssid)
-        core.debug_log("wifi setup: trying to connect to %s" % ssid)
+        core.log("wifi setup: trying to connect to %s" % ssid)
         ok = try_connect(iface, ssid, password)
         if stop_requested():
             break
         if ok:
-            core.debug_log("wifi setup: connected to %s" % ssid)
+            core.log("wifi setup: connected to %s" % ssid)
             set_state("ok", ssid=ssid)
             wait_or_stop(RESULT_PAUSE)
             break
-        core.debug_log("wifi setup: could not connect to %s, trying again" % ssid)
+        core.log("wifi setup: could not connect to %s, trying again" % ssid)
         set_state("failed", ssid=ssid)
         if wait_or_stop(RESULT_PAUSE):
             break

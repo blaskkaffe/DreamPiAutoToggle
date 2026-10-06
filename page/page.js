@@ -38,12 +38,12 @@ ui.popup=function(el){
  el.addEventListener("click",function(e){e.stopPropagation()});
  ui._pops.push(p);return p};
 document.addEventListener("click",function(){ui.closePopups()});
-// Round icon buttons that are on or off: a bell (remind me), a star (favourite) and a play button (start the game on the Dreamcast; never "on"). ui.iconButtonHtml(kind, on, what, attrs) is the markup
+// Round icon buttons that are on or off: a bell (remind me) and a star (favourite). ui.iconButtonHtml(kind, on, what, attrs) is the markup
 // (a module that builds its rows as HTML puts attrs, such as a data-id, on the button); ui.iconButton(kind, on, what) the element.
 // The look is .ibtn in page.css; the state is .on and aria-pressed; what is the name of the thing it is about (a screen reader's label).
-ui.icons={play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',bell:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.4-2h-4.8A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5.5-6.8V3a1.5 1.5 0 0 0-3 0v1.2A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>',
+ui.icons={bell:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.4-2h-4.8A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5.5-6.8V3a1.5 1.5 0 0 0-3 0v1.2A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>',
  star:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 17.9 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg>'};
-ui.iconTexts={play:["Starting on the Dreamcast","Start on the Dreamcast","Starting ","Start on the Dreamcast: "],bell:["Reminder on: tap to clear","Remind me","Clear the reminder for ","Remind me of "],star:["Favorite: tap to remove","Add to favorites","Remove from favorites: ","Add to favorites: "]};
+ui.iconTexts={bell:["Reminder on: tap to clear","Remind me","Clear the reminder for ","Remind me of "],star:["Favorite: tap to remove","Add to favorites","Remove from favorites: ","Add to favorites: "]};
 ui.iconButtonHtml=function(kind,on,what,attrs){var t=ui.iconTexts[kind];
  return '<button type="button" class="ibtn '+kind+(on?' on':'')+'" '+(attrs||'')+' aria-pressed="'+(on?'true':'false')+'" title="'+(on?t[0]:t[1])+'" aria-label="'+(on?t[2]:t[3])+esc(what||"")+'">'+ui.icons[kind]+'</button>'};
 ui.iconButton=function(kind,on,what){var d=document.createElement("div");d.innerHTML=ui.iconButtonHtml(kind,on,what);return d.firstChild};
@@ -55,20 +55,12 @@ function setHtml(el,h){if(el._html!==h){el._html=h;el.innerHTML=h}}
 function setClass(el,c){if(el.className!==c)el.className=c}
 function setStyle(el,prop,v){if(el.style[prop]!==v)el.style[prop]=v}
 function dot(el,state){setClass(el,"dot "+(state||""))}
-// Status dot preview of the LED effect: [keyframes, slow s, fast s, timing]
-var DOT_FX={blink:["blink",1,.4,"steps(1)"],fade:["blink",3,1.2,"ease-in-out"],breathe:["breathe",4,1.6,"ease-in-out"],      // solid has no animation
- blink1:["dotb1",1.6,.8,"steps(1)"],blink2:["dotb2",1.6,.8,"steps(1)"],blink3:["dotb3",1.6,.8,"steps(1)"],rainbow:["dotrainbow",6,2,"linear"]};   // periods as in modules/led/netswitch_led.py
-// look = {colour: a palette id, or dcnow / dcnet / network, effect, speed}: the dot shows the page's palette colour (never an LED's calibrated value)
-function lookDot(el,look){setClass(el,"dot");if(!look||!look.colour){setStyle(el,"background","#333");setStyle(el,"animation","none");return}
- var f=DOT_FX[look.effect];setStyle(el,"background","var(--c-"+colourId(look.colour,"switcher")+")");
- setStyle(el,"animation",f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none")}
 function render(d){
  pinNeeded=!!d.pin;
  for(var k in d)S[k]=d[k];       // S keeps the data sources' answers and the page's own state between /api answers
  NOTICES=d.notices||[];
  setHtml($("warnings"),d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("")+
   NOTICES.map(function(n,i){return '<div class="notebox" role="status"><span>'+esc(n.text)+'</span>'+(n.post?'<button type="button" class="nx" data-n="'+i+'" title="Dismiss" aria-label="Dismiss">&#10005;</button>':'')+'</div>'}).join(""));
- window.lastDreampiState=d.dreampi&&d.dreampi.state;
  engineUpdate();
  fire("api",d);
 }

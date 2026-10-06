@@ -1,7 +1,4 @@
-"""Repo-level guards: the DreamPi hook must stay Python 2.7 compatible, the
-shell scripts must parse, and every Python file must compile."""
-import ast
-import json
+"""Repo-level guards: the shell scripts must parse, every Python file must compile, the docs link to files that exist."""
 import glob
 import os
 import py_compile
@@ -13,81 +10,10 @@ import unittest
 from support import ROOT
 
 
-def module_hook_files():
-    """Every module's "hook" file (module.json): it runs inside DreamPi like netswitch_hook.py."""
-    out = {}
-    for name in sorted(os.listdir(os.path.join(ROOT, "modules"))):
-        path = os.path.join(ROOT, "modules", name, "module.json")
-        if os.path.exists(path):
-            with open(path) as f:
-                hook = json.load(f).get("hook")
-            if hook:
-                out[name] = os.path.join(ROOT, "modules", name, hook + ".py")
-    return out
-
-
-HOOK_FILES = [os.path.join(ROOT, "netswitch_hook.py")] + sorted(module_hook_files().values())
-
-
-class HookCompatTests(unittest.TestCase):
-    """netswitch_hook.py, and the debug log module's part that it loads, run inside DreamPi on Python 2.7."""
-    def test_no_python3_only_syntax(self):
-        for path in HOOK_FILES:
-            self.check_syntax(path)
-
-    def check_syntax(self, path):
-        with open(path) as f:
-            tree = ast.parse(f.read())
-        for node in ast.walk(tree):
-            self.assertNotIsInstance(node, ast.JoinedStr, "f-string at line %d" % getattr(node, "lineno", 0))
-            self.assertNotIsInstance(node, (ast.AnnAssign, ast.AsyncFunctionDef, ast.NamedExpr),
-                                     "Python 3 syntax at line %d" % getattr(node, "lineno", 0))
-            if isinstance(node, ast.FunctionDef):
-                self.assertIsNone(node.returns, "return annotation on %s" % node.name)
-                for a in node.args.args + node.args.kwonlyargs:
-                    self.assertIsNone(a.annotation, "annotation on %s(%s)" % (node.name, a.arg))
-                self.assertEqual(node.args.kwonlyargs, [], "keyword-only args in %s" % node.name)
-
-    def test_no_python3_only_imports(self):
-        for path in HOOK_FILES:
-            self.check_imports(path)
-
-    def check_imports(self, path):
-        with open(path) as f:
-            tree = ast.parse(f.read())
-        top = set()
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                top.update(a.name.split(".")[0] for a in node.names)
-            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                top.add(node.module.split(".")[0])
-        self.assertFalse(top & {"pathlib", "typing", "asyncio", "subprocess32", "dataclasses", "enum", "secrets"}, top)
-
-
-class ActionTests(unittest.TestCase):
-    def test_every_announced_action_is_done_by_the_modules_hook_file(self):
-        import importlib
-        import support  # noqa: F401  (puts every module folder on the path)
-        files = module_hook_files()
-        for name in sorted(os.listdir(os.path.join(ROOT, "modules"))):
-            path = os.path.join(ROOT, "modules", name, "module.json")
-            if not os.path.exists(path):
-                continue
-            with open(path) as f:
-                actions = json.load(f).get("actions") or []
-            if not actions:
-                continue
-            self.assertIn(name, files, "%s announces actions but has no hook file" % name)
-            part = importlib.import_module(os.path.basename(files[name])[:-3])
-            for a in actions:
-                self.assertTrue(callable(part.ACTIONS.get(a["id"])), "%s.%s has no function in %s" % (name, a["id"], files[name]))
-                self.assertTrue(a.get("label"), "%s.%s has no label" % (name, a["id"]))
-
-
 class LayeringTests(unittest.TestCase):
     """The small services must not drag the web server in."""
-    def test_led_and_buttons_do_not_import_the_web_module(self):
-        for mod in ("netswitch_led", "netswitch_led_drivers", "netswitch_buttons", "netswitch_wifi_setup", "netswitch_core", "netswitch_ledconfig", "netswitch_probes"):
+    def test_services_do_not_import_the_web_module(self):
+        for mod in ("netswitch_wifi_setup", "netswitch_core", "netswitch_probes", "netswitch_contacts", "netswitch_checkin"):
             code = ("import sys; sys.path[:0] = %r; import %s; sys.exit(1 if 'netswitch_web' in sys.modules else 0)"
                     % ([ROOT] + [os.path.join(ROOT, "modules", m) for m in os.listdir(os.path.join(ROOT, "modules"))], mod))
             self.assertEqual(subprocess.call(["python3", "-c", code]), 0, mod)

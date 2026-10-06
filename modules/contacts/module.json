@@ -1,0 +1,9 @@
+{
+ "name": "Contacts",
+ "description": "The people: import a CSV (name, department, role, phone, location) that the check-in board is built from.",
+ "enabled": true,
+ "visible": true,
+ "order": 30,
+ "ui": 2,
+ "web": "netswitch_contacts"
+}

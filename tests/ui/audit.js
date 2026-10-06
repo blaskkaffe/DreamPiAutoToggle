@@ -51,33 +51,19 @@ const AUDIT = () => {
     await page.goto('http://127.0.0.1:' + (process.env.PORT || 8734) + '/', { waitUntil: 'networkidle' });
     await page.waitForTimeout(1200);
     const check = async (label) => { const res = await page.evaluate(AUDIT); res.forEach(r => problems.push([r[0], label + ': ' + r[1]])); };
-    await check('main closed');
-    await page.locator('.now').first().click(); await page.waitForTimeout(300); await check('main net open');
-    await page.locator('.now').nth(1).click({ position: { x: 20, y: 10 } }); await page.waitForTimeout(2500); await check('main players open');
-    await page.locator('.dbox[data-box="debug log"] .now').click({ position: { x: 20, y: 10 } }); await page.waitForTimeout(500); await check('main debug open');
+    await check('board closed');
+    await page.locator('.rp-e').first().click(); await page.waitForTimeout(300); await check('board status menu');
+    await page.locator('.rp-menu button[data-code="LATE"]').click(); await page.waitForTimeout(300); await check('board status needs a time');
+    await page.keyboard.press('Escape');
     await page.screenshot({ path: `/tmp/dpns-audit-main-${w}.png`, fullPage: true });
     await page.click('#cog'); await page.waitForTimeout(1500); await check('settings');
+    await page.click('[data-box="check-in"] .srow:has-text("Look") > button'); await page.waitForTimeout(300); await check('settings look pop-up');
+    await page.keyboard.press('Escape');
     // wifi flow states
     await page.click('[data-box="system"] .srow:not([data-id]):has-text("Wi-Fi setup") > button'); await page.waitForTimeout(4500); await check('settings wifi list');
     await page.click('.wlist .srow:nth-child(4) button'); await page.waitForTimeout(300); await check('settings wifi pop-up, long ssid');
     await page.screenshot({ path: `/tmp/dpns-audit-settings-${w}.png`, fullPage: true });
     await page.click('[data-box="system"] .srow:not([data-id]):has-text("Wi-Fi setup") > button'); await page.waitForTimeout(1500);
-    // popups
-    await page.click('[data-box="status led"] .wtrig .srow.edit button.pill-s'); await page.waitForTimeout(300); await check('LED colour edit pop-up');
-    await page.click('[data-box="status led"] .pop.open [aria-expanded]'); await page.waitForTimeout(300); await check('LED add messages list');
-    await page.keyboard.press('Escape');
-    await page.click('[data-box="special phone numbers"] .wtrig .srow.edit button.pill-s'); await page.waitForTimeout(300); await check('numbers row pop-up');
-    await page.keyboard.press('Escape');
-    await page.click('[data-box="status led"] .srow:has-text("Calibration") > button'); await page.waitForTimeout(300); await check('calibration pop-up');
-    await page.keyboard.press('Escape');
-    await page.click('[data-box="status led"] button[aria-label="Adjust the colours"]'); await page.waitForTimeout(500); await check('LED colours pop-up');
-    await page.keyboard.press('Escape');
-    // switch button functions
-    await page.click('[data-box="gpio"] .srow:has-text("Button 1") > button'); await page.waitForTimeout(400); await check('GPIO edit pop-up');
-    await page.selectOption('select[aria-label="Button 1: Function"]', { label: 'On = Wi-Fi setup' }); await page.waitForTimeout(700); await check('switch fn selected');
-    await page.selectOption('select[aria-label="Button 1: Function"]', { label: 'Toggle network' }); await page.waitForTimeout(500);
-    await page.keyboard.press('Escape');
-    await page.click('[data-box="gpio"] .srow:has-text("LED") > button'); await page.waitForTimeout(400); await check('LED edit pop-up'); await page.keyboard.press('Escape');
     summary[w] = problems;
     await page.close();
   }
@@ -86,9 +72,9 @@ const AUDIT = () => {
     const seen = {};
     summary[w].forEach(p => { const k = p[0] + ' | ' + p[1]; seen[k] = (seen[k] || 0) + 1; });
     console.log('=== width ' + w + ': ' + Object.keys(seen).length + ' distinct findings');
-    Object.keys(seen).filter(k => !k.startsWith('tiny-text') && !/small-tap-target \| .*input#(wb-[rgb]|led-bright|lvl-r)/.test(k)).forEach(k => { console.log('  ' + k); bad++; });
+    Object.keys(seen).filter(k => !k.startsWith('tiny-text')).forEach(k => { console.log('  ' + k); bad++; });
   }
   await browser.close();
-  console.log(bad ? bad + ' finding(s)' : 'no findings (tiny text and native range sliders are ignored)');
+  console.log(bad ? bad + ' finding(s)' : 'no findings (tiny text is ignored)');
   process.exit(bad ? 1 : 0);
 })();

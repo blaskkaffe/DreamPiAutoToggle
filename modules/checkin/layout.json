@@ -1,0 +1,121 @@
+{
+ "dashboard": [
+  {
+   "box": "checkin",
+   "items": [
+    {
+     "type": "roster",
+     "source": "@checkin",
+     "toggle": "/checkin/toggle",
+     "status": "/checkin/status"
+    }
+   ]
+  }
+ ],
+ "settings": [
+  {
+   "box": "check-in",
+   "title": "Check-in board",
+   "items": [
+    {
+     "type": "text",
+     "text": "@checkin.text"
+    },
+    {
+     "type": "form",
+     "get": "/checkin/config",
+     "post": "/checkin/config",
+     "fields": [
+      {
+       "title": "Look",
+       "sub_text": "style",
+       "controls": [
+        {
+         "type": "select",
+         "key": "style",
+         "options": "styles",
+         "label": "Layout"
+        }
+       ]
+      },
+      {
+       "title": "Group people by",
+       "sub_text": "group_by",
+       "controls": [
+        {
+         "type": "select",
+         "key": "group_by",
+         "options": "groups",
+         "label": "Group by"
+        }
+       ]
+      },
+      {
+       "title": "Colour people by",
+       "sub_text": "colour_by",
+       "controls": [
+        {
+         "type": "select",
+         "key": "colour_by",
+         "options": "groups",
+         "label": "Colour by"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "roster",
+     "mode": "colours",
+     "get": "/checkin/config",
+     "post": "/checkin/colour"
+    },
+    {
+     "type": "row",
+     "title": "Start of the day",
+     "sub": "Everybody out, statuses cleared",
+     "control": {
+      "type": "button",
+      "label": "All out",
+      "arm": "Tap again",
+      "post": "/checkin/all",
+      "body": {
+       "in": false
+      }
+     }
+    },
+    {
+     "type": "row",
+     "title": "Everybody in",
+     "sub": "Everybody in, statuses cleared",
+     "control": {
+      "type": "button",
+      "label": "All in",
+      "arm": "Tap again",
+      "post": "/checkin/all",
+      "body": {
+       "in": true
+      }
+     }
+    }
+   ]
+  },
+  {
+   "box": "appearance",
+   "title": "Appearance",
+   "items": [
+    {
+     "type": "row",
+     "title": "Check-in board colour",
+     "sub": "Module",
+     "control": {
+      "type": "swatches",
+      "tint": true,
+      "key": "checkin",
+      "title": "Colour of the check-in board"
+     }
+    }
+   ]
+  }
+ ]
+}

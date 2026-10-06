@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# DreamPi Netswitch add-on - the Wi-Fi setup module's own service (dreampi-netswitch-wifi).
+# Check-in add-on - the Wi-Fi setup module's own service (dreampi-netswitch-wifi).
 #
-# Runs as root. Idle until something asks for Wi-Fi setup: the page's Settings > Network button (POST /wifitoggle)
-# or a button hold (netswitch_buttons.py, in the base) just touch wifi_start / wifi_stop in /opt/dreampi-netswitch,
-# and this service picks that up and runs netswitch_wifi_setup.setup_cycle(). So the buttons never load any Wi-Fi code;
-# this module sits on top of them. While the module is switched off in Settings > Modules the service only idles
-# (and stops a setup that is running), so it needs no restart when the module is toggled.
+# Runs as root. Idle until something asks for Wi-Fi setup: the page's Settings > System button (POST /wifitoggle) just touches
+# wifi_start / wifi_stop in /opt/dreampi-netswitch, and this service picks that up and runs netswitch_wifi_setup.setup_cycle().
+# While the module is switched off in Settings > Modules the service only idles (and stops a setup that is running), so it
+# needs no restart when the module is toggled.
 import os
 import signal
 import sys
@@ -39,7 +38,7 @@ def run_once():
     if wifi.start_requested():
         wifi.clear_flags()
         if not iface:
-            core.debug_log("wifi setup: no Wi-Fi adapter found")
+            core.log("wifi setup: no Wi-Fi adapter found")
             wifi.set_state("failed", ssid="no Wi-Fi adapter found")
             wifi.wait_or_stop(wifi.RESULT_PAUSE)
             wifi.set_state("idle")
@@ -47,7 +46,7 @@ def run_once():
             try:
                 wifi.setup_cycle(iface)
             except Exception:
-                core.debug_log("wifi setup: unexpected error, stopping")
+                core.log("wifi setup: unexpected error, stopping")
                 sys.stderr.write("wifi setup failed:\n")
                 import traceback
                 traceback.print_exc()

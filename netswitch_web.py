@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
-# DreamPi Netswitch add-on - web page to choose DCNow! or DCNET.
-# Shows DreamPi's and the modem's live status and internet access, plus an
-# optional debug timeline. It only creates/removes the files that
-# netswitch_hook.py reads. This module is the HTTP side (page, API, HTTPS,
-# watchdog); settings and state are in netswitch_core.py, the optional features in modules/ (netswitch_modules.py loads them), measurements in
-# netswitch_probes.py. Works on Python 3 and 2.7.
+# Check-in add-on - the web service: the page, the API, HTTPS and the watchdog. Everything the page shows comes from the modules
+# in modules/ (netswitch_modules.py loads them); settings and state are in netswitch_core.py. Python 3.
 import gzip
 import io
 import json
@@ -24,16 +20,8 @@ except ImportError:
 
 import netswitch_core as core
 import netswitch_modules as modules
-import netswitch_probes as probes
 import netswitch_security as security
 
-STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-STATIC_FILES = {   # only these are served from /static/
-    "favicon-dcnow.png": "image/png",   # DreamPi logo (without the text)
-    "favicon-dcnet.png": "image/png",   # Flycast logo while DCNET is selected
-    "touch-dcnow.png": "image/png",
-    "touch-dcnet.png": "image/png",
-}
 PORT = 80
 HTTPS_PORT = 443   # 0 = no HTTPS; both can be given on the command line: netswitch_web.py [port] [https port]
 CERT = os.path.join(core.BASE_DIR, "https.crt")   # self-signed, made by install.sh
@@ -42,7 +30,7 @@ KEY = os.path.join(core.BASE_DIR, "https.key")
 
 def api_state():
     """The /api answer. The base only has the page-wide parts (PIN flag, warnings, time, the modules' colours); everything
-    else is added by the enabled modules' api() hooks (the network switcher adds the network and the status rows)."""
+    else is added by the enabled modules' api() hooks (the check-in board adds who is in)."""
     warnings = ["Module %s is not loaded: %s" % (name, why) for name, why in sorted(modules.errors().items())]
     d = {"pin": security.pin_required(),     # the page asks for it before update / restart / Wi-Fi connect
          "colours": modules.live_colours(), "tints": modules.live_tints(), "primary": {}, "primary_key": {}, "enabled": modules.enabled_map(),
@@ -50,7 +38,7 @@ def api_state():
          "highlight": {},       # {dashboard box id: why}: a module asks for one of its boxes to stand out for a while (an event soon, say)
          "notices": [],         # banners over the boxes that are not warnings: {"id", "text", "post" (dismiss: POST {"id"} there)}
          "theme": {"highlight": core.highlight_style()}}
-    modules.apply_api(d, warnings)          # what the enabled modules add: network, status, debug, wifi, the dot's LED look ...
+    modules.apply_api(d, warnings)          # what the enabled modules add: the board, wifi, the clock ...
     return d
 
 
@@ -109,14 +97,13 @@ def _gzip(body):
     return buf.getvalue()
 
 
-_static_cache = {}
 _page_state = {"sig": None}
 _page_lock = threading.Lock()
 PAGE = PAGE_BYTES = None
 
 
 def _page_signature():
-    sig = [PAGE_DIR, tuple(sorted(core.module_colours("switcher").items()))]    # the colours are built into the page
+    sig = [PAGE_DIR]
     for f in BASE_PAGE_FILES:
         try:
             sig.append(os.path.getmtime(os.path.join(PAGE_DIR, f)))
@@ -143,19 +130,6 @@ def refresh_page(force=False):
 
 
 refresh_page(force=True)
-
-
-def _static(name):
-    """A file from static/ (only those in STATIC_FILES), kept in memory."""
-    if name not in STATIC_FILES:
-        return None
-    if name not in _static_cache:
-        try:
-            with open(os.path.join(STATIC_DIR, name), "rb") as f:
-                _static_cache[name] = f.read()
-        except (IOError, OSError):
-            return None
-    return _static_cache[name]
 
 
 def _colour_reply():
@@ -263,20 +237,6 @@ class Handler(BaseHTTPRequestHandler):
             self.send("ok\n", "text/plain")
         elif path == "/api":
             self.send(json.dumps(api_state()), "application/json")
-        elif path == "/tag":
-            # For openMenu over the PPP link: a tiny HTTP/1.0 answer, no markup, no caching.
-            code = core.tag()
-            text = dict(core.TAGS).get(code, "") if "text" in self.path else code
-            self.send(text + "\n", "text/plain; charset=utf-8")
-        elif path.startswith("/static/"):
-            name = path[len("/static/"):]
-            body = _static(name)
-            if body is None:
-                self.send_response(404)
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-                return
-            self.send(body, STATIC_FILES[name], cache=86400, fixed=True)
         elif path == "/modules":
             self.send(json.dumps({"modules": modules.listing()}), "application/json")
         elif path == "/colours":
@@ -303,7 +263,7 @@ class Handler(BaseHTTPRequestHandler):
         if modules.protected(path):
             ok, message = security.check_pin(self.headers.get("X-Netswitch-Pin") or "")
             if not ok:
-                core.debug_log("web page: %s refused (%s)" % (path, message))
+                core.log("web page: %s refused (%s)" % (path, message))
                 self.send(json.dumps({"started": False, "message": message}), "application/json",
                           status=429 if message.startswith("Too many") else 401)
                 return
@@ -345,7 +305,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
         if not core.save_module_enabled(name, on):
             return self.send("No such module: %s" % name, "text/plain; charset=utf-8", status=404)
-        core.debug_log("web page: module %s switched %s" % (name, "on" if on else "off"))
+        core.log("web page: module %s switched %s" % (name, "on" if on else "off"))
         refresh_page(force=True)
         self.send(json.dumps({"modules": modules.listing()}), "application/json")
 
@@ -357,7 +317,7 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("order must be a list of module names")
         except (ValueError, AttributeError, IOError, OSError) as e:
             return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
-        core.debug_log("web page: module order %s" % ", ".join(order))
+        core.log("web page: module order %s" % ", ".join(order))
         refresh_page(force=True)
         self.send(json.dumps({"modules": modules.listing()}), "application/json")
 
@@ -377,7 +337,7 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, AttributeError, IOError, OSError) as e:
             return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
         refresh_page(force=True)       # the colours are built into the page
-        core.debug_log("web page: %s colours %s" % (data["module"], json.dumps(got, sort_keys=True)))
+        core.log("web page: %s colours %s" % (data["module"], json.dumps(got, sort_keys=True)))
         self.send(json.dumps({"module": data["module"], "colours": got, "tints": core.module_tints(data["module"])}), "application/json")
 
     def _post_palette(self):
@@ -416,7 +376,7 @@ class Handler(BaseHTTPRequestHandler):
 class Server(ThreadingMixIn, HTTPServer):
     """One thread per request, so a slow client never blocks the page.
     Listens on IPv6 and IPv4 when it can: phones often try the IPv6 address
-    of dreampi.local first, and an IPv4-only server makes them wait."""
+    of the .local name first, and an IPv4-only server makes them wait."""
     daemon_threads = True
     allow_reuse_address = True
     request_queue_size = 64   # browsers open several connections at once
@@ -440,7 +400,7 @@ class Server(ThreadingMixIn, HTTPServer):
         HTTPServer.server_bind(self)
 
     def server_name_lookup(self):
-        return "dreampi"
+        return "checkin"
 
     def handle_error(self, request, client_address):
         # dropped connections and rejected certificates are normal; log the rest
@@ -509,8 +469,7 @@ if __name__ == "__main__":
         PORT = int(sys.argv[1])
     if len(sys.argv) > 2:
         HTTPS_PORT = int(sys.argv[2])
-    core.reset_network_after_boot()      # DCNow! after every reboot
-    for target in (probes.checker, watchdog):
+    for target in (watchdog,):
         t = threading.Thread(target=target)
         t.daemon = True
         t.start()

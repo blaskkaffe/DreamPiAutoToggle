@@ -1,9 +1,8 @@
-# DreamPi Netswitch add-on - Wi-Fi setup module, web side. The setup itself (scanning, the temporary access
+# Check-in add-on - Wi-Fi setup module, web side. The setup itself (scanning, the temporary access
 # point, connecting) runs in the module's own service (netswitch_wifi_service.py + netswitch_wifi_setup.py in this folder);
 # this file is how the page starts and stops it and tells it which network to join:
 #   POST /wifitoggle   start Wi-Fi setup, or stop it while it runs (touches wifi_start / wifi_stop)
 #   POST /wificonnect  join a network chosen on this page (an alternative to the access point's own page)
-#   GET/POST /wifibutton   which button (1, 2 or both held) starts it: the standard form answer {values, options}
 # api() adds the Wi-Fi state to /api (with the texts the page's widgets show) and the warning boxes shown while setup is in progress.
 import json
 import os
@@ -14,10 +13,10 @@ import netswitch_core as core
 def _toggle(h):
     if core.wifi_state().get("state", "idle") == "idle":
         open(core.WIFI_START, "w").close()
-        core.debug_log("web page: Wi-Fi setup started")
+        core.log("web page: Wi-Fi setup started")
     else:
         open(core.WIFI_STOP, "w").close()
-        core.debug_log("web page: Wi-Fi setup stop requested")
+        core.log("web page: Wi-Fi setup stop requested")
 
 
 def _connect(h):
@@ -35,38 +34,17 @@ def _connect(h):
         with open(tmp, "w") as f:
             json.dump({"ssid": ssid, "password": password}, f)
         os.rename(tmp, core.WIFI_CONNECT)
-        core.debug_log("web page: Wi-Fi connect requested for %s" % ssid)
-
-
-def _wifi_button_reply():
-    choice = core.wifi_button()
-    return {"values": {"wifi_button": choice},
-            "texts": {"wifi_button": "Hold button %s for 3 s to start Wi-Fi setup" % ("1 + 2" if choice == "12" else choice)},
-            "options": {"choices": [{"value": c[0], "label": c[1]} for c in core.WIFI_BUTTON_CHOICES]}}
-
-
-def _get_button(h):
-    h.send(json.dumps(_wifi_button_reply()), "application/json")
-
-
-def _post_button(h):
-    try:
-        core.save_wifi_button((json.loads(h._body(1024).decode("utf-8")).get("values") or {}).get("wifi_button"))
-    except (ValueError, IOError, OSError, AttributeError) as e:
-        return h.send(str(e), "text/plain; charset=utf-8", status=400)
-    h.send(json.dumps(_wifi_button_reply()), "application/json")
-    return True
+        core.log("web page: Wi-Fi connect requested for %s" % ssid)
 
 
 PROTECTED = ("/wificonnect",)      # joins a network as root: the PIN is asked for when one is set
-GET = {"/wifibutton": _get_button}
-POST = {"/wifitoggle": _toggle, "/wificonnect": _connect, "/wifibutton": _post_button}
+POST = {"/wifitoggle": _toggle, "/wificonnect": _connect}
 
 # the button label and the line under "Wi-Fi setup" for each state of the setup service
 LABELS = {
     "idle": ("Search", "Search for a Wi-Fi network to connect the Pi to"),
     "scanning": ("Stop", "Scanning for Wi-Fi networks..."),
-    "hosting": ("Stop", "Pick a network below, or connect to \u201cDreamPi WiFi Config\u201d and open http://192.168.4.1"),
+    "hosting": ("Stop", "Pick a network below, or connect to \u201cCheckIn WiFi Config\u201d and open http://192.168.4.1"),
     "connecting": ("Stop", "Connecting to \u201c%s\u201d..."),
     "ok": ("Connected", "Connected to \u201c%s\u201d"),
     "failed": ("Stop", "Couldn't connect (%s)")}

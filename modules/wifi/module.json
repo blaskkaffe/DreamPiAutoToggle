@@ -5,37 +5,5 @@
  "visible": true,
  "order": 60,
  "ui": 2,
- "web": "netswitch_wifi_web",
- "led_messages": [
-  {
-   "id": "wifisetup-scan",
-   "label": "Scanning or hosting",
-   "group": "Wi-Fi setup",
-   "description": "Wi-Fi setup is looking for networks or hosting its own."
-  },
-  {
-   "id": "wifisetup-choose",
-   "label": "Choose a network",
-   "group": "Wi-Fi setup",
-   "description": "Wi-Fi setup is waiting for you to pick a network."
-  },
-  {
-   "id": "wifisetup-connecting",
-   "label": "Connecting",
-   "group": "Wi-Fi setup",
-   "description": "Wi-Fi setup is connecting to the network you picked."
-  },
-  {
-   "id": "wifisetup-ok",
-   "label": "Connected",
-   "group": "Wi-Fi setup",
-   "description": "Wi-Fi setup connected to the network."
-  },
-  {
-   "id": "wifisetup-failed",
-   "label": "Could not connect",
-   "group": "Wi-Fi setup",
-   "description": "Wi-Fi setup could not connect."
-  }
- ]
+ "web": "netswitch_wifi_web"
 }

@@ -14,13 +14,12 @@ from urllib.request import Request, urlopen
 from support import ROOT, web, core, sandbox, cleanup
 
 REAL_MODULES = os.path.join(ROOT, "modules")
-NAMES = ["background", "clock", "debuglog", "events", "led", "numbers", "openmenu", "players", "rebootupdate", "wifi"]      # the modules the picker can switch
-HIDDEN = ["switcher", "system"]                                                # always on, not in the picker
+NAMES = ["checkin", "clock", "contacts", "rebootupdate", "wifi"]      # the modules the picker can switch
+HIDDEN = ["system"]                                                # always on, not in the picker
 ALL = sorted(NAMES + HIDDEN)
 # a path only that module answers (GET, or POST when None)
-ENDPOINT = {"background": ("GET", "/background/dc-background.js"), "clock": ("GET", "/clock"), "events": ("GET", "/events/view"), "numbers": ("GET", "/numbers"), "openmenu": ("GET", "/openmenu/view"), "players": ("GET", "/players"), "debuglog": ("GET", "/dtmf"),
-            "led": ("GET", "/ledconfig"), "wifi": ("POST", "/wifitoggle"), "rebootupdate": ("GET", "/update")}
-HIDDEN_ENDPOINT = {"switcher": ("GET", "/status"), "system": ("GET", "/about")}
+ENDPOINT = {"checkin": ("GET", "/checkin"), "clock": ("GET", "/clock"), "contacts": ("GET", "/contacts"), "wifi": ("POST", "/wifitoggle"), "rebootupdate": ("GET", "/update")}
+HIDDEN_ENDPOINT = {"system": ("GET", "/about")}
 BASE_IDS = ('id="dash"', 'id="set-boxes"', 'id="settings"', 'id="bg"', 'id="warnings"')
 
 
@@ -53,8 +52,6 @@ class Base(unittest.TestCase):
         self.modules = os.path.join(self.tmp, "modules")
         shutil.copytree(REAL_MODULES, self.modules, ignore=shutil.ignore_patterns("__pycache__"))
         self.saved_dir, core.MODULES_DIR = core.MODULES_DIR, self.modules
-        for off_by_default in ("debuglog", "background"):
-            core.save_module_enabled(off_by_default, True)   # the tests want to see them
         if self.ENABLE_WIFI:
             core.save_module_enabled("wifi", True)
         web.refresh_page(force=True)
@@ -129,9 +126,9 @@ class RepoModules(unittest.TestCase):
 
     def test_defaults(self):
         on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["enabled"]) for n in ALL)
-        self.assertEqual(on, {"background": False, "clock": True, "debuglog": False, "events": True, "led": True, "numbers": True, "openmenu": True, "players": True, "rebootupdate": True, "switcher": True, "system": True, "wifi": False})
+        self.assertEqual(on, {"checkin": True, "clock": True, "contacts": True, "rebootupdate": True, "system": True, "wifi": False})
         hidden = [n for n in ALL if json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["visible"] is False]
-        self.assertEqual(hidden, HIDDEN)                   # the network switcher and the system info can't be switched off
+        self.assertEqual(hidden, HIDDEN)                   # the system info can't be switched off
 
 
 class WithEverything(Base):
@@ -151,62 +148,44 @@ class WithEverything(Base):
 
     def test_boxes_are_shared_by_name_between_modules(self):
         lay = layout_of(self.page())
-        gpio = [b for b in lay["settings"] if b["id"] == "gpio"]
-        self.assertEqual(len(gpio), 1)
-        self.assertEqual(gpio[0]["mods"], ["switcher", "led", "wifi"])          # one GPIO box, three modules in picker order (the network buttons are the switcher's)
-        self.assertEqual(gpio[0]["title"], "GPIO")
         system = [b for b in lay["settings"] if b["id"] == "system"][0]
         self.assertEqual(system["mods"], ["wifi", "rebootupdate"])
         self.assertEqual([w["type"] for w in system["items"] if w["mod"] == "rebootupdate"][-1], "row")      # the Reboot row ends the System box
         self.assertEqual([b["id"] for b in lay["settings"]][-2:], ["about", "system"])                     # System is the very last box, About just above it
-        appearance = [b for b in lay["settings"] if b["id"] == "appearance"][0]
-        self.assertEqual((appearance["mods"], appearance["title"]), (["switcher", "clock", "players", "events", "openmenu", "debuglog", "background"], "Appearance"))      # the colours (network, clock, players, events, openMenu link, debug log), the notification highlight look and the background's switch
-        self.assertEqual([w["control"]["module"] for w in appearance["items"] if w["type"] == "row" and w["control"]["type"] == "toggle"], ["background"])
         about = [b for b in lay["settings"] if b["id"] == "about"][0]
         self.assertEqual((about["mods"], about["title"]), (["system"], "About"))               # the versions are their own box, not part of System
-        self.assertEqual([b["id"] for b in lay["dashboard"]], ["network", "clock", "players", "events", "openmenu", "debug log"])
+        self.assertEqual([b["id"] for b in lay["dashboard"]], ["checkin", "clock"])
+        self.assertEqual([b["id"] for b in lay["settings"]], ["check-in", "appearance", "clock", "contacts", "colours", "about", "system"])
 
     def test_system_is_the_last_settings_box_whatever_the_picker_order(self):
-        core.save_module_order(["rebootupdate", "wifi", "system", "debuglog", "background", "led", "numbers", "events", "players", "clock", "switcher"])
+        core.save_module_order(["rebootupdate", "wifi", "system", "contacts", "clock", "checkin"])
         lay = layout_of(self.page())
         self.assertEqual([b["id"] for b in lay["settings"]][-1], "system")
         self.assertEqual(len([b for b in lay["settings"] if b["id"] == "system"]), 1)
-
-    def test_led_hardware_settings_are_in_the_gpio_box_and_come_from_the_led_module(self):
-        lay = layout_of(self.page())
-        gpio = [b for b in lay["settings"] if b["id"] == "gpio"][0]
-        keys = [c["key"] for w in gpio["items"] if w["mod"] == "led" for f in w["fields"] for c in f["controls"]]
-        self.assertEqual(keys, ["led_count", "led_order", "led_gpio"])
-        led_box = [b for b in lay["settings"] if b["id"] == "status led"][0]
-        custom = led_box["items"][0]
-        self.assertEqual(custom["type"], "custom")
-        self.assertNotIn("led-count-i", custom["html"])                  # the hardware rows are not in the messages widget
-        self.assertIn('id="cal-pop"', custom["html"])                    # but the rest of it is (markup came from messages.html)
 
     def test_the_about_module_is_listed_as_about_and_moves_its_box(self):
         got = {m["name"]: m["title"] for m in self.json("/modules")["modules"]}
         self.assertEqual(got["system"], "About")                                   # the picker row says what it moves
         core.save_module_order(["system"])                                         # the rest keeps its order after it
         web.refresh_page(force=True)
-        self.assertEqual([b["id"] for b in layout_of(self.page())["settings"]][0], "about")
+        self.assertEqual([b["id"] for b in layout_of(self.page())["settings"]][0], "colours")      # the system module's first box
 
     def test_protected_paths_are_the_modules_own_post_routes(self):
         import netswitch_modules as mods
-        self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/wificonnect"})
+        self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/wificonnect", "/contacts/import", "/contacts/active"})
         for path in mods._state["protected"]:
             self.assertTrue(mods.route("POST", path), path)
 
     def test_modules_menu_lists_them_all(self):
         got = self.json("/modules")["modules"]
-        self.assertEqual([m["name"] for m in got], ["switcher", "clock", "players", "events", "openmenu", "numbers", "led", "debuglog", "system", "wifi", "rebootupdate", "background"])   # picker order, the always-on modules included
-        self.assertEqual([m["name"] for m in got if m["visible"] is False], ["switcher", "system"])                     # which the page lists without a switch
+        self.assertEqual([m["name"] for m in got], ["checkin", "clock", "contacts", "system", "wifi", "rebootupdate"])   # picker order, the always-on modules included
+        self.assertEqual([m["name"] for m in got if m["visible"] is False], ["system"])                     # which the page lists without a switch
         self.assertTrue(all(m["enabled"] for m in got))
         self.assertTrue(all(m["title"] and m["description"] for m in got))
 
 
 class WithNothing(Base):
-    """The base alone: the website with the network box, the two buttons, buttons config, appearance, about,
-    reboot and the Modules menu."""
+    """The base alone: the page frame, About and the Modules menu."""
     def setUp(self):
         Base.setUp(self)
         for n in NAMES:
@@ -219,8 +198,8 @@ class WithNothing(Base):
             self.assertIn(ident, html)
         for n in NAMES:
             self.assertFalse(present(html, n), n)
-        self.assertEqual(layout_of(html)["modules"], ["switcher", "system"])
-        for word in ("led-section", "Status LED", "NeoPixel", "Special phone numbers", "dcbg", "Debug log", "Online players", "@@"):
+        self.assertEqual(layout_of(html)["modules"], ["system"])
+        for word in ("Check-in board", "contacts-import", "@@"):
             self.assertNotIn(word, html, word)
         self.check_js(html)
 
@@ -230,24 +209,10 @@ class WithNothing(Base):
 
     def test_everything_in_the_base_still_works(self):
         d = self.json("/api")
-        self.assertEqual(d["network"], "dcnow")
-        self.assertIn("look", d["dreampi"])
+        self.assertNotIn("checkin", d)
         self.assertNotIn("wifi", d)
-        self.assertNotIn("debug", d)
-        self.assertEqual(self.status("POST", "/dcnet"), 204)
-        self.assertEqual(self.status("GET", "/status"), 200)
-        self.assertEqual(self.status("GET", "/buttonconfig"), 200)
         self.assertEqual(self.status("GET", "/about"), 200)
-        self.assertEqual([m["name"] for m in self.json("/modules")["modules"]], ["switcher", "system"])      # only the always-on ones are left
-
-    def test_the_dreampi_dot_still_has_a_look(self):
-        import netswitch_modules as mods
-        switcher = mods.get("switcher")
-        for state, effect in (("ok", "solid"), ("busy", "blink"), ("off", "blink"), ("call-dcnow", "solid")):
-            look = switcher._dot_look(state)
-            self.assertEqual(look["effect"], effect, state)
-            self.assertRegex(look["colour"], r"^[a-z-]+$")                        # a palette id (or dcnow / dcnet / network), never a hex value
-        self.assertIsNone(switcher._dot_look("somethingelse"))
+        self.assertEqual([m["name"] for m in self.json("/modules")["modules"]], ["system"])      # only the always-on one is left
 
     def test_unknown_paths_are_404_not_the_page(self):
         self.assertEqual(self.status("GET", "/nothing-here"), 404)
@@ -304,28 +269,27 @@ class OneModuleGone(Base):
             self.assertIn(self.status(*ENDPOINT[name]), (200, 204), name)
 
     def test_switching_is_remembered_in_modules_json(self):
-        self.status("POST", "/modules", {"name": "players", "enabled": False})
+        self.status("POST", "/modules", {"name": "contacts", "enabled": False})
         with open(core.MODULES_STATE) as f:
-            self.assertEqual(json.load(f)["players"], False)
-        self.assertFalse(core.module_enabled("players"))
-        self.assertTrue(core.module_enabled("numbers"))
+            self.assertEqual(json.load(f)["contacts"], False)
+        self.assertFalse(core.module_enabled("contacts"))
+        self.assertTrue(core.module_enabled("checkin"))
 
     def test_bad_menu_requests(self):
         self.assertEqual(self.status("POST", "/modules", {"name": "nope", "enabled": True}), 404)
-        self.assertEqual(self.status("POST", "/modules", {"name": "switcher", "enabled": False}), 404)       # not in the picker
-        self.assertEqual(self.status("POST", "/modules", {"name": "led"}), 400)
-        self.assertEqual(self.status("POST", "/modules", {"name": "led", "enabled": "yes"}), 400)
+        self.assertEqual(self.status("POST", "/modules", {"name": "system", "enabled": False}), 404)       # not in the picker
+        self.assertEqual(self.status("POST", "/modules", {"name": "clock"}), 400)
+        self.assertEqual(self.status("POST", "/modules", {"name": "clock", "enabled": "yes"}), 400)
         self.assertEqual(self.status("POST", "/modules", {"name": "../x", "enabled": True}), 404)
-        req = Request(self.base + "/modules", method="POST", data=b'{"name":"led","enabled":false}')
+        req = Request(self.base + "/modules", method="POST", data=b'{"name":"clock","enabled":false}')
         with self.assertRaises(HTTPError) as cm:                  # from another site: no header, no origin
             urlopen(req, timeout=10)
         self.assertEqual(cm.exception.code, 403)
-        self.assertTrue(core.module_enabled("led"))
+        self.assertTrue(core.module_enabled("clock"))
 
 
 class BrokenAndNewModules(Base):
     def test_a_module_that_fails_to_import_is_reported_and_the_rest_works(self):
-        shutil.copy(os.path.join(self.modules, "numbers", "module.json"), os.path.join(self.modules, "numbers", "module.json.bak"))
         folder = os.path.join(self.modules, "extra")
         os.makedirs(folder)
         with open(os.path.join(folder, "module.json"), "w") as f:
@@ -337,7 +301,7 @@ class BrokenAndNewModules(Base):
         self.touch_all()
         html = self.page()
         self.assertNotIn("extra-box", html)
-        self.assertTrue(present(html, "led"))
+        self.assertTrue(present(html, "checkin"))
         extra = [m for m in self.json("/modules")["modules"] if m["name"] == "extra"][0]
         self.assertIn("broken on purpose", extra["error"])
 
@@ -368,43 +332,19 @@ class BrokenAndNewModules(Base):
         self.check_js(html)
 
     def test_editing_a_page_file_shows_up_without_a_restart(self):
-        with open(os.path.join(self.modules, "led", "page.css"), "a") as f:
+        with open(os.path.join(self.modules, "checkin", "page.css"), "a") as f:
             f.write("\n.marker-for-the-test{color:red}\n")
         self.touch_all()
         self.assertIn("marker-for-the-test", self.page())
 
 
 class Services(unittest.TestCase):
-    """The LED and buttons services follow the Modules menu."""
+    """The Wi-Fi service follows the Modules menu."""
     def setUp(self):
         self.tmp = sandbox()
 
     def tearDown(self):
         cleanup(self.tmp)
-
-    def test_led_service_drives_no_leds_while_the_module_is_off(self):
-        import netswitch_led as led
-        import netswitch_ledconfig as ledconfig
-        ledconfig.save_led_count(5)
-        self.assertEqual(led.wanted_count(), 5)
-        core.save_module_enabled("led", False)
-        self.assertEqual(led.wanted_count(), 0)
-        core.save_module_enabled("led", True)
-        self.assertEqual(led.wanted_count(), 5)
-
-    def test_buttons_service_wifi_follows_the_module(self):
-        import netswitch_buttons as buttons
-        self.assertFalse(buttons.wifi_enabled())                # the Wi-Fi module is off by default
-        core.save_module_enabled("wifi", True)
-        self.assertTrue(buttons.wifi_enabled())
-        core.save_module_enabled("wifi", False)
-        self.assertFalse(buttons.wifi_enabled())
-
-    def test_buttons_service_loads_no_module_code(self):
-        """Wi-Fi is layered on top: a button hold only touches wifi_start / wifi_stop; the module has its own service."""
-        code = ("import sys; sys.path[:0] = %r; import netswitch_buttons; "
-                "sys.exit(1 if 'netswitch_wifi_setup' in sys.modules else 0)" % [ROOT])
-        self.assertEqual(subprocess.call(["python3", "-c", code]), 0)
 
     def test_wifi_service_idles_while_module_is_off_and_runs_a_requested_setup(self):
         import netswitch_wifi_service as svc
@@ -455,10 +395,10 @@ class InstallerTests(unittest.TestCase):
                 self.assertTrue(os.path.exists(os.path.join(self.dest, "modules", n, "layout.json")), n)
 
     def test_no_pycache_is_installed(self):
-        os.makedirs(os.path.join(self.src, "modules", "led", "__pycache__"))
-        open(os.path.join(self.src, "modules", "led", "__pycache__", "x.pyc"), "w").close()
+        os.makedirs(os.path.join(self.src, "modules", "clock", "__pycache__"))
+        open(os.path.join(self.src, "modules", "clock", "__pycache__", "x.pyc"), "w").close()
         self.run_sync(self.src, self.dest)
-        self.assertFalse(os.path.exists(os.path.join(self.dest, "modules", "led", "__pycache__")))
+        self.assertFalse(os.path.exists(os.path.join(self.dest, "modules", "clock", "__pycache__")))
 
     def test_a_module_dropped_from_the_folder_is_removed_and_cleans_up_after_itself(self):
         self.run_sync(self.src, self.dest)
@@ -466,17 +406,17 @@ class InstallerTests(unittest.TestCase):
         with open(os.path.join(self.dest, "modules", "wifi", "remove.sh"), "w") as f:      # what its remove.sh would do
             f.write('echo gone > "%s"\n' % marker)
         shutil.rmtree(os.path.join(self.src, "modules", "wifi"))
-        shutil.rmtree(os.path.join(self.src, "modules", "players"))
+        shutil.rmtree(os.path.join(self.src, "modules", "contacts"))
         out = self.run_sync(self.src, self.dest)
         self.assertFalse(os.path.exists(os.path.join(self.dest, "modules", "wifi")))
-        self.assertFalse(os.path.exists(os.path.join(self.dest, "modules", "players")))
-        self.assertTrue(os.path.exists(os.path.join(self.dest, "modules", "led")))
+        self.assertFalse(os.path.exists(os.path.join(self.dest, "modules", "contacts")))
+        self.assertTrue(os.path.exists(os.path.join(self.dest, "modules", "clock")))
         self.assertEqual(open(marker).read().strip(), "gone")
         self.assertIn("wifi", out)
 
     def test_a_module_added_to_the_folder_is_installed_and_old_copies_are_replaced(self):
         self.run_sync(self.src, self.dest)
-        stale = os.path.join(self.dest, "modules", "led", "old-file.py")
+        stale = os.path.join(self.dest, "modules", "clock", "old-file.py")
         open(stale, "w").write("stale")
         extra = os.path.join(self.src, "modules", "extra")
         os.makedirs(extra)
@@ -493,17 +433,16 @@ class InstallerTests(unittest.TestCase):
                 path = os.path.join(REAL_MODULES, n, script)
                 if os.path.exists(path):
                     self.assertEqual(subprocess.run(["sh", "-n", path]).returncode, 0, path)
-        led = open(os.path.join(REAL_MODULES, "led", "install.sh")).read()
-        for needle in ("ConditionPathExists=$DEST/modules/led/netswitch_led.py", "ConditionPathExists=$DEST/modules/led/netswitch_ledconfig.py",
-                       "ExecStart=$(command -v python3) $DEST/modules/led/netswitch_led.py", 'NS_SERVICES="$NS_SERVICES dreampi-netswitch-led.service"'):
-            self.assertIn(needle, led)
-        self.assertIn("disable --now dreampi-netswitch-led.service", open(os.path.join(REAL_MODULES, "led", "remove.sh")).read())
+        wifi = open(os.path.join(REAL_MODULES, "wifi", "install.sh")).read()
+        for needle in ('NS_SERVICES="$NS_SERVICES dreampi-netswitch-wifi.service"',):
+            self.assertIn(needle, wifi)
+        self.assertIn("disable --now dreampi-netswitch-wifi.service", open(os.path.join(REAL_MODULES, "wifi", "remove.sh")).read())
 
     def test_installer_copies_the_loader_and_the_base_only(self):
         text = open(os.path.join(ROOT, "install.sh")).read()
         self.assertIn("netswitch_modules.py", text)
-        for gone in ("netswitch_ledconfig.py\" ", "netswitch_players.py\" ", "page/led.html\" "):
-            self.assertNotIn('cp "$SRC/' + gone.strip(), text)
+        for gone in ("netswitch_contacts.py", "netswitch_checkin.py"):
+            self.assertNotIn('cp "$SRC/' + gone, text)           # modules are copied as folders, never one by one
 
 
 class Layering(unittest.TestCase):
@@ -521,8 +460,7 @@ class Layering(unittest.TestCase):
                 for line in f:
                     m = re.match(r"\s*(?:import|from)\s+(\w+)", line)
                     if m and m.group(1) in module_files:
-                        # one place loads a module's code on purpose, guarded: the hook inside DreamPi (the debug log's part)
-                        self.assertIn((name, m.group(1)), [("netswitch_hook.py", "netswitch_hookdebug")], (name, line))
+                        self.fail("%s imports module code: %s" % (name, line))
 
     def test_modules_only_use_the_base_and_themselves(self):
         base = set(f[:-3] for f in os.listdir(ROOT) if f.endswith(".py"))

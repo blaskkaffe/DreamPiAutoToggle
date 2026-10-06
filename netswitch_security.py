@@ -1,4 +1,4 @@
-# DreamPi Netswitch add-on - who may talk to the web service, and the optional PIN.
+# Check-in add-on - who may talk to the web service, and the optional PIN.
 # The web service runs as root (it restarts DreamPi, reboots the Pi and runs the updater), so
 # a request is checked before anything is done:
 #   - Host header: refuse names that are not this Pi's (DNS rebinding: a web page on the
@@ -63,8 +63,8 @@ def extra_hosts():
 
 def host_allowed(header):
     """True when the Host header names this Pi: an IP address, a plain or local name, its own
-    host name, or something listed in allowed_hosts. No Host header (old HTTP/1.0 clients such
-    as the Dreamcast) is fine: a browser always sends one."""
+    host name, or something listed in allowed_hosts. No Host header (old HTTP/1.0 clients,
+    a very simple device) is fine: a browser always sends one."""
     host = _host_only(header)
     if not host:
         return not (header or "").strip()

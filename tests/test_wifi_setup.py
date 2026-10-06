@@ -126,14 +126,14 @@ class DemoModeTests(unittest.TestCase):
 
     def test_dummy_networks_are_listed(self):
         nets = w.scan_networks("wlan0")
-        self.assertEqual([n["ssid"] for n in nets][:2], ["DreamCast-Home", "Neighbour 5G"])
+        self.assertEqual([n["ssid"] for n in nets][:2], ["Office-Wifi", "Neighbour 5G"])
         self.assertTrue(any(not n["secured"] for n in nets))
 
     def test_demo_has_an_interface_without_wifi_hardware(self):
         self.assertEqual(w.wifi_iface(), "wlan0")
 
     def test_right_password_connects(self):
-        self.assertEqual(self.cycle("DreamCast-Home", "demo"), ["scanning", "hosting", "connecting", "ok", "idle"])
+        self.assertEqual(self.cycle("Office-Wifi", "demo"), ["scanning", "hosting", "connecting", "ok", "idle"])
 
     def test_open_network_connects_without_a_password(self):
         self.assertEqual(self.cycle("CoffeeShop Free", "")[-2:], ["ok", "idle"])
@@ -149,14 +149,14 @@ class DemoModeTests(unittest.TestCase):
         self.assertEqual(self.cycle("Old Router", "nope"), ["scanning", "hosting", "connecting", "failed", "scanning", "idle"])   # failed -> rescans -> sees the stop request
 
     def test_try_connect_results(self):
-        self.assertTrue(w.try_connect("wlan0", "DreamCast-Home", "demo"))
-        self.assertFalse(w.try_connect("wlan0", "DreamCast-Home", "wrong"))
+        self.assertTrue(w.try_connect("wlan0", "Office-Wifi", "demo"))
+        self.assertFalse(w.try_connect("wlan0", "Office-Wifi", "wrong"))
         self.assertTrue(w.try_connect("wlan0", "CoffeeShop Free", ""))
         self.assertTrue(w.try_connect("wlan0", "Some Hidden Net", "demo"))
 
     def test_no_wpa_supplicant_conf_is_written(self):
-        w.try_connect("wlan0", "DreamCast-Home", "demo")
-        self.assertFalse(os.path.exists(w.WPA_CONF) and "DreamCast-Home" in open(w.WPA_CONF).read())
+        w.try_connect("wlan0", "Office-Wifi", "demo")
+        self.assertFalse(os.path.exists(w.WPA_CONF) and "Office-Wifi" in open(w.WPA_CONF).read())
 
 
 if __name__ == "__main__":

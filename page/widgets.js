@@ -19,16 +19,14 @@ function h(tag,attrs,kids){var el=document.createElement(tag),k;
 function lines(t){return esc(t==null?"":t).replace(/\n/g,"<br>")}
 function setLines(el,t){setHtml(el,lines(t))}
 function sh(el,show){setStyle(el,"display",show?"":"none")}
-// A colour reference: a palette id ("orange"), one of the module's own colour keys ("dcnow") or "module.key" of another module
+// A colour reference: a palette id ("orange"), one of the module's own colour keys ("checkin") or "module.key" of another module
 function colourId(ref,mod){if(!ref)return"";var c=S.colours||LAY.colours||{};
- if(ref.indexOf(".")>0){var p=ref.split(".");return realColour((c[p[0]]||{})[p[1]]||"")}
- return realColour((c[mod]||{})[ref]||ref)}
-// "Selected network" is not a colour of its own: it is the colour DCNow! or DCNET has right now, so it follows the switch
-function realColour(id){if(id!=="network")return id;var sw=(S.colours||LAY.colours||{}).switcher||{};return sw[S.network||"dcnow"]||"orange"}
+ if(ref.indexOf(".")>0){var p=ref.split(".");return (c[p[0]]||{})[p[1]]||""}
+ return (c[mod]||{})[ref]||ref}
 // Whether the background of a colour is coloured (the default) or neutral: the "Coloured background" box next to a colour pick
 function tintOf(ref,mod){if(!ref)return true;var p=ref.indexOf(".")>0?ref.split("."):[mod,ref],t=(S.tints||LAY.tints||{})[p[0]]||{};return t[p[1]]!==false}
 // An element with its own colour (a button of the module's colour key): it follows S.colours live and is not repainted with the
-// module's primary colour, so the network buttons keep the colours chosen in Settings whichever network is selected.
+// module's primary colour, so the buttons keep the colours chosen in Settings.
 function colourClass(el,ref,mod){el.setAttribute("data-own-colour","1");
  function apply(){var r=val(ref),id=colourId(r,mod),old=el._cc;el.classList.toggle("plain",!tintOf(r,mod));if(old===id)return;
   if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._cc=id}
@@ -90,12 +88,12 @@ function hideEmptyBoxes(){var bs=document.querySelectorAll("[data-box]"),i,j;
 var themeKey="";
 function applyTheme(){var p={},pk={},k;for(k in (LAY.primary||{}))p[k]=LAY.primary[k];for(k in (S.primary||{}))p[k]=S.primary[k];
  for(k in (LAY.primary_key||{}))pk[k]=LAY.primary_key[k];for(k in (S.primary_key||{}))pk[k]=S.primary_key[k];
- var key=JSON.stringify([p,pk,S.tints||LAY.tints||{},S.network||"",(S.colours||{}).switcher||""]);if(key===themeKey)return;themeKey=key;
+ var key=JSON.stringify([p,pk,S.tints||LAY.tints||{},""]);if(key===themeKey)return;themeKey=key;
  var els=document.querySelectorAll("[data-mod]"),i,root="";
- for(i=0;i<(LAY.modules||[]).length&&!root;i++)root=realColour(p[LAY.modules[i]]||"");
+ for(i=0;i<(LAY.modules||[]).length&&!root;i++)root=p[LAY.modules[i]]||"";
  function paint(el,id){var old=el._pc;if(old===id)return;if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._pc=id}
  paint(document.body,root);
- for(i=0;i<els.length;i++)if(!els[i].hasAttribute("data-own-colour")){var m=els[i].getAttribute("data-mod");paint(els[i],realColour(p[m]||""));
+ for(i=0;i<els.length;i++)if(!els[i].hasAttribute("data-own-colour")){var m=els[i].getAttribute("data-mod");paint(els[i],p[m]||"");
   els[i].classList.toggle("plain",!!pk[m]&&!tintOf(m+"."+pk[m],m))}}   // a neutral background where the user switched the colour's background off
 // ---- data sources a module asked for in its layout ("data": {"players": {"url": "/players", "every": 60}}): fetched into S.<name>
 // every N seconds while the page is on screen (with "when": "settings", only while Settings is open); "retry_if": "busy" asks again
@@ -168,7 +166,7 @@ W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.l
 W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx))};
 // ---- the module's own colour choice: a "Colour" button in the chosen colour that opens a pop-up with the palette's colours;
 // the pick is kept for the module (core.set_module_colour)
-// the palette in the server's order, without the ids a pick leaves out ("exclude": the network colours cannot be "Selected network", that would be a circle)
+// the palette in the server's order, without the ids a pick leaves out ("exclude": palette ids a pick leaves out)
 function paletteOrder(s){return (LAY.palette||[]).filter(function(c){return (s.exclude||[]).indexOf(c.id)<0})}
 function colourOfId(id){var r=null;(LAY.palette||[]).forEach(function(p){if(p.id===id)r=p});return r}
 function mixWhite(hex){var n=[1,3,5].map(function(i){var v=parseInt(hex.substr(i,2),16);return Math.round(v+(255-v)*0.45)});return "#"+n.map(function(v){return (v<16?"0":"")+v.toString(16)}).join("")}
@@ -199,15 +197,14 @@ W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri
   var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui+";--cl:"+c.ui_l,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
   b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){p.close();refresh();ctx.saved()}})};grid.appendChild(b)});
  btn.onclick=function(e){p.toggle(btn,e)};
- function paint(){var cur=(((S.colours||{})[s.mod])||{})[s.key]||"",real=realColour(cur);
+ function paint(){var cur=(((S.colours||{})[s.mod])||{})[s.key]||"",real=cur;
   if(btn._cc!==real){if(btn._cc)btn.classList.remove("c-"+btn._cc);if(real)btn.classList.add("c-"+real);btn._cc=real;
    btn.setAttribute("aria-label",(s.label||"Colour")+": "+(names[cur]||cur||"not set"))}
-  if(btns.network){var nw=colourOfId(realColour("network"));if(nw)btns.network.style.cssText="--c:"+nw.ui+";--cl:"+nw.ui_l}      // the ball shows the network's colour now
   for(var id in btns){var on=id===cur;btns[id].classList.toggle("sel",on);btns[id].setAttribute("aria-pressed",on?"true":"false")}}
  function paintTint(){if(tint)tint.checked=tintOf(s.key,s.mod)}
  UPD.push(paint);UPD.push(paintTint);paint();paintTint();hook("settingsClose",function(){p.close()});return el};
-// ---- the status box: a label, a headline and rows that show when it is tapped open (network box, players box)
-function dotLook(el,v){if(v===null||typeof v==="object")lookDot(el,v);else dot(el,v)}
+// ---- the status box: a label, a headline and rows that show when it is tapped open (the clock box, the System box)
+function dotLook(el,v){dot(el,v)}
 W.status=function(s){var d=h("span",{"class":"dot"}),t=h("span",{"class":"nw"}),sub=h("span",{"class":"sub blk"}),
  el=h("span",{"class":"status"},[s.dot!==undefined?d:null,h("span",{},[t,sub])]);
  if(s.dot!==undefined)bind(s.dot,function(v){dotLook(d,v)});
@@ -344,22 +341,6 @@ W.links=function(s){var btn=s.style==="buttons",el=h("span",{"class":"links keep
 //   lead / lead_big  a small line over a bold one in a column at the left (a date and a time)   title, href (the title is a link)   sub   tag, tag_colour
 //   icon  {kind: "star" | "bell", post, on: the item's field, data: the data source the answer replaces, body: fixed fields, fields: {key: item field}}:
 //         a round on / off button at the end that POSTs {...body, ...fields, on} (a favourite, a reminder)
-// ---- games a module that can start games on the Dreamcast announces (module.json "launcher": the openMenu link; LAY.launcher): a list row with
-// "start": {"game": field, "text": field, "label": "Join"} gets a Join button when its game is among them and the Dreamcast is connected. The game field holds a game's name (same name, or one
-// inside the other); with "text" too, the row is a free text (an event) and the card game whose name appears in the two fields is meant.
-// Only games that work online are announced, so the buttons are the games that can be played with others.
-function launcherNorm(t){return String(t||"").toLowerCase().replace(/\u00d7/g,"x").replace(/[^a-z0-9]+/g,"")}
-function launcherGames(){var L=LAY.launcher,d=L&&S[L.games];return d&&d.games?d.games.filter(function(g){return g.online!==false}):[]}
-function launcherGame(spec,it){var all=launcherGames(),i,g,n,w,best=null;if(!all.length)return null;
- if(spec.text){var hay=launcherNorm((it[spec.game]||"")+" "+(it[spec.text]||""));
-  for(i=0;i<all.length;i++){g=all[i];n=launcherNorm(g.name);if(n.length>=5&&hay.indexOf(n)>=0&&(!best||n.length>launcherNorm(best.name).length))best=g}
-  return best}
- w=launcherNorm(it[spec.game]);if(w.length<3)return null;
- for(i=0;i<all.length;i++)if(launcherNorm(all[i].name)===w)return all[i];
- for(i=0;i<all.length;i++){g=all[i];n=launcherNorm(g.name);if(n.length>=3&&(w.indexOf(n)>=0||n.indexOf(w)>=0)&&(!best||n.length<launcherNorm(best.name).length))best=g}
- return best}
-// what the buttons of all lists depend on: the games announced and whether the Dreamcast can start one now
-function launcherSig(){var L=LAY.launcher;if(!L)return "";var st=S[L.state]||{},d=S[L.games]||{};return [d.hash,(d.games||[]).length,!!st.connected,!!st.busy].join("|")}
 // A line that scrolls round like the carousel when it is wider than its room, and stands still (left-aligned) when it fits: the names in a compact list
 // (a player's, a game's). node is what it shows (a text node or a link); it is measured when it is shown, resized or its fonts arrive.
 function marquee(node){var el=h("span",{"class":"carousel mq"}),trk=h("span",{"class":"trk"}),sp=h("span",{"class":"sp",text:"\u00a0\u00a0\u2022\u00a0\u00a0"}),t=h("span",{"class":"t"},[node,sp]),on=false;
@@ -382,11 +363,6 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
    :[tn,h("span",{"class":"pg",text:it[R.sub||"sub"]||""})]);      // long names scroll (not in the grid style, its pairs are short)
   if(R.tag_colour&&it[R.tag_colour]){var id=colourId(it[R.tag_colour],s.mod);if(id)c.style.color="var(--c-"+id+"-l)"}
   var kids=[R.lead?h("span",{"class":"pl"},[h("span",{text:it[R.lead]||""}),h("b",{text:it[R.lead_big]||""})]):null,t,R.tag?c:null],ic=R.icon;
-  var g=R.start?launcherGame(R.start,it):null,L=LAY.launcher,st=L?S[L.state]||{}:{};      // R.start: a Join button when a module that can start games on the Dreamcast announces this game as online, has it and is connected
-  if(g&&st.connected){var pb=h("button",{type:"button","class":"pill-s join",text:R.start.label||"Join","aria-label":(R.start.label||"Join")+" "+g.name});pb.disabled=!!st.busy;
-   pb.title=pb.disabled?"A game is already on its way to the Dreamcast":"Start "+g.name+" on the Dreamcast";
-   pb.onclick=function(e){e.stopPropagation();if(!confirm("Start "+g.name+" on the Dreamcast?"))return;pb.disabled=true;
-    post(L.start,{product:g.product},function(r,s2,b2){pb.disabled=false;if(!r&&b2&&b2.message)alert(b2.message);reloadData(L.state)})};kids.push(pb)}
   if(ic){var b=ui.iconButton(ic.kind,!!it[ic.on],title);
    b.onclick=function(e){e.stopPropagation();b.disabled=true;var body={},k;for(k in (ic.body||{}))body[k]=ic.body[k];for(k in (ic.fields||{}))body[k]=it[ic.fields[k]];body.on=b.getAttribute("aria-pressed")!=="true";
     post(ic.post,body,function(r){b.disabled=false;if(r){if(ic.data)S[ic.data]=r;engineUpdate()}})};kids.push(b)}
@@ -410,7 +386,7 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
     p.close();refresh()})})}
  setText(go,P.submit||"OK");go.onclick=submit;
  function paint(){var raw=val(s.items);if(raw==null){if(key!==null){key=null;inner.innerHTML=""}return}      // null: not known yet, nothing is said about it (no "Nobody ...")
-  var items=raw,k=JSON.stringify(items)+(s.row&&s.row.start?launcherSig():"");if(k===key)return;key=k;
+  var items=raw,k=JSON.stringify(items)+"";if(k===key)return;key=k;
   inner.innerHTML="";
   items.forEach(function(it,i){inner.appendChild(rowFor(it,i,false))});
   if(!items.length&&s.empty)inner.appendChild(s.style==="compact"||s.style==="grid"?h("span",{text:s.empty}):h("div",{"class":"srow"},[h("span",{text:s.empty})]));
@@ -574,7 +550,7 @@ W.triggers=function(s,ctx){var el=h("div",{"class":"wtrig"}),cfg=null,timer=null
    box.appendChild(h("div",{"class":"fld"},[inp,addI]));box.appendChild(msg)}
   del.onclick=function(){var i=cfg.rows.indexOf(row);ed.p.close();if(i>=0)cfg.rows.splice(i,1);paint();save()};done.onclick=function(){ed.p.close()};
   box.appendChild(h("div",{"class":"bar end"},[del,done]))}
- function lookOf(row){var l=row.look;if(!l)return;var id=colourId(l.colour,"switcher");return id?[id,l.effect,l.speed]:null}
+ function lookOf(row){var l=row.look;if(!l)return;var id=colourId(l.colour,"");return id?[id,l.effect,l.speed]:null}
  // an option changed: the row's own look follows at once (the server writes its title and grey line when it has saved)
  function soft(row){var re=rowEls[cfg.rows.indexOf(row)];if(!re)return;var o=row.opts||{};
   if(row.look&&o.colour){row.look={colour:o.colour,effect:o.effect,speed:o.speed};var lk=lookOf(row);if(lk)re.setLook(lk[0],lk[1],lk[2])}}
@@ -609,7 +585,7 @@ W.triggers=function(s,ctx){var el=h("div",{"class":"wtrig"}),cfg=null,timer=null
   post(s.source,body,function(r){if(r){ctx.saved();if(n===want)adopt(r)}})},100)}      // an answer to an older save is not used while a newer change is waiting
  TRIGGERS[s.source]=function(){xhrJson("GET",s.source,function(r){if(r&&cfg)adopt(r)})};         // reloadTriggers(source): the texts have changed on the server (the global level of the LED rows)
  hook("settingsOpen",load);hook("settingsClose",function(){pp.close()});
- hook("api",function(){if(cfg)cfg.rows.forEach(function(row,i){var lk=lookOf(row);if(lk&&rowEls[i])rowEls[i].setLook(lk[0],lk[1],lk[2])})});      // a row in the colour of the selected network follows the switch
+ hook("api",function(){if(cfg)cfg.rows.forEach(function(row,i){var lk=lookOf(row);if(lk&&rowEls[i])rowEls[i].setLook(lk[0],lk[1],lk[2])})});
  return el};
 // ---- a console: lines of text in a box. "lines": "@path" replaces them all; "tail": "/url" adds what is new (GET url?from=N -> {text, size, reset})
 W.console=function(s,ctx){var el=h("div",{"class":"console"+(s.nowrap?" nowrap":""),role:"log","aria-label":s.label||"Log"}),size=0,busy=false,rules=(s.rules||[]).map(function(r){return[new RegExp(r[0],"i"),r[1]]}),
@@ -636,6 +612,74 @@ W.info=function(s){var el=h("table",{"class":"about"});
  function paint(rows){setHtml(el,(rows||[]).map(function(r){return '<tr><td class="n">'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>'}).join(""))}
  if(s.rows!==undefined)bind(s.rows,paint);
  if(s.source)hook("settingsOpen",function(){xhrJson("GET",s.source,function(r){if(r)paint(r)})});return el};
+// ---- the roster: people as buttons (style "buttons") or one box per group with a row per person (style "boxes"), after CheckinChicken.
+// "source": "@checkin" (what the check-in module puts in /api: groups of people, the status menu, buildings). A tap on a person switches in /
+// out (POST s.toggle {id}); the small Status button opens the status menu under it (POST s.status {id, code, detail}). A grey button is out,
+// a coloured one is in (the colour of the person's department or building), a status colours it with its own colour and puts its name on it.
+// Only the palette's ids are used for colour. With several buildings a row of chips picks which ones this screen shows (kept in this browser;
+// ?location=A,B in the address sets it). "mode": "colours": the settings list of departments / buildings with a colour pick each (GET s.get, POST s.post).
+function rosterLocations(){var sel=[],q=(window.location.search||"").match(/[?&]location=([^&]*)/),k="checkin:locations";
+ try{if(q){sel=decodeURIComponent(q[1].replace(/\+/g," ")).split(",").map(function(x){return x.trim()}).filter(Boolean);localStorage.setItem(k,sel.join("|"))}
+  else sel=(localStorage.getItem(k)||"").split("|").filter(Boolean)}catch(e){}return sel}
+function rosterSaveLocations(sel){try{localStorage.setItem("checkin:locations",sel.join("|"))}catch(e){}}
+W.roster=function(s,ctx){
+ if(s.mode==="colours")return rosterColours(s,ctx);
+ var el=h("div",{"class":"roster"}),chips=h("div",{"class":"rp-chips"}),list=h("div",{"class":"rp-list"}),menu=h("div",{"class":"rp-menu"}),
+  sel=rosterLocations(),last="",D=null,cur=null,pop=null;
+ el.appendChild(chips);el.appendChild(list);el.appendChild(menu);document.body.classList.add("wide");
+ pop=ui.popup(menu);
+ function visible(p){if(!sel.length)return !p.restrict;return sel.indexOf(p.building)>=0||(!p.building&&!p.restrict)}
+ function person(id){var r=null;((D&&D.groups)||[]).forEach(function(g){g.people.forEach(function(p){if(p.id===id)r=p})});return r}
+ function colourCls(p){return p.colour?" c-"+p.colour:""}
+ function paintChips(){var b=(D&&D.buildings)||[],html=b.length<2?"":['<button type="button" class="pill-s'+(sel.length?"":" pri")+'" data-loc="">All</button>'].concat(b.map(function(n){
+  return '<button type="button" class="pill-s'+(sel.indexOf(n)>=0?" pri":"")+'" data-loc="'+esc(n)+'">'+esc(n)+'</button>'})).join("");setHtml(chips,html)}
+ function row(p,boxes){var name='<span class="rp-n">'+esc(p.name)+'</span>',sub=p.text||(p.in?"In":"Out"),
+  edit='<button type="button" class="pill-s rp-e" data-act="menu" aria-label="Set status for '+esc(p.name)+'">Status</button>';
+  if(boxes)return '<div class="rp-r" data-id="'+esc(p.id)+'"><button type="button" class="rp-t" data-act="toggle" aria-pressed="'+(p.in?"true":"false")+'" aria-label="'+esc(p.name)+': '+esc(sub)+' (tap to switch)">'+
+   '<span class="rp-d'+(p.colour?colourCls(p)+" on":"")+'"></span>'+name+'<span class="rp-s">'+esc(p.text||(p.role||""))+'</span></button>'+edit+'</div>';
+  return '<div class="rp-r" data-id="'+esc(p.id)+'"><button type="button" class="pill rp-b'+(p.colour?" pri"+colourCls(p):" out")+'" data-act="toggle" aria-pressed="'+(p.in?"true":"false")+'" aria-label="'+esc(p.name)+': '+esc(sub)+' (tap to switch)">'+
+   name+'<span class="rp-s">'+esc(p.status?p.text:(p.in?"In":"Out"))+'</span></button>'+edit+'</div>'}
+ function paint(){if(!D)return;paintChips();var boxes=D.style==="boxes",html="";
+  if(!D.total){setHtml(list,'<div class="sub rp-empty">'+esc(D.text)+'</div>');return}
+  D.groups.forEach(function(g){var ps=g.people.filter(visible);if(!ps.length)return;
+   var n=ps.filter(function(p){return p.in}).length;
+   html+=boxes?'<div class="now rp-box'+(g.colour?" c-"+g.colour:"")+'" data-own-colour="1"><div class="rp-gh"><span class="nlabel">'+esc(g.title)+'</span><span class="sub">'+n+'/'+ps.length+'</span></div>'+ps.map(function(p){return row(p,true)}).join("")+'</div>'
+    :'<div class="rp-g"><h2>'+esc(g.title)+' <span class="sub">'+n+'/'+ps.length+'</span></h2><div class="rp-grid">'+ps.map(function(p){return row(p,false)}).join("")+'</div></div>'});
+  setHtml(list,html||'<div class="sub rp-empty">Nobody to show for the chosen buildings.</div>')}
+ chips.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-loc]");if(!b)return;var n=b.getAttribute("data-loc");
+  if(!n)sel=[];else{var i=sel.indexOf(n);if(i>=0)sel.splice(i,1);else sel.push(n)}rosterSaveLocations(sel);paint()});
+ list.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-act]");if(!b)return;var r=b.closest(".rp-r"),id=r&&r.getAttribute("data-id");if(!id)return;
+  if(b.getAttribute("data-act")==="menu"){openMenu(id,b,e);return}
+  pop.close();b.disabled=true;post(s.toggle,{id:id},function(r2){b.disabled=false;if(r2&&r2.checkin){S.checkin=D=r2.checkin;last="";paint()}})});
+ // ---- the status menu
+ function menuHtml(p){var st=D.statuses||[];
+  return '<div class="t">'+esc(p.name)+(p.role?' <span class="sub">'+esc(p.role)+'</span>':'')+'</div>'+(p.phone?'<div class="sub rp-ph">'+esc(p.phone)+'</div>':'')+
+   '<div class="optrow rp-opts"><button type="button" class="pill-s'+(p.in&&!p.status?' on c-'+(p.colour||"green"):'')+'" data-code="IN">In</button><button type="button" class="pill-s'+(!p.in&&!p.status?" on c-global":"")+'" data-code="OUT">Out</button></div>'+
+   '<div class="optrow rp-opts">'+st.map(function(x){return '<button type="button" class="pill-s pri c-'+esc(x.colour)+(p.status===x.code?" on":"")+'" data-code="'+esc(x.code)+'" aria-pressed="'+(p.status===x.code?"true":"false")+'">'+esc(x.label)+'</button>'}).join("")+'</div>'+
+   '<div class="rp-need" style="display:none"></div><div class="bar end"><button type="button" class="pill-s" data-code="">Clear status</button><button type="button" class="pill-s" data-close="1">Close</button></div>'}
+ function openMenu(id,btn,e){var p=person(id);if(!p)return;cur=id;menu.innerHTML=menuHtml(p);pop.toggle(btn,e)}
+ function send(code,detail){post(s.status,{id:cur,code:code,detail:detail||""},function(r){if(r&&r.checkin){S.checkin=D=r.checkin;last="";paint()}pop.close()})}
+ menu.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("button");if(!b)return;
+  if(b.hasAttribute("data-close")){pop.close();return}
+  if(b.hasAttribute("data-set")){var inp=menu.querySelector(".rp-need input");send(b.getAttribute("data-set"),inp?inp.value:"");return}
+  if(!b.hasAttribute("data-code"))return;var code=b.getAttribute("data-code"),st=null;(D.statuses||[]).forEach(function(x){if(x.code===code)st=x});
+  if(!st||!st.needs){send(code);return}
+  var need=menu.querySelector(".rp-need"),type=st.needs==="time"?"time":st.needs==="date"?"date":"text";
+  need.style.display="";need.innerHTML='<label class="sub">'+esc(st.label)+(st.needs==="time"?" at":st.needs==="date"?" until":": ")+' <input type="'+type+'" value="'+esc(st.default||"")+'" maxlength="60" aria-label="'+esc(st.label)+'"></label> <button type="button" class="pill-s pri c-'+esc(st.colour)+'" data-set="'+esc(code)+'">Set</button>';
+  var inp=need.querySelector("input");if(inp&&inp.focus)inp.focus()});
+ bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+(d.style||"")+"|"+d.groups.length;if(key===last)return;last=key;D=d;paint()});
+ return el};
+// the settings list: a department / building per row with a select of palette colours ("Automatic" = the module picks one)
+function rosterColours(s,ctx){var el=h("div",{"class":"roster-cols"}),R=null;
+ function paint(){if(!R)return;var html="";["department","building"].forEach(function(kind){var rows=(R.colours||{})[kind]||[];if(!rows.length)return;
+  html+='<div class="t rp-ct">'+(kind==="department"?"Departments":"Buildings")+'</div>'+rows.map(function(r){
+   var opts='<option value="">Automatic</option>'+(LAY.palette||[]).map(function(c){return '<option value="'+esc(c.id)+'"'+(r.own&&r.colour===c.id?" selected":"")+'>'+esc(c.name)+'</option>'}).join("");
+   return '<div class="srow"><span><span class="dot c-'+esc(r.colour)+' rp-sw"></span>'+esc(r.name)+'</span><select class="ord" data-kind="'+kind+'" data-name="'+esc(r.key)+'" aria-label="Colour of '+esc(r.name)+'">'+opts+'</select></div>'}).join("")});
+  setHtml(el,html||'<div class="sub">Import people to pick colours for their departments and buildings.</div>')}
+ el.addEventListener("change",function(e){var sl=e.target;if(!sl.getAttribute||!sl.getAttribute("data-kind"))return;
+  post(s.post,{kind:sl.getAttribute("data-kind"),name:sl.getAttribute("data-name"),colour:sl.value},function(r){if(r){R=r;paint();ctx.saved();refresh()}})});
+ function load(){xhrJson("GET",s.get,function(r){if(r){R=r;paint()}})}
+ hook("settingsOpen",load);load();return el}
 // ---- a module's own widget: its page.js registered custom(name, fn); fn(host, ctx) fills the empty element
 W.custom=function(s,ctx){var host=h("div",{"class":"wcustom"+(s.cls?" "+s.cls:""),html:s.html||""}),f=CUSTOM[s.name];
  if(f)AFTER.push(function(){f(host,ctx)});          // after the layout is in the page, so the module may look its elements up by id
@@ -662,10 +706,10 @@ function control(spec,F,change){var key=spec.key,el,paint;
   paint=function(){if(document.activeElement!==el)el.value=F.values[key]==null?"":F.values[key]};
   el.onchange=function(){var n=parseInt(el.value,10);if(!isNaN(n)){F.values[key]=Math.max(spec.min!=null?spec.min:n,Math.min(spec.max!=null?spec.max:n,n));change()}};
   el._paint=paint;return el}
- // "colour": the options ([{value,label}], palette ids or the network colours) as balls in the colour they have now; a tap picks
+ // "colour": the options ([{value,label}], palette ids) as balls in the colour they have now; a tap picks
  if(spec.type==="colour"){el=h("span",{"class":"swatches grid",role:"group","aria-label":spec.aria||spec.label||key});var lastk="",bs=[];
   paint=function(){var opts=optionList(spec,F),k=JSON.stringify(opts),name="";
-   if(k!==lastk){lastk=k;el.innerHTML="";bs=opts.map(function(o){var id=colourId(o.value,"switcher"),b=h("button",{type:"button","class":"swatch",title:o.label,"aria-label":o.label,style:"--c:var(--c-"+id+");--cl:var(--c-"+id+"-l)"});
+   if(k!==lastk){lastk=k;el.innerHTML="";bs=opts.map(function(o){var id=colourId(o.value,""),b=h("button",{type:"button","class":"swatch",title:o.label,"aria-label":o.label,style:"--c:var(--c-"+id+");--cl:var(--c-"+id+"-l)"});
     b.onclick=function(e){e.stopPropagation();F.values[key]=o.value;change()};el.appendChild(b);return b})}
    opts.forEach(function(o,i){var on=String(o.value)===String(F.values[key]);bs[i].classList.toggle("sel",on);if(on)name=o.label});
    if(el._labelEl)setText(el._labelEl,(spec.label||"")+": "+name)};

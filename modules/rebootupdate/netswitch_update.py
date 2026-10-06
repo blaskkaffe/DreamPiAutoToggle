@@ -1,10 +1,8 @@
-# DreamPi Netswitch add-on - update check and "Update now".
-# Asks GitHub whether the installed add-on commit is behind its branch, and
-# whether DreamPi's own scripts (dreampi.py, netlink.py, dcnow.py) have newer
-# version lines than the ones on the Pi. The page shows the result in Settings >
-# About with a manual update guide; "Update now" fast-forwards the checkout that
+# Check-in add-on - update check and "Update now".
+# Asks GitHub whether the installed add-on commit is behind its branch. The page shows the result in Settings >
+# System with a manual update guide; "Update now" fast-forwards the checkout that
 # install.sh recorded (src_dir) and re-runs its installer, detached so the
-# restart of this web service doesn't kill it. Works on Python 3 and 2.7.
+# restart of this web service doesn't kill it. Python 3.
 import json
 import os
 import re
@@ -12,22 +10,17 @@ import subprocess
 import threading
 import time
 
-try:
-    from urllib.request import urlopen, Request
-except ImportError:   # Python 2.7
-    from urllib2 import urlopen, Request
+from urllib.request import urlopen, Request
 
 import netswitch_core as core
 import netswitch_probes as probes
 
 DEFAULT_REPO = "blaskkaffe/DreamPiAutoToggle"
 DEFAULT_BRANCH = "main"
-DREAMPI_RAW = "https://raw.githubusercontent.com/Kazade/dreampi/master/"   # what DreamPi's own updater follows
-DREAMPI_FILES = ("dreampi.py", "netlink.py", "dcnow.py")
 TIMEOUT = 10
 
 _lock = threading.Lock()
-_info = {"time": 0, "started": 0, "checking": False, "addon": None, "dreampi": None, "error": None}
+_info = {"time": 0, "started": 0, "checking": False, "addon": None, "error": None}
 
 
 def fetch(url):
@@ -96,34 +89,6 @@ def check_addon():
     return out
 
 
-def _raw_version(text):
-    m = re.search(r"_version=(\d{12})", text or "")
-    return m.group(1) if m else None
-
-
-def _pretty(v):
-    return "%s-%s-%s %s:%s" % (v[:4], v[4:6], v[6:8], v[8:10], v[10:12]) if v and len(v) == 12 else (v or "not found")
-
-
-def check_dreampi():
-    files, newer = [], False
-    for name in DREAMPI_FILES:
-        local = None
-        try:
-            with open(os.path.join(probes.DREAMPI_DIR, name), "rb") as f:
-                local = _raw_version(f.read(4096).decode("utf-8", "replace"))
-        except (IOError, OSError):
-            pass
-        try:
-            latest = _raw_version(fetch(DREAMPI_RAW + name)[:4096])
-        except Exception:
-            latest = None
-        is_newer = bool(local and latest and latest > local)
-        newer = newer or is_newer
-        files.append({"name": name, "current": _pretty(local), "latest": _pretty(latest) if latest else None, "newer": is_newer})
-    return {"files": files, "newer": newer, "auto_updates": not os.path.exists("/boot/noautoupdates.txt")}
-
-
 def _begin():
     """Mark a check as running; False when one already is. Done before the thread starts so that the page's very next
     question already says "checking" (a refresh that came in between used to show the old result: the button seemed dead)."""
@@ -142,22 +107,16 @@ def check():
 
 
 def _run():
-    result = {"time": int(time.time()), "addon": None, "dreampi": None, "error": None}
+    result = {"time": int(time.time()), "addon": None, "error": None}
     try:
         try:
             result["addon"] = check_addon()
         except Exception as e:
             result["error"] = "Couldn't reach GitHub (%s)" % (getattr(e, "reason", None) or e)
-        try:
-            result["dreampi"] = check_dreampi()
-        except Exception:
-            pass
     finally:
         with _lock:
             _info.update(result)
             _info["checking"] = False
-        a, d = result.get("addon"), result.get("dreampi")
-        core.write_update_info(None if not a else a.get("available"), bool(d and d.get("newer")))      # for the LEDs
 
 
 def check_in_background():
@@ -313,7 +272,7 @@ def start_update():
             return False, "This install can't update itself (no git checkout recorded): use the update guide"
         problem = origin_problem()
         if problem:
-            core.debug_log("web page: update refused (%s)" % problem)
+            core.log("web page: update refused (%s)" % problem)
             return False, "Update refused: %s" % problem
         http, https = _ports()
         try:
@@ -329,5 +288,5 @@ def start_update():
             except OSError:
                 pass
             return False, "Could not start the update (%s)" % e
-    core.debug_log("web page: update started (%s, branch %s)" % (src, branch))
+    core.log("web page: update started (%s, branch %s)" % (src, branch))
     return True, "Update started"

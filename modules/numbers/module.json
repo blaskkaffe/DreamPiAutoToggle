@@ -1,9 +1,0 @@
-{
- "name": "Special phone numbers",
- "description": "Dreamcast can dial to switch network between DCNow! and DCNET.",
- "enabled": true,
- "visible": true,
- "order": 20,
- "ui": 2,
- "web": "netswitch_numbers"
-}

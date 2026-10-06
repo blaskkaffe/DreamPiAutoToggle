@@ -97,15 +97,9 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await page.click('#cog'); await settle(800);
   await page.locator('[data-box="appearance"] .srow', { hasText: 'Clock colour' }).locator('button').first().click(); await settle(300);
   const ids = await page.locator('.pop.open .swatch').evaluateAll(els => els.map(e => e.getAttribute('data-id')));
-  ok(ids.length === 16 && ids[0] === 'global' && ids[8] === 'network' && ids[9] === 'white' && !ids.includes('pink') && !ids.includes('bright-orange'), 'the palette starts its rows with Global main and Selected network (' + ids.join(' ') + ')');
+  ok(ids.length === 16 && ids[0] === 'global' && ids[8] === 'teal' && ids[9] === 'white' && !ids.includes('network') && !ids.includes('bright-orange'), 'the palette starts with Global main and has no "Selected network" any more (' + ids.join(' ') + ')');
   await page.keyboard.press('Escape'); await page.click('#close-settings'); await settle(400);
-  await clockPick('Selected network');
   const clockBox = page.locator('.dbox[data-box="clock"]');
-  ok(await clockBox.evaluate(e => e.classList.contains('c-orange')), 'Selected network: the clock has the colour of DCNow!');
-  await page.locator('.pill').nth(1).click(); await settle(2500);                       // DCNET / FLYCAST
-  ok(await clockBox.evaluate(e => e.classList.contains('c-blue') && !e.classList.contains('c-orange')), 'and follows the switch to DCNET at once');
-  await page.locator('.pill').nth(0).click(); await settle(2500);
-  ok(await clockBox.evaluate(e => e.classList.contains('c-orange')), 'and back');
   await clockPick('Global main');
   ok(await clockBox.evaluate(e => e.classList.contains('c-global')), 'Global main: the clock takes it');
   await page.click('#cog'); await settle(800);

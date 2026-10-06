@@ -1,0 +1,20 @@
+# Wi-Fi setup (the `wifi` module)
+
+Read before touching `modules/wifi/`. Back to [CLAUDE.md](../CLAUDE.md). The module is **off by default**; `install.sh --wifi` or Settings > System > Modules switches it on. It lets a Pi with no keyboard join a Wi-Fi network: it scans, hosts a temporary open access point with a small page, and writes the chosen network into `wpa_supplicant.conf`.
+
+- **Files:** `netswitch_wifi_service.py` (the module's own service `dreampi-netswitch-wifi`, written by `install.sh`, removed by `remove.sh`; runs as root, idles until a start request, runs `setup_cycle()`, and treats switching the module off mid-setup as a stop), `netswitch_wifi_setup.py` (the library: scan, access point, connect, the AP page), `netswitch_wifi_web.py` (the page's side: `POST /wifitoggle`, `POST /wificonnect`, `api()` with the `wifi` state and the warning boxes).
+- **Control files** under `/opt/dreampi-netswitch`: `wifi_start` / `wifi_stop`, touched by `POST /wifitoggle` and consumed by the service's loop. `wifi_connect` (JSON `{"ssid", "password"}`) is the same idea for choosing a network: `POST /wificonnect` on the *regular* page writes it and `run_ap_server()` polls for it next to the AP page's own `/connect`, so the network list also works from Settings when the Pi is reachable another way (Ethernet) while Wi-Fi is being set up. Separate processes share only these files.
+- **State file** `/tmp/dreampi-netswitch.wifi` (JSON: `state`, `ssid`, `networks` while hosting, `time`), written by `set_state()` on every transition and read by `core.wifi_state()` (idle if missing, or stale past `WIFI_STALE` = 30 s). `/api` carries it as `wifi` with ready texts.
+- **The cycle** (`setup_cycle()`, looping until stopped or connected): `scanning` (`wpa_cli scan` + `scan_results`, deduplicated by SSID) -> `hosting` (`start_ap()` stops `wpa_supplicant` / `dhcpcd` on the interface, gives it `192.168.4.1/24`, starts `hostapd` and `dnsmasq`; `run_ap_server()` serves the setup page on port 80) -> `connecting` (`try_connect()` writes the network into `/etc/wpa_supplicant/wpa_supplicant.conf` with `save_network()`, `wpa_cli reconfigure`, waits for an IP within 25 s, then `probes.check_internet()`) -> `ok` or `failed` (loops back to `scanning`). A stop request is checked throughout and always ends in `restore_client()` + `idle`.
+- **Graceful exit:** SIGTERM / SIGINT tear the access point down and restore client Wi-Fi if a cycle was in progress.
+- **AP page** (`AP_PAGE_TMPL`): a small self-contained page in the same dark look: the scanned networks, a manual entry for hidden SSIDs, a password field for secured networks. The access point is called **CheckIn WiFi Config** (`core.WIFI_AP_SSID`).
+- **Assumes** the classic Raspberry Pi OS stack: `wpa_supplicant` + `dhcpcd` for the client side, `hostapd` + `dnsmasq` for the access point (installed with `apt` by every `install.sh` run if missing; their own systemd units are disabled). A NetworkManager image would need different code.
+- **Safety:** the access point is open and its page can add a network, so `run_ap_server()` closes it after 600 s without a choice, its handler has a 10 s socket timeout and a clamped Content-Length, and `save_network()` writes `wpa_supplicant.conf` with mode 600.
+
+## Demo mode
+
+`install.sh --wifi-demo` switches the module on and creates `wifi_demo` (`core.WIFI_DEMO`); `--no-wifi-demo` removes it. While it exists the whole cycle runs on `DEMO_NETWORKS` without hostapd, dnsmasq, wpa_supplicant or the interface: the scan returns the dummy list, nothing is hosted, a connect succeeds for open networks and for the password `demo`. States, `/api` and the page are real, so the flow can be tried on a Pi with no Wi-Fi (and in the demo server: `WIFIDEMO=1`).
+
+## Tests
+
+`tests/test_wifi_setup.py` (scan parsing, `wpa_supplicant.conf` dedup / rewrite, start / stop flags, the demo cycle with system commands forbidden), `tests/test_module_views.py` (the texts), `tests/test_modules.py` (the service following the module switch). **Not verified on hardware** (see [hardware-status.md](hardware-status.md)).
