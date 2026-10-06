@@ -1,8 +1,8 @@
 """Demo server for looking at the page and for the browser checks (audit.js, functional.js ...): the real web service on a sandbox (all paths
 in a temp dir), with the 25 people of tests/ui/people.csv imported. Switches via environment:
-STYLE=boxes (the board as a box per department instead of buttons), IN=n (the first n people start checked in, one of them with a status),
+IN=n (the first n people start checked in, one of them with a status),
 WIFIDEMO=1 (dummy Wi-Fi networks + the setup loop), FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log),
-CLOCK=1 (the clock module on; off by default so the box counts are stable), EMPTY=1 (no people imported),
+CLOCK=1 (the clock module on; off by default so the box counts are stable), EMPTY=1 (no people imported), PEOPLE=file.csv (another roster),
 OFF=wifi,... (modules switched off in the module picker; OFF=all = every module the picker can switch, only the always-on ones stay),
 PIN=1234 (a PIN for update / restart / Wi-Fi / import; restart is faked), PORT=n (default 8734)."""
 import sys, os, threading, time, json
@@ -14,14 +14,13 @@ import netswitch_checkin as checkin
 tmp = sandbox(wifi)
 if not os.environ.get("CLOCK"): core.save_module_enabled("clock", False)      # the checks count the dashboard boxes: the clock box is only there with CLOCK=1
 if not os.environ.get("EMPTY"):
-    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "people.csv"), encoding="utf-8") as f:
+    with open(os.environ.get("PEOPLE") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "people.csv"), encoding="utf-8") as f:
         contacts.import_csv(f.read())
     n = int(os.environ.get("IN", "0"))
     if n:
         people = [p for g in checkin.snapshot()["groups"] for p in g["people"]]
         for p in people[:n]: checkin.toggle(p["id"])
         if n > 2: checkin.set_status(people[1]["id"], "LATE", "08:15"); checkin.set_status(people[2]["id"], "SICK")
-if os.environ.get("STYLE"): checkin.save_config({"style": os.environ["STYLE"]})
 if os.environ.get("WIFI"): core.save_module_enabled("wifi", True)
 if os.environ.get("WIFIDEMO"):
     core.save_module_enabled("wifi", True); open(core.WIFI_DEMO, "w").close()

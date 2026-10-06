@@ -8,7 +8,7 @@ Nothing yet in this version of the add-on (the check-in board, the contacts and 
 
 ## Not yet verified
 
-- **The check-in board** (`modules/checkin/`, the `roster` widget): tested off-hardware in Chromium against the demo server (`sh tests/ui/run.sh`: both looks at four widths, tapping, the status menu, a second browser page following the first within about two seconds, the buildings filter, the settings, the CSV import) and by unit tests. **Not seen on a Pi, on a touch screen, on a TV or with more than two browser windows at once.** How it looks and feels on the real screens (button size, the 1 s refresh) is unconfirmed.
+- **The check-in board** (`modules/checkin/`, the `roster` widget): tested off-hardware in Chromium against the demo server (`sh tests/ui/run.sh`: at four widths, tapping, the status menu, a second browser page following the first within about two seconds, the buildings filter, the settings, the CSV import) and by unit tests. **Not seen on a Pi, on a touch screen, on a TV or with more than two browser windows at once.** How it looks and feels on the real screens (button size, the 1 s refresh) is unconfirmed.
 - **Several screens on one host:** only two Chromium pages against one demo server were tried. Whether a Pi 3 / Zero serves 10+ screens polling `/api` once a second is untested; the answer carries the whole board (a few kilobytes per hundred people).
 - **Kiosk mode** (`kiosk/kiosk-browser.sh`, the autostart file): never run. It is adapted from CheckinChicken's script, which is the reference.
 - **Contacts import** from a real CSV exported by Excel or Google Sheets (encodings, delimiters): comma, semicolon and tab and a BOM are handled and tested with made-up files only.

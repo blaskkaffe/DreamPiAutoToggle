@@ -612,9 +612,9 @@ W.info=function(s){var el=h("table",{"class":"about"});
  function paint(rows){setHtml(el,(rows||[]).map(function(r){return '<tr><td class="n">'+esc(r[0])+'</td><td>'+esc(r[1])+'</td></tr>'}).join(""))}
  if(s.rows!==undefined)bind(s.rows,paint);
  if(s.source)hook("settingsOpen",function(){xhrJson("GET",s.source,function(r){if(r)paint(r)})});return el};
-// ---- the roster: people as buttons (style "buttons") or one box per group with a row per person (style "boxes"), after CheckinChicken.
+// ---- the roster: one box per group (department or building) with a row per person, after CheckinChicken.
 // "source": "@checkin" (what the check-in module puts in /api: groups of people, the status menu, buildings). A tap on a person switches in /
-// out (POST s.toggle {id}); the small Status button opens the status menu under it (POST s.status {id, code, detail}). A grey button is out,
+// out (POST s.toggle {id}); the small Status button opens the status menu under it (POST s.status {id, code, detail}). A grey row is out,
 // a coloured one is in (the colour of the person's department or building), a status colours it with its own colour and puts its name on it.
 // Only the palette's ids are used for colour. With several buildings a row of chips picks which ones this screen shows (kept in this browser;
 // ?location=A,B in the address sets it). "mode": "colours": the settings list of departments / buildings with a colour pick each (GET s.get, POST s.post).
@@ -626,25 +626,22 @@ W.roster=function(s,ctx){
  if(s.mode==="colours")return rosterColours(s,ctx);
  var el=h("div",{"class":"roster"}),chips=h("div",{"class":"rp-chips"}),list=h("div",{"class":"rp-list"}),menu=h("div",{"class":"rp-menu"}),
   sel=rosterLocations(),last="",D=null,cur=null,pop=null;
- el.appendChild(chips);el.appendChild(list);el.appendChild(menu);document.body.classList.add("wide");
+ el.appendChild(chips);el.appendChild(list);el.appendChild(menu);
  pop=ui.popup(menu);
  function visible(p){if(!sel.length)return !p.restrict;return sel.indexOf(p.building)>=0||(!p.building&&!p.restrict)}
  function person(id){var r=null;((D&&D.groups)||[]).forEach(function(g){g.people.forEach(function(p){if(p.id===id)r=p})});return r}
  function colourCls(p){return p.colour?" c-"+p.colour:""}
  function paintChips(){var b=(D&&D.buildings)||[],html=b.length<2?"":['<button type="button" class="pill-s'+(sel.length?"":" pri")+'" data-loc="">All</button>'].concat(b.map(function(n){
   return '<button type="button" class="pill-s'+(sel.indexOf(n)>=0?" pri":"")+'" data-loc="'+esc(n)+'">'+esc(n)+'</button>'})).join("");setHtml(chips,html)}
- function row(p,boxes){var name='<span class="rp-n">'+esc(p.name)+'</span>',sub=p.text||(p.in?"In":"Out"),
+ function row(p){var sub=p.text||p.role||"",state=p.text?p.text:(p.in?"in":"out"),
   edit='<button type="button" class="pill-s rp-e" data-act="menu" aria-label="Set status for '+esc(p.name)+'">Status</button>';
-  if(boxes)return '<div class="rp-r" data-id="'+esc(p.id)+'"><button type="button" class="rp-t" data-act="toggle" aria-pressed="'+(p.in?"true":"false")+'" aria-label="'+esc(p.name)+': '+esc(sub)+' (tap to switch)">'+
-   '<span class="rp-d'+(p.colour?colourCls(p)+" on":"")+'"></span>'+name+'<span class="rp-s">'+esc(p.text||(p.role||""))+'</span></button>'+edit+'</div>';
-  return '<div class="rp-r" data-id="'+esc(p.id)+'"><button type="button" class="pill rp-b'+(p.colour?" pri"+colourCls(p):" out")+'" data-act="toggle" aria-pressed="'+(p.in?"true":"false")+'" aria-label="'+esc(p.name)+': '+esc(sub)+' (tap to switch)">'+
-   name+'<span class="rp-s">'+esc(p.status?p.text:(p.in?"In":"Out"))+'</span></button>'+edit+'</div>'}
- function paint(){if(!D)return;paintChips();var boxes=D.style==="boxes",html="";
+  return '<div class="rp-r '+(p.colour?"pri"+colourCls(p):"out")+'" data-id="'+esc(p.id)+'"><button type="button" class="rp-t" data-act="toggle" aria-pressed="'+(p.in?"true":"false")+'" aria-label="'+esc(p.name)+': '+esc(state)+' (tap to switch)">'+
+   '<span class="rp-n">'+esc(p.name)+'</span><span class="rp-s">'+esc(sub)+'</span></button>'+edit+'</div>'}
+ function paint(){if(!D)return;paintChips();var html="";
   if(!D.total){setHtml(list,'<div class="sub rp-empty">'+esc(D.text)+'</div>');return}
   D.groups.forEach(function(g){var ps=g.people.filter(visible);if(!ps.length)return;
    var n=ps.filter(function(p){return p.in}).length;
-   html+=boxes?'<div class="now rp-box'+(g.colour?" c-"+g.colour:"")+'" data-own-colour="1"><div class="rp-gh"><span class="nlabel">'+esc(g.title)+'</span><span class="sub">'+n+'/'+ps.length+'</span></div>'+ps.map(function(p){return row(p,true)}).join("")+'</div>'
-    :'<div class="rp-g"><h2>'+esc(g.title)+' <span class="sub">'+n+'/'+ps.length+'</span></h2><div class="rp-grid">'+ps.map(function(p){return row(p,false)}).join("")+'</div></div>'});
+   html+='<div class="rp-box"><div class="rp-gh"><span class="rp-gt">'+esc(g.title)+'</span><span class="sub">'+n+'/'+ps.length+'</span></div>'+ps.map(row).join("")+'</div>'});
   setHtml(list,html||'<div class="sub rp-empty">Nobody to show for the chosen buildings.</div>')}
  chips.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-loc]");if(!b)return;var n=b.getAttribute("data-loc");
   if(!n)sel=[];else{var i=sel.indexOf(n);if(i>=0)sel.splice(i,1);else sel.push(n)}rosterSaveLocations(sel);paint()});
@@ -667,7 +664,7 @@ W.roster=function(s,ctx){
   var need=menu.querySelector(".rp-need"),type=st.needs==="time"?"time":st.needs==="date"?"date":"text";
   need.style.display="";need.innerHTML='<label class="sub">'+esc(st.label)+(st.needs==="time"?" at":st.needs==="date"?" until":": ")+' <input type="'+type+'" value="'+esc(st.default||"")+'" maxlength="60" aria-label="'+esc(st.label)+'"></label> <button type="button" class="pill-s pri c-'+esc(st.colour)+'" data-set="'+esc(code)+'">Set</button>';
   var inp=need.querySelector("input");if(inp&&inp.focus)inp.focus()});
- bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+(d.style||"")+"|"+d.groups.length;if(key===last)return;last=key;D=d;paint()});
+ bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+d.groups.length;if(key===last)return;last=key;D=d;paint()});
  return el};
 // the settings list: a department / building per row with a select of palette colours ("Automatic" = the module picks one)
 function rosterColours(s,ctx){var el=h("div",{"class":"roster-cols"}),R=null;

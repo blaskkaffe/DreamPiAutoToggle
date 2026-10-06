@@ -1,20 +1,18 @@
 # Check-in board
 
-A check-in board for a Raspberry Pi (or any Linux computer) that **several screens show in step**: who is in, who is out and why, in real time. The people come from a CSV file, and each one is a button that is grey while they are out and coloured while they are in, in the colour of their department or building. A small **Status** button next to it sets a status (sick, late, on a trip, holiday ...) which the button then shows in the status' own colour.
+A check-in board for a Raspberry Pi (or any Linux computer) that **several screens show in step**: who is in, who is out and why, in real time. The people come from a CSV file, and each one is a row that is grey while they are out and coloured while they are in, in the colour of their department or building. A small **Status** button next to it sets a status (sick, late, on a trip, holiday ...) which the button then shows in the status' own colour.
 
 It is built on the module base of the DreamPi network switcher, and the board and its features follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken) (a Node.js check-in board): same CSV columns, same statuses, same ideas (several buildings, a screen per building, kiosk screens). Everything the page shows is a module, so the rest of the base (clock, Wi-Fi setup, updates, reboot) is there too.
 
-<p align="center"><img src="docs/images/board-buttons.png" alt="The board with a button per person, grouped by department: grey is out, coloured is in, a status shows on the button" width="720"></p>
+<p align="center"><img src="docs/images/board.png" alt="The board: a box per department, a row per person, grey while out and coloured while in, a status shows on the row" width="420"> <img src="docs/images/status-menu.png" alt="The status menu" width="420"></p>
 
 What you get:
-- **A button per person** (the look "Buttons") or **a box per department with a row per person** (the look "Boxes"); switch between them in Settings > Check-in board. Tap a person to switch in / out; tap **Status** to pick one of CheckinChicken's statuses (times and dates are asked for where they matter).
+- **A box per department with a row per person.** The whole row is grey while the person is out and turns coloured while they are in; tap it to switch. Tap **Status** on the row to pick one of CheckinChicken's statuses (times and dates are asked for where they matter); the row then shows the status in its colour. One column, large text: 60 people fit a 1080p screen in two columns (portrait) or three (landscape) once the page has columns.
 - **Colours by department and/or building**, picked from the page's palette (automatic, or your own pick for each department / building).
 - **Screens in step in real time.** The Pi (the host) keeps everything; every other screen is only a browser that opens the host's address, in kiosk mode if you like (`kiosk/kiosk-browser.sh`). A change on one screen is on the others within about a second.
 - **A screen per building:** with several buildings a row of chips picks what a screen shows (kept in that browser; `?location=Område A` in the address sets it).
 - **Contacts:** import a CSV (a file or pasted text), export it again, switch people off.
 - A **clock** (12 or 24-hour, `.beat`, world times and a time zone map), **Wi-Fi setup** (`--wifi`), **update and reboot buttons** on the page and an optional **PIN** for them.
-
-<p align="center"><img src="docs/images/board-boxes.png" alt="The same board as a box per department" width="480"> <img src="docs/images/status-menu.png" alt="The status menu" width="480"></p>
 
 **Tested so far:** off the Pi only: unit tests (`sh tests/run.sh`) and the page driven in Chromium against a demo server (`sh tests/ui/run.sh`). See [docs/hardware-status.md](docs/hardware-status.md) for what has and has not been seen on real hardware.
 
@@ -78,7 +76,7 @@ Everything the page shows is a module, one folder in `modules/`. **Settings > Sy
 
 | Module | What it does | Default |
 |---|---|---|
-| Check-in board | The board: a button per person or a box per department, statuses, colours | on |
+| Check-in board | The board: a box per department, a row per person, statuses, colours | on |
 | Contacts | The people: CSV import and export | on |
 | Clock | The time on the board page: 12 / 24-hour, `.beat`, world times, time zone map | on |
 | About | Versions, the time zone, the global colours, a link to the project (always on) | on |
@@ -101,12 +99,12 @@ Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), 
 
 The main page is the board (and the clock box above it when that module is on). The cogwheel opens **Settings**:
 
-- **Check-in board:** the look (Buttons or Boxes), what to group by and what to colour by (department or building), a colour for every department and building (Automatic or your pick), **All out** (the start of the day) and **All in**.
+- **Check-in board:** what to group by and what to colour by (department or building), a colour for every department and building (Automatic or your pick), **All out** (the start of the day) and **All in**.
 - **Appearance / Global colours:** the module's colour, the global main colour, the highlight look.
 - **Contacts:** how many people, import (a file or pasted text), Export.
 - **About:** versions, the address, the time zone, GitHub. **System:** Modules, Wi-Fi setup (when on), Updates, Reboot.
 
-The page works on a phone as well as a wall display: the boxes are one column on a phone and as many columns as fit on a wide screen.
+The page works on a phone as well as a wall display: the board is one column (several columns are planned).
 
 ## Checking it works
 

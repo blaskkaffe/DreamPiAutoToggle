@@ -1,6 +1,6 @@
 #!/bin/sh
 # Optional UI check (needs node + the playwright module + Chromium; not part of tests/run.sh):
-#   sh tests/ui/run.sh          audit at four screen widths (the board as buttons, then as boxes) and a functional check of the page, against the demo server
+#   sh tests/ui/run.sh          audit at four screen widths  and a functional check of the page, against the demo server
 # Findings print as "<kind> | <state>: <element>"; screenshots go to /tmp/dpns-audit-*.png.
 cd "$(dirname "$0")" || exit 1
 export NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules}
@@ -15,7 +15,6 @@ run() {     # run <node script> <env...>: a demo server with that environment, t
     wait $SERVER 2>/dev/null
 }
 run audit.js IN=8 WIFIDEMO=1 FAKEUPDATE=1
-run audit.js IN=8 STYLE=boxes WIFIDEMO=1
 run functional.js IN=0 WIFIDEMO=1 FAKEUPDATE=1
 # the clock module has its own demo server (it is off in the one above so that the box counts stay as they are)
 run clock.js CLOCK=1

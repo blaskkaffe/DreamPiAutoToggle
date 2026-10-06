@@ -57,7 +57,7 @@ const AUDIT = () => {
     await page.keyboard.press('Escape');
     await page.screenshot({ path: `/tmp/dpns-audit-main-${w}.png`, fullPage: true });
     await page.click('#cog'); await page.waitForTimeout(1500); await check('settings');
-    await page.click('[data-box="check-in"] .srow:has-text("Look") > button'); await page.waitForTimeout(300); await check('settings look pop-up');
+    await page.click('[data-box="check-in"] .srow:has-text("Group people by") > button'); await page.waitForTimeout(300); await check('settings group-by pop-up');
     await page.keyboard.press('Escape');
     // wifi flow states
     await page.click('[data-box="system"] .srow:not([data-id]):has-text("Wi-Fi setup") > button'); await page.waitForTimeout(4500); await check('settings wifi list');

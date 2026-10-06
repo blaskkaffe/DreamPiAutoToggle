@@ -238,11 +238,10 @@ class HttpTests(Base):
 
     def test_settings_and_colour_endpoints(self):
         r = self.get("/checkin/config")
-        self.assertEqual(r["values"], {"style": "buttons", "group_by": "department", "colour_by": "department"})
+        self.assertEqual(r["values"], {"group_by": "department", "colour_by": "department"})
         self.assertEqual([x["key"] for x in r["colours"]["department"]], ["Kök", "No department", "Servering"])
-        r = self.post("/checkin/config", {"values": {"style": "boxes", "colour_by": "building", "group_by": "nonsense"}})
-        self.assertEqual(r["values"], {"style": "boxes", "group_by": "department", "colour_by": "building"})
-        self.assertEqual(self.get("/api")["checkin"]["style"], "boxes")
+        r = self.post("/checkin/config", {"values": {"colour_by": "building", "group_by": "nonsense"}})
+        self.assertEqual(r["values"], {"group_by": "department", "colour_by": "building"})
         r = self.post("/checkin/colour", {"kind": "department", "name": "Kök", "colour": "bright-pink"})
         self.assertEqual([x for x in r["colours"]["department"] if x["key"] == "Kök"][0]["colour"], "bright-pink")
 

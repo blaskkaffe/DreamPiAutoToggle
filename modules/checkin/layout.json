@@ -27,18 +27,6 @@
      "post": "/checkin/config",
      "fields": [
       {
-       "title": "Look",
-       "sub_text": "style",
-       "controls": [
-        {
-         "type": "select",
-         "key": "style",
-         "options": "styles",
-         "label": "Layout"
-        }
-       ]
-      },
-      {
        "title": "Group people by",
        "sub_text": "group_by",
        "controls": [
