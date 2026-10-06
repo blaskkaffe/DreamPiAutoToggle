@@ -34,6 +34,8 @@ OPENMENU_GAMES = os.path.join(BASE_DIR, "openmenu_games.json")   # {"hash", "tim
 NUMBERS = os.path.join(BASE_DIR, "numbers.json")     # phone numbers per action, edited on the page, read by the hook
 CLOCK_MODE = os.path.join(BASE_DIR, "clock_mode")    # older versions: "24h", "12h" or "beat" (read once to carry the choice over to clock.json)
 HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id: how a highlighted box looks (Settings > Appearance)
+SETTINGS_PIN = os.path.join(BASE_DIR, "settings_pin")   # exists = Settings asks for the PIN (when one is set) before it opens and changes anything
+SCREEN = os.path.join(BASE_DIR, "screen.json")         # how the page is laid out on a wide screen: max columns, stretch, scale (Settings > Appearance)
 EVENTS_DB = os.path.join(BASE_DIR, "events.db")        # SQLite: the DC99 events imported by the events module
 EVENTS_CONFIG = os.path.join(BASE_DIR, "events.json")   # its settings: reminder lead time, time zone, sync interval, picked events, series
 EVENT_REMINDERS = os.path.join(BASE_DIR, "event_reminders.json")   # the DC99 events the user asked to be reminded of (events module, read by the LEDs)
@@ -457,6 +459,64 @@ def save_highlight_style(value):
         f.write(value)
     os.rename(tmp, HIGHLIGHT)
     return value
+
+
+def settings_pin_on():
+    return os.path.exists(SETTINGS_PIN)
+
+
+def save_settings_pin(on):
+    if on:
+        open(SETTINGS_PIN, "w").close()
+    elif os.path.exists(SETTINGS_PIN):
+        os.remove(SETTINGS_PIN)
+
+
+# ---- screen layout: how many columns the dashboard and Settings may use on a wide screen, and whether the boxes stretch to fill it
+SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False}
+MAX_COLUMNS = 6
+
+
+def screen_settings():
+    """{"dash_cols": 1-6, "set_cols": 1-6, "stretch": bool, "scale": bool}: the saved layout settings over the defaults (a bad or missing
+    file gives the defaults). dash_cols / set_cols are the most columns the dashboard / Settings may use; they only get as many as the screen
+    fits (about 430 px each). stretch makes the columns fill the screen's width; scale (only with stretch) makes the boxes' content grow
+    with their width instead of getting more room."""
+    out = dict(SCREEN_DEFAULTS)
+    try:
+        with open(SCREEN) as f:
+            data = json.load(f)
+    except (IOError, OSError, ValueError):
+        data = {}
+    if isinstance(data, dict):
+        for k in ("dash_cols", "set_cols"):
+            v = data.get(k)
+            if isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= MAX_COLUMNS:
+                out[k] = v
+        for k in ("stretch", "scale"):
+            if isinstance(data.get(k), bool):
+                out[k] = data[k]
+    return out
+
+
+def save_screen_settings(changes):
+    """Change some of the layout settings ({key: value}; unknown keys and bad values are ignored). Returns the new settings."""
+    cur = screen_settings()
+    for k, v in (changes or {}).items():
+        if k in ("dash_cols", "set_cols"):
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= v <= MAX_COLUMNS:
+                cur[k] = v
+        elif k in ("stretch", "scale") and isinstance(v, bool):
+            cur[k] = v
+    tmp = SCREEN + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cur, f, sort_keys=True)
+    os.rename(tmp, SCREEN)
+    return cur
 
 
 def set_module_colour(name, key, ident):

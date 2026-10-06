@@ -70,7 +70,7 @@ function renderLayout(){
  (LAY.settings||[]).forEach(function(b){cols.appendChild(box("settings",b))});
  buildPicker(cols);
  AFTER.forEach(function(f){f()});AFTER=[]}
-function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});applyTheme();applyHighlight();hideEmptyBoxes()}
+function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});applyTheme();applyHighlight();hideEmptyBoxes();applyScreen()}
 // ---- highlight (/api "highlight": {box id: why}): those dashboard boxes get the class "hl" (page.css draws it) and the reason as a
 // tooltip; the look is global (/api theme.highlight: "rainbow" or a palette id)
 var hlKey="";
@@ -155,6 +155,15 @@ W.button=function(s,ctx){var pill=s.style==="pill",
  return el};
 // a switch: bound to a value on the server and POSTed ({value: true/false}) on change, or kept only in this page with "local": "name" (S._local.name)
 S._local={};
+// "pinset": the buttons that set, change or remove the PIN (the page asks for the old one first when there is one)
+W.pinset=function(s,ctx){var set=h("button",{type:"button","class":"pill-s",text:"Set PIN"}),rem=h("button",{type:"button","class":"pill-s",text:"Remove"}),
+ el=h("span",{"class":"optrow"},[set,rem]);
+ function send(pin,okText){withPin(function(){post("/pin",{pin:pin},function(r,st){if(r){pinValue=pin;alert(okText);refresh();ctx.saved()}
+  else alert(st===400?"The PIN must be 4 to 64 characters.":"The PIN was not changed.")})})}
+ set.onclick=function(e){e.stopPropagation();var a=prompt("New PIN (4 to 64 characters)");if(a===null)return;if(prompt("Enter the new PIN again")!==a){alert("The two PINs are not the same.");return}send(a,"The PIN is set.")};
+ rem.onclick=function(e){e.stopPropagation();if(confirm("Remove the PIN?"))send("","The PIN is removed.")};
+ function paint(){var has=!!(S.settings_pin&&S.settings_pin.pin);set.textContent=has?"Change PIN":"Set PIN";sh(rem,has)}
+ UPD.push(paint);paint();return el};
 W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.look||"neutral"),"aria-label":s.label||""}),el=box;
  if(s.text){el=h("label",{"class":"sub tgl"},[box,document.createTextNode(s.text)])}
  if(s.colour)colourClass(box,s.colour,s.mod);
@@ -740,8 +749,8 @@ function sortable(box,onDone){
    // The grabbed row itself is never taken out of the document and put back (iOS Safari ends a touch whose element is re-inserted):
    // when it passes a neighbour, the NEIGHBOUR moves to the other side of it.
    function place(){for(var guard=0;guard<30;guard++){
-     var r=row.getBoundingClientRect(),nat=r.top-tx,want=y-grab;
-     tx=want-nat;row.style.transform="translateY("+tx+"px)";
+     var r=row.getBoundingClientRect(),nat=r.top-tx,want=y-grab,f=row.offsetHeight?r.height/row.offsetHeight:1;      // f: the row is drawn f times bigger (Scale content)
+     tx=want-nat;row.style.transform="translateY("+(tx/f)+"px)";
      var c=want+r.height/2,prev=row.previousElementSibling,next=row.nextElementSibling;
      if(hasId(prev)&&c<mid(prev))box.insertBefore(prev,row.nextSibling);
      else if(hasId(next)&&c>mid(next))box.insertBefore(next,row);

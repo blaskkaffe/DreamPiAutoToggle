@@ -763,4 +763,5 @@ def _get(h):
 
 
 GET = {"/players": _get, "/players/favorites": _get_favorites}
+OPEN = ("/players/star",)                   # the star in the Online players list works while Settings is locked with the PIN
 POST = {"/players/favorites": _post_favorites, "/players/star": _post_star}

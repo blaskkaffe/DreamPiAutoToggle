@@ -317,4 +317,5 @@ def _launch_post(h):
 
 
 GET = {"/openmenu/poll": _poll, "/openmenu/view": _view_get, "/openmenu/games": _games_get}
+OPEN = ("/openmenu/games", "/openmenu/launch")   # the Dreamcast uploads its list; Start / Join are dashboard buttons
 POST = {"/openmenu/games": _games_post, "/openmenu/launch": _launch_post}

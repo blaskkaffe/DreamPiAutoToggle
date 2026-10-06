@@ -11,6 +11,8 @@
 #                                                                    POST function returns True once it has answered
 #   api(d, warnings)                add to the /api answer (d is its dict) and to the warning boxes
 #   PROTECTED = ("/path", ...)      POST paths that need the PIN when one is set (they run as root)
+#   OPEN = ("/path", ...)           POST paths of the dashboard (and of the Dreamcast) that stay open when Settings is locked with the PIN; every
+#                                   other POST of the module is a setting and needs the PIN then
 #   GET_PREFIX / POST_PREFIX        {"/api/events/": fn}: a path that starts with it (and goes on) and no exact path matched
 #   start()                         called once, when the web service itself starts (start_background()) or when the module is
 #                                   switched on later: for background work that should run without anyone viewing the page
@@ -38,14 +40,14 @@ UI_KIT = 2       # the version of the page kit (ui in page/page.js, the kit bloc
 _PAGE_FILES = ("page.css", "page.js")
 # the standard widgets the page can draw from a layout (docs/modules.md, "Layout"); "custom" hands a box to the module's own page.js
 WIDGETS = ("text", "row", "button", "toggle", "swatches", "colourpick", "link", "form", "infobox", "status", "bar", "carousel", "worldmap", "triggers",
-           "picker", "list", "links", "console", "info", "custom")
+           "picker", "list", "links", "console", "info", "pinset", "custom")
 CONTROLS = ("select", "choice", "number", "text", "toggle", "colour", "slider", "range")      # what a form field may hold (W.form, control() in page/widgets.js)
 SECTIONS = ("dashboard", "settings")
 BACKGROUND_TYPES = ("fullscreen", "part")
 _LAYOUT_KEYS = SECTIONS + ("background", "data")
 _NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _lock = threading.Lock()
-_state = {"sig": None, "loaded": [], "errors": {}, "get": {}, "post": {}, "api": [], "protected": set(), "background": False, "started": set()}
+_state = {"sig": None, "loaded": [], "errors": {}, "get": {}, "post": {}, "api": [], "protected": set(), "open": set(), "background": False, "started": set()}
 
 
 def _read(path):
@@ -92,7 +94,7 @@ def refresh(force=False):
         sig = signature()
         if sig == _state["sig"] and not force:
             return False
-        loaded, errors, get, post, api, protected = [], {}, {}, {}, [], set()
+        loaded, errors, get, post, api, protected, open_ = [], {}, {}, {}, [], set(), set()
         state = core.modules_state()
         for name in core.module_names():
             if not core.module_enabled(name, state):
@@ -122,9 +124,10 @@ def refresh(force=False):
                 for k, fn in (getattr(web, "POST_PREFIX", None) or {}).items():
                     post["prefix:" + k] = fn
                 protected.update(getattr(web, "PROTECTED", None) or ())
+                open_.update(getattr(web, "OPEN", None) or ())
                 if callable(getattr(web, "api", None)):
                     api.append(web.api)
-        _state.update(sig=sig, loaded=loaded, errors=errors, get=get, post=post, api=api, protected=protected)
+        _state.update(sig=sig, loaded=loaded, errors=errors, get=get, post=post, api=api, protected=protected, open=open_)
         if _state["background"]:
             _start_new()
         return True
@@ -375,6 +378,11 @@ def route(method, path):
             if k.startswith("prefix:") and path.startswith(k[7:]) and len(path) > len(k) - 7 and len(k) - 7 > len(best):
                 best, fn = k[7:], table[k]
     return fn
+
+
+def open_post(path):
+    """True for a POST path that an enabled module marked OPEN: it still works without the PIN while Settings is locked."""
+    return path in _state["open"]
 
 
 def protected(path):

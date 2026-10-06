@@ -161,7 +161,7 @@ class WithEverything(Base):
         self.assertEqual([b["id"] for b in lay["settings"]][-2:], ["about", "system"])                     # System is the very last box, About just above it
         appearance = [b for b in lay["settings"] if b["id"] == "appearance"][0]
         self.assertEqual((appearance["mods"], appearance["title"]), (["switcher", "clock", "players", "events", "openmenu", "debuglog", "background"], "Appearance"))      # the colours (network, clock, players, events, openMenu link, debug log), the notification highlight look and the background's switch
-        self.assertEqual([w["control"]["module"] for w in appearance["items"] if w["type"] == "row" and w["control"]["type"] == "toggle"], ["background"])
+        self.assertEqual([w["control"]["module"] for w in appearance["items"] if w["type"] == "row" and w["control"]["type"] == "toggle" and "module" in w["control"]], ["background"])
         about = [b for b in lay["settings"] if b["id"] == "about"][0]
         self.assertEqual((about["mods"], about["title"]), (["system"], "About"))               # the versions are their own box, not part of System
         self.assertEqual([b["id"] for b in lay["dashboard"]], ["network", "clock", "players", "events", "openmenu", "debug log"])

@@ -195,4 +195,5 @@ def _post_buttons(h):
 
 
 GET = {"/status": _status, "/buttonconfig": _get_buttons}
+OPEN = ("/dcnow", "/dcnet", "/hangup")       # the dashboard's buttons (and openMenu's) work while Settings is locked with the PIN
 POST = {"/dcnow": _select("dcnow"), "/dcnet": _select("dcnet"), "/hangup": _hangup, "/buttonconfig": _post_buttons}

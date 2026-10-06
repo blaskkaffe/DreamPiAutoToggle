@@ -54,4 +54,10 @@ SERVER=$!
 sleep 3
 PORT=8740 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node openmenu.js || RESULT=1
 kill $SERVER 2>/dev/null
+# the screen layout (max columns, stretch, scale) and the PIN lock on Settings
+CLOCK=1 EVENTS=1 FAKEPLAYERS=1 PORT=8741 python3 demo_server.py > /tmp/dpns-demo-screen.log 2>&1 &
+SERVER=$!
+sleep 3
+PORT=8741 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node screen.js || RESULT=1
+kill $SERVER 2>/dev/null
 exit $RESULT

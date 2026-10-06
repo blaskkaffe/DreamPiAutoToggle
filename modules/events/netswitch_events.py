@@ -746,6 +746,7 @@ GET = {"/events/view": _get_view, "/events/settings": _get_settings, "/events/se
        "/api/events": lambda h: _api_events(h), "/api/events/upcoming": lambda h: _api_events(h, upcoming=True),
        "/api/sources": _api_sources, "/api/games": _api_games, "/api/status": _api_status}
 GET_PREFIX = {"/api/events/": _api_event}
+OPEN = ("/events/remind", "/events/dismiss")   # the bell and the banner's dismiss work while Settings is locked with the PIN
 POST = {"/events/remind": _post_remind, "/events/dismiss": _post_dismiss, "/events/settings": _post_settings,
         "/events/series": _post_series, "/api/sync": _api_sync}
 
