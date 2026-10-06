@@ -1,5 +1,5 @@
 """layout.json: what a module shows as data. Boxes with the same name (case-insensitive) are shared, the picker order is
-the priority, a background module has only a background, and a broken layout keeps its module out with the reason shown."""
+the priority, a background module has a background and settings (no dashboard boxes), and a broken layout keeps its module out with the reason shown."""
 import json
 import os
 import unittest
@@ -80,11 +80,17 @@ class BoxTests(LayoutBase):
 
 
 class BackgroundTests(LayoutBase):
-    def test_a_background_module_cannot_also_have_boxes(self):
-        self.module("bad", {"background": {"type": "fullscreen"}, "settings": [{"box": "x", "items": []}]})
+    def test_a_background_module_cannot_also_have_dashboard_boxes(self):
+        self.module("bad", {"background": {"type": "fullscreen"}, "dashboard": [{"box": "x", "items": []}]})
         lay = self.load()
         self.assertEqual(lay["modules"], [])
-        self.assertIn("only have a background", mods._state["errors"]["bad"])
+        self.assertIn("no dashboard boxes", mods._state["errors"]["bad"])
+
+    def test_a_background_module_can_have_settings_boxes(self):
+        self.module("pic", {"background": {"type": "fullscreen"}, "settings": [{"box": "pic", "title": "Picture", "items": [{"type": "text", "text": "hi"}]}]})
+        lay = self.load()
+        self.assertEqual([b["mod"] for b in lay["backgrounds"]], ["pic"])
+        self.assertEqual([b["id"] for b in lay["settings"]], ["pic"])
 
     def test_the_background_type_must_be_known(self):
         self.module("bad", {"background": {"type": "wallpaper"}})

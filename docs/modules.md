@@ -28,6 +28,7 @@ base or module Python that runs on its own. Moving each service into its module'
 | `debuglog` (Debug log) | yes | Dashboard: the Debug log box, an `infobox` of two rows (the top line "Debug log", then `@debuglog.last` = the last three lines of the log, or "Recording off"); open, the record / Clear / Follow buttons, the links and the live `console` are rows of the same box (the console runs out to the box's edges and reads only while the box is open); `GET /log`, `/dtmf`, `POST /debug`, `/clearlog`; the part inside DreamPi (`netswitch_hookdebug.py`) | **off** |
 | `wifi` (Wi-Fi setup) | yes | Settings: the Wi-Fi setup row and network list in System, the hold-button row in GPIO; `POST /wifitoggle`, `/wificonnect`, `GET`/`POST /wifibutton`; its own service `dreampi-netswitch-wifi` | **off** |
 | `rebootupdate` (Reboot and Update) | yes | Settings: the Updates rows (check, Update now, log) and the Reboot row, all in System; `GET /update`, `POST /update/check`, `/update/start`, `/reboot` | on |
+| `imagebg` (Background image) | yes | A fullscreen **background** (a fixed picture layer and a black layer that darkens it, drawn from `/api` `imagebg` {has, fit, dim, version}) **and** a settings box `background-image`: the custom widget `imagebg-pick` (Choose / Remove, a thumbnail; a big picture is shrunk in the browser first) and a form for Fit and Darken. `GET /imagebg` (form reply), `POST /imagebg`, `POST /imagebg/upload` (the picture as the body, at most 8 MB, type decided by its first bytes: PNG, JPEG, GIF, WebP), `POST /imagebg/remove`, `GET /imagebg/image?v=`; files `background_image` and `imagebg.json` (`core.IMAGEBG_FILE`, `core.IMAGEBG_CONFIG`) | **off** |
 | `background` (Dreamcast background) | yes | A fullscreen **background**: the animated scene and the translucent box styling; `GET /background/*.js` | **off** |
 
 A module is **installed** when its folder (with a `module.json`) is there, and **enabled** when the picker has it on (`modules.json` in
@@ -155,7 +156,7 @@ yet; a new widget that two modules could use goes into `page/widgets.js` instead
 ### Backgrounds
 
 A module with `{"background": {"type": "fullscreen" | "part", "position": "top" | "bottom"}}` is a **background module** and can have
-**nothing else** (no boxes, no data): it is the only kind of module that draws behind the boxes. The page walks the enabled background modules in
+**settings boxes** (the Background image module has one) but no dashboard boxes and no data: it is the only kind of module that draws behind the boxes. The page walks the enabled background modules in
 picker order: the first one is drawn; if it is `fullscreen` nothing below it is (and its script isn't even sent); if it is `part` (a
 taskbar-like strip or a logo that only fills an area; `position` pins it to the top or bottom, the module sets its height) the next one is drawn too.
 The module's `page.js` calls `background("<module name>", function(host, spec){ ... })` and draws into `host`

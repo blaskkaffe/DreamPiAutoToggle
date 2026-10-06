@@ -22,7 +22,7 @@
 #   BOX = {"box": "gpio", "title": "GPIO", "items": [WIDGET, ...]}
 # Modules that name the same box (case-insensitive) share it: their items come one after the other in picker order and
 # the first module (in that order) that gives a title names it. A WIDGET is {"type": ..., ...} from WIDGETS below.
-# A background module (type "fullscreen" or "part") has a background and nothing else; the top one in picker order is
+# A background module (type "fullscreen" or "part") has a background and, if it needs them, settings boxes (no dashboard boxes); the top one in picker order is
 # drawn and, if it is fullscreen, nothing below it is.
 # Nothing outside this file and the web service knows which modules exist. A module whose folder is missing,
 # that is switched off, or whose Python fails to import is simply absent. Works on Python 3 and 2.7.
@@ -176,12 +176,11 @@ def _check_layout(layout):
         if key not in _LAYOUT_KEYS:
             raise ValueError("unknown key %r (use %s)" % (key, ", ".join(_LAYOUT_KEYS)))
     if "background" in layout:
-        if any(k in layout for k in SECTIONS + ("data",)):
-            raise ValueError("a background module can only have a background, no dashboard or settings boxes")
+        if "dashboard" in layout or "data" in layout:
+            raise ValueError("a background module can have a background and settings boxes, no dashboard boxes or data")
         bg = layout["background"]
         if not isinstance(bg, dict) or bg.get("type") not in BACKGROUND_TYPES:
             raise ValueError("background.type must be one of %s" % ", ".join(BACKGROUND_TYPES))
-        return
     for sec in SECTIONS:
         if sec not in layout:
             continue
@@ -302,7 +301,6 @@ def layout():
             if not covered:
                 out["backgrounds"].append(dict(lay["background"], mod=name))
                 covered = lay["background"]["type"] == "fullscreen"
-            continue
         for sec in SECTIONS:
             for box in lay.get(sec, []):
                 b = _add_box(out, boxes, sec, box["box"].strip().lower(), box.get("title"), name)

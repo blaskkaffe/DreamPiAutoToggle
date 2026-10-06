@@ -184,7 +184,7 @@ class Handler(BaseHTTPRequestHandler):
         form is kept in memory instead of compressed for every request."""
         if not isinstance(body, bytes):
             body = body.encode("utf-8")
-        gz = len(body) > 2000 and "gzip" in (self.headers.get("Accept-Encoding") or "")
+        gz = len(body) > 2000 and "gzip" in (self.headers.get("Accept-Encoding") or "") and not ctype.startswith("image/")      # pictures are packed already
         if gz:
             key = (id(body), len(body)) if fixed else None
             if key and key in _gz_cache:

@@ -60,4 +60,10 @@ SERVER=$!
 sleep 3
 PORT=8741 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node screen.js || RESULT=1
 kill $SERVER 2>/dev/null
+# the Background image module: choose a picture, fit, darken, a big one is shrunk, remove
+IMGBG=1 PORT=8742 python3 demo_server.py > /tmp/dpns-demo-imagebg.log 2>&1 &
+SERVER=$!
+sleep 3
+PORT=8742 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node imagebg.js || RESULT=1
+kill $SERVER 2>/dev/null
 exit $RESULT
