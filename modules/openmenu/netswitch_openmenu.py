@@ -14,7 +14,7 @@
 #   NET dcnet|dcnow                               the network calls go to now (dcnet only when it is selected and DreamPi can use it)
 #   DCNET ok | DCNET off <why>                    whether DCNET works: why = config (netlink_config.ini not found), disabled ([DCNet] enabled =
 #                                                 yes missing), noupdates (/boot/noautoupdates.txt) or inactive (DreamPi is not running the add-on)
-#   PLY 2 1 27                                    the slots of the card's games that someone plays online right now, the most played first
+#   PLY 2:3 1:1 27:2                              the card's games (slot:players) that someone plays online right now, the most played first
 #                                                 (left out when none)
 #   EVENT <unix start> <due 0|1> <title>          the DC99 event to show: the one whose reminder is due (due 1), else the soonest (left out when none)
 # The module announces itself to the rest of the add-on in module.json ("launcher"): the card's games that are in the online game table
@@ -159,8 +159,7 @@ def is_online(name, table):
 
 
 def playing_now(players):
-    """[(slot, count)]: the card's games that the players (players_file()[0]) play online right now, each with how many play it, most first
-    (the PLY line sends the slots only)."""
+    """[(slot, count)]: the card's games that the players (players_file()[0]) play online right now, each with how many play it, most first"""
     glist = games()["games"]
     counts = {}
     for p in players:
@@ -211,7 +210,7 @@ def poll_reply(headers_query):
     players, _table, age = players_file()
     playing = playing_now(players)
     if playing:
-        lines.append("PLY " + " ".join(str(slot) for slot, _count in playing))
+        lines.append("PLY " + " ".join("%d:%d" % kv for kv in playing))
     event = event_line(now)
     if event:
         lines.append(event)

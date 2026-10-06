@@ -168,20 +168,20 @@ class LiveInfo(Base):
         with mock.patch.object(core, "tag", return_value="DCNET_OFF"):           # selected, but calls go to DCNow! anyway
             self.assertIn("NET dcnow", self.poll_lines())
 
-    def test_the_slots_of_the_games_played_online_go_back(self):
+    def test_the_games_played_online_go_back_with_how_many_play_them(self):
         self.upload2()
         self.players_file([{"player": "Dave", "game": "Crazy Taxi", "network": "DCNow!"}, {"player": "Eve", "game": "Quake III Arena", "network": "DCNET"},
                            {"player": "Fay", "game": "Quake III Arena", "network": "DCNow!"}, {"player": "Gus", "game": "Not On The Card", "network": "DCNow!"},
                            {"player": "Idle", "game": "", "network": "DCNow!"}])
         lines = self.poll_lines()
-        self.assertIn("PLY 3 2", lines)                             # the slots, the most played game first; unknown and idle ones are left out
+        self.assertIn("PLY 3:2 2:1", lines)                         # slot:players, the most played first; unknown and idle ones are left out
         self.players_file([])
         self.assertFalse([l for l in self.poll_lines() if l.startswith("PLY")])     # nobody: no line
 
     def test_a_game_without_a_slot_is_left_out(self):
         self.call("POST", "/openmenu/games", self.UPLOAD2.replace("T9999N\t3", "T9999N\tx").encode(), {"X-Requested-With": "openMenu"})
         self.players_file([{"player": "Eve", "game": "Quake III Arena", "network": "DCNET"}, {"player": "Dave", "game": "Crazy Taxi", "network": "DCNow!"}])
-        self.assertIn("PLY 2", self.poll_lines())
+        self.assertIn("PLY 2:1", self.poll_lines())
 
     def test_the_dcnet_line_says_why_dcnet_does_not_work(self):
         from unittest import mock
