@@ -8,3 +8,8 @@ custom("contacts-import",function(host){
   post("/contacts/import",{csv:ta.value,replace:rep.checked},function(r,st,b){go.disabled=false;
    setText(msg,(b&&b.message)||"The import did not work");
    if(r&&r.ok){ta.value="";file.value="";reloadData("contacts");refresh()}})}});
+
+// The people on file, one row each with a switch for "on the board" (the standard row and toggle widgets, built from the data source /contacts).
+custom("contacts-people",function(host){var key="",box=host.querySelector(".cpeople");box.style.maxHeight="46vh";box.style.overflowY="auto";
+ bind("@contacts.people",function(list){list=list||[];var k=JSON.stringify(list);if(k===key)return;key=k;box.innerHTML="";
+  list.forEach(function(p){box.appendChild(build({type:"row",title:p.title,sub:p.tag,control:{type:"toggle",bind:p.active,post:"/contacts/active",body:{id:p.id},label:p.title+" on the board"}},{saved:function(){reloadData("contacts")}}))})})});

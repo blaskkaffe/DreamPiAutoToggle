@@ -191,7 +191,7 @@ def _post_import(h):
 def _post_active(h):
     try:
         body = json.loads(h._body(4096).decode("utf-8"))
-        ok = set_active(str(body.get("id", "")), bool(body.get("active")))
+        ok = set_active(str(body.get("id", "")), bool(body.get("active", body.get("value"))))
     except (ValueError, UnicodeDecodeError, AttributeError):
         ok = False
     h.send(json.dumps({"ok": ok}), "application/json", status=200 if ok else 400)

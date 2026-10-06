@@ -684,6 +684,7 @@ W.roster=function(s,ctx){
     refresh();setTimeout(function(){if(cur===id){var p=person(id);if(p)modal.querySelector(".rp-avl").innerHTML=rosterAvatar(p,"rp-avb")+'<input type="file" accept="image/*" aria-label="Photo of '+esc(p.name)+'" data-photo="1">'}},1300)})};
   img.onerror=function(){URL.revokeObjectURL(url);alert("That file is not a picture")};img.src=url});
  hook("escape",function(){if(cur!==null){closeMenu();return true}});
+bind(s.source,function(d){if(d)document.body.classList.toggle("no-title",d.show_title===false)});
  bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+d.groups.length;if(key===last)return;last=key;D=d;paint()});
  return el};
 // the settings list: a department / building per row with a select of palette colours ("Automatic" = the module picks one)

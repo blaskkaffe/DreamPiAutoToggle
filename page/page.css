@@ -221,6 +221,7 @@
  .rp-clear{display:flex;justify-content:center;margin-top:10px} .rp-clear .rp-so{width:calc((100% - 20px) / 3);min-width:0;flex:none}   /* centred, the size of one status button */
  .rp-so.on{box-shadow:0 0 0 3px #fff}
  .rp-need{margin:14px 0 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+ body.no-title header h1{display:none} body.no-title header{height:0;margin:0} body.no-title .cog{top:20px}
  .rp-empty{padding:12px 4px}
  textarea{display:block;width:100%;margin:8px 0;padding:8px 10px;background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm);resize:vertical} input[type=file],.rp-need input{min-height:var(--h-ctl);max-width:100%;font-size:var(--fs-sm);color:var(--text-2)} .rp-need input{color:var(--text-1);background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);padding:0 8px}
  .rp-ct{margin-top:10px} .rp-sw{margin-right:8px;background:rgb(var(--primary-rgb))}

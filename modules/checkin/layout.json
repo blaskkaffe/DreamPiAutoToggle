@@ -27,6 +27,17 @@
      "post": "/checkin/config",
      "fields": [
       {
+       "title": "Title",
+       "sub_text": "show_title",
+       "controls": [
+        {
+         "type": "toggle",
+         "key": "show_title",
+         "label": "Show the title"
+        }
+       ]
+      },
+      {
        "title": "Group people by",
        "sub_text": "group_by",
        "controls": [

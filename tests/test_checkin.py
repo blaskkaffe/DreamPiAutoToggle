@@ -238,12 +238,21 @@ class HttpTests(Base):
 
     def test_settings_and_colour_endpoints(self):
         r = self.get("/checkin/config")
-        self.assertEqual(r["values"], {"group_by": "department", "colour_by": "department"})
+        self.assertEqual(r["values"], {"show_title": True, "group_by": "department", "colour_by": "department"})
         self.assertEqual([x["key"] for x in r["colours"]["department"]], ["Kök", "No department", "Servering"])
-        r = self.post("/checkin/config", {"values": {"colour_by": "building", "group_by": "nonsense"}})
-        self.assertEqual(r["values"], {"group_by": "department", "colour_by": "building"})
+        r = self.post("/checkin/config", {"values": {"colour_by": "building", "group_by": "nonsense", "show_title": False}})
+        self.assertEqual(r["values"], {"show_title": False, "group_by": "department", "colour_by": "building"})
+        self.assertFalse(self.get("/api")["checkin"]["show_title"])
         r = self.post("/checkin/colour", {"kind": "department", "name": "Kök", "colour": "bright-pink"})
         self.assertEqual([x for x in r["colours"]["department"] if x["key"] == "Kök"][0]["colour"], "bright-pink")
+
+    def test_people_can_be_switched_off_and_on_the_board(self):
+        anna = [p for g in self.get("/api")["checkin"]["groups"] for p in g["people"] if p["name"] == "Anna Svensson"][0]["id"]
+        self.post("/contacts/active", {"id": anna, "value": False})
+        self.assertEqual(self.get("/api")["checkin"]["total"], 3)
+        self.assertEqual([p["active"] for p in self.get("/contacts")["people"] if p["title"] == "Anna Svensson"], [False])
+        self.post("/contacts/active", {"id": anna, "value": True})
+        self.assertEqual(self.get("/api")["checkin"]["total"], 4)
 
     def test_import_over_http(self):
         r = self.post("/contacts/import", {"csv": u"name,department\nNy Person,Lager\n"})

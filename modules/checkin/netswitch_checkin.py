@@ -92,7 +92,7 @@ def config(data=None):
     """{"group_by", "colour_by": department|building, "colours": {department: {name: id}, building: {...}}}"""
     c = (data or _load()).get("config", {})
     colours = c.get("colours") if isinstance(c.get("colours"), dict) else {}
-    out = {"group_by": c.get("group_by") if c.get("group_by") in GROUPS else "department",
+    out = {"show_title": c.get("show_title") is not False, "group_by": c.get("group_by") if c.get("group_by") in GROUPS else "department",
            "colour_by": c.get("colour_by") if c.get("colour_by") in GROUPS else "department", "colours": {}}
     for kind in GROUPS:
         m = colours.get(kind) if isinstance(colours.get(kind), dict) else {}
@@ -187,7 +187,7 @@ def snapshot(data=None):
     total = sum(len(g["people"]) for g in groups)
     n_in = sum(1 for g in groups for p in g["people"] if p["in"])
     buildings = sorted(set(p.get("location") or "" for p in people) - set([""]), key=str.lower)
-    return {"rev": "%d.%d" % (data.get("rev", 0), _roster_stamp()), "group_by": cfg["group_by"], "colour_by": cfg["colour_by"], "groups": groups,
+    return {"rev": "%d.%d" % (data.get("rev", 0), _roster_stamp()), "show_title": cfg["show_title"], "group_by": cfg["group_by"], "colour_by": cfg["colour_by"], "groups": groups,
             "statuses": menu, "buildings": buildings, "total": total, "in": n_in,
             "text": "No people yet: import a CSV in Settings > Contacts." if not total else "%d of %d in" % (n_in, total),
             "out_colour": OUT_COLOUR}
@@ -262,6 +262,8 @@ def save_config(values):
             for k, allowed in (("group_by", GROUPS), ("colour_by", GROUPS)):
                 if values.get(k) in allowed:
                     cur[k] = values[k]
+            if isinstance(values.get("show_title"), bool):
+                cur["show_title"] = values["show_title"]
         data["config"] = cur
         _save(data)
         return cur
@@ -327,9 +329,9 @@ def _config_reply():
         people = _roster()
         cols = group_colours(people, kind, c)
         kinds[kind] = [{"name": n or "(none)", "key": n, "colour": cols[n], "own": n in c["colours"][kind]} for n in sorted(cols, key=lambda s: s.lower()) if n]
-    return {"values": {"group_by": c["group_by"], "colour_by": c["colour_by"]},
+    return {"values": {"show_title": c["show_title"], "group_by": c["group_by"], "colour_by": c["colour_by"]},
             "options": {"groups": [{"value": "department", "label": "Department"}, {"value": "building", "label": "Building"}]},
-            "texts": {"group_by": c["group_by"].capitalize(), "colour_by": c["colour_by"].capitalize()},
+            "texts": {"show_title": "Shown" if c["show_title"] else "Hidden", "group_by": c["group_by"].capitalize(), "colour_by": c["colour_by"].capitalize()},
             "colours": kinds, "palette_exclude": ["network"], "total": snap["total"]}
 
 
