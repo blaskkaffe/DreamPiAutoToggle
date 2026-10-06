@@ -243,7 +243,7 @@ function later(fn){if(window.requestAnimationFrame)requestAnimationFrame(functio
 // while that is false the box has nothing to show when tapped, so it does not open (and is not a button)
 W.infobox=function(s,ctx){
  var el=h("div",{"class":"now rows",title:"Show or hide details",role:"button",tabindex:"0","aria-expanded":"false"}),
-  head=h("b"),canOpen=true;
+  head=h("b",{"class":s.title_small?"small":""}),canOpen=true;      // title_small: the main title is as big as the rows' text (still bold)
  if(s.label!==undefined){var lab=h("div",{"class":"nlabel"});el.appendChild(lab);bind(s.label,function(t){setText(lab,t==null||t===""?"\u00a0":t)})}   // the top line: a text or a binding; empty keeps its height
  el.appendChild(head);
  var tk=(s.parts!==undefined||s.title!==undefined)?ticker(head,s.mod):null;      // no title and no parts: the line is empty and takes no room
@@ -257,8 +257,10 @@ W.infobox=function(s,ctx){
   var spec=r.value||{type:"text",text:""};
   if(r.main&&spec.type==="text"&&spec.style!=="log")spec=Object.assign({},spec,{type:"carousel"});      // the line that shows while the box is closed is one line: it scrolls like the title when it is too long (a log stays text)
   var v=h("span",{"class":"v"+(spec.type==="carousel"?" fill":"")});v.appendChild(build(Object.assign({mod:s.mod},spec),ctx));row.appendChild(v);
-  // "busy": "@path" - a small spinner at the end of the row while it is true: the row is being refreshed, what it shows stays until the new data is there
-  if(r.busy!==undefined){var sp=h("span",{"class":"spin",role:"status","aria-label":"Refreshing"});row.appendChild(sp);bind(r.busy,function(x){sh(sp,!!x)})}
+  // "busy": "@path" - a small spinner next to the row's title while it is true: the row is being refreshed, what it shows stays until the new data is there
+  // (a row without a visible title, such as the main row of a closed box, has a second one at its start: page.css shows the right one)
+  if(r.busy!==undefined){var sp=h("span",{"class":"spin",role:"status","aria-label":"Refreshing"}),sp2=h("span",{"class":"spin alt","aria-hidden":"true"});
+   row.firstChild.appendChild(sp);row.appendChild(sp2);bind(r.busy,function(x){sh(sp,!!x);sh(sp2,!!x)})}
   if(r.show!==undefined)bind(r.show,function(x){sh(row,!!x)});
   el.appendChild(row)});
  if(s.actions&&s.actions.length){var act=h("div",{"class":"row more hang keep"});
@@ -343,7 +345,7 @@ W.links=function(s){var btn=s.style==="buttons",el=h("span",{"class":"links keep
 //   icon  {kind: "star" | "bell", post, on: the item's field, data: the data source the answer replaces, body: fixed fields, fields: {key: item field}}:
 //         a round on / off button at the end that POSTs {...body, ...fields, on} (a favourite, a reminder)
 // ---- games a module that can start games on the Dreamcast announces (module.json "launcher": the openMenu link; LAY.launcher): a list row with
-// "start": {"game": field, "text": field} gets a play button when its game is among them. The game field holds a game's name (same name, or one
+// "start": {"game": field, "text": field, "label": "Join"} gets a Join button when its game is among them and the Dreamcast is connected. The game field holds a game's name (same name, or one
 // inside the other); with "text" too, the row is a free text (an event) and the card game whose name appears in the two fields is meant.
 // Only games that work online are announced, so the buttons are the games that can be played with others.
 function launcherNorm(t){return String(t||"").toLowerCase().replace(/\u00d7/g,"x").replace(/[^a-z0-9]+/g,"")}
@@ -358,6 +360,14 @@ function launcherGame(spec,it){var all=launcherGames(),i,g,n,w,best=null;if(!all
  return best}
 // what the buttons of all lists depend on: the games announced and whether the Dreamcast can start one now
 function launcherSig(){var L=LAY.launcher;if(!L)return "";var st=S[L.state]||{},d=S[L.games]||{};return [d.hash,(d.games||[]).length,!!st.connected,!!st.busy].join("|")}
+// A line that scrolls round like the carousel when it is wider than its room, and stands still (left-aligned) when it fits: the names in a compact list
+// (a player's, a game's). node is what it shows (a text node or a link); it is measured when it is shown, resized or its fonts arrive.
+function marquee(node){var el=h("span",{"class":"carousel mq"}),trk=h("span",{"class":"trk"}),sp=h("span",{"class":"sp",text:"\u00a0\u00a0\u2022\u00a0\u00a0"}),t=h("span",{"class":"t"},[node,sp]),on=false;
+ trk.appendChild(t);el.appendChild(trk);
+ function fit(){var need=t.offsetWidth-sp.offsetWidth>el.clientWidth+1;if(!el.clientWidth||need===on)return;on=need;el.classList.toggle("sc",need);
+  while(trk.childNodes.length>1)trk.removeChild(trk.lastChild);
+  if(need){var d=t.cloneNode(true);d.className="t dup";d.setAttribute("aria-hidden","true");trk.appendChild(d);el.style.setProperty("--d",Math.max(10,Math.round((t.textContent||"").length*0.28))+"s")}}
+ watchSize(el,fit);later(fit);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);return el}
 W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" compact keep":s.style==="grid"?" grid keep":"")}),pop=h("div"),popT=h("div",{"class":"t"}),msg=h("div",{"class":"msg"}),
  fields=[],go=h("button",{type:"button","class":"pill-s"}),cur=null,key="";
  var P=s.popup||{};
@@ -368,17 +378,18 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
  var inner=h("div"),p;el.appendChild(inner);el.appendChild(pop);p=ui.popup(pop);
  function compactRow(it){var R=s.row,tag=R.tag?it[R.tag]:"",c=h("span",{"class":"pw",text:tag}),title=it[R.title||"title"],
   tn=R.href&&it[R.href]?h("a",{href:it[R.href],target:"_blank",rel:"noopener noreferrer",text:title}):document.createTextNode(title),
-  t=h("span",{"class":"pn"},[tn,h("span",{"class":"pg",text:it[R.sub||"sub"]||""})]);
+  t=h("span",{"class":"pn"},s.style==="compact"?[marquee(tn),h("span",{"class":"pg"},[marquee(document.createTextNode(it[R.sub||"sub"]||""))])]
+   :[tn,h("span",{"class":"pg",text:it[R.sub||"sub"]||""})]);      // long names scroll (not in the grid style, its pairs are short)
   if(R.tag_colour&&it[R.tag_colour]){var id=colourId(it[R.tag_colour],s.mod);if(id)c.style.color="var(--c-"+id+"-l)"}
   var kids=[R.lead?h("span",{"class":"pl"},[h("span",{text:it[R.lead]||""}),h("b",{text:it[R.lead_big]||""})]):null,t,R.tag?c:null],ic=R.icon;
+  var g=R.start?launcherGame(R.start,it):null,L=LAY.launcher,st=L?S[L.state]||{}:{};      // R.start: a Join button when a module that can start games on the Dreamcast announces this game as online, has it and is connected
+  if(g&&st.connected){var pb=h("button",{type:"button","class":"pill-s join",text:R.start.label||"Join","aria-label":(R.start.label||"Join")+" "+g.name});pb.disabled=!!st.busy;
+   pb.title=pb.disabled?"A game is already on its way to the Dreamcast":"Start "+g.name+" on the Dreamcast";
+   pb.onclick=function(e){e.stopPropagation();if(!confirm("Start "+g.name+" on the Dreamcast?"))return;pb.disabled=true;
+    post(L.start,{product:g.product},function(r,s2,b2){pb.disabled=false;if(!r&&b2&&b2.message)alert(b2.message);reloadData(L.state)})};kids.push(pb)}
   if(ic){var b=ui.iconButton(ic.kind,!!it[ic.on],title);
    b.onclick=function(e){e.stopPropagation();b.disabled=true;var body={},k;for(k in (ic.body||{}))body[k]=ic.body[k];for(k in (ic.fields||{}))body[k]=it[ic.fields[k]];body.on=b.getAttribute("aria-pressed")!=="true";
     post(ic.post,body,function(r){b.disabled=false;if(r){if(ic.data)S[ic.data]=r;engineUpdate()}})};kids.push(b)}
-  var g=R.start?launcherGame(R.start,it):null;      // R.start: a play button when a module that can start games on the Dreamcast announces this game
-  if(g){var pb=ui.iconButton("play",false,g.name),L=LAY.launcher,st=S[L.state]||{};pb.disabled=!st.connected||!!st.busy;
-   pb.title=pb.disabled?"The Dreamcast is not connected, or busy":"Start "+g.name+" on the Dreamcast";
-   pb.onclick=function(e){e.stopPropagation();if(!confirm("Start "+g.name+" on the Dreamcast?"))return;pb.disabled=true;
-    post(L.start,{product:g.product},function(r,s2,b2){pb.disabled=false;if(!r&&b2&&b2.message)alert(b2.message);reloadData(L.state)})};kids.push(pb)}
   return h("div",{"class":"p"},kids)}
  function rowFor(it,i,extra){if(s.style==="compact"||s.style==="grid")return compactRow(it);var info=extra?it.sub:it[s.row.sub||"sub"],
   title=extra?it.title:it[s.row.title||"title"],b=h("button",{type:"button","class":"pill-s",text:extra?it.button:(s.row.button||"Select"),"aria-label":(extra?it.button:(s.row.button||"Select"))+" "+title});

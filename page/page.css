@@ -29,7 +29,7 @@
  .notebox{display:flex;align-items:center;gap:12px;background:rgba(var(--primary-rgb),.75);border:var(--bw) solid rgb(var(--primary-l-rgb));padding:10px 12px 10px 20px;border-radius:var(--r-box);margin:0 0 12px;font-size:var(--fs-md)}
  .notebox span{flex:1;min-width:0} .notebox .nx{flex:none;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.28)}
  .now{font-size:var(--fs-md);margin:0 0 16px;padding:14px 24px;border-radius:var(--r-box);text-align:center;background:rgba(var(--primary-rgb),.62);border:var(--bw) solid rgb(var(--primary-l-rgb));line-height:1.35}
- .now .nlabel{font-size:1.3em} .now b{font-size:1.6em;display:block}      /* the box's own lines are larger; every row inside it is the size of a settings row */
+ .now .nlabel{font-size:1.3em} .now b{font-size:1.6em;display:block} .now b.small{font-size:1em}      /* the box's own lines are larger; every row inside it is the size of a settings row */
  /* notification highlight: a module asks for one of its dashboard boxes to stand out for a while (/api "highlight", an event about to
     start, say). A neutral box (class plain: its colour's Highlight switch is off) takes its own colour; a box that is coloured
     already gets the global look of Settings > Appearance > Notification highlight: an animated rainbow edge (body.hl-rainbow) or
@@ -88,7 +88,8 @@
  .rows.noopen{cursor:default}
  .ibtn{flex:none;width:36px;height:36px;padding:0;border-radius:50%;background:rgba(0,0,0,.25);display:inline-flex;align-items:center;justify-content:center}   /* a round on / off icon button: ui.iconButton() */
  .ibtn svg{width:18px;height:18px;fill:rgba(255,255,255,.45)} .ibtn.on{background:rgba(255,255,255,.9)} .ibtn.on svg{fill:var(--primary)}
- .spin{flex:none;display:inline-block;width:.8em;height:.8em;margin-left:8px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spin .8s linear infinite}   /* "refreshing": next to a row whose data is being fetched again, the old data stays */
+ .spin{flex:none;display:inline-block;width:.8em;height:.8em;margin-left:8px;vertical-align:middle;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spin .8s linear infinite}   /* "refreshing": next to a row whose data is being fetched again, the old data stays */
+ .spin.alt{display:none} .now:not(.open) .row.main .spin.alt,.now .row.r-full .spin.alt{display:inline-block;order:-1;margin:0 8px 0 0} .now .row.r-full .spin.alt{order:3;margin:0 0 0 8px}      /* a row whose title is not shown has its spinner at the start of the row (the one in the title is hidden with it); a full-width row at its end */
  @keyframes spin{to{transform:rotate(360deg)}} @media(prefers-reduced-motion:reduce){.spin{animation:none}}
  .srow > span:first-child{min-width:0;overflow-wrap:anywhere} .srow .pill-s{flex:none}
  input[type=number]{width:54px;box-sizing:border-box;height:var(--h-ctl);padding:0 6px;border-radius:var(--r-ctl);border:var(--bw) solid var(--ctl-line);background:var(--ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm)}
@@ -144,7 +145,7 @@
  .now .pln{white-space:nowrap} .now .pln+.pln{margin-left:.6em}
  .now .wlist.compact{display:block;width:100%;max-height:40vh;overflow-y:auto;overscroll-behavior:contain}
  .now .wlist .p{display:flex;gap:8px;padding:4px 0;border-top:1px solid rgba(255,255,255,.12)} .now .wlist .p:first-child{border-top:0}
- .now .wlist .pn{flex:1;min-width:0;overflow-wrap:anywhere} .now .wlist .pg{display:block;color:var(--box-text-3)}
+ .now .wlist .pn{flex:1;min-width:0;overflow-wrap:anywhere} .now .wlist .carousel.mq{text-align:left;min-height:0;max-width:100%} .now .wlist .pg .carousel.mq{display:block}      /* names scroll when too long (marquee() in widgets.js) */ .now .wlist .pg{display:block;color:var(--box-text-3)}
  .now .wlist .pl{flex:none;width:5.6em;line-height:1.25;color:var(--box-text-3);white-space:nowrap} .now .wlist .pl b{display:block;font-size:1.15em;color:#fff;font-variant-numeric:tabular-nums} .now .wlist .pn a{color:#fff;text-decoration:none}
  .now .wlist.grid > div:first-child{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:3px 18px;width:100%} .now .wlist.grid .p{border-top:0;padding:0;justify-content:space-between} .now .wlist.grid .pn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--box-text-2)}   /* "style": "grid": short name / value pairs */
  .now .wlist .pw{flex:none;font-weight:bold;white-space:nowrap}
@@ -161,7 +162,7 @@
  .now[data-title-rows="full"]:not(.open) > b{grid-row:1 / 4}
  .now[data-title-rows="upper"]:not(.open) > b{grid-row:1 / 3}
  .now[data-title-rows="lower"]:not(.open) > b{grid-row:2 / 4}
- .now[data-title-rows]:not(.open) > .row.main{grid-row:3} .now .wlist .p{align-items:center} .now .wlist .p .ibtn{width:30px;height:30px}
+ .now[data-title-rows]:not(.open) > .row.main{grid-row:3} .now .wlist .p{align-items:center} .now .wlist .p .ibtn{width:30px;height:30px} .now .wlist .p .join{flex:none;min-height:0;height:30px;padding:0 14px;white-space:nowrap}      /* Join: as high as the star */
  .now .links{display:flex;flex-wrap:wrap;gap:6px} .now .links a{color:#fff;opacity:.9;padding:6px 0} .now .links.btns{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:8px;width:100%} .now .links.btns a.pill-s{display:flex;justify-content:center;align-items:center;min-width:0;padding:0 2px;opacity:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:none}
  .now .st{display:block;overflow-wrap:anywhere}
  .frow.stack{flex-direction:column;align-items:stretch;gap:8px}   /* a pop-up row with its control under the label */
