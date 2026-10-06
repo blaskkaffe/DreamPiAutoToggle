@@ -112,15 +112,23 @@ def _internet_view(internet, pi):
     return out
 
 
+def _source(h):
+    """Who asked: the Dreamcast's openMenu (it sends X-Requested-With: openMenu over the PPP link) or the web page."""
+    return "openMenu" if (h.headers.get("X-Requested-With") or "").strip().lower() == "openmenu" else "web page"
+
+
 def _select(net):
+    """POST /dcnow and POST /dcnet: the two network buttons of the page, and the same two buttons in openMenu. Both send the same
+    request, so the same code answers (204 with X-Requested-With, 303 for a plain form post). The choice applies from the next call."""
     def handler(h):
+        who = _source(h)
         if net == "dcnet":
             open(core.FLAG, "w").close()
-            core.debug_log("web page: DCNET selected")
+            core.debug_log("%s: DCNET selected" % who)
         else:
             if os.path.exists(core.FLAG):
                 os.remove(core.FLAG)
-            core.debug_log("web page: DCNow! selected")
+            core.debug_log("%s: DCNow! selected" % who)
     return handler
 
 

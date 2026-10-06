@@ -141,6 +141,19 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertEqual(self.req("POST", "/dcnet")[0], 403)
         self.assertFalse(os.path.exists(core.FLAG))
 
+    def test_openmenu_selects_the_network_like_the_page(self):
+        """openMenu's two buttons send POST /dcnow and /dcnet over the PPP link: X-Requested-With: openMenu, no Origin, often no Host."""
+        h = {"X-Requested-With": "openMenu"}
+        open(core.DEBUG_DTMF, "w").close()                       # the debug log is on
+        core.save_module_enabled("debuglog", True)
+        self.assertEqual(self.req("POST", "/dcnet", h)[0], 204)
+        self.assertTrue(os.path.exists(core.FLAG))
+        self.assertEqual(self.req("POST", "/dcnow", h)[0], 204)
+        self.assertFalse(os.path.exists(core.FLAG))
+        log = open(core.DTMF_LOG).read()
+        self.assertIn("openMenu: DCNET selected", log)
+        self.assertIn("openMenu: DCNow! selected", log)
+
     def test_same_site_form_post_still_works_without_javascript(self):
         status, _b, r = self.req("POST", "/dcnet", {"Origin": "http://127.0.0.1:%d" % self.port,
                                                     "Host": "127.0.0.1:%d" % self.port})
