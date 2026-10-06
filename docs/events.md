@@ -66,7 +66,7 @@ changed, n removed)` or `events: sync failed, the stored events are kept: ...`.
 - **One event:** the bell in the box (`POST /events/remind {"id", "on"}`). **A series:** Settings > DC99 events > *Always remind
   me of* (`GET`/`POST /events/series`, a picker with the titles of the coming events as choices; up to 12).
 - `write_reminders()` writes the reminded events of the next 30 days to `core.EVENT_REMINDERS` (`event_reminders.json`: `lead`,
-  `after`, `items` `[{"id", "title", "start"}]`, `dismissed`), after every change and every minute from the background loop.
+  `after`, `items` `[{"id", "title", "start"}]`, `upcoming` (the next 5 coming events, reminded or not, same shape; read by `core.next_event()` for the openMenu link's `EVENT` line), `dismissed`), after every change and every minute from the background loop.
   `core.event_reminder(now)` reads it: an item is due from `lead` minutes before its start (5 to 60, default 15) until `after`
   (10) minutes after, unless dismissed.
 - While one is due: the module's `api()` adds a **notice** (the banner; its ✕ is `POST /events/dismiss`) and **highlights** the

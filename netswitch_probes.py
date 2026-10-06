@@ -44,7 +44,7 @@ def check_internet():
         socket.gethostbyname("dreamcast.online")
     except Exception:
         return {"state": "warn", "text": "Connected, but DNS lookups fail"}
-    return {"state": "ok", "text": "Connected (%d ms)" % best}
+    return {"state": "ok", "text": "Connected", "ms": best}      # the ping is its own field: the page shows it as the row's subtitle
 
 
 def _sys(iface, name):
@@ -253,8 +253,7 @@ def pi_health():
     details = []
     if up is not None:
         details.append("Uptime " + _duration(up))
-    ip = lan_ip()
-    details.append("IP: " + (ip or "none"))
+    ip = lan_ip()      # shown with the internet (the switcher's Internet row), not in the Pi's lines
     now, since = [], []
     if flags is not None:
         if flags & 0x1: now.append("under-voltage")

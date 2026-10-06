@@ -90,7 +90,7 @@ def api(d, warnings):
     pi_lines = [pi["line1"], pi.get("line2") or ""] + ([pi["warn"]] if pi.get("warn") else []) if pi.get("line1") else [pi.get("text") or "..."]
     d.update({"network": sel["id"], "selected": sel,
               "modem": {"state": _modem_dot(dstate, plugged, compat), "text": mtext, "since": msince, "since_text": _ago(msince, now), "plugged": plugged, "label": label, "compat": compat},
-              "internet": checks["internet"],
+              "internet": _internet_view(checks["internet"], pi),
               "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"), "line2": pi.get("line2"),
                      "warn": pi.get("warn"), "lines": pi_lines},
               "hangup": {"busy": busy, "text": probes._hangup["text"] or "hanging up...",
@@ -98,6 +98,18 @@ def api(d, warnings):
     pick = core.module_colours("switcher").get("selector", "network")
     d.setdefault("primary", {})["switcher"] = core.network_colour(sel["id"])["id"] if pick == "network" else pick      # the box and its borders: the selector's colour (the selected network's by default)
     d.setdefault("primary_key", {})["switcher"] = "selector"                               # and the box follows the selector's background setting
+
+
+def _internet_view(internet, pi):
+    """The Internet row: its text and dot as measured, and a subtitle with the ping and the Pi's IP address ("Ping 23 ms \u2022 IP 192.168.1.20")."""
+    out = dict(internet)
+    sub = []
+    if internet.get("state") == "ok" and internet.get("ms") is not None:
+        sub.append("Ping %d ms" % internet["ms"])
+    if "ip" in pi:                                  # not measured yet at the very start: nothing is said
+        sub.append("IP " + pi["ip"] if pi["ip"] else "No IP address")
+    out["sub"] = " \u2022 ".join(sub)
+    return out
 
 
 def _select(net):

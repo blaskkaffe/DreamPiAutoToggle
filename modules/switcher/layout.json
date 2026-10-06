@@ -31,7 +31,8 @@
        "value": {
         "type": "status",
         "dot": "@internet.state",
-        "text": "@internet.text"
+        "text": "@internet.text",
+        "sub": "@internet.sub"
        }
       },
       {

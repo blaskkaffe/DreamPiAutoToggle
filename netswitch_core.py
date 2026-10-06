@@ -578,21 +578,35 @@ def hook_problem():
     return None
 
 
-def dcnet_problem():
-    """None when DreamPi's DCNET support is switched on, else a reason."""
+def _dcnet_check():
+    """(code, reason): (None, None) when DreamPi's DCNET support is switched on, else why not: code "noupdates" (/boot/noautoupdates.txt
+    exists), "config" (netlink_config.ini is not found) or "disabled" ([DCNet] enabled = yes is missing)."""
     if os.path.exists("/boot/noautoupdates.txt"):
-        return ("/boot/noautoupdates.txt exists, so DreamPi skips netlink_config.ini "
-                "and DCNET stays off")
+        return "noupdates", ("/boot/noautoupdates.txt exists, so DreamPi skips netlink_config.ini "
+                             "and DCNET stays off")
     for path in ("/boot/netlink_config.ini", "/home/pi/dreampi/netlink_config.ini"):
         if os.path.isfile(path):
             break
     else:
-        return "netlink_config.ini not found, so DCNET is off"
+        return "config", "netlink_config.ini not found, so DCNET is off"
     text = read_file(path) or ""
     section = re.search(r"^\[DCNet\](.*?)(?=^\[|\Z)", text, re.M | re.S)
     if not section or not re.search(r"^\s*enabled\s*=\s*yes\s*$", section.group(1), re.M):
-        return "DCNET is not enabled in " + path + " ([DCNet] enabled = yes)"
-    return None
+        return "disabled", "DCNET is not enabled in " + path + " ([DCNet] enabled = yes)"
+    return None, None
+
+
+def dcnet_problem():
+    """None when DreamPi's DCNET support is switched on, else a reason."""
+    return _dcnet_check()[1]
+
+
+def dcnet_code():
+    """"ok" when DreamPi's DCNET support is switched on, else a short code for why not (see _dcnet_check()), "inactive" when DreamPi is
+    not running the add-on (nothing is being switched then). openMenu gets it in the DCNET line of the poll."""
+    if hook_problem():
+        return "inactive"
+    return _dcnet_check()[0] or "ok"
 
 
 # The short tag served at GET /tag for openMenu (docs/openmenu.md): which network this
@@ -769,6 +783,20 @@ def event_reminder(now=None):
     except (IOError, OSError, ValueError, AttributeError, KeyError, TypeError):
         return None
     return min(due, key=lambda i: i["start"]) if due else None
+
+
+def next_event(now=None):
+    """The soonest DC99 event that has not ended its reminder window yet, or None: {"id", "title", "start"}. The events module writes the
+    next few into EVENT_REMINDERS ("upcoming", soonest first) whenever it changes, so the openMenu answer needs no page and no events code."""
+    now = time.time() if now is None else now
+    try:
+        with open(EVENT_REMINDERS) as f:
+            data = json.load(f)
+        after = float(data.get("after", 10)) * 60
+        coming = [i for i in data.get("upcoming") or [] if i["start"] + after > now]
+    except (IOError, OSError, ValueError, AttributeError, KeyError, TypeError):
+        return None
+    return min(coming, key=lambda i: i["start"]) if coming else None
 
 
 def mark_reboot():

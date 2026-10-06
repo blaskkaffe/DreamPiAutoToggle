@@ -230,6 +230,53 @@ class SwitcherView(unittest.TestCase):
                 probes._checks.update(old)
 
 
+class InternetRow(unittest.TestCase):
+    """The Internet row: the ping and the Pi's IP address are its subtitle (the Pi row no longer has the IP)."""
+    def setUp(self):
+        self.tmp = sandbox()
+        with probes._checks_lock:
+            self.old = dict(probes._checks)
+
+    def tearDown(self):
+        with probes._checks_lock:
+            probes._checks.clear()
+            probes._checks.update(self.old)
+        cleanup(self.tmp)
+
+    def row(self, internet, pi):
+        with probes._checks_lock:
+            probes._checks["internet"], probes._checks["pi"] = internet, pi
+        d = {}
+        sw.api(d, [])
+        return d["internet"]
+
+    def test_the_ping_and_the_ip_are_the_subtitle(self):
+        r = self.row({"state": "ok", "text": "Connected via Ethernet", "ms": 23}, {"state": "ok", "text": "t", "ip": "192.168.1.20"})
+        self.assertEqual((r["text"], r["sub"]), ("Connected via Ethernet", "Ping 23 ms \u2022 IP 192.168.1.20"))
+
+    def test_without_internet_there_is_no_ping_but_the_ip_is_still_shown(self):
+        r = self.row({"state": "bad", "text": "No internet connection"}, {"state": "ok", "text": "t", "ip": "192.168.1.20"})
+        self.assertEqual(r["sub"], "IP 192.168.1.20")
+        r = self.row({"state": "bad", "text": "No network connection"}, {"state": "ok", "text": "t", "ip": None})
+        self.assertEqual(r["sub"], "No IP address")
+
+    def test_nothing_is_said_before_the_pi_has_been_measured(self):
+        self.assertEqual(self.row({"state": "checking", "text": "Checking..."}, {"state": "checking", "text": "Checking..."})["sub"], "")
+
+    def test_the_check_keeps_the_ping_out_of_the_text(self):
+        from unittest import mock
+        with mock.patch.object(probes.socket, "create_connection", return_value=mock.Mock()), mock.patch.object(probes.socket, "gethostbyname", return_value="1.2.3.4"):
+            r = probes.check_internet()
+        self.assertEqual((r["state"], r["text"]), ("ok", "Connected"))
+        self.assertIsInstance(r["ms"], int)
+
+    def test_the_pi_row_has_no_ip_any_more(self):
+        pi = probes.pi_health()
+        self.assertNotIn("IP", pi["line2"])
+        self.assertNotIn("IP", pi["text"])
+        self.assertIn("ip", pi)                                                # it is still measured: the Internet row shows it
+
+
 class ModemDot(unittest.TestCase):
     def test_the_modem_row_has_a_dot_in_the_states_of_the_other_rows(self):
         import netswitch_switcher as sw

@@ -274,6 +274,16 @@ class Reminders(Base):
         self.remind("US Game Night", False)
         self.assertIsNone(core.event_reminder(start))
 
+    def test_the_soonest_events_are_in_the_file_for_the_openmenu_link(self):
+        self.remind("US Game Night")
+        data = json.load(open(core.EVENT_REMINDERS))
+        self.assertEqual([i["title"] for i in data["upcoming"]][0], "US Game Night")             # reminded or not: the soonest first
+        self.assertEqual(len(data["upcoming"]), 3)
+        start = utc(2026, 10, 9, 1)
+        self.assertEqual(core.next_event(start - 3600)["title"], "US Game Night")
+        self.assertEqual(core.next_event(start + 9 * 60)["title"], "US Game Night")             # still counts while its reminder window lasts
+        self.assertNotEqual((core.next_event(start + 11 * 60) or {}).get("title"), "US Game Night")   # then the next one
+
     def test_banner_highlight_and_dismiss(self):
         self.remind("US Game Night")
         start = utc(2026, 10, 9, 1)

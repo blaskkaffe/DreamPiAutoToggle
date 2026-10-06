@@ -410,8 +410,12 @@ def reminded(row, cfg):
     return str(row["id"]) in cfg["picked"] or row["title"] in cfg["series"]
 
 
+UPCOMING_KEPT = 5       # the soonest events (reminded or not) that EVENT_REMINDERS also holds, for core.next_event()
+
+
 def write_reminders(now=None):
-    """The reminded events of the next 30 days to core.EVENT_REMINDERS (the LEDs and the page read it); old picks are dropped."""
+    """The reminded events of the next 30 days to core.EVENT_REMINDERS (the LEDs and the page read it); old picks are dropped. It also
+    holds the soonest few events of all ("upcoming"), which the openMenu link tells the Dreamcast about."""
     now = time.time() if now is None else now
     cfg = read_config()
     rows = query("removed=0 AND start_utc>=? AND start_utc<?", (int(now - AFTER * 60), int(now + REMIND_DAYS * 86400)))
@@ -421,7 +425,8 @@ def write_reminders(now=None):
     keep_dismissed = [i for i in cfg["dismissed"] if i in alive]
     if keep_picked != cfg["picked"] or keep_dismissed != cfg["dismissed"]:
         cfg = save_config({"picked": keep_picked, "dismissed": keep_dismissed})
-    data = {"lead": cfg["lead"], "after": AFTER, "items": items, "dismissed": cfg["dismissed"], "written": int(now)}
+    coming = [{"id": str(r["id"]), "title": r["title"], "start": r["start_utc"]} for r in sorted(rows, key=lambda r: r["start_utc"])[:UPCOMING_KEPT]]
+    data = {"lead": cfg["lead"], "after": AFTER, "items": items, "upcoming": coming, "dismissed": cfg["dismissed"], "written": int(now)}
     tmp = core.EVENT_REMINDERS + ".tmp"
     with open(tmp, "w") as f:
         json.dump(data, f)

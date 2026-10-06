@@ -61,9 +61,9 @@ class OpenMenu(Base):
     def test_poll_asks_for_games_then_stops(self):
         status, text = self.call("GET", "/openmenu/poll?v=1&n=0&h=00000000")
         self.assertEqual(status, 200)
-        self.assertEqual(text.splitlines(), ["openmenu 1", "NEED games", "NET dcnow"])
+        self.assertEqual(text.splitlines(), ["openmenu 1", "NEED games", "NET dcnow", "DCNET off inactive"])
         self.assertEqual(self.upload()[0], 200)
-        self.assertEqual(self.call("GET", POLL)[1].splitlines(), ["openmenu 1", "NET dcnow"])
+        self.assertEqual(self.call("GET", POLL)[1].splitlines(), ["openmenu 1", "NET dcnow", "DCNET off inactive"])
         self.assertIn("NEED games", self.call("GET", "/openmenu/poll?v=1&n=3&h=other")[1])
 
     def test_upload_parsed_sorted_and_kept(self):
@@ -97,8 +97,8 @@ class OpenMenu(Base):
         self.upload()
         self.call("GET", POLL)
         self.launch("MK51035")
-        self.assertEqual(self.call("GET", POLL)[1].splitlines(), ["openmenu 1", "LAUNCH MK51035", "NET dcnow"])
-        self.assertEqual(self.call("GET", POLL)[1].splitlines(), ["openmenu 1", "NET dcnow"])
+        self.assertEqual(self.call("GET", POLL)[1].splitlines(), ["openmenu 1", "LAUNCH MK51035", "NET dcnow", "DCNET off inactive"])
+        self.assertEqual(self.call("GET", POLL)[1].splitlines(), ["openmenu 1", "NET dcnow", "DCNET off inactive"])
 
     def test_old_launch_dropped(self):
         self.upload()
@@ -168,20 +168,50 @@ class LiveInfo(Base):
         with mock.patch.object(core, "tag", return_value="DCNET_OFF"):           # selected, but calls go to DCNow! anyway
             self.assertIn("NET dcnow", self.poll_lines())
 
-    def test_the_games_played_online_go_back_as_folders(self):
+    def test_the_games_played_online_go_back_with_how_many_play_them(self):
         self.upload2()
         self.players_file([{"player": "Dave", "game": "Crazy Taxi", "network": "DCNow!"}, {"player": "Eve", "game": "Quake III Arena", "network": "DCNET"},
                            {"player": "Fay", "game": "Quake III Arena", "network": "DCNow!"}, {"player": "Gus", "game": "Not On The Card", "network": "DCNow!"},
                            {"player": "Idle", "game": "", "network": "DCNow!"}])
         lines = self.poll_lines()
-        self.assertIn("PLAYING game02 game03", lines)              # once each, in the order of the players; unknown and idle ones are left out
+        self.assertIn("PLAYING 3:2 2:1", lines)                     # slot:players, the most played first; unknown and idle ones are left out
         self.players_file([])
         self.assertFalse([l for l in self.poll_lines() if l.startswith("PLAYING")])     # nobody: no line
 
-    def test_a_folder_that_is_not_one_word_is_replaced_by_the_product_code(self):
+    def test_a_game_without_a_slot_is_left_out(self):
+        self.call("POST", "/openmenu/games", self.UPLOAD2.replace("T9999N\t3", "T9999N\tx").encode(), {"X-Requested-With": "openMenu"})
+        self.players_file([{"player": "Eve", "game": "Quake III Arena", "network": "DCNET"}, {"player": "Dave", "game": "Crazy Taxi", "network": "DCNow!"}])
+        self.assertIn("PLAYING 2:1", self.poll_lines())
+
+    def test_the_dcnet_line_says_why_dcnet_does_not_work(self):
+        from unittest import mock
         self.upload2()
-        self.players_file([{"player": "Dave", "game": "Death Crimson 2", "network": "DCNow!"}])
-        self.assertIn("PLAYING HDR-0001", self.poll_lines())
+        with mock.patch.object(core, "hook_problem", return_value=None):
+            for code, line in ((None, "DCNET ok"), ("config", "DCNET off config"), ("disabled", "DCNET off disabled"), ("noupdates", "DCNET off noupdates")):
+                with mock.patch.object(core, "_dcnet_check", return_value=(code, "why" if code else None)):
+                    self.assertIn(line, self.poll_lines())
+        self.assertIn("DCNET off inactive", self.poll_lines())             # DreamPi is not running the add-on
+
+    def test_the_event_line_is_the_one_due_else_the_soonest(self):
+        self.upload2()
+        now = int(time.time())
+
+        def reminders(items, upcoming):
+            with open(core.EVENT_REMINDERS, "w") as f:
+                json.dump({"lead": 15, "after": 10, "items": items, "upcoming": upcoming, "dismissed": [], "written": now}, f)
+        reminders([], [])
+        self.assertFalse([l for l in self.poll_lines() if l.startswith("EVENT")])
+        soon = {"id": "1", "title": "Game\nNight  UK", "start": now + 3600}
+        reminders([], [soon])
+        self.assertIn("EVENT %d 0 Game Night UK" % (now + 3600), self.poll_lines())                  # the soonest, one line, no reminder due
+        due = {"id": "2", "title": "Power Smash", "start": now + 300}
+        reminders([due], [due, soon])
+        self.assertIn("EVENT %d 1 Power Smash" % (now + 300), self.poll_lines())                     # a reminder is due: that one, flagged
+        reminders([], [{"id": "3", "title": "Over", "start": now - 3600}])
+        self.assertFalse([l for l in self.poll_lines() if l.startswith("EVENT")])                    # it is over
+        reminders([], [soon])
+        core.save_module_enabled("events", False)
+        self.assertFalse([l for l in self.poll_lines() if l.startswith("EVENT")])                    # the events module is off
 
     def test_an_old_players_list_says_nobody_plays(self):
         self.upload2()

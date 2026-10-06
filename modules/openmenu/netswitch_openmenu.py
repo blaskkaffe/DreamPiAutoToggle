@@ -10,9 +10,12 @@
 #   GET  /openmenu/games                          the game list for the games widget (read again when the hash changes).
 #   POST /openmenu/launch  {"product": "..."}     asks openMenu to start that game the next time it polls.
 # Events are not handled here: the events module owns them (GET /api/events/upcoming). Nothing is pushed to the Dreamcast:
-# a launch waits until openMenu asks. The answer to a poll also carries two short lines of live info for the Dreamcast:
-#   NET dcnet|dcnow                               the network that is selected
-#   PLAYING game02 game07                         the folders of the card's games that someone plays online right now (left out when none)
+# a launch waits until openMenu asks. The answer to a poll also carries short lines of live info for the Dreamcast:
+#   NET dcnet|dcnow                               the network calls go to now (dcnet only when it is selected and DreamPi can use it)
+#   DCNET ok | DCNET off <why>                    whether DCNET works: why = config (netlink_config.ini not found), disabled ([DCNet] enabled =
+#                                                 yes missing), noupdates (/boot/noautoupdates.txt) or inactive (DreamPi is not running the add-on)
+#   PLAYING 2:3 7:1                               the card's games (slot:players) that someone plays online right now (left out when none)
+#   EVENT <unix start> <due 0|1> <title>          the DC99 event to show: the one whose reminder is due (due 1), else the soonest (left out when none)
 # The module announces itself to the rest of the add-on in module.json ("launcher"): the card's games that are in the online game table
 # (GET /openmenu/games, "online": true) and how to start one, so the Online players and DC99 events lists can show a Start button.
 # The online players and the table of online games are read from the Online players module's file (core.PLAYERS_CACHE), never from its
@@ -32,7 +35,7 @@ MAX_GAMES = 5000
 PLAYERS_FRESH = 300       # the Online players module's list counts as current for this long
 PLAYERS_ASK = 45          # a Dreamcast that is polling asks for a new list when the old one is older than this ...
 PLAYERS_ASK_EVERY = 30    # ... at most this often
-MAX_PLAYING = 16          # folders in the PLAYING line
+MAX_PLAYING = 16          # games in the PLAYING line
 
 _lock = threading.Lock()
 _state = {"seen": 0.0, "pending": None, "pending_time": 0.0, "launched": None, "launched_time": 0.0, "games": None, "asked": 0.0}
@@ -154,21 +157,28 @@ def is_online(name, table):
     return table is None or any(same_game(name, t) for t in table)
 
 
-def ident(game):
-    """What the Dreamcast calls the game in the live info: its folder as openMenu uploaded it (game02), else the product code."""
-    folder = game.get("folder") or ""
-    return folder if re.match(r"^[A-Za-z0-9_.-]+$", folder) else game["product"]
-
-
 def playing_now(players):
-    """The ident() of the card's games that the players (players_file()[0]) play online right now, each once, in the order of the list."""
+    """[(slot, count)]: the card's games that the players (players_file()[0]) play online right now, each with how many play it, most first."""
     glist = games()["games"]
-    out = []
+    counts = {}
     for p in players:
         g = match_game(p["game"], glist)
-        if g and ident(g) not in out:
-            out.append(ident(g))
-    return out[:MAX_PLAYING]
+        if g and g["slot"] > 0:
+            counts[g["slot"]] = counts.get(g["slot"], 0) + 1
+    return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:MAX_PLAYING]
+
+
+def event_line(now):
+    """The EVENT line, or None: the event whose reminder is due now (due 1), else the soonest one. Both come from files the DC99 events
+    module writes (core.event_reminder(), core.next_event()); nothing when that module is off."""
+    if not core.module_enabled("events"):
+        return None
+    due = core.event_reminder(now)
+    ev = due or core.next_event(now)
+    if not ev:
+        return None
+    title = re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f]", " ", ev["title"])).strip()[:60]
+    return "EVENT %d %d %s" % (int(ev["start"]), 1 if due else 0, title)
 
 
 def network():
@@ -194,10 +204,15 @@ def poll_reply(headers_query):
     if q.get("h", "") != have.get("hash", "") or not have["games"]:
         lines.append("NEED games")
     lines.append("NET " + network())
+    code = core.dcnet_code()
+    lines.append("DCNET ok" if code == "ok" else "DCNET off " + code)
     players, _table, age = players_file()
     playing = playing_now(players)
     if playing:
-        lines.append("PLAYING " + " ".join(playing))
+        lines.append("PLAYING " + " ".join("%d:%d" % kv for kv in playing))
+    event = event_line(now)
+    if event:
+        lines.append(event)
     _ask_for_players(age, now)
     return "\n".join(lines) + "\n"
 
