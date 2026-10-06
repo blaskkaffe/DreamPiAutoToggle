@@ -81,7 +81,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok((await sick.locator('.rp-io').textContent()) === 'INNE', 'INNE / UTE changes in / out while the status stays');
   await sick.locator('.rp-t').click(); await settle(300);
   await page.locator('.rp-sheet button[data-code=""]').click(); await settle(500);
-  ok(await person('Erik Lindqvist').locator('.rp-trk').count() === 0, 'Clear status takes the status off');
+  ok(await person('Erik Lindqvist').locator('.rp-trk').count() === 0, 'Rensa status takes the status off');
   await person('Erik Lindqvist').locator('.rp-t').click(); await settle(300);
   await page.keyboard.press('Escape'); await settle(200);
   ok(await page.locator('.rp-modal:visible').count() === 0, 'Escape closes the menu');

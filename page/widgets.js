@@ -662,7 +662,7 @@ W.roster=function(s,ctx){
    '<div class="rp-who"><label class="rp-avl"'+((S.enabled||{}).contacts?' title="Change the photo"':'')+'>'+rosterAvatar(p,"rp-avb")+((S.enabled||{}).contacts?'<input type="file" accept="image/*" aria-label="Photo of '+esc(p.name)+'" data-photo="1">':'')+'</label>'+
    '<div class="rp-wt"><div class="rp-wn">'+esc(p.name)+'</div>'+(who?'<div class="rp-wl">'+esc(who)+'</div>':'')+(p.role?'<div class="rp-wl">'+esc(p.role)+'</div>':'')+(p.phone?'<div class="rp-wl">'+esc(p.phone)+'</div>':'')+'</div></div>'+
    '<div class="rp-opts">'+st.map(function(x){return '<button type="button" class="pill-s pri rp-so c-'+esc(x.colour)+(p.status===x.code?" on":"")+'" data-code="'+esc(x.code)+'" aria-pressed="'+(p.status===x.code?"true":"false")+'">'+esc(x.label)+'</button>'}).join("")+
-   '<button type="button" class="pill-s rp-so" data-code="">Clear status</button></div><div class="rp-need" style="display:none"></div></div>'}
+   '</div><div class="rp-clear"><button type="button" class="pill-s rp-so" data-code="">Rensa status</button></div><div class="rp-need" style="display:none"></div></div>'}
  function openMenu(id){var p=person(id);if(!p)return;cur=id;modal.innerHTML=menuHtml(p);modal.style.display="";var x=modal.querySelector(".rp-x");if(x&&x.focus)x.focus()}
  function closeMenu(){modal.style.display="none";modal.innerHTML="";cur=null}
  function send(code,detail){var id=cur;post(s.status,{id:id,code:code,detail:detail||""},function(r){take(r);closeMenu()})}

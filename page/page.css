@@ -218,6 +218,7 @@
  .rp-opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
  .rp-so{min-height:56px;padding:6px 8px;justify-content:center;text-align:center;font-size:1.1em;line-height:1.15;white-space:normal;overflow-wrap:break-word;hyphens:auto}
  @media(max-width:760px){.rp-sheet{width:100%}.rp-so{font-size:1em}}   /* on a phone the menu takes the whole width */
+ .rp-clear{display:flex;justify-content:center;margin-top:10px} .rp-clear .rp-so{width:calc((100% - 20px) / 3);min-width:0;flex:none}   /* centred, the size of one status button */
  .rp-so.on{box-shadow:0 0 0 3px #fff}
  .rp-need{margin:14px 0 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
  .rp-empty{padding:12px 4px}
