@@ -307,7 +307,7 @@ def _config_reply():
         cols = group_colours(people, kind, c)
         kinds[kind] = [{"name": n or "(none)", "key": n, "colour": cols[n], "own": n in c["colours"][kind]} for n in sorted(cols, key=lambda s: s.lower()) if n]
     return {"values": {"style": c["style"], "group_by": c["group_by"], "colour_by": c["colour_by"]},
-            "options": {"styles": [{"value": "buttons", "label": "Buttons: a button per person"}, {"value": "boxes", "label": "Boxes: a box per group, a row per person"}],
+            "options": {"styles": [{"value": "buttons", "label": "Buttons"}, {"value": "boxes", "label": "Boxes"}],
                         "groups": [{"value": "department", "label": "Department"}, {"value": "building", "label": "Building"}]},
             "texts": {"style": "Buttons" if c["style"] == "buttons" else "Boxes", "group_by": c["group_by"].capitalize(), "colour_by": c["colour_by"].capitalize()},
             "colours": kinds, "palette_exclude": ["network"], "total": snap["total"]}

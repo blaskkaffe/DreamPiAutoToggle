@@ -90,7 +90,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await openSettings();
   ok(await page.locator('[data-box="contacts"]').count() === 1 && await page.locator('[data-box="check-in"]').count() === 1, 'Settings has the contacts and the check-in boxes');
   await page.locator('[data-box="check-in"] .srow:has-text("Look") > button').click(); await settle(300);
-  await page.selectOption('select[aria-label="Look: Layout"]', { label: 'Boxes: a box per group, a row per person' }); await settle(900);
+  await page.selectOption('select[aria-label="Look: Layout"]', { label: 'Boxes' }); await settle(900);
   await page.keyboard.press('Escape'); await closeSettings(); await settle(1500);
   ok(await page.locator('.rp-box').count() === 5, 'the Boxes look draws a box per department');
   ok(await page.locator('.rp-box .rp-t').count() === 23 && await page.locator('.rp-b').count() === 0, 'with a row per person');
@@ -104,7 +104,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await page.locator('.rp-box.c-bright-pink').count() === 1, 'a colour picked for a department is used by its box (' + pink + ')');
   await openSettings();
   await page.locator('[data-box="check-in"] .srow:has-text("Look") > button').click(); await settle(300);
-  await page.selectOption('select[aria-label="Look: Layout"]', { label: 'Buttons: a button per person' }); await settle(800);
+  await page.selectOption('select[aria-label="Look: Layout"]', { label: 'Buttons' }); await settle(800);
   await page.keyboard.press('Escape');
   const csv = 'name,department,role,phone,location\nNy Person,Lager,Chef,,Område B\n';
   await page.fill('[data-box="contacts"] .ctext', csv); await page.click('[data-box="contacts"] .cgo'); await settle(1200);

@@ -212,7 +212,7 @@
  .rp-d{flex:none;width:.9em;height:.9em;border-radius:50%;background:var(--btn-bg);border:2px solid var(--btn-line)} .rp-d.on{background:rgb(var(--primary-rgb));border-color:rgb(var(--primary-l-rgb))}
  .rp-list{display:grid;grid-template-columns:1fr;gap:0 16px} .rp-list:has(.rp-box){grid-template-columns:repeat(auto-fill,minmax(340px,1fr));align-items:start}
  .rp-g{grid-column:1/-1} .rp-empty{padding:12px 4px}
- textarea{display:block;width:100%;margin:8px 0;padding:8px 10px;background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm);resize:vertical} input[type=file]{max-width:100%;font-size:var(--fs-sm);color:var(--text-2)}
+ textarea{display:block;width:100%;margin:8px 0;padding:8px 10px;background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm);resize:vertical} input[type=file],.rp-need input{min-height:var(--h-ctl);max-width:100%;font-size:var(--fs-sm);color:var(--text-2)} .rp-need input{color:var(--text-1);background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);padding:0 8px}
  .rp-menu .rp-opts{margin:8px 0} .rp-menu .rp-ph{margin:-2px 0 4px} .rp-need{margin:8px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
  .rp-ct{margin-top:10px} .rp-sw{margin-right:8px;background:rgb(var(--primary-rgb))}
  /* ===== end of the page kit ===== */
