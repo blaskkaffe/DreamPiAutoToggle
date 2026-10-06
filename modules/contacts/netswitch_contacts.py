@@ -4,7 +4,9 @@
 # (unless "replace" is asked for, which deactivates the ones that are not in the file). A person's id comes from
 # location + department + name, so their check-in state survives a re-import. The roster is core.CONTACTS; the check-in module
 # reads that file, this module is the only one that writes it. Runs in the web service (Python 3).
+import base64
 import csv
+import glob
 import hashlib
 import io
 import json
@@ -196,8 +198,71 @@ def _post_active(h):
     return True
 
 
+PHOTO_MAX = 150000          # bytes of a stored photo (the page sends a 160 px square, a few kilobytes)
+_ID_RE = re.compile(r"^p[0-9a-f]{10}$")
+_TYPES = ((b"\xff\xd8\xff", "jpg", "image/jpeg"), (b"\x89PNG\r\n\x1a\n", "png", "image/png"))
+
+
+def photo_files():
+    """{person id: path} of the stored photos."""
+    out = {}
+    for path in glob.glob(os.path.join(core.PHOTOS_DIR, "p*.*")):
+        pid = os.path.basename(path).rsplit(".", 1)[0]
+        if _ID_RE.match(pid):
+            out[pid] = path
+    return out
+
+
+def save_photo(pid, data_url):
+    """Store (or, with an empty value, remove) a person's photo; data_url is a data:image/jpeg|png;base64 URL. False for an unknown
+    person, True when it is stored; ValueError for something that is not a small JPEG or PNG."""
+    if not _ID_RE.match(pid or "") or pid not in set(p["id"] for p in read()["people"]):
+        return False
+    with _lock:
+        for path in glob.glob(os.path.join(core.PHOTOS_DIR, pid + ".*")):
+            os.remove(path)
+        if not data_url:
+            return True
+        m = re.match(r"^data:image/(?:jpeg|png);base64,([A-Za-z0-9+/=]+)$", data_url)
+        if not m:
+            raise ValueError("The photo must be a JPEG or PNG")
+        raw = base64.b64decode(m.group(1))
+        kind = next((t for t in _TYPES if raw.startswith(t[0])), None)
+        if kind is None or len(raw) > PHOTO_MAX:
+            raise ValueError("The photo must be a small JPEG or PNG")
+        if not os.path.isdir(core.PHOTOS_DIR):
+            os.makedirs(core.PHOTOS_DIR)
+        path = os.path.join(core.PHOTOS_DIR, "%s.%s" % (pid, kind[1]))
+        with open(path + ".tmp", "wb") as f:
+            f.write(raw)
+        os.rename(path + ".tmp", path)
+    return True
+
+
+def _post_photo(h):
+    try:
+        body = json.loads(h._body(PHOTO_MAX * 2).decode("utf-8"))
+        ok = save_photo(str(body.get("id", "")), str(body.get("photo") or ""))
+        err = "Unknown person"
+    except (ValueError, UnicodeDecodeError, AttributeError) as e:
+        ok, err = False, str(e) or "That is not a photo"
+    h.send(json.dumps({"ok": bool(ok), "message": "" if ok else err}), "application/json", status=200 if ok else 400)
+    return True
+
+
+def _get_photo(h):
+    pid = h.path.split("?")[0][len("/contacts/photo/"):]
+    path = photo_files().get(pid) if _ID_RE.match(pid) else None
+    if not path:
+        return h._refuse(404, "No photo")
+    with open(path, "rb") as f:
+        body = f.read()
+    h.send(body, "image/png" if path.endswith(".png") else "image/jpeg", cache=3600)
+
+
 GET = {"/contacts": _get_view, "/contacts.csv": _get_csv}
-POST = {"/contacts/import": _post_import, "/contacts/active": _post_active}
+GET_PREFIX = {"/contacts/photo/": _get_photo}
+POST = {"/contacts/import": _post_import, "/contacts/active": _post_active, "/contacts/photo": _post_photo}
 PROTECTED = ("/contacts/import", "/contacts/active")
 
 

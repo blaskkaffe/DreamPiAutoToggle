@@ -13,7 +13,7 @@ Details and the rules for adding or changing a module: `docs/modules.md`. The ba
 - `install.sh` copies the base files, `page/` and `kiosk/` to `/opt/dreampi-netswitch`, syncs `modules/*/` (a module dropped from the repo is removed through its `remove.sh`), removes what the DreamPi version left (hook `.pth` files, buttons / LED services), writes the `dreampi-netswitch` systemd unit, sources each module's `install.sh` (the Wi-Fi module handles `--wifi` / `--no-wifi` / `--wifi-demo`).
 
 ## State is in files (cross-process; no sockets between services)
-- `/opt/dreampi-netswitch/`: `contacts.json` (the roster), `checkin.json` (who is in, statuses, the board's settings), `modules.json`, `module_order.json`, `colours.json`, `tints.json`, `palette.json`, `highlight`, `clock.json`, `time_zone`, `wifi_start` / `wifi_stop` / `wifi_connect` / `wifi_demo`, `version`, `version_commit` / `src_dir` / `install_ports` / `update_origin` (for the update), `admin_pin` (PIN hash), `allowed_hosts`, `https.crt` / `https.key`. All paths are constants in `netswitch_core.py`.
+- `/opt/dreampi-netswitch/`: `contacts.json` (the roster), `checkin.json` (who is in, statuses, the board's settings), `modules.json`, `module_order.json`, `colours.json`, `tints.json`, `palette.json`, `highlight`, `clock.json`, `time_zone`, `photos/` (profile photos), `wifi_start` / `wifi_stop` / `wifi_connect` / `wifi_demo`, `version`, `version_commit` / `src_dir` / `install_ports` / `update_origin` (for the update), `admin_pin` (PIN hash), `allowed_hosts`, `https.crt` / `https.key`. All paths are constants in `netswitch_core.py`.
 - `/tmp/dreampi-netswitch.*`: `wifi` (Wi-Fi setup -> web), `update` / `update.log`.
 
 ## Read the right doc before changing an area

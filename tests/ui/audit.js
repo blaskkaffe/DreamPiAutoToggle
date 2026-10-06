@@ -13,7 +13,7 @@ const AUDIT = () => {
     if (!inSettings && el.closest('#settings')) return;
     const r = el.getBoundingClientRect();
     if (el.closest('.console')) return;
-    if (el.closest('.carousel') || el.matches('.v')&&el.querySelector('.carousel')) return;   // the scrolling games line is meant to run past its box
+    if (el.closest('.rp-mq') || el.closest('.carousel') || el.matches('.v')&&el.querySelector('.carousel')) return;   // the scrolling games line is meant to run past its box
     if (r.right > W + 1 || r.left < -1) out.push(['outside-viewport', sel(el) + ' ' + Math.round(r.left) + '..' + Math.round(r.right)]);
     const card = el.closest('.card, .pill, .wide, .warnbox, .now');
     if (card && card !== el) { const c = card.getBoundingClientRect(); if (r.right > c.right + 1 || r.left < c.left - 1) out.push(['overflows-box', sel(el) + ' in ' + sel(card) + ' by ' + Math.round(Math.max(r.right - c.right, c.left - r.left)) + 'px']); }
@@ -32,7 +32,7 @@ const AUDIT = () => {
     if (fs < 11.5 && el.childNodes.length && Array.from(el.childNodes).some(n => n.nodeType === 3 && n.textContent.trim())) out.push(['tiny-text', sel(el) + ' ' + fs + 'px "' + el.textContent.trim().slice(0, 20) + '"']);
     if (el.classList.contains('pill-s') && el.closest('.srow, .fld, .bar') && r.width > 240 && !el.closest('.pop, .wlist, .now')) out.push(['pill-stretched', sel(el) + ' w=' + Math.round(r.width) + ' "' + el.textContent.trim().slice(0, 20) + '"']);
     // wrapped single-word buttons (a pill whose label breaks onto 2 lines)
-    if (/^(BUTTON|A)$/.test(el.tagName) && el.classList.contains('pill-s') && r.height > 46) out.push(['pill-wraps', sel(el) + ' h=' + Math.round(r.height) + ' "' + el.textContent.trim() + '"']);
+    if (/^(BUTTON|A)$/.test(el.tagName) && el.classList.contains('pill-s') && !el.classList.contains('rp-so') && r.height > 46) out.push(['pill-wraps', sel(el) + ' h=' + Math.round(r.height) + ' "' + el.textContent.trim() + '"']);
   });
   const ids = {}; document.querySelectorAll('[id]').forEach(e => { ids[e.id] = (ids[e.id] || 0) + 1; });
   Object.keys(ids).filter(k => ids[k] > 1).forEach(k => out.push(['duplicate-id', k]));
@@ -52,8 +52,8 @@ const AUDIT = () => {
     await page.waitForTimeout(1200);
     const check = async (label) => { const res = await page.evaluate(AUDIT); res.forEach(r => problems.push([r[0], label + ': ' + r[1]])); };
     await check('board closed');
-    await page.locator('.rp-e').first().click(); await page.waitForTimeout(300); await check('board status menu');
-    await page.locator('.rp-menu button[data-code="LATE"]').click(); await page.waitForTimeout(300); await check('board status needs a time');
+    await page.locator('.rp-t').first().click(); await page.waitForTimeout(300); await check('board status menu');
+    await page.locator('.rp-sheet button[data-code="LATE"]').click(); await page.waitForTimeout(300); await check('board status needs a time');
     await page.keyboard.press('Escape');
     await page.screenshot({ path: `/tmp/dpns-audit-main-${w}.png`, fullPage: true });
     await page.click('#cog'); await page.waitForTimeout(1500); await check('settings');

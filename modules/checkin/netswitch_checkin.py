@@ -101,11 +101,33 @@ def config(data=None):
 
 
 def _roster_stamp():
-    """Changes when the contacts module writes the roster, so a screen draws the board again after an import."""
+    """Changes when the contacts module writes the roster or a photo, so a screen draws the board again after an import."""
     try:
-        return os.stat(core.CONTACTS).st_mtime_ns
+        stamp = os.stat(core.CONTACTS).st_mtime_ns
     except OSError:
-        return 0
+        stamp = 0
+    try:
+        stamp += int(os.stat(core.PHOTOS_DIR).st_mtime_ns)
+    except OSError:
+        pass
+    return stamp
+
+
+def _photos():
+    """{person id: url} of the photos the contacts module stored (the version in the url changes when a photo does)."""
+    out = {}
+    try:
+        names = os.listdir(core.PHOTOS_DIR)
+    except OSError:
+        return out
+    for n in names:
+        pid, _dot, ext = n.rpartition(".")
+        if ext in ("jpg", "png") and re.match(r"^p[0-9a-f]{10}$", pid):
+            try:
+                out[pid] = "/contacts/photo/%s?v=%d" % (pid, os.stat(os.path.join(core.PHOTOS_DIR, n)).st_mtime_ns // 1000000)
+            except OSError:
+                pass
+    return out
 
 
 def _roster():
@@ -142,6 +164,7 @@ def snapshot(data=None):
     by_code = dict((s["code"], s) for s in menu)
     people = sorted(_roster(), key=lambda p: (p.get("order", 0), p["name"].lower()))
     colour_of = group_colours(people, cfg["colour_by"], cfg)
+    photos = _photos()
     groups, index = [], {}
     for p in people:
         gname = _key_of(p, cfg["group_by"]) or ("No building" if cfg["group_by"] == "building" else "No department")
@@ -151,7 +174,7 @@ def snapshot(data=None):
         base = colour_of.get(_key_of(p, cfg["colour_by"]), "blue")
         detail = str(st.get("detail") or "")
         item = {"id": p["id"], "name": p["name"], "role": p.get("role", ""), "phone": p.get("phone", ""), "department": p.get("department", ""),
-                "building": p.get("location", ""), "restrict": bool(p.get("restrictToLocation")), "in": is_in,
+                "building": p.get("location", ""), "photo": photos.get(p["id"], ""), "restrict": bool(p.get("restrictToLocation")), "in": is_in,
                 "colour": status["colour"] if status else (base if is_in else ""),
                 "status": status["code"] if status else "", "text": _status_text(status, detail) if status else "", "detail": detail,
                 "state": "Status" if status else ("In" if is_in else "Out"), "at": st.get("at", 0)}

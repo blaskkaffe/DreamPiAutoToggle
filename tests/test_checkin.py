@@ -255,6 +255,39 @@ class HttpTests(Base):
         self.assertEqual(e.exception.code, 400)
         self.assertIn("Ny Person", urlopen(self.base + "/contacts.csv", timeout=10).read().decode())
 
+    def test_a_photo_is_kept_served_and_shown_on_the_board(self):
+        import base64
+        board = self.get("/api")["checkin"]
+        anna = [p for g in board["groups"] for p in g["people"] if p["name"] == "Anna Svensson"][0]
+        self.assertEqual(anna["photo"], "")
+        png = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"x" * 40).decode()
+        r = self.post("/contacts/photo", {"id": anna["id"], "photo": "data:image/png;base64," + png})
+        self.assertTrue(r["ok"])
+        after = [p for g in self.get("/api")["checkin"]["groups"] for p in g["people"] if p["id"] == anna["id"]][0]
+        self.assertTrue(after["photo"].startswith("/contacts/photo/" + anna["id"] + "?v="))
+        got = urlopen(self.base + after["photo"], timeout=10)
+        self.assertEqual((got.status, got.headers["Content-Type"]), (200, "image/png"))
+        self.assertNotEqual(self.get("/api")["checkin"]["rev"], board["rev"])        # every screen draws the new photo
+        self.post("/contacts/photo", {"id": anna["id"], "photo": ""})                # removing it
+        with self.assertRaises(HTTPError) as e:
+            urlopen(self.base + "/contacts/photo/" + anna["id"], timeout=10)
+        self.assertEqual(e.exception.code, 404)
+
+    def test_bad_photos_are_refused(self):
+        import base64
+        anna = [p for g in self.get("/api")["checkin"]["groups"] for p in g["people"]][0]["id"]
+        for photo in ("data:image/gif;base64,AAAA", "data:image/png;base64," + base64.b64encode(b"not a png").decode(),
+                      "data:image/jpeg;base64," + base64.b64encode(b"\xff\xd8\xff" + b"x" * 200000).decode(), "javascript:alert(1)"):
+            with self.assertRaises(HTTPError) as e:
+                self.post("/contacts/photo", {"id": anna, "photo": photo})
+            self.assertEqual(e.exception.code, 400, photo[:30])
+        with self.assertRaises(HTTPError) as e:
+            self.post("/contacts/photo", {"id": "p0000000000", "photo": ""})            # nobody by that id
+        self.assertEqual(e.exception.code, 400)
+        with self.assertRaises(HTTPError) as e:
+            urlopen(self.base + "/contacts/photo/..%2f..%2fetc%2fpasswd", timeout=10)    # no way out of the photo folder
+        self.assertEqual(e.exception.code, 404)
+
     def test_the_board_works_with_the_contacts_module_off(self):
         core.save_module_enabled("contacts", False)
         web.refresh_page(force=True)

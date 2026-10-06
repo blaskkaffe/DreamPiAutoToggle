@@ -203,10 +203,25 @@
  .rp-t{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:4px 16px;background:none;text-align:left;font-size:1.75em;line-height:1.2;color:inherit;text-shadow:inherit}
  .rp-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600} .rp-s{flex:none;max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.6em;opacity:.85}
  .rp-r.out .rp-n{font-weight:500}
- .rp-e{flex:none;white-space:nowrap;min-height:28px;padding:0 12px}
+ .rp-mq{flex:1;min-width:0;overflow:hidden;white-space:nowrap;font-weight:600} .rp-trk{display:inline-block;animation:marquee var(--d,12s) linear infinite} .rp-trk > span{display:inline-block;padding-right:3em}   /* name and status scroll round like the carousel */
+ @media(prefers-reduced-motion:reduce){.rp-trk{animation:none}.rp-trk > span + span{display:none}}
+ .rp-io{flex:none;min-width:5.2em;min-height:34px;padding:0 14px;font-weight:700;font-size:var(--fs-md);letter-spacing:.04em;box-shadow:0 0 0 2px rgba(0,0,0,.4)}   /* INNE (green) / UTE (red) */
+ /* the status menu: in the middle of the screen, about 60 % of its width */
+ .rp-modal{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.62)}
+ .rp-sheet{position:relative;box-sizing:border-box;width:clamp(320px,60vw,900px);max-width:100%;max-height:96vh;overflow:auto;padding:20px;border-radius:var(--r-box);background:var(--pop);border:var(--bw) solid var(--ctl-line)}
+ .rp-x{position:absolute;top:10px;right:10px;width:40px;height:40px;padding:0;border-radius:50%;background:rgba(255,255,255,.12);font-size:1.2em;line-height:1}
+ .rp-who{display:flex;align-items:center;gap:18px;margin:0 48px 16px 0} .rp-wt{min-width:0}
+ .rp-wn{font-size:1.6em;font-weight:600;line-height:1.2;overflow-wrap:break-word} .rp-wl{font-size:1.05em;color:var(--text-2);margin-top:2px;overflow-wrap:break-word}
+ .rp-avl{position:relative;flex:none;display:block;cursor:pointer} .rp-avl input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+ .rp-av{display:flex;align-items:center;justify-content:center;border-radius:50%;background-color:rgb(var(--primary-rgb));background-size:cover;background-position:center;color:#fff;font-weight:700}
+ .rp-avb{width:96px;height:96px;font-size:2.2em}
+ .rp-opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+ .rp-so{min-height:56px;padding:6px 8px;justify-content:center;text-align:center;font-size:1.1em;line-height:1.15;white-space:normal;overflow-wrap:break-word;hyphens:auto}
+ @media(max-width:760px){.rp-sheet{width:100%}.rp-so{font-size:1em}}   /* on a phone the menu takes the whole width */
+ .rp-so.on{box-shadow:0 0 0 3px #fff}
+ .rp-need{margin:14px 0 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
  .rp-empty{padding:12px 4px}
  textarea{display:block;width:100%;margin:8px 0;padding:8px 10px;background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm);resize:vertical} input[type=file],.rp-need input{min-height:var(--h-ctl);max-width:100%;font-size:var(--fs-sm);color:var(--text-2)} .rp-need input{color:var(--text-1);background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);padding:0 8px}
- .rp-menu .rp-opts{margin:8px 0} .rp-menu .rp-ph{margin:-2px 0 4px} .rp-need{margin:8px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
  .rp-ct{margin-top:10px} .rp-sw{margin-right:8px;background:rgb(var(--primary-rgb))}
  /* ===== end of the page kit ===== */
  :focus-visible{outline:3px solid var(--link);outline-offset:2px}

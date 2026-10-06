@@ -22,6 +22,7 @@ UPDATE_STATUS = "/tmp/dreampi-netswitch.update"          # running / ok / failed
 UPDATE_LOG = "/tmp/dreampi-netswitch.update.log"
 HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id: how a highlighted box looks (Settings > Appearance)
 CONTACTS = os.path.join(BASE_DIR, "contacts.json")     # {"people": [{id, name, department, role, phone, location, restrictToLocation, active, order}]}: the contacts module's roster (imported from a CSV)
+PHOTOS_DIR = os.path.join(BASE_DIR, "photos")           # <person id>.jpg / .png: the small profile photos (uploaded from the status menu, written by the contacts module, read by the check-in board)
 CHECKIN = os.path.join(BASE_DIR, "checkin.json")       # {"rev", "config", "statuses", "people": {id: {in, status, detail, at}}}: the check-in module's live state, shared by every screen
 CLOCK_CONFIG = os.path.join(BASE_DIR, "clock.json")  # {"format": "24h"|"12h"|"12h-ampm", "beat": bool, "world": bool, "large": bool, "cities": [...]}: the clock module's settings
 TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the Pi's own (Settings > About)
