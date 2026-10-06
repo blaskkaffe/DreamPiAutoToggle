@@ -105,31 +105,68 @@ window.addEventListener("resize",function(){applyScreen();if($("settings").class
 // ---- the screen layout (Settings > Appearance; S.screen from /api): how many columns the dashboard and Settings use on a wide screen and
 // whether they stretch. A column is about COLW px wide; there are as many as fit, up to the setting. Stretch: the columns share the whole width
 // (the boxes are wider). Scale content: a stretched box is drawn bigger (CSS zoom) in step with its width, so it is taller too.
-var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false},COLW=428,SGAP=20,scrKey="";
+var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false},COLW=428,SGAP=20,scrKey="";
 function colsFor(max,W){return Math.max(1,Math.min(max,Math.floor((W+SGAP)/(COLW+SGAP))))}
 function scrZoom(n,W){return SCR.stretch&&SCR.scale?Math.max(1,((W-SGAP*(n-1))/n)/COLW):1}
 // The dashboard's boxes in dn columns: each box goes to the column that is shortest so far, in the order of the layout (so the first boxes are at
 // the top); they stay where they are put when their content changes. Placed again when the number of columns or the set of shown boxes changes.
 var dashKey="";
-function layoutDash(dn){var dash=$("dash"),kids=Array.prototype.slice.call(dash.querySelectorAll(".dbox"));
- if(!kids.length)return;
+function dashTiles(){var kids=Array.prototype.slice.call($("dash").querySelectorAll(".dbox"));
  kids.forEach(function(b,i){if(b._ord===undefined)b._ord=i});
- kids.sort(function(a,b){return a._ord-b._ord});
+ return kids.sort(function(a,b){return a._ord-b._ord})}
+function layoutDash(dn){var dash=$("dash"),kids=dashTiles();
+ if(!kids.length)return;
  var key=dn+"/"+kids.map(function(b){return b.offsetHeight?1:0}).join("");if(key===dashKey)return;dashKey=key;
  Array.prototype.slice.call(dash.querySelectorAll(":scope > .dcol")).forEach(function(c){c.parentNode.removeChild(c)});
  kids.forEach(function(b){dash.appendChild(b)});
  if(dn<2)return;
- var cols=[],i,hs=[];for(i=0;i<dn;i++){var c=document.createElement("div");c.className="dcol";dash.appendChild(c);cols.push(c)}
- kids.forEach(function(b,k){cols[k%dn].appendChild(b)});                                // measured in columns of their final width
- kids.forEach(function(b){hs.push(b.offsetHeight?b.getBoundingClientRect().height:0)});
- var used=cols.map(function(){return 0});
- kids.forEach(function(b,k){var at=0,j;for(j=1;j<dn;j++)if(used[j]<used[at])at=j;cols[at].appendChild(b);used[at]+=hs[k]+(hs[k]?12:0)})}
+ var cols=[],i,k=0;for(i=0;i<dn;i++){var c=document.createElement("div");c.className="dcol";dash.appendChild(c);cols.push(c)}
+ kids.forEach(function(b){if(b.offsetHeight)cols[k++%dn].appendChild(b);else cols[0].appendChild(b)})}      // the shown tiles go round the columns in their order, so a place in a column means a place in the order
+// ---- rearranging the main screen (Settings > Appearance): a handle on each tile, drag it before or after another; the modules follow the
+// tiles' order (POST /modules/dashboard-order). While Settings is locked with the PIN this needs the PIN to have been given.
+function tilesMovable(){return !!SCR.drag&&!(S.settings_pin&&S.settings_pin.on&&!pinValue)}
+function shownTiles(){return dashTiles().filter(function(b){return b.offsetHeight||b===dragTile})}
+var dragTile=null,dropBar=null;
+function tileTitle(b){var t=b.querySelector("b,h2,.nlabel");return t?t.textContent.trim():b.getAttribute("data-box")}
+function applyGrips(){var on=tilesMovable();$("dash").classList.toggle("movable",on);
+ dashTiles().forEach(function(b){if(!b._grip){var g=h("button",{type:"button","class":"tilegrip keep",title:"Drag to move this tile (or use the arrow keys)",html:"&#8942;&#8942;"});b._grip=g;b.insertBefore(g,b.firstChild);gripEvents(b,g)}
+  sh(b._grip,on);b._grip.setAttribute("aria-label","Move the "+tileTitle(b)+" tile: drag, or use the arrow keys")})}
+// where a tile dropped at (x,y) goes: {tile, after} = next to the tile under or nearest to the point
+function dropSpot(x,y,moving){var best=null,bd=1e9;
+ shownTiles().forEach(function(t){if(t===moving)return;var r=t.getBoundingClientRect(),dx=x<r.left?r.left-x:(x>r.right?x-r.right:0),dy=y<r.top?r.top-y:(y>r.bottom?y-r.bottom:0),d=dx*dx+dy*dy;
+  if(d<bd){bd=d;best={tile:t,after:y>r.top+r.height/2,r:r}}});return best}
+function moveTile(tile,spot){var seq=shownTiles().filter(function(t){return t!==tile}),at=seq.indexOf(spot.tile)+(spot.after?1:0);seq.splice(at,0,tile);commitTiles(seq)}
+function commitTiles(seq){var ords=shownTiles().map(function(b){return b._ord}).sort(function(a,b){return a-b}),moved=false;
+ seq.forEach(function(b,i){if(b._ord!==ords[i]){moved=true;b._ord=ords[i]}});if(!moved)return;
+ dashKey="";layoutDash(colsFor(SCR.dash_cols,document.documentElement.clientWidth-(SCR.stretch&&document.documentElement.clientWidth>=900?48:32)));
+ var names=[],boxes={};(LAY.dashboard||[]).forEach(function(b){boxes[b.id]=b});
+ seq.forEach(function(b){((boxes[b.getAttribute("data-box")]||{}).mods||[]).forEach(function(m){if(names.indexOf(m)<0)names.push(m)})});
+ post("/modules/dashboard-order",{order:names},function(r){if(!r){alert("The new order was not saved.");location.reload()}})}
+function gripEvents(tile,grip){
+ grip.addEventListener("click",function(e){e.stopPropagation()});
+ grip.addEventListener("keydown",function(e){var back=e.key==="ArrowUp"||e.key==="ArrowLeft",fwd=e.key==="ArrowDown"||e.key==="ArrowRight";if(!back&&!fwd)return;e.preventDefault();
+  var seq=shownTiles(),i=seq.indexOf(tile),j=i+(back?-1:1);if(j<0||j>=seq.length)return;seq.splice(i,1);seq.splice(j,0,tile);commitTiles(seq);grip.focus()});
+ grip.addEventListener("pointerdown",function(e){if(e.pointerType==="mouse"&&e.button!==0)return;e.preventDefault();
+  var pid=e.pointerId,spot=null;dragTile=tile;try{grip.setPointerCapture(pid)}catch(x){}
+  tile.classList.add("tile-drag");document.body.classList.add("dragging");
+  if(!dropBar){dropBar=h("div",{"class":"dropbar"});document.body.appendChild(dropBar)}
+  function show(ev){spot=dropSpot(ev.clientX,ev.clientY,tile);if(!spot){dropBar.style.display="none";return}
+   dropBar.style.display="block";dropBar.style.left=spot.r.left+"px";dropBar.style.width=spot.r.width+"px";dropBar.style.top=((spot.after?spot.r.bottom:spot.r.top)-3)+"px"}
+  function move(ev){if(ev.pointerId===pid)show(ev)}
+  function end(cancel){grip.removeEventListener("pointermove",move);grip.removeEventListener("pointerup",up);grip.removeEventListener("pointercancel",lost);document.removeEventListener("keydown",esc,true);
+   try{grip.releasePointerCapture(pid)}catch(x){}
+   tile.classList.remove("tile-drag");document.body.classList.remove("dragging");dropBar.style.display="none";dragTile=null;
+   if(!cancel&&spot)moveTile(tile,spot)}
+  function up(ev){if(ev.pointerId===pid)end(false)}
+  function lost(ev){if(ev.pointerId===pid)end(true)}
+  function esc(ev){if(ev.key==="Escape"){ev.stopPropagation();end(true)}}
+  grip.addEventListener("pointermove",move);grip.addEventListener("pointerup",up);grip.addEventListener("pointercancel",lost);document.addEventListener("keydown",esc,true);show(e)})}
 function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;
  var vw=document.documentElement.clientWidth,pad=SCR.stretch&&vw>=900?24:16,W=vw-2*pad,dn=colsFor(SCR.dash_cols,W),dz=scrZoom(dn,W),
   sn=colsFor(SCR.set_cols,W),key=[dn,dz,sn,pad,SCR.stretch,SCR.set_cols].join("/");
  var dash=$("dash"),b=document.body,inn=document.querySelector("#settings .in");
  b.style.maxWidth=SCR.stretch?"none":(dn*COLW+(dn-1)*SGAP+2*pad)+"px";b.style.paddingLeft=b.style.paddingRight=pad+"px";
- dash.style.setProperty("--z",dz);dash.classList.toggle("multi",dn>1);layoutDash(dn);
+ dash.style.setProperty("--z",dz);dash.classList.toggle("multi",dn>1);layoutDash(dn);applyGrips();
  if(inn){inn.style.maxWidth=SCR.stretch?"none":(sn*COLW+(sn-1)*SGAP+2*pad)+"px";inn.style.paddingLeft=inn.style.paddingRight=pad+"px"}
  if(key!==scrKey){scrKey=key;if(!fromSettings&&$("settings").classList.contains("open"))layoutColumns(true)}}
 // The PIN (when one is set with install.sh --pin) is asked for once per page load, before update / restart / Wi-Fi connect.

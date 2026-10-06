@@ -167,16 +167,42 @@ def saved_module_order():
         return []
 
 
+_layout_groups = {}
+
+
+def module_group(name):
+    """0 = a module with a dashboard box (with or without settings), 1 = settings only (or nothing to show), 2 = a background. The picker
+    lists the groups in this order, whatever the user's own order says inside each of them (read from the module's layout.json)."""
+    path = os.path.join(MODULES_DIR, name, "layout.json")
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return 1
+    cached = _layout_groups.get(path)
+    if cached and cached[0] == mtime:
+        return cached[1]
+    try:
+        with open(path) as f:
+            lay = json.load(f)
+    except (IOError, OSError, ValueError):
+        lay = {}
+    lay = lay if isinstance(lay, dict) else {}
+    group = 2 if "background" in lay else (0 if lay.get("dashboard") else 1)
+    _layout_groups[path] = (mtime, group)
+    return group
+
+
 def module_names():
     """Names of the installed modules (folders with a readable module.json), in picker order: the order the user set
-    (module_order.json) first, then any module not in it by its manifest's "order" hint and name."""
+    (module_order.json) first, then any module not in it by its manifest's "order" hint and name; then grouped: the modules with a
+    dashboard box first, then the settings-only ones, then the backgrounds (module_group()), each group in that order."""
     try:
         names = [n for n in os.listdir(MODULES_DIR) if module_manifest(n)]
     except OSError:
         return []
     saved = [n for n in saved_module_order() if n in names]
     rest = sorted((n for n in names if n not in saved), key=lambda n: (module_manifest(n).get("order", 100), n))
-    return saved + rest
+    return sorted(saved + rest, key=module_group)             # a stable sort: inside a group the order is unchanged
 
 
 def save_module_order(order):
@@ -192,6 +218,21 @@ def save_module_order(order):
         json.dump(new, f)
     os.rename(tmp, MODULE_ORDER)
     return new
+
+
+def save_dashboard_order(names):
+    """The tiles of the main screen were moved: `names` are modules, in the order their tiles now have. They take the places that
+    those modules had in the picker order, in that sequence (the others stay where they are). Returns the new order, or None."""
+    if not isinstance(names, list) or not all(isinstance(n, type(u"")) for n in names):
+        return None
+    cur = module_names()
+    moved = [n for n in names if n in cur]
+    moved = [n for i, n in enumerate(moved) if n not in moved[:i]]
+    slots = [i for i, n in enumerate(cur) if n in moved]
+    new = list(cur)
+    for i, n in zip(slots, moved):
+        new[i] = n
+    return save_module_order(new)
 
 
 def modules_state():
@@ -475,7 +516,7 @@ def save_settings_pin(on):
 
 
 # ---- screen layout: how many columns the dashboard and Settings may use on a wide screen, and whether the boxes stretch to fill it
-SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False}
+SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False}
 MAX_COLUMNS = 6
 
 
@@ -483,7 +524,7 @@ def screen_settings():
     """{"dash_cols": 1-6, "set_cols": 1-6, "stretch": bool, "scale": bool}: the saved layout settings over the defaults (a bad or missing
     file gives the defaults). dash_cols / set_cols are the most columns the dashboard / Settings may use; they only get as many as the screen
     fits (about 430 px each). stretch makes the columns fill the screen's width; scale (only with stretch) makes the boxes' content grow
-    with their width instead of getting more room."""
+    with their width instead of getting more room; drag lets the tiles of the main screen be moved (which reorders the modules)."""
     out = dict(SCREEN_DEFAULTS)
     try:
         with open(SCREEN) as f:
@@ -495,7 +536,7 @@ def screen_settings():
             v = data.get(k)
             if isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= MAX_COLUMNS:
                 out[k] = v
-        for k in ("stretch", "scale"):
+        for k in ("stretch", "scale", "drag"):
             if isinstance(data.get(k), bool):
                 out[k] = data[k]
     return out
@@ -512,7 +553,7 @@ def save_screen_settings(changes):
                 continue
             if 1 <= v <= MAX_COLUMNS:
                 cur[k] = v
-        elif k in ("stretch", "scale") and isinstance(v, bool):
+        elif k in ("stretch", "scale", "drag") and isinstance(v, bool):
             cur[k] = v
     tmp = SCREEN + ".tmp"
     with open(tmp, "w") as f:

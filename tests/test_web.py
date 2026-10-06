@@ -175,12 +175,12 @@ class HttpTests(unittest.TestCase):
 
     def test_screen_layout_settings(self):
         d = json.loads(self.get("/api")[2].decode())
-        self.assertEqual(d["screen"], {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False})
+        self.assertEqual(d["screen"], {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False})
         self.post("/screen", {"values": {"dash_cols": 3, "set_cols": 2}})
         self.post("/screen/stretch", {"value": True})
         self.post("/screen/scale", {"value": True})
         d = json.loads(self.get("/api")[2].decode())
-        self.assertEqual(d["screen"], {"dash_cols": 3, "set_cols": 2, "stretch": True, "scale": True})
+        self.assertEqual(d["screen"], {"dash_cols": 3, "set_cols": 2, "stretch": True, "scale": True, "drag": False})
         reply = json.loads(self.get("/screen")[2].decode())
         self.assertEqual(reply["values"], {"dash_cols": 3, "set_cols": 2})
         self.assertEqual([o["value"] for o in reply["options"]["cols"]], [1, 2, 3, 4, 5, 6])
@@ -188,6 +188,19 @@ class HttpTests(unittest.TestCase):
         self.assertEqual((core.screen_settings()["dash_cols"], core.screen_settings()["set_cols"]), (3, 2))
         self.post("/screen/stretch", {"value": "yes"})                                             # not true or false: kept
         self.assertTrue(core.screen_settings()["stretch"])
+
+    def test_moving_the_tiles_of_the_main_screen_reorders_the_modules(self):
+        self.post("/screen/drag", {"value": True})
+        self.assertTrue(core.screen_settings()["drag"])
+        before = core.module_names()
+        got = json.loads(self.post("/modules/dashboard-order", {"order": ["players", "switcher"]})[1].decode())
+        names = [m["name"] for m in got["modules"]]
+        self.assertEqual(names.index("players") < names.index("switcher"), True)
+        self.assertEqual(sorted(core.module_names()), sorted(before))                           # nothing lost
+        self.assertEqual([m["group"] for m in got["modules"]], sorted(m["group"] for m in got["modules"]))
+        with self.assertRaises(HTTPError):
+            self.post("/modules/dashboard-order", {"order": "players"})
+        self.post("/screen/drag", {"value": False})
 
     def test_a_bad_screen_file_gives_the_defaults(self):
         open(core.SCREEN, "w").write("[1, 2")

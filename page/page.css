@@ -207,8 +207,12 @@
  .sec{margin-bottom:18px;break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid}
  .sec > h2:first-child{margin-top:0}
  #settings .cols{padding-top:6px}
+ .mlist .grp{margin:10px 0 2px;text-transform:uppercase;letter-spacing:.06em;font-size:var(--fs-xs)} .mlist .grp:first-child{margin-top:0}
  /* the screen layout (applyScreen() in page.js): the dashboard in several columns, boxes drawn bigger with Scale content (--z) */
- #dash.multi{display:flex;gap:20px;align-items:flex-start} #dash .dcol{flex:1 1 0;min-width:0} #dash .dbox,#set-boxes .sec{zoom:var(--z,1)}
+ #dash.multi{display:flex;gap:20px;align-items:flex-start} #dash .dcol{flex:1 1 0;min-width:0}
+ /* rearranging the main screen: a handle in the corner of each tile, a bar where the dragged one will land */
+ #dash .dbox{position:relative} .tilegrip{position:absolute;top:8px;left:8px;z-index:3;width:34px;height:34px;margin:0;padding:0;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font-size:1.1em;letter-spacing:-.15em;line-height:1;cursor:grab;touch-action:none;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+ .tile-drag{opacity:.45} .dropbar{display:none;position:fixed;z-index:30;height:6px;border-radius:var(--r-ctl);background:#fff;pointer-events:none;box-shadow:0 0 8px rgba(255,255,255,.8)} #dash .dbox,#set-boxes .sec{zoom:var(--z,1)}
  /* nothing is drawn until /api and the data sources have answered (boot.js), so the boxes appear together and in place; the animation shows the page anyway after 3 s if the script died */
  body.booting #dash,body.booting #warnings{opacity:0;pointer-events:none;animation:bootshow 0s 3s forwards} #dash,#warnings{transition:opacity .18s}
  @keyframes bootshow{to{opacity:1;pointer-events:auto}}

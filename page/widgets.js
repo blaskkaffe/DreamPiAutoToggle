@@ -783,20 +783,21 @@ function buildPicker(cols){
  var card=cols.querySelector('[data-box="system"] .card'),
   btn=h("button",{type:"button","class":"pill-s",text:"Edit","aria-haspopup":"dialog"}),list=h("div",{"class":"mlist"}),
   done=h("button",{type:"button","class":"pill-s",text:"Done"}),
-  pop=h("div",{},[h("div",{"class":"t",text:"Modules: tick to switch on or off, drag the handle to move. The top one has priority."}),list,h("div",{"class":"bar end"},[done])]),
+  pop=h("div",{},[h("div",{"class":"t",text:"Modules: tick to switch on or off, drag the handle to move inside its group. The top one has priority."}),list,h("div",{"class":"bar end"},[done])]),
   row=h("div",{"class":"srow edit","data-picker":"modules"},[h("span",{},[document.createTextNode("Modules"),h("span",{"class":"sub",text:"Switch modules on or off and set their priority"})]),btn]);
  if(!card){card=h("div",{"class":"card"});cols.appendChild(h("section",{"class":"sec","data-box":"system"},[h("h2",{text:"System"}),card]))}
  card.insertBefore(row,card.firstChild);card.appendChild(pop);
  var p=ui.popup(pop),mods=[],boxes={};
- function paint(list2){mods=list2;boxes={};list.innerHTML="";
+ function paint(list2){mods=list2;boxes={};list.innerHTML="";var GROUPS=["On the main screen","In Settings only","Backgrounds"],shownGroup=-1;
   mods.forEach(function(m){var cb;
+   if(m.group!==shownGroup){shownGroup=m.group;list.appendChild(h("div",{"class":"sub grp",text:GROUPS[m.group]||""}))}      // a heading is not a row: a module moves inside its group
    if(m.visible===false)cb=h("span",{"class":"sub fixed",text:"Always on"});                     // can be moved, not switched off
    else{cb=h("input",{type:"checkbox","class":"cbox neutral","data-module":m.name,"aria-label":m.title});cb.checked=m.enabled;boxes[m.name]=cb}
    var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+m.title+": drag, or use the up and down arrow keys",html:"&#8942;&#8942;"}),
     left=h("span",{},[document.createTextNode(m.title),h("span",{"class":"sub",html:esc(m.description)+(m.note?"<br>"+esc(m.note):"")+(m.error?'<br><b class="modbad">Could not load: '+esc(m.error)+"</b>":"")})]);
    list.appendChild(h("div",{"class":"srow","data-id":m.name},[grip,left,cb]))});
   sortable(list,function(){})}                                                                       // the order is read from the page when Done is pressed
- function apply(){var order=Array.prototype.map.call(list.children,function(r){return r.getAttribute("data-id")}),
+ function apply(){var order=Array.prototype.map.call(list.children,function(r){return r.getAttribute("data-id")}).filter(Boolean),
    was=mods.map(function(m){return m.name}),changes=[];
   mods.forEach(function(m){var cb=boxes[m.name];if(cb&&cb.checked!==m.enabled)changes.push({name:m.name,enabled:cb.checked})});
   var reorder=order.length&&order.join()!==was.join();

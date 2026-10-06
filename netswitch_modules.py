@@ -417,7 +417,7 @@ def listing():
         m = core.module_manifest(name)
         if not core.module_visible(name, m) and not shows_something(name):
             continue                       # a module with no box and no background (a plain service) has nothing to move
-        out.append({"name": name, "visible": core.module_visible(name, m), "title": core.module_title(name, m), "description": m.get("description", ""),
+        out.append({"name": name, "group": core.module_group(name), "visible": core.module_visible(name, m), "title": core.module_title(name, m), "description": m.get("description", ""),
                     "note": m.get("note", ""), "enabled": core.module_enabled(name, state),
                     "default": core.module_default_enabled(m), "error": _state["errors"].get(name)})
     return out

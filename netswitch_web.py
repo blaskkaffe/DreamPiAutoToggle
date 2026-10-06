@@ -332,13 +332,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_modules()
         if path == "/modules/order":
             return self._post_module_order()
+        if path == "/modules/dashboard-order":
+            return self._post_dashboard_order()
         if path == "/colour":
             return self._post_colour()
         if path == "/highlight":
             return self._post_highlight()
         if path == "/timezone":
             return self._post_timezone()
-        if path in ("/screen", "/screen/stretch", "/screen/scale"):
+        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/drag"):
             return self._post_screen(path)
         if path == "/palette":
             return self._post_palette()
@@ -369,6 +371,18 @@ class Handler(BaseHTTPRequestHandler):
         if not core.save_module_enabled(name, on):
             return self.send("No such module: %s" % name, "text/plain; charset=utf-8", status=404)
         core.debug_log("web page: module %s switched %s" % (name, "on" if on else "off"))
+        refresh_page(force=True)
+        self.send(json.dumps({"modules": modules.listing()}), "application/json")
+
+    def _post_dashboard_order(self):
+        """The tiles of the main screen were moved: {"order": [module names, in the order of their tiles]}."""
+        try:
+            order = core.save_dashboard_order(json.loads(self._body(4096).decode("utf-8")).get("order"))
+        except (ValueError, AttributeError, IOError, OSError) as e:
+            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
+        if order is None:
+            return self.send("Bad request: order must be a list of module names", "text/plain; charset=utf-8", status=400)
+        core.debug_log("web page: main screen tiles moved, modules now %s" % ", ".join(order))
         refresh_page(force=True)
         self.send(json.dumps({"modules": modules.listing()}), "application/json")
 

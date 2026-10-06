@@ -122,6 +122,12 @@
     },
     {
      "type": "row",
+     "title": "Rearrange the main screen",
+     "sub": "A handle on each tile lets you drag it to another place; the modules take that order (the same as dragging them in Modules)",
+     "control": {"type": "toggle", "bind": "@screen.drag", "post": "/screen/drag", "label": "Rearrange the main screen"}
+    },
+    {
+     "type": "row",
      "title": "Ask for the PIN to open Settings",
      "sub": "The dashboard keeps working without it; opening Settings and changing anything in it needs the PIN. Set a PIN below first.",
      "control": {"type": "toggle", "bind": "@settings_pin.on", "post": "/settings-pin", "label": "Ask for the PIN to open Settings"}
