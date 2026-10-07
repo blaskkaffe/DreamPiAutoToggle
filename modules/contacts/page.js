@@ -11,6 +11,27 @@ custom("contacts-import",function(host){
    if(r&&r.ok){ta.value="";file.value="";reloadData("contacts");refresh()}})}});
 
 // The people on file, one row each with a switch for "on the board" (the standard row and toggle widgets, built from the data source /contacts).
-custom("contacts-people",function(host){var key="",box=host.querySelector(".cpeople");box.style.maxHeight="46vh";box.style.overflowY="auto";
- bind("@contacts.people",function(list){list=list||[];var k=JSON.stringify(list);if(k===key)return;key=k;box.innerHTML="";
-  list.forEach(function(p){box.appendChild(build({type:"row",title:p.title,sub:p.tag,control:{type:"toggle",bind:p.active,post:"/contacts/active",body:{id:p.id},label:p.title+" on the board"}},{saved:function(){reloadData("contacts")}}))})})});
+// A tap on a row (not on its switch) opens a pop-up to edit the person: name, department, role, phone, building (POST /contacts/person).
+custom("contacts-people",function(host){var key="",box=host.querySelector(".cpeople"),modal=h("div",{"class":"rp-modal keep-visible",style:"display:none"}),list0=[];
+ document.body.appendChild(modal);box.style.maxHeight="46vh";box.style.overflowY="auto";
+ var FIELDS=[["name","Name","text"],["department","Department","text"],["role","Role","text"],["phone","Phone","tel"],["location","Building","text"]];
+ function close(){modal.style.display="none";modal.innerHTML=""}
+ function edit(p){modal.innerHTML='<div class="rp-sheet rp-need2" role="dialog" aria-modal="true" aria-label="Edit '+esc(p.title)+'"><button type="button" class="rp-x" data-close="1" title="Close" aria-label="Close">&#10005;</button>'+
+  '<div class="rp-wn">'+esc(p.title)+'</div>'+FIELDS.map(function(f){return '<label class="rp-nl">'+f[1]+'<input class="rp-big" type="'+f[2]+'" data-f="'+f[0]+'" value="'+esc(p[f[0]]||"")+'" maxlength="80"></label>'}).join("")+
+  '<label class="rp-nl rp-chk"><input type="checkbox" class="cbox neutral" data-f="restrictToLocation"'+(p.restrict?" checked":"")+'> Only show on the board when this building is chosen</label>'+
+  '<div class="rp-cmsg sub" aria-live="polite"></div><div class="rp-nb"><button type="button" class="pill-s rp-so" data-close="1">Cancel</button><button type="button" class="pill-s pri rp-so c-green" data-save="1">Save</button></div></div>';
+  modal.style.display="";var f0=modal.querySelector("input");if(f0&&f0.focus)f0.focus();
+  modal._id=p.id}
+ function save(){var body={id:modal._id},msg=modal.querySelector(".rp-cmsg"),btn=modal.querySelector("[data-save]");
+  Array.prototype.forEach.call(modal.querySelectorAll("[data-f]"),function(i){body[i.getAttribute("data-f")]=i.type==="checkbox"?i.checked:i.value});
+  btn.disabled=true;post("/contacts/person",body,function(r,st,b){btn.disabled=false;
+   if(r&&r.ok){close();reloadData("contacts");refresh();return}
+   setText(msg,(b&&b.message)||"That did not work")})}
+ modal.addEventListener("click",function(e){if(e.target===modal){close();return}var b=e.target.closest&&e.target.closest("button");if(!b)return;
+  if(b.hasAttribute("data-close"))close();else if(b.hasAttribute("data-save"))save()});
+ modal.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target.type!=="checkbox"){e.preventDefault();save()}});
+ hook("escape",function(){if(modal.style.display!=="none"){close();return true}});
+ bind("@contacts.people",function(list){list=list||[];var k=JSON.stringify(list);if(k===key)return;key=k;list0=list;box.innerHTML="";
+  list.forEach(function(p){var row=build({type:"row",title:p.title,sub:p.tag,control:{type:"toggle",bind:p.active,post:"/contacts/active",body:{id:p.id},label:p.title+" on the board"}},{saved:function(){reloadData("contacts")}});
+   row.classList.add("rp-edit");row.setAttribute("title","Edit "+p.title);
+   row.addEventListener("click",function(e){if(e.target.closest&&e.target.closest("input,label,button"))return;edit(p)});box.appendChild(row)})})});

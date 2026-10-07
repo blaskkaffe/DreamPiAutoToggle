@@ -35,7 +35,8 @@
          "key": "show_title",
          "label": "Show the title"
         }
-       ]
+       ],
+       "inline": true
       },
       {
        "title": "Group people by",
@@ -47,7 +48,8 @@
          "options": "groups",
          "label": "Group by"
         }
-       ]
+       ],
+       "inline": true
       },
       {
        "title": "Colour people by",
@@ -59,7 +61,8 @@
          "options": "groups",
          "label": "Colour by"
         }
-       ]
+       ],
+       "inline": true
       }
      ]
     },

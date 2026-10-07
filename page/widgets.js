@@ -640,8 +640,9 @@ W.roster=function(s,ctx){
  if(s.mode==="colours")return rosterColours(s,ctx);
  var el=h("div",{"class":"roster"}),chips=h("div",{"class":"rp-chips"}),msg=h("div"),
   modal=h("div",{"class":"rp-modal",style:"display:none"}),
-  sel=rosterLocations(),last="",D=null,cur=null;
- el.appendChild(chips);el.appendChild(msg);document.body.appendChild(modal);
+  sel=rosterLocations(),last="",D=null,cur=null,modal2;
+ modal2=h("div",{"class":"rp-modal rp-modal2",style:"display:none"});
+ el.appendChild(chips);el.appendChild(msg);document.body.appendChild(modal);document.body.appendChild(modal2);
  function visible(p){if(!sel.length)return !p.restrict;return sel.indexOf(p.building)>=0||(!p.building&&!p.restrict)}
  function person(id){var r=null;((D&&D.groups)||[]).forEach(function(g){g.people.forEach(function(p){if(p.id===id)r=p})});return r}
  function colourCls(p){return p.colour?" c-"+p.colour:""}
@@ -696,19 +697,29 @@ W.roster=function(s,ctx){
    '<div class="rp-who"><label class="rp-avl"'+((S.enabled||{}).contacts?' title="Change the photo"':'')+'>'+rosterAvatar(p,"rp-avb")+((S.enabled||{}).contacts?'<input type="file" accept="image/*" aria-label="Photo of '+esc(p.name)+'" data-photo="1">':'')+'</label>'+
    '<div class="rp-wt"><div class="rp-wn">'+esc(p.name)+'</div>'+(who?'<div class="rp-wl">'+esc(who)+'</div>':'')+(p.role?'<div class="rp-wl">'+esc(p.role)+'</div>':'')+(p.phone?'<div class="rp-wl">'+esc(p.phone)+'</div>':'')+'</div></div>'+
    '<div class="rp-opts">'+st.map(function(x){return '<button type="button" class="pill-s pri rp-so c-'+esc(x.colour)+(p.status===x.code?" on":"")+'" data-code="'+esc(x.code)+'" aria-pressed="'+(p.status===x.code?"true":"false")+'">'+esc(x.label)+'</button>'}).join("")+
-   '</div><div class="rp-clear"><button type="button" class="pill-s rp-so" data-code="">Rensa status</button></div><div class="rp-need" style="display:none"></div></div>'}
+   '</div><div class="rp-clear"><button type="button" class="pill-s rp-so" data-code="">Rensa status</button></div></div>'}
  function openMenu(id){var p=person(id);if(!p)return;cur=id;modal.innerHTML=menuHtml(p);modal.style.display="";var x=modal.querySelector(".rp-x");if(x&&x.focus)x.focus()}
- function closeMenu(){modal.style.display="none";modal.innerHTML="";cur=null}
+ // a status that needs a time, a date or a note: its own pop-up on top of the menu, with a big field (Enter sets it, Esc or a tap outside goes back)
+ function openNeed(code,st){var p=person(cur),type=st.needs==="time"?"time":st.needs==="date"?"date":"text",
+  what=st.needs==="time"?"At what time?":st.needs==="date"?"Until which date?":"What is it?";
+  modal2.innerHTML='<div class="rp-sheet rp-need2" role="dialog" aria-modal="true" aria-label="'+esc(st.label)+'"><button type="button" class="rp-x" data-back="1" title="Back" aria-label="Back">&#10005;</button>'+
+   '<div class="rp-wn">'+esc(st.label)+'</div><div class="rp-wl">'+esc(p?p.name:"")+'</div><label class="rp-nl">'+what+'<input class="rp-big" type="'+type+'" value="'+esc(st.default||"")+'" maxlength="60" aria-label="'+esc(st.label)+'"></label>'+
+   '<div class="rp-nb"><button type="button" class="pill-s rp-so" data-back="1">Cancel</button><button type="button" class="pill-s pri rp-so c-'+esc(st.colour)+'" data-set="'+esc(code)+'">Set</button></div></div>';
+  modal2.style.display="";var inp=modal2.querySelector("input");if(inp&&inp.focus)inp.focus()}
+ function closeNeed(){modal2.style.display="none";modal2.innerHTML=""}
+ modal2.addEventListener("click",function(e){if(e.target===modal2){closeNeed();return}
+  var b=e.target.closest&&e.target.closest("button");if(!b)return;
+  if(b.hasAttribute("data-back")){closeNeed();return}
+  if(b.hasAttribute("data-set")){var inp=modal2.querySelector("input"),code=b.getAttribute("data-set");closeNeed();send(code,inp?inp.value:"")}});
+ modal2.addEventListener("keydown",function(e){if(e.key==="Enter"){var b=modal2.querySelector("[data-set]");if(b){e.preventDefault();b.click()}}});
+ function closeMenu(){closeNeed();modal.style.display="none";modal.innerHTML="";cur=null}
  function send(code,detail){var id=cur;post(s.status,{id:id,code:code,detail:detail||""},function(r){take(r);closeMenu()})}
  modal.addEventListener("click",function(e){if(e.target===modal){closeMenu();return}
   var b=e.target.closest&&e.target.closest("button");if(!b)return;
   if(b.hasAttribute("data-close")){closeMenu();return}
-  if(b.hasAttribute("data-set")){var inp=modal.querySelector(".rp-need input");send(b.getAttribute("data-set"),inp?inp.value:"");return}
   if(!b.hasAttribute("data-code"))return;var code=b.getAttribute("data-code"),st=null;(D.statuses||[]).forEach(function(x){if(x.code===code)st=x});
   if(!st||!st.needs){send(code);return}
-  var need=modal.querySelector(".rp-need"),type=st.needs==="time"?"time":st.needs==="date"?"date":"text";
-  need.style.display="";need.innerHTML='<label class="sub">'+esc(st.label)+(st.needs==="time"?" at":st.needs==="date"?" until":": ")+' <input type="'+type+'" value="'+esc(st.default||"")+'" maxlength="60" aria-label="'+esc(st.label)+'"></label> <button type="button" class="pill-s pri c-'+esc(st.colour)+'" data-set="'+esc(code)+'">Set</button>';
-  var inp2=need.querySelector("input");if(inp2&&inp2.focus)inp2.focus()});
+  openNeed(code,st)});
  // a photo chosen in the menu: cut to a 160 px square in the browser, kept by the contacts module
  modal.addEventListener("change",function(e){var f=e.target&&e.target.getAttribute&&e.target.getAttribute("data-photo")&&e.target.files&&e.target.files[0],id=cur;if(!f||!id)return;
   var img=new Image(),url=URL.createObjectURL(f);
@@ -717,7 +728,7 @@ W.roster=function(s,ctx){
    post("/contacts/photo",{id:id,photo:c.toDataURL("image/jpeg",.82)},function(r,st,b){if(!r){alert((b&&b.message)||"The photo was not saved");return}
     refresh();setTimeout(function(){if(cur===id){var p=person(id);if(p)modal.querySelector(".rp-avl").innerHTML=rosterAvatar(p,"rp-avb")+'<input type="file" accept="image/*" aria-label="Photo of '+esc(p.name)+'" data-photo="1">'}},1300)})};
   img.onerror=function(){URL.revokeObjectURL(url);alert("That file is not a picture")};img.src=url});
- hook("escape",function(){if(cur!==null){closeMenu();return true}});
+ hook("escape",function(){if(modal2.style.display!=="none"){closeNeed();return true}if(cur!==null){closeMenu();return true}});
 bind(s.source,function(d){if(d)document.body.classList.toggle("no-title",d.show_title===false)});
  bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+d.groups.length;if(key===last)return;last=key;D=d;paint()});
  return el};
@@ -800,6 +811,10 @@ function control(spec,F,change){var key=spec.key,el,paint;
 W.form=function(s,ctx){var el=h("div",{"class":"wform"}),F={values:{},options:{},texts:{},lists:{}},timer=null,ctls=[],subs=[];
  // one edit row per field; its controls are in a pop-up that opens under the row's Edit button (changes save as they are made)
  (s.fields||[]).forEach(function(f){
+  // "inline": the one control (a switch, a select) sits on the row itself, no Edit button and no pop-up
+  if(f.inline&&(f.controls||[]).length===1){var c0=f.controls[0],e0=control(Object.assign({},c0,{aria:f.title||c0.label||c0.key}),F,save);ctls.push(e0);
+   el.appendChild(h("div",{"class":"srow"},[h("span",{text:f.title||c0.label||c0.key}),e0]));
+   if(f.show!==undefined)bind(f.show,function(v){sh(e0.parentNode,!!v)});return}
   var r=editRow({title:f.title,button:f.button||"Edit",aria:"Edit "+(f.title||"")}),done=h("button",{type:"button","class":"pill-s",text:"Done"}),pop=h("div"),p;
   pop.appendChild(h("div",{"class":"t",text:f.popup_title||f.title||""}));
   // a field with one "choice" control is a simple pick: its pop-up is just the buttons, a tap picks and closes (no Done)

@@ -192,6 +192,23 @@ class BoardTests(Base):
         self.assertEqual(checkin.snapshot()["total"], 4)
 
 
+    def test_a_person_can_be_edited_and_keeps_the_status_and_a_reimport_finds_them(self):
+        anna = self.people()["Anna Svensson"]
+        checkin.toggle(anna["id"])
+        got = contacts.update_person(anna["id"], {"name": "Anna S", "role": "Köksmästare", "phone": "070-9", "department": "Servering"})
+        self.assertEqual((got["id"], got["name"], got["department"]), (anna["id"], "Anna S", "Servering"))
+        p = self.people()["Anna S"]
+        self.assertEqual((p["id"], p["in"], p["department"], p["role"]), (anna["id"], True, "Servering", "Köksmästare"))      # still in, same person
+        r = contacts.import_csv(u"name,department,location\nAnna S,Servering,Område A\n")
+        self.assertEqual((r["added"], len(contacts.read()["people"])), (0, 4))                                                  # found by the edited values
+        with self.assertRaises(ValueError):
+            contacts.update_person(anna["id"], {"name": " "})
+        with self.assertRaises(ValueError):
+            contacts.update_person("pnobody", {"name": "x"})
+        erik = self.people()["Erik Lindqvist"]
+        with self.assertRaises(ValueError):
+            contacts.update_person(erik["id"], {"name": "Anna S", "department": "Servering", "location": "Område A"})            # would be a double
+
     def test_the_order_of_the_boxes_is_kept(self):
         self.assertEqual([g["title"] for g in checkin.snapshot()["groups"]], ["Kök", "No department", "Servering"])
         checkin.set_group_order(["Servering", "Kök"])
@@ -236,6 +253,16 @@ class HttpTests(Base):
         self.post("/checkin/status", {"id": anna, "code": "VACATION", "detail": "2026-07-01"})
         text = [p["text"] for g in self.get("/api")["checkin"]["groups"] for p in g["people"] if p["id"] == anna][0]
         self.assertEqual(text, "Semester · tillbaka 1/7")
+
+    def test_a_person_is_edited_over_http(self):
+        board = self.get("/api")["checkin"]
+        anna = [p for g in board["groups"] for p in g["people"] if p["name"] == "Anna Svensson"][0]["id"]
+        self.assertEqual(self.post("/contacts/person", {"id": anna, "role": "Chef"})["ok"], True)
+        got = [p for g in self.get("/api")["checkin"]["groups"] for p in g["people"] if p["id"] == anna][0]
+        self.assertEqual(got["role"], "Chef")
+        with self.assertRaises(HTTPError) as e:
+            self.post("/contacts/person", {"id": anna, "name": ""})
+        self.assertEqual(e.exception.code, 400)
 
     def test_the_order_of_the_boxes_is_posted_and_seen_by_the_other_screen(self):
         r = self.post("/checkin/order", {"order": ["Servering", "Kök"]})

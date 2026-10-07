@@ -90,6 +90,7 @@ def import_csv(text, replace=False):
     with _lock:
         data = read()
         by_id = dict((p["id"], p) for p in data["people"])
+        key_of = dict((person_id(p["name"], p["department"], p.get("location", "")), p["id"]) for p in data["people"])      # a person edited by hand keeps the id
         seen, added, changed, skipped = set(), 0, 0, 0
         for i, row in enumerate(rows):
             name = row.get("name", "").strip()
@@ -98,7 +99,7 @@ def import_csv(text, replace=False):
                 continue
             department = row.get("department", "").strip() or NO_DEPARTMENT
             location = row.get("location", "").strip()
-            pid = person_id(name, department, location)
+            pid = key_of.get(person_id(name, department, location)) or person_id(name, department, location)
             prev = by_id.get(pid)
             new = {"id": pid, "name": name, "department": department, "role": row.get("role", ""),
                    "phone": row.get("phone", "") or (prev or {}).get("phone", ""), "location": location,
@@ -134,6 +135,33 @@ def set_active(pid, active):
     return False
 
 
+def update_person(pid, fields):
+    """Edit one person (name, department, role, phone, location, restrictToLocation; the id stays, so the status and the photo stay).
+    Returns the person; ValueError with a message when there is no such person, no name, or somebody else has the same name, department and building."""
+    if not isinstance(fields, dict):
+        raise ValueError("Nothing to change")
+    with _lock:
+        data = read()
+        p = next((x for x in data["people"] if x["id"] == pid), None)
+        if p is None:
+            raise ValueError("Unknown person")
+        new = dict(p)
+        for k, limit in (("name", 80), ("department", 80), ("role", 80), ("phone", 40), ("location", 80)):
+            if k in fields:
+                new[k] = str(fields[k] if fields[k] is not None else "").strip()[:limit]
+        if "restrictToLocation" in fields:
+            new["restrictToLocation"] = bool(fields["restrictToLocation"]) if isinstance(fields["restrictToLocation"], bool) else _flag(fields["restrictToLocation"])
+        if not new["name"]:
+            raise ValueError("A person needs a name")
+        new["department"] = new["department"] or NO_DEPARTMENT
+        key = person_id(new["name"], new["department"], new["location"])
+        if any(x["id"] != pid and person_id(x["name"], x["department"], x.get("location", "")) == key for x in data["people"]):
+            raise ValueError("Somebody else already has that name in that department and building")
+        p.update(new)
+        _write(data)
+        return p
+
+
 def export_csv():
     out = io.StringIO()
     w = csv.writer(out, lineterminator="\n")
@@ -160,7 +188,8 @@ def view():
         text = "No people yet: import a CSV file."
     return {"text": text, "count": len(active), "columns": ", ".join(COLUMNS),
             "people": [{"id": p["id"], "title": p["name"], "tag": p["department"] + (" / " + p["location"] if p["location"] else ""),
-                        "active": p.get("active", True)} for p in people]}
+                        "active": p.get("active", True), "name": p["name"], "department": p["department"], "role": p.get("role", ""),
+                        "phone": p.get("phone", ""), "location": p.get("location", ""), "restrict": bool(p.get("restrictToLocation"))} for p in people]}
 
 
 def _get_view(h):
@@ -185,6 +214,17 @@ def _post_import(h):
     if r["skipped"]:
         msg += ", %d rows without a name skipped" % r["skipped"]
     h.send(json.dumps(dict(result, ok=True, message=msg)), "application/json")
+    return True
+
+
+def _post_person(h):
+    try:
+        body = json.loads(h._body(8192).decode("utf-8"))
+        update_person(str(body.get("id", "")), body)
+    except (ValueError, UnicodeDecodeError, AttributeError) as e:
+        h.send(json.dumps({"ok": False, "message": str(e) or "That did not work"}), "application/json", status=400)
+        return True
+    h.send(json.dumps({"ok": True, "message": "Saved"}), "application/json")
     return True
 
 
@@ -262,8 +302,8 @@ def _get_photo(h):
 
 GET = {"/contacts": _get_view, "/contacts.csv": _get_csv}
 GET_PREFIX = {"/contacts/photo/": _get_photo}
-POST = {"/contacts/import": _post_import, "/contacts/active": _post_active, "/contacts/photo": _post_photo}
-PROTECTED = ("/contacts/import", "/contacts/active")
+POST = {"/contacts/import": _post_import, "/contacts/active": _post_active, "/contacts/person": _post_person, "/contacts/photo": _post_photo}
+PROTECTED = ("/contacts/import", "/contacts/active", "/contacts/person")
 OPEN = ("/contacts/photo",)          # a photo is set from the status menu on the board
 
 

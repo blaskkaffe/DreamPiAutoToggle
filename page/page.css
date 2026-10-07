@@ -206,7 +206,7 @@
  .rp-r.out .rp-n{font-weight:500}
  .rp-mq{flex:1;min-width:0;overflow:hidden;white-space:nowrap;font-weight:600} .rp-trk{display:inline-block;animation:marquee var(--d,12s) linear infinite} .rp-trk > span{display:inline-block;padding-right:3em}   /* name and status scroll round like the carousel */
  @media(prefers-reduced-motion:reduce){.rp-trk{animation:none}.rp-trk > span + span{display:none}}
- .rp-io{flex:none;min-width:5.2em;min-height:34px;padding:0 14px;font-weight:700;font-size:var(--fs-md);letter-spacing:.04em;box-shadow:0 0 0 2px rgba(0,0,0,.4)}   /* INNE (green) / UTE (red) */
+ .rp-io{flex:none;min-width:5.2em;min-height:34px;padding:0 14px;font-weight:700;font-size:var(--fs-md);letter-spacing:.04em}   /* INNE (green) / UTE (red) */
  /* the status menu: in the middle of the screen, about 60 % of its width */
  .rp-modal{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.62)}
  .rp-sheet{position:relative;box-sizing:border-box;width:clamp(320px,60vw,900px);max-width:100%;max-height:96vh;overflow:auto;padding:20px;border-radius:var(--r-box);background:var(--pop);border:var(--bw) solid var(--ctl-line)}
@@ -221,7 +221,10 @@
  @media(max-width:760px){.rp-sheet{width:100%}.rp-so{font-size:1em}}   /* on a phone the menu takes the whole width */
  .rp-clear{display:flex;justify-content:center;margin-top:10px} .rp-clear .rp-so{width:calc((100% - 20px) / 3);min-width:0;flex:none}   /* centred, the size of one status button */
  .rp-so.on{box-shadow:0 0 0 3px #fff}
- .rp-need{margin:14px 0 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+ .rp-edit{cursor:pointer} .rp-chk{display:flex;align-items:center;gap:10px;color:var(--text-1)} .rp-cmsg{min-height:1.4em;margin-top:10px}
+ .rp-modal2{z-index:31} .rp-need2{width:clamp(300px,42vw,620px)} .rp-nl{display:block;margin:18px 0 0;font-size:1.1em;color:var(--text-2)}
+ input.rp-big{display:block;box-sizing:border-box;width:100%;height:auto;min-height:64px;margin:8px 0 0;padding:8px 14px;font:inherit;font-size:1.6em;color:var(--text-1);background:var(--ctl);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl)}
+ .rp-nb{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:20px}
  body.no-title header h1{display:none} body.no-title header{height:34px;margin:0 0 6px}   /* no title: only a strip for the cogwheel is left */
  .rp-empty{padding:12px 4px}
  textarea{display:block;width:100%;margin:8px 0;padding:8px 10px;background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm);resize:vertical} input[type=file],.rp-need input{min-height:var(--h-ctl);max-width:100%;font-size:var(--fs-sm);color:var(--text-2)} .rp-need input{color:var(--text-1);background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);padding:0 8px}

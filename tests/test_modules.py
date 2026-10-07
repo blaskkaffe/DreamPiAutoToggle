@@ -193,7 +193,7 @@ class WithEverything(Base):
 
     def test_protected_paths_are_the_modules_own_post_routes(self):
         import netswitch_modules as mods
-        self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/wificonnect", "/contacts/import", "/contacts/active"})
+        self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/wificonnect", "/contacts/import", "/contacts/active", "/contacts/person"})
         for path in mods._state["protected"]:
             self.assertTrue(mods.route("POST", path), path)
 
