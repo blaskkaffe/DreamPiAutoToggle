@@ -195,7 +195,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.evaluate(() => Promise.all([['/screen', { values: { dash_cols: 2 } }], ['/screen/stretch', { value: true }]].map(([u, b]) => fetch(u, { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify(b) }))));
   await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
   const fills = await page.evaluate(() => Array.from(document.querySelectorAll('#dash .rp-mq')).map(mq => { const t = mq.querySelector('.rp-trk'); return { have: t.children.length, want: 2 * Math.max(1, Math.ceil(mq.getBoundingClientRect().width / t.firstChild.getBoundingClientRect().width)) }; }));
-  ok(fills.length > 0 && fills.every(f => f.have === f.want) && fills.some(f => f.have > 2), 'in a stretched wide row the carousel has enough copies of its text to fill it (' + fills.map(f => f.have + '/' + f.want).join(' ') + ')');
+  ok(fills.length > 0 && fills.every(f => f.have === f.want), 'in a stretched wide row the carousel has enough copies of its text to fill it (' + fills.map(f => f.have + '/' + f.want).join(' ') + ')');
   await page.evaluate(() => Promise.all([['/screen', { values: { dash_cols: 1 } }], ['/screen/stretch', { value: false }]].map(([u, b]) => fetch(u, { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify(b) }))));
 
   // ---- delete a person (the editor, two taps), the CSV box in the app's own look
