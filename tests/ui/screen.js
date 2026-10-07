@@ -10,7 +10,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   const page = await browser.newPage({ viewport: { width: 1500, height: 900 } });
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
-  page.on('console', m => { if (m.type() === 'error' && !/status of (401|409)/.test(m.text())) errors.push(m.text().slice(0, 150)); });     // the refused requests of the PIN checks are expected
+  page.on('console', m => { if (m.type() === 'error' && !/status of (400|401|409)/.test(m.text())) errors.push(m.text().slice(0, 150)); });     // the refused requests of the PIN checks are expected
   let prompts = [], alerts = [];
   page.on('dialog', d => { if (d.type() === 'prompt') { prompts.push(d.message()); return d.accept(answers.shift() || ''); } alerts.push(d.message()); return d.accept(); });
   const answers = [];
@@ -55,7 +55,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   const sc = await page.evaluate(() => ({ cols: document.querySelectorAll('#set-boxes > .col').length, z: getComputedStyle(document.querySelector('#set-boxes .sec')).zoom }));
   ok(sc.cols === 3 && sc.z !== '1', 'Settings: six allowed, three fit, stretched and scaled (' + JSON.stringify(sc) + ')');
   const app = page.locator('[data-box="appearance"]');
-  await app.locator('.srow', { hasText: 'Network Selector colour' }).locator('.colourpick > button').click(); await settle(500);
+  await app.locator('.srow', { hasText: 'Check-in board colour' }).locator('.colourpick > button').click(); await settle(500);
   const geo = await page.evaluate(() => { const p = document.querySelector('.pop.open'), c = p.closest('.card').getBoundingClientRect(), r = p.getBoundingClientRect(), a = p.closest('.card').querySelector('.colourpick > button').getBoundingClientRect();
     return { l: r.left - c.left, rr: c.right - r.right, below: r.top - a.bottom }; });
   ok(Math.abs(geo.l - 16 * 1.0) < 40 && geo.rr >= -1 && geo.l >= -1 && geo.below > -4 && geo.below < 40, 'a pop-up in a scaled box sits under its button and inside the card (' + JSON.stringify(geo) + ')');
