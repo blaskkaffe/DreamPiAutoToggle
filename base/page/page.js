@@ -40,14 +40,15 @@ ui.popup=function(el){
  el.addEventListener("click",function(e){e.stopPropagation()});
  ui._pops.push(p);return p};
 document.addEventListener("click",function(){ui.closePopups()});
-// Round icon buttons that are on or off: a bell (remind me) and a star (favourite). ui.iconButtonHtml(kind, on, what, attrs) is the markup
+// Round icon buttons that are on or off: a bell (remind me), a star (favourite) and a play button (start something on the device a module announces as its launcher; never "on"). ui.iconButtonHtml(kind, on, what, attrs) is the markup
 // (a module that builds its rows as HTML puts attrs, such as a data-id, on the button); ui.iconButton(kind, on, what) the element.
 // The look is .ibtn in page.css; the state is .on and aria-pressed; what is the name of the thing it is about (a screen reader's label).
 ui.icons={bell:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.4-2h-4.8A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5.5-6.8V3a1.5 1.5 0 0 0-3 0v1.2A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>',
  star:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3.1 6.6 7.2.9-5.3 5 1.4 7.1L12 17.9 5.6 21.6 7 14.5 1.7 9.5l7.2-.9z"/></svg>'};
-ui.iconTexts={bell:["Reminder on: tap to clear","Remind me","Clear the reminder for ","Remind me of "],star:["Favorite: tap to remove","Add to favorites","Remove from favorites: ","Add to favorites: "]};
+ui.target=function(){return (LAY.launcher&&LAY.launcher.target)||"the device"};      // what a play button starts something on (the launcher module says)
+ui.iconTexts={play:["Starting","Start","Starting ","Start: "],bell:["Reminder on: tap to clear","Remind me","Clear the reminder for ","Remind me of "],star:["Favorite: tap to remove","Add to favorites","Remove from favorites: ","Add to favorites: "]};
 ui.iconButtonHtml=function(kind,on,what,attrs){var t=ui.iconTexts[kind];
- return '<button type="button" class="ibtn '+kind+(on?' on':'')+'" '+(attrs||'')+' aria-pressed="'+(on?'true':'false')+'" title="'+(on?t[0]:t[1])+'" aria-label="'+(on?t[2]:t[3])+esc(what||"")+'">'+ui.icons[kind]+'</button>'};
+ return '<button type="button" class="ibtn '+kind+(on?' on':'')+'" '+(attrs||'')+' aria-pressed="'+(on?'true':'false')+'" title="'+(kind==="play"?(on?t[0]:t[1])+" on "+ui.target():(on?t[0]:t[1]))+'" aria-label="'+(kind==="play"&&!on?"Start on "+ui.target()+": ":on?t[2]:t[3])+esc(what||"")+'">'+ui.icons[kind]+'</button>'};
 ui.iconButton=function(kind,on,what){var d=document.createElement("div");d.innerHTML=ui.iconButtonHtml(kind,on,what);return d.firstChild};
 hook("escape",function(){if(ui._pops.some(function(p){return p.isOpen()})){ui.closePopups();return true}});
 hook("settingsClose",function(){ui.closePopups()});
@@ -57,6 +58,13 @@ function setHtml(el,h){if(el._html!==h){el._html=h;el.innerHTML=h}}
 function setClass(el,c){if(el.className!==c)el.className=c}
 function setStyle(el,prop,v){if(el.style[prop]!==v)el.style[prop]=v}
 function dot(el,state){setClass(el,"dot "+(state||""))}
+// Status dot preview of a light effect: [keyframes, slow s, fast s, timing]
+var DOT_FX={blink:["blink",1,.4,"steps(1)"],fade:["blink",3,1.2,"ease-in-out"],breathe:["breathe",4,1.6,"ease-in-out"],      // solid has no animation
+ blink1:["dotb1",1.6,.8,"steps(1)"],blink2:["dotb2",1.6,.8,"steps(1)"],blink3:["dotb3",1.6,.8,"steps(1)"],rainbow:["dotrainbow",6,2,"linear"]};   // periods as in the module that drives the light
+// look = {colour: a palette id, a colour token or a colour key of the module named in look.module, effect, speed}: the dot shows the page's palette colour (never a light's calibrated value)
+function lookDot(el,look){setClass(el,"dot");if(!look||!look.colour){setStyle(el,"background","#333");setStyle(el,"animation","none");return}
+ var f=DOT_FX[look.effect];setStyle(el,"background","var(--c-"+colourId(look.colour,look.module)+")");
+ setStyle(el,"animation",f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none")}
 function render(d){
  pinNeeded=!!d.pin;
  for(var k in d)S[k]=d[k];       // S keeps the data sources' answers and the page's own state between /api answers
@@ -216,7 +224,7 @@ function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;applyLook();
  if(inn){inn.style.maxWidth=SCR.stretch?"none":(sn*COLW+(sn-1)*SGAP+2*pad)+"px";inn.style.paddingLeft=inn.style.paddingRight=pad+"px"}
  if(key!==scrKey){scrKey=key;if(!fromSettings&&$("settings").classList.contains("open"))layoutColumns(true)}
  fire("screen")}
-// The PIN (when one is set with install.sh --pin) is asked for once per page load, before update / restart.
+// The PIN (when one is set with install.sh --pin) is asked for once per page load, before an action a module marks PROTECTED.
 var pinNeeded=false,pinValue="";
 // askPin(title, cb): a PIN pad in the middle of the screen (round number keys, a field that also takes the keyboard); cb(pin) when OK or Enter, nothing when it is cancelled
 var pinDlg=null;
@@ -241,7 +249,7 @@ function askConfirm(text,okLabel,cb){closePin();var m=h("div",{"class":"rp-modal
  document.body.appendChild(m);pinDlg=m;no.focus()}
 function withPin(go){if(!pinNeeded||pinValue)return go();askPin("Enter the PIN",function(p){pinValue=p;go()})}
 function xhrJson(method,url,cb,body){var x=new XMLHttpRequest(),counted=method!=="POST";if(counted)inflight++;x.open(method,url,true);
- if(method=="POST"){x.setRequestHeader("X-Requested-With","checkin");if(pinValue)x.setRequestHeader("X-Checkin-Pin",pinValue);
+ if(method=="POST"){x.setRequestHeader("X-Requested-With","page");if(pinValue)x.setRequestHeader("X-Pin",pinValue);
   if(body!==undefined)x.setRequestHeader("Content-Type","application/json")}
  x.onload=function(){if(counted)inflight--;var r=null;try{r=JSON.parse(x.responseText)}catch(e){}
   if(x.status==401||x.status==429)pinValue="";   // asked again next time

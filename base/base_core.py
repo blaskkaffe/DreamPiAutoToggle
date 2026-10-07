@@ -1,6 +1,6 @@
 # Base - shared state and settings of the modular dashboard (everything the web service and the services of the modules all read or write).
 # What belongs to the project is in project.json (name, page title, data folder, ...) and in its modules. No server, no probing,
-# so the small services can import it cheaply. Python 3.
+# so the small services can import it cheaply. Works on Python 3 and 2.7.
 import json
 import os
 import re
@@ -29,31 +29,22 @@ def _read_project():
 
 
 PROJECT = _read_project()      # project.json: {"name", "title" (the page's), "data_dir", "tmp_prefix", "service", "icon", "touch_icon"}
-BASE_DIR = PROJECT.get("data_dir", "/opt/dashboard")           # where the project keeps its settings and state
-TMP_PREFIX = PROJECT.get("tmp_prefix", "/tmp/dashboard")       # the start of the names of its short-lived state files
+BASE_DIR = PROJECT.get("data_dir", "/opt/" + PROJECT.get("name", "app"))           # where the project keeps its settings and state
+TMP_PREFIX = PROJECT.get("tmp_prefix", "/tmp/" + PROJECT.get("name", "app"))       # the start of the names of its short-lived state files
 PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the user's changes to the list of the palette (Appearance > Colour palette): {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui"}]}
-PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb"}}: palette colours the user changed
+PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb"}}: palette colours the user changed on screen (Appearance > Colour palette)
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
-MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"checkin": {"checkin": "green", ...}}: the global-palette colours each module uses
-MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["switcher", "numbers", ...]: the order set in the module picker (top = first, wins)
-ADDON_COMMIT = os.path.join(BASE_DIR, "version_commit")  # full commit hash of the checkout that was installed (install.sh)
-ADDON_SRC = os.path.join(BASE_DIR, "src_dir")            # that checkout's folder, used by the web update
-INSTALL_PORTS = os.path.join(BASE_DIR, "install_ports")  # "<http port> <https port>", so an update keeps them
-UPDATE_ORIGIN = os.path.join(BASE_DIR, "update_origin")  # the checkout's git origin URL when installed; "Update now" refuses another one
-ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for update/restart (install.sh --pin)
+MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"clock": {"clock": "orange", ...}}: the global-palette colours each module uses
+MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["clock", "players", ...]: the order set in the module picker (top = first, wins)
+DEBUG_FLAG = os.path.join(BASE_DIR, PROJECT.get("debug_flag", "debug"))     # exists = the debug timeline is recorded (a debug module switches it)
+ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for the actions a module marks PROTECTED (install.sh --pin)
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
-UPDATE_STATUS = TMP_PREFIX + ".update"          # running / ok / failed, written by the update script
-UPDATE_LOG = TMP_PREFIX + ".update.log"
-IMAGEBG_FILE = os.path.join(BASE_DIR, "background_image")     # the picture of the Background image module (any of PNG, JPEG, GIF, WebP; its type is in the config)
-IMAGEBG_CONFIG = os.path.join(BASE_DIR, "imagebg.json")  # {"fit", "dim", "type", "version"} of the Background image module
+HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id: how a highlighted box looks (Settings > Appearance)
 SETTINGS_PIN = os.path.join(BASE_DIR, "settings_pin")   # exists = Settings asks for the PIN (when one is set) before it opens and changes anything
 SCREEN = os.path.join(BASE_DIR, "screen.json")         # how the page is laid out on a wide screen: max columns, stretch, scale (Settings > Appearance)
-HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id: how a highlighted box looks (Settings > Appearance)
-CONTACTS = os.path.join(BASE_DIR, "contacts.json")     # {"people": [{id, name, department, role, phone, location, restrictToLocation, active, order}]}: the contacts module's roster (imported from a CSV)
-PHOTOS_DIR = os.path.join(BASE_DIR, "photos")           # <person id>.jpg / .png: the small profile photos (uploaded from the status menu, written by the contacts module, read by the check-in board)
-CHECKIN = os.path.join(BASE_DIR, "checkin.json")       # {"rev", "config", "statuses", "people": {id: {in, status, detail, at}}}: the check-in module's live state, shared by every screen
-CLOCK_CONFIG = os.path.join(BASE_DIR, "clock.json")  # {"format": "24h"|"12h"|"12h-ampm", "beat": bool, "world": bool, "large": bool, "cities": [...]}: the clock module's settings
 TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the Pi's own (Settings > About)
+DEBUG_LOG = TMP_PREFIX + PROJECT.get("debug_log", "-debug.log")           # the debug timeline
+POKE_PREFIX = TMP_PREFIX + ".poke."   # poke(name): "measure it again now", see poke()
 
 
 # ------------------------------------------------------------------ modules
@@ -63,14 +54,14 @@ TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every modul
 #   "description"  the text under it in the picker
 #   "enabled"      on by default when it is first loaded           (older files: "default"); the picker's own choice
 #                  (modules.json) overrides it
-#   "visible"      false = not in the picker and always on (the system / About module, say)   (default true)
+#   "visible"      false = not in the picker and always on (a module that is always there, say)   (default true)
 #   optional: "web" (Python entry for the web service), "ui" (page kit version), "order" (where it starts out in the
 #   list), "colours" / "primary" (see the colour section below)
 # A module is *installed* when its folder is there and *enabled* when it is on in the picker. Its place in the picker
 # (module_order.json) is its priority: the first one shows first and wins where two modules want the same thing.
-# Everything that has to know - the web page and the services of the modules - asks here.
+# Everything that has to know - the web page, a module's own service - asks here.
 MODULES_DIR = project_path("modules")
-MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"clock": true, "imagebg": false, ...} set from the module picker
+MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"clock": true, "players": false, ...} set from the module picker
 
 
 _manifests = {}     # path -> (mtime, parsed): module.json is asked for many times a second, it changes almost never
@@ -108,6 +99,20 @@ def module_visible(name, manifest=None):
 
 def module_default_enabled(manifest):
     return bool(manifest.get("enabled", manifest.get("default", True)))
+
+
+def module_announcements(key):
+    """What the enabled modules announce under `key` in their module.json (a list of objects, e.g. "actions" or "led_messages"), in picker
+    order, as [(module name, the module's title, one announcement)]. How an announcement is used is for the module that asked."""
+    out, state = [], modules_state()
+    for name in module_names():
+        manifest = module_manifest(name) or {}
+        if not module_enabled(name, state):
+            continue
+        for item in manifest.get(key) or []:
+            if isinstance(item, dict):
+                out.append((name, module_title(name, manifest), item))
+    return out
 
 
 def saved_module_order():
@@ -266,13 +271,6 @@ def save_module_enabled(name, on):
     return True
 
 
-# ---------------------------------------------------------------- colours
-# The page's colours: one global palette of 15 named colours (7 hues, each normal and bright, and "Global main"),
-# defined only here. A module never writes a colour of its own; it names one from the palette by its id ("orange",
-# "bright-blue" ...), either in module.json  "colours": {"checkin": "green", ...}  (the user can change these in the
-# module's own settings, see module_colour()) or as its  "primary"  colour, the one used on its borders and buttons.
-# id, name, hue group, page colour, its lighter variant (borders, text).
-# "global" is not a fixed colour: Global main, one colour the user picks in Appearance, for boxes that should share it.
 PALETTE = (
     ("global", "Global main", "global", "#6f7d99", "#b0b7c7"),
     ("red", "Red", "red", "#d9363e", "#ef8a8f"),
@@ -295,6 +293,12 @@ FIXED_COLOURS = ("global", "orange")   # never deleted: "Global main" is not a c
 # colours that were in the palette once: what a saved choice of them becomes
 LEGACY_COLOURS = {"bright-orange": "orange", "bright-yellow": "yellow", "pink": "bright-pink", "teal": "cyan"}
 DEFAULT_COLOUR = "orange"
+# A module's colour keys listed in its module.json "colours_real" only hold real palette colours (never a module's colour token such as
+# "Selected network", which would be a circle) and, with "colours_unique", never the same one; its other colour keys are free.
+
+
+def _real_key(name, key):
+    return key in ((module_manifest(name) or {}).get("colours_real") or [])
 
 
 _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -354,59 +358,98 @@ def palette_ids():
     return tuple(c[0] for c in _palette_entries())
 
 
-def palette_overrides():
-    """{id: {"ui": "#rrggbb"}}: what the user changed in the palette editor (only valid entries)."""
+def _read_dict(path):
     try:
-        with open(PALETTE_FILE) as f:
+        with open(path) as f:
             data = json.load(f)
     except (IOError, OSError, ValueError):
         return {}
-    out = {}
-    ids = palette_ids()
-    for ident, v in (data.items() if isinstance(data, dict) else []):
-        if ident in ids and isinstance(v, dict):
-            keep = dict((k, str(v[k]).lower()) for k in ("ui",) if isinstance(v.get(k), _STR) and _HEX.match(v[k]))
-            if keep:
-                out[ident] = keep
+    return data if isinstance(data, dict) else {}
+
+
+# ---- services: what one module offers the base (and, through the base, the others) without anyone importing it. A module's web entry
+# lists them in SERVICES = {"<name>": function}; the module loader (base_modules.py) is the finder. A service is only there in the web
+# service while its module is on, so an answer of None must always be handled (a service never has to exist).
+_finder = [None]
+
+
+def set_service_finder(fn):
+    _finder[0] = fn
+
+
+def service(name, *args):
+    """What the enabled module that offers `name` answers (None when there is none, or it fails)."""
+    fn = _finder[0](name) if _finder[0] else None
+    if fn is None:
+        return None
+    try:
+        return fn(*args)
+    except Exception:
+        return None
+
+
+def colour_tokens():
+    """[{"id", "name", "module"}]: colours that the enabled modules add to what a colour pick offers (module.json "colour_tokens": [{"id", "name"}]), after
+    the palette. Not part of the palette: it cannot be edited or deleted. A token's colour is named by a service of the module that added it (see service())."""
+    out, seen = [], set(PALETTE_IDS)
+    state = modules_state()
+    for name in module_names():
+        if not module_enabled(name, state):
+            continue
+        for t in (module_manifest(name) or {}).get("colour_tokens") or []:
+            if isinstance(t, dict) and isinstance(t.get("id"), _STR) and _CUSTOM_ID.match(t["id"]) and t["id"] not in seen:
+                seen.add(t["id"])
+                out.append({"id": t["id"], "name": str(t.get("name") or t["id"])[:24], "module": name})
+    return out
+
+
+def colour_ids():
+    """Every id a colour pick may hold: the palette's and the modules' colours (colour_tokens())."""
+    return palette_ids() + tuple(t["id"] for t in colour_tokens())
+
+
+def palette_overrides():
+    """{id: {"ui": "#rrggbb"}}: what the user changed in a palette colour on screen (palette.json: the colour palette editor); only valid entries."""
+    ids, out = palette_ids(), {}
+    for ident, v in _read_dict(PALETTE_FILE).items():
+        if ident in ids and isinstance(v, dict) and isinstance(v.get("ui"), _STR) and _HEX.match(v["ui"]):
+            out[ident] = {"ui": v["ui"].lower()}
     return out
 
 
 def colours():
-    """The palette as dicts: id, name, group, ui, ui_l, and the default colour (ui_default) as the add-on ships it."""
+    """The palette as dicts: id, name, group, ui, ui_l and ui_default (as the add-on ships it). A module that shows a colour some other way
+    (another module) keeps its own table for that."""
     over, out = palette_overrides(), []
     for c in _palette_entries():
         o = over.get(c[0], {})
         ui = o.get("ui", c[3])
-        out.append({"id": c[0], "name": c[1], "group": c[2], "ui": ui, "ui_l": lighter(ui) if "ui" in o else c[4],
-                    "ui_default": c[3]})
+        out.append({"id": c[0], "name": c[1], "group": c[2], "ui": ui, "ui_l": lighter(ui) if "ui" in o else c[4], "ui_default": c[3]})
+    # the modules' own colours (colour_tokens()): each is a palette colour that the module that added it names right now (its service
+    # "colour:<id>", see service()), e.g. "Selected network" is the colour of the network that is selected
+    for t in colour_tokens():
+        pick = service("colour:" + t["id"])
+        base = ([c for c in out if c["id"] == pick] or [c for c in out if c["id"] == DEFAULT_COLOUR] or out)[0]
+        out.append(dict(base, id=t["id"], name=t["name"], group="token", ui_default=base["ui"], token=True, follows=base["id"]))
     return out
 
 
-def set_palette_colour(ident, ui=None):
-    """Change a palette colour (ui), "#rrggbb". A value equal to the default is not kept.
-    Returns False for an unknown id or a value that is not a colour."""
-    if ident not in palette_ids() or any(v is not None and not (isinstance(v, _STR) and _HEX.match(v)) for v in (ui,)):
+def set_palette_colour(ident, ui):
+    """Change a palette colour on screen, "#rrggbb". A value equal to the default is not kept. Returns False for an unknown id or a value that is not a colour."""
+    if ident not in palette_ids() or not (isinstance(ui, _STR) and _HEX.match(ui)):
         return False
     base = [c for c in _palette_entries() if c[0] == ident][0]
     over = palette_overrides()
-    entry = over.get(ident, {})
-    for key, value, default in (("ui", ui, base[3]),):
-        if value is None:
-            continue
-        if value.lower() == default.lower():
-            entry.pop(key, None)
-        else:
-            entry[key] = value.lower()
-    if entry:
-        over[ident] = entry
-    else:
+    if ui.lower() == base[3].lower():
         over.pop(ident, None)
+    else:
+        over[ident] = {"ui": ui.lower()}
     _write_palette(over)
     return True
 
 
 def reset_palette(ident=None):
-    """Put one palette colour (or all of them) back to the shipped colour."""
+    """Put one palette colour (or all of them) back to the shipped values."""
     over = palette_overrides()
     if ident is None:
         over = {}
@@ -416,10 +459,10 @@ def reset_palette(ident=None):
 
 
 def _write_palette(over):
-    """Keep what is changed on screen in palette.json."""
+    """Keep what is changed (palette.json)."""
     tmp = PALETTE_FILE + ".tmp"
     with open(tmp, "w") as f:
-        json.dump(over, f)
+        json.dump(dict((i, {"ui": v["ui"]}) for i, v in over.items() if "ui" in v), f)
     os.rename(tmp, PALETTE_FILE)
 
 
@@ -465,7 +508,8 @@ def palette_add(name, ui):
 
 
 def palette_edit(ident, name=None, ui=None):
-    """Rename a colour and / or change its colour. False when it does not exist."""
+    """Rename a colour and / or change its colour on screen (what another module shows is that module's). A colour token cannot change colour, only be
+    renamed. False when it does not exist."""
     if ident not in palette_ids():
         return False
     data = _raw_layout()
@@ -490,7 +534,8 @@ def palette_edit(ident, name=None, ui=None):
 
 
 def palette_delete(ident):
-    """Take a colour out of the palette. What used it falls back (a module's pick to its default, a highlight to the rainbow). False for one that cannot be deleted (FIXED_COLOURS) or does not exist."""
+    """Take a colour out of the palette. What used it falls back (a module's pick to its default, a highlight to the rainbow, another module's row to
+    orange). False for one that cannot be deleted (FIXED_COLOURS) or does not exist."""
     if ident in FIXED_COLOURS or ident not in palette_ids():
         return False
     over = palette_overrides()                  # read while the colour is still in the palette: its changes go with it
@@ -534,7 +579,7 @@ def palette_order(ids):
 
 def palette_reset(ident=None):
     """Back to the colours the add-on ships: the whole palette (all colours, names, order, screen colours) or one shipped colour (its name and screen
-    colour). What the LED shows for a colour is the LED module's and stays."""
+    colour). What another module shows for a colour is that module's and stays."""
     if ident is None:
         reset_palette()
         try:
@@ -554,7 +599,7 @@ def palette_reset(ident=None):
 def palette_version():
     """A short tag of the palette as the page draws it (ids, names, colours): the page asks for the palette again only when it changes."""
     import hashlib
-    text = json.dumps([[c["id"], c["name"], c["ui"], c["ui_l"]] for c in colours()], sort_keys=True)
+    text = json.dumps([[c["id"], c["name"], c["ui"], c["ui_l"], c.get("follows", "")] for c in colours()], sort_keys=True)
     return hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
 
@@ -601,10 +646,11 @@ def module_colours(name):
     wanted = manifest.get("colours")
     if not isinstance(wanted, dict):
         return {}
-    ids = palette_ids()
+    ids = colour_ids()
 
-    def ok(k, v):
-        return LEGACY_COLOURS.get(v, v) in ids
+    def ok(k, v):       # the network colours cannot be "the selected network's" (that would be a circle)
+        v = LEGACY_COLOURS.get(v, v)
+        return v in ids and not (k in (manifest.get("colours_real") or []) and v not in palette_ids())
     out = dict((k, LEGACY_COLOURS.get(v, v) if ok(k, v) else DEFAULT_COLOUR) for k, v in wanted.items())
     mine = _saved_module_colours().get(name)
     if isinstance(mine, dict):
@@ -612,26 +658,27 @@ def module_colours(name):
             if ok(k, mine.get(k)):
                 out[k] = LEGACY_COLOURS.get(mine[k], mine[k])
     if manifest.get("colours_unique"):
-        if len(set(out.values())) < len(out):
-            for k in out:
+        uniq = [k for k in out if k in (manifest.get("colours_real") or [])] or list(out)
+        if len(set(out[k] for k in uniq)) < len(uniq):
+            for k in uniq:
                 out[k] = LEGACY_COLOURS.get(wanted[k], wanted[k]) if ok(k, wanted[k]) else DEFAULT_COLOUR
             used = set()
             for k in uniq:                       # still the same colour twice (a default was deleted from the palette): the first ones that are free
                 if out[k] in used:
-                    out[k] = ([i for i in ids if i not in used and i != "global"] or [DEFAULT_COLOUR])[0]
+                    out[k] = ([i for i in ids if i not in used and i not in ("global", "network")] or [DEFAULT_COLOUR])[0]
                 used.add(out[k])
     return out
 
 
 # ---- highlight: a module can ask for one of its dashboard boxes to stand out for a while (an event starts soon, say): /api
-# "highlight" {box id: why}. A neutral box turns its own colour; a coloured box takes the highlight look
+# "highlight" {box id: why}. A grey box (a background module's) turns its own colour; a coloured box takes the highlight look
 # set here, the same for every module: an animated rainbow edge or one palette colour that glows.
 HIGHLIGHT_STYLES = ("rainbow",) + PALETTE_IDS        # as shipped; highlight_styles() is the list in use
 DEFAULT_HIGHLIGHT = "rainbow"
 
 
 def highlight_styles():
-    return ("rainbow",) + palette_ids()
+    return ("rainbow",) + colour_ids()
 
 
 def highlight_style():
@@ -648,68 +695,6 @@ def save_highlight_style(value):
         f.write(value)
     os.rename(tmp, HIGHLIGHT)
     return value
-
-
-def set_module_colour(name, key, ident):
-    """The user gives one of the module's colour keys a palette colour. With "colours_unique", the key that had that
-    colour gets the old one (a swap), so they never match. Returns the module's new {key: id}, or None when the
-    module, key or colour is unknown."""
-    cur = module_colours(name)
-    ident = LEGACY_COLOURS.get(ident, ident)
-    if key not in cur or ident not in palette_ids():
-        return None
-    if (module_manifest(name) or {}).get("colours_unique"):
-        for k, v in list(cur.items()):
-            if k != key and v == ident:
-                cur[k] = cur[key]
-    cur[key] = ident
-    data = _saved_module_colours()
-    data[name] = cur
-    tmp = MODULE_COLOURS + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(data, f, sort_keys=True)
-    os.rename(tmp, MODULE_COLOURS)
-    return cur
-
-
-def module_tints(name):
-    """{colour key: True | False} for a module: whether the background of what has that colour is highlighted, i.e. coloured (True) or
-    neutral (False). The default is the module's manifest "tints" ({"clock": false}); anything it does not name is highlighted
-    (the buttons and similar), the boxes on the main page start neutral."""
-    manifest = module_manifest(name) or {}
-    defaults = manifest.get("tints") if isinstance(manifest.get("tints"), dict) else {}
-    try:
-        with open(MODULE_TINTS) as f:
-            saved = json.load(f).get(name)
-    except (IOError, OSError, ValueError, AttributeError):
-        saved = None
-    saved = saved if isinstance(saved, dict) else {}
-    return dict((k, saved[k] if isinstance(saved.get(k), bool) else defaults.get(k) is not False) for k in module_colours(name))
-
-
-def set_module_tint(name, key, coloured):
-    """The user turns the highlight (a coloured background) of one of the module's colours on or off. Returns the module's
-    {key: bool}, or None for an unknown module or key."""
-    if key not in module_colours(name) or not isinstance(coloured, bool):
-        return None
-    try:
-        with open(MODULE_TINTS) as f:
-            data = json.load(f)
-        data = data if isinstance(data, dict) else {}
-    except (IOError, OSError, ValueError):
-        data = {}
-    mine = data.get(name) if isinstance(data.get(name), dict) else {}
-    default = ((module_manifest(name) or {}).get("tints") or {}).get(key) is not False
-    if coloured == default:
-        mine.pop(key, None)                  # only what differs from the default is kept
-    else:
-        mine[key] = coloured
-    data[name] = mine
-    tmp = MODULE_TINTS + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(data, f, sort_keys=True)
-    os.rename(tmp, MODULE_TINTS)
-    return module_tints(name)
 
 
 def settings_pin_on():
@@ -733,7 +718,7 @@ def screen_settings():
     """{"dash_cols": 1-6, "set_cols": 1-6, "stretch": bool, "scale": bool}: the saved layout settings over the defaults (a bad or missing
     file gives the defaults). dash_cols / set_cols are the most columns the dashboard / Settings may use; they only get as many as the screen
     fits (about 430 px each). stretch makes the columns fill the screen's width; scale (only with stretch) makes the boxes' content grow
-    with their width instead of getting more room; fit scales the main screen up until its bottom meets the bottom of the screen; drag lets the tiles of the main screen be moved (which reorders the modules); noscroll stops the main screen from scrolling; autohide hides the top bar (building buttons, title, cogwheel) until the pointer or a tap is at the top edge; theme is "dark", "light" or "auto" (the device's own setting)."""
+    with their width instead of getting more room; fit scales the main screen up until its bottom meets the bottom of the screen; drag lets the tiles of the main screen be moved (which reorders the modules); noscroll stops the main screen from scrolling; autohide hides the top bar until the pointer or a tap is at the top edge; theme is "dark", "light" or "auto" (the device's own setting)."""
     out = dict(SCREEN_DEFAULTS)
     try:
         with open(SCREEN) as f:
@@ -775,17 +760,74 @@ def save_screen_settings(changes):
     return cur
 
 
+def set_module_colour(name, key, ident):
+    """The user gives one of the module's colour keys a palette colour. With "colours_unique", the key that had that
+    colour gets the old one (a swap), so they never match. Returns the module's new {key: id}, or None when the
+    module, key or colour is unknown."""
+    cur = module_colours(name)
+    ident = LEGACY_COLOURS.get(ident, ident)
+    if key not in cur or ident not in colour_ids() or (_real_key(name, key) and ident not in palette_ids()):
+        return None
+    if (module_manifest(name) or {}).get("colours_unique"):
+        uniq = [k for k in cur if _real_key(name, k)] or list(cur)
+        for k, v in list(cur.items()):
+            if k != key and v == ident and key in uniq and k in uniq:
+                cur[k] = cur[key]
+    cur[key] = ident
+    data = _saved_module_colours()
+    data[name] = cur
+    tmp = MODULE_COLOURS + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, sort_keys=True)
+    os.rename(tmp, MODULE_COLOURS)
+    return cur
+
+
+def module_tints(name):
+    """{colour key: True | False} for a module: whether the background of what has that colour is highlighted, i.e. coloured (True) or
+    neutral (False). The default is the module's manifest "tints" ({"clock": false}); anything it does not name is highlighted
+    (the network buttons and similar buttons), the boxes on the main page start neutral."""
+    manifest = module_manifest(name) or {}
+    defaults = manifest.get("tints") if isinstance(manifest.get("tints"), dict) else {}
+    try:
+        with open(MODULE_TINTS) as f:
+            saved = json.load(f).get(name)
+    except (IOError, OSError, ValueError, AttributeError):
+        saved = None
+    saved = saved if isinstance(saved, dict) else {}
+    return dict((k, saved[k] if isinstance(saved.get(k), bool) else defaults.get(k) is not False) for k in module_colours(name))
+
+
+def set_module_tint(name, key, coloured):
+    """The user turns the highlight (a coloured background) of one of the module's colours on or off. Returns the module's
+    {key: bool}, or None for an unknown module or key."""
+    if key not in module_colours(name) or not isinstance(coloured, bool):
+        return None
+    try:
+        with open(MODULE_TINTS) as f:
+            data = json.load(f)
+        data = data if isinstance(data, dict) else {}
+    except (IOError, OSError, ValueError):
+        data = {}
+    mine = data.get(name) if isinstance(data.get(name), dict) else {}
+    default = ((module_manifest(name) or {}).get("tints") or {}).get(key) is not False
+    if coloured == default:
+        mine.pop(key, None)                  # only what differs from the default is kept
+    else:
+        mine[key] = coloured
+    data[name] = mine
+    tmp = MODULE_TINTS + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, sort_keys=True)
+    os.rename(tmp, MODULE_TINTS)
+    return module_tints(name)
+
+
 def time_zone():
     """The common time zone setting: an IANA name from base_tz.ZONE_CHOICES, or "" = the Pi's own. Any module that shows a
-    time of day reads it here (the clock does; the events module still has a zone of its own). Older installs kept it in clock.json."""
+    time of day reads it here."""
     import base_tz as tz
     zone = read_file(TIME_ZONE)
-    if zone is None:
-        try:
-            with open(CLOCK_CONFIG) as f:
-                zone = json.load(f).get("zone")
-        except (IOError, OSError, ValueError, AttributeError):
-            zone = ""
     return zone if zone in tz.ZONE_CHOICES else ""
 
 
@@ -817,17 +859,61 @@ def read_file(path):
 
 
 
-
-
-def update_status():
-    """running / ok / failed, or idle. A finished result is only reported for 10 minutes, so an old update isn't
-    announced for ever."""
-    text = (read_file(UPDATE_STATUS) or "").strip()
-    if text not in ("running", "ok", "failed"):
-        return "idle"
+def debug_log(text):
+    """Add a line to the debug timeline (same format as the hook)."""
+    if not os.path.exists(DEBUG_FLAG) or not module_enabled(PROJECT.get("debug_module", "debug")):
+        return
     try:
-        if text != "running" and time.time() - os.path.getmtime(UPDATE_STATUS) > 600:
-            return "idle"
+        now = time.time()
+        with open(DEBUG_LOG, "a") as f:
+            f.write("%s.%03d %9s  %s\n" % (time.strftime("%H:%M:%S", time.localtime(now)),
+                                          int(now * 1000) % 1000, "", text))
+    except IOError:
+        pass
+
+
+LOG_MAX = 1000000     # the debug log is trimmed to its newest LOG_KEEP bytes
+LOG_KEEP = 500000     # when it grows past LOG_MAX
+
+
+def trim_log():
+    """Keep the debug log from growing without limit while recording.
+    The hook opens the file for every line, so replacing it is safe."""
+    try:
+        if os.path.getsize(DEBUG_LOG) <= LOG_MAX:
+            return
+        with open(DEBUG_LOG, "rb") as f:
+            f.seek(-LOG_KEEP, 2)
+            data = f.read()
+        data = data[data.find(b"\n") + 1:]      # start at a whole line
+        tmp = DEBUG_LOG + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(data)
+        os.rename(tmp, DEBUG_LOG)
+    except (IOError, OSError):
+        pass
+
+
+def poke(name):
+    """Ask whoever measures `name` ("internet") to do it again now instead of when its timer runs out. Works from any process: the
+    message is a file that is replaced (a new inode), and the receiver looks at poke_stamp() often, which costs next to nothing."""
+    path = POKE_PREFIX + re.sub(r"[^a-z0-9_]", "", str(name).lower())
+    tmp = path + ".tmp%d" % os.getpid()
+    try:
+        with open(tmp, "w") as f:
+            f.write("%f" % time.time())
+        os.rename(tmp, path)
+    except (IOError, OSError):
+        pass
+
+
+def poke_stamp(name):
+    """Changes every time poke(name) is called (None before the first)."""
+    try:
+        st = os.stat(POKE_PREFIX + re.sub(r"[^a-z0-9_]", "", str(name).lower()))
+        return (st.st_mtime, st.st_ino)
     except OSError:
-        return "idle"
-    return text
+        return None
+
+
+

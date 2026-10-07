@@ -14,9 +14,11 @@ class LayoutBase(unittest.TestCase):
         self.dir = os.path.join(self.tmp, "mods")
         os.makedirs(self.dir)
         self.saved, core.MODULES_DIR = core.MODULES_DIR, self.dir
+        mods._base["layout"] = {}            # these tests are about the modules' boxes alone, not the base's own (base/layout.json)
 
     def tearDown(self):
         core.MODULES_DIR = self.saved
+        mods._base.clear()
         mods.refresh(force=True)
         cleanup(self.tmp)
 

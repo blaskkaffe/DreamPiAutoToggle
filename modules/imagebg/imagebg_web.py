@@ -12,6 +12,8 @@ import time
 
 import base_core as core
 
+IMAGEBG_CONFIG = os.path.join(core.BASE_DIR, "imagebg.json")  # {"fit", "dim", "type", "version"} of the Background image module
+IMAGEBG_FILE = os.path.join(core.BASE_DIR, "background_image")     # the picture of the Background image module (any of PNG, JPEG, GIF, WebP; its type is in the config)
 MAX_BYTES = 8000000
 FITS = [("cover", "Cover the screen"), ("contain", "Show it whole"), ("stretch", "Stretch"), ("tile", "Tile")]
 DIMS = [0, 25, 50, 75]
@@ -34,7 +36,7 @@ def sniff(data):
 def config():
     out = dict(DEFAULT)
     try:
-        with open(core.IMAGEBG_CONFIG) as f:
+        with open(IMAGEBG_CONFIG) as f:
             data = json.load(f)
     except (IOError, OSError, ValueError):
         data = {}
@@ -43,7 +45,7 @@ def config():
             out["fit"] = data["fit"]
         if data.get("dim") in DIMS:
             out["dim"] = data["dim"]
-        if data.get("type") in ("image/png", "image/jpeg", "image/gif", "image/webp") and os.path.exists(core.IMAGEBG_FILE):
+        if data.get("type") in ("image/png", "image/jpeg", "image/gif", "image/webp") and os.path.exists(IMAGEBG_FILE):
             out["type"] = data["type"]
             if isinstance(data.get("version"), int):
                 out["version"] = data["version"]
@@ -51,10 +53,10 @@ def config():
 
 
 def save_config(cfg):
-    tmp = core.IMAGEBG_CONFIG + ".tmp"
+    tmp = IMAGEBG_CONFIG + ".tmp"
     with open(tmp, "w") as f:
         json.dump(cfg, f, sort_keys=True)
-    os.rename(tmp, core.IMAGEBG_CONFIG)
+    os.rename(tmp, IMAGEBG_CONFIG)
 
 
 def view():
@@ -103,7 +105,7 @@ def _get_image(h):
         h.send("", "text/plain; charset=utf-8", status=404)
         return
     try:
-        with open(core.IMAGEBG_FILE, "rb") as f:
+        with open(IMAGEBG_FILE, "rb") as f:
             body = f.read()
     except (IOError, OSError):
         h.send("", "text/plain; charset=utf-8", status=404)
@@ -124,10 +126,10 @@ def _post_upload(h):
     if not data or kind is None:
         h.send("Not a PNG, JPEG, GIF or WebP picture", "text/plain; charset=utf-8", status=400)
         return True
-    tmp = core.IMAGEBG_FILE + ".tmp"
+    tmp = IMAGEBG_FILE + ".tmp"
     with open(tmp, "wb") as f:
         f.write(data)
-    os.rename(tmp, core.IMAGEBG_FILE)
+    os.rename(tmp, IMAGEBG_FILE)
     cfg = config()
     cfg.update(type=kind, version=int(time.time() * 1000))
     save_config(cfg)
@@ -138,7 +140,7 @@ def _post_upload(h):
 
 def _post_remove(h):
     try:
-        os.remove(core.IMAGEBG_FILE)
+        os.remove(IMAGEBG_FILE)
     except OSError:
         pass
     cfg = config()

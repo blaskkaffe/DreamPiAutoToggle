@@ -2,7 +2,7 @@
 # People come from a CSV file (the columns of CheckinChicken's people.csv: name, department, role, phone, location,
 # restrictToLocation; "location" is the building / area). Importing again updates people in place and never deletes anyone
 # (unless "replace" is asked for, which deactivates the ones that are not in the file). A person's id comes from
-# location + department + name, so their check-in state survives a re-import. The roster is core.CONTACTS; the check-in module
+# location + department + name, so their check-in state survives a re-import. The roster is CONTACTS; the check-in module
 # reads that file, this module is the only one that writes it. Runs in the web service (Python 3).
 import base64
 import csv
@@ -15,6 +15,9 @@ import re
 import threading
 
 import base_core as core
+
+CONTACTS = os.path.join(core.BASE_DIR, "contacts.json")     # {"people": [{id, name, department, role, phone, location, restrictToLocation, active, order}]}: the contacts module's roster (imported from a CSV)
+PHOTOS_DIR = os.path.join(core.BASE_DIR, "photos")           # <person id>.jpg / .png: the small profile photos (written by the contacts module, read by the check-in board)
 
 MAX_BYTES = 1000000
 MAX_PEOPLE = 2000
@@ -44,7 +47,7 @@ def _flag(s):
 def read():
     """{"people": [person]} as saved (an empty roster when there is none)."""
     try:
-        with io.open(core.CONTACTS, encoding="utf-8") as f:
+        with io.open(CONTACTS, encoding="utf-8") as f:
             data = json.load(f)
     except (IOError, OSError, ValueError):
         data = None
@@ -53,10 +56,10 @@ def read():
 
 
 def _write(data):
-    tmp = core.CONTACTS + ".tmp"
+    tmp = CONTACTS + ".tmp"
     with io.open(tmp, "w", encoding="utf-8") as f:
         f.write(json.dumps(data, ensure_ascii=False, indent=1))
-    os.rename(tmp, core.CONTACTS)
+    os.rename(tmp, CONTACTS)
 
 
 def parse_csv(text):
@@ -275,7 +278,7 @@ _TYPES = ((b"\xff\xd8\xff", "jpg", "image/jpeg"), (b"\x89PNG\r\n\x1a\n", "png", 
 def photo_files():
     """{person id: path} of the stored photos."""
     out = {}
-    for path in glob.glob(os.path.join(core.PHOTOS_DIR, "p*.*")):
+    for path in glob.glob(os.path.join(PHOTOS_DIR, "p*.*")):
         pid = os.path.basename(path).rsplit(".", 1)[0]
         if _ID_RE.match(pid):
             out[pid] = path
@@ -288,7 +291,7 @@ def save_photo(pid, data_url):
     if not _ID_RE.match(pid or "") or pid not in set(p["id"] for p in read()["people"]):
         return False
     with _lock:
-        for path in glob.glob(os.path.join(core.PHOTOS_DIR, pid + ".*")):
+        for path in glob.glob(os.path.join(PHOTOS_DIR, pid + ".*")):
             os.remove(path)
         if not data_url:
             return True
@@ -299,9 +302,9 @@ def save_photo(pid, data_url):
         kind = next((t for t in _TYPES if raw.startswith(t[0])), None)
         if kind is None or len(raw) > PHOTO_MAX:
             raise ValueError("The photo must be a small JPEG or PNG")
-        if not os.path.isdir(core.PHOTOS_DIR):
-            os.makedirs(core.PHOTOS_DIR)
-        path = os.path.join(core.PHOTOS_DIR, "%s.%s" % (pid, kind[1]))
+        if not os.path.isdir(PHOTOS_DIR):
+            os.makedirs(PHOTOS_DIR)
+        path = os.path.join(PHOTOS_DIR, "%s.%s" % (pid, kind[1]))
         with open(path + ".tmp", "wb") as f:
             f.write(raw)
         os.rename(path + ".tmp", path)

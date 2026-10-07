@@ -10,6 +10,8 @@ import time
 
 import base_core as core
 import base_tz as tz
+CLOCK_CONFIG = os.path.join(core.BASE_DIR, "clock.json")  # {"format": "24h"|"12h"|"12h-ampm", "beat": bool, "world": bool, "large": bool, "cities": [...]}: the clock module's settings
+CLOCK_MODE = os.path.join(core.BASE_DIR, "clock_mode")    # older versions: "24h", "12h" or "beat" (read once to carry the choice over to clock.json)
 
 FORMATS = ("12h", "12h-ampm", "24h")
 LABELS = {"12h": "12h", "12h-ampm": "12h am/pm", "24h": "24h"}
@@ -45,16 +47,28 @@ def _cities(value):
     return out[:MAX_CITIES]
 
 
+def _legacy():
+    """The choice of an older version (clock_mode: 24h, 12h or beat) as a config, or None."""
+    try:
+        with open(CLOCK_MODE) as f:
+            old = f.read().strip().lower()
+    except (IOError, OSError):
+        return None
+    return {"format": _format(old), "beat": old == "beat", "world": False}
+
+
 def read_config():
     """{"format": "24h"|"12h"|"12h-ampm", "beat": bool, "world": bool, "large": bool, "zone": the common time zone (read only here),
     "cities": [names]}."""
     try:
-        with open(core.CLOCK_CONFIG) as f:
+        with open(CLOCK_CONFIG) as f:
             data = json.load(f)
     except (IOError, OSError, ValueError):
         data = None
     if not isinstance(data, dict):
-        data = {}
+        data = _legacy() or {}
+    if core.read_file(core.TIME_ZONE) is None and data.get("zone"):      # older installs kept the time zone here: carry it over once
+        core.save_time_zone(data.get("zone"))
     return {"format": _format(data.get("format")), "beat": _flag(data.get("beat")), "world": _flag(data.get("world")),
             "large": _flag(data.get("large")), "zone": core.time_zone(), "cities": _cities(data.get("cities"))}
 
@@ -66,10 +80,10 @@ def save_config(values):
         for key, clean in (("format", _format), ("beat", _flag), ("world", _flag), ("large", _flag), ("cities", _cities)):
             if key in values:
                 cfg[key] = clean(values[key])
-    tmp = core.CLOCK_CONFIG + ".tmp"
+    tmp = CLOCK_CONFIG + ".tmp"
     with open(tmp, "w") as f:
         json.dump(dict((k, v) for k, v in cfg.items() if k != "zone"), f)
-    os.rename(tmp, core.CLOCK_CONFIG)
+    os.rename(tmp, CLOCK_CONFIG)
     return cfg
 
 

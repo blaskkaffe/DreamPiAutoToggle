@@ -80,7 +80,7 @@ class ImportTests(Base):
         self.assertIn("4 people in 3 departments and 2 buildings", v["text"])
         out = contacts.export_csv()
         self.assertTrue(out.startswith("name,department,role,phone,location,restrictToLocation"))
-        os.remove(core.CONTACTS)
+        os.remove(contacts.CONTACTS)
         self.assertEqual(contacts.import_csv(out)["added"], 4)
 
 
@@ -186,7 +186,7 @@ class BoardTests(Base):
         self.assertGreaterEqual(len(checkin.statuses()), 10)
 
     def test_a_damaged_state_file_starts_over(self):
-        with open(core.CHECKIN, "w") as f:
+        with open(checkin.CHECKIN, "w") as f:
             f.write("{oops")
         self.assertEqual(checkin.snapshot()["in"], 0)
         self.assertEqual(checkin.snapshot()["total"], 4)
@@ -211,12 +211,12 @@ class BoardTests(Base):
 
     def test_a_person_can_be_deleted_with_the_photo(self):
         anna = self.people()["Anna Svensson"]
-        os.makedirs(core.PHOTOS_DIR, exist_ok=True)
-        open(os.path.join(core.PHOTOS_DIR, anna["id"] + ".jpg"), "wb").write(b"x")
+        os.makedirs(contacts.PHOTOS_DIR, exist_ok=True)
+        open(os.path.join(contacts.PHOTOS_DIR, anna["id"] + ".jpg"), "wb").write(b"x")
         self.assertTrue(contacts.delete_person(anna["id"]))
         self.assertNotIn("Anna Svensson", self.people())
         self.assertEqual(checkin.snapshot()["total"], 3)
-        self.assertFalse(os.path.exists(os.path.join(core.PHOTOS_DIR, anna["id"] + ".jpg")))
+        self.assertFalse(os.path.exists(os.path.join(contacts.PHOTOS_DIR, anna["id"] + ".jpg")))
         self.assertFalse(contacts.delete_person(anna["id"]))
         self.assertFalse(contacts.delete_person(""))
 

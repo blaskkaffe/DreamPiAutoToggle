@@ -24,29 +24,28 @@ if os.environ.get("IMGBG"): core.save_module_enabled("imagebg", True)
 if os.environ.get("FAKEUPDATE"):
     import subprocess
     import rebootupdate_update as up
-    import base_probes
     src = os.path.join(tmp, "checkout"); os.mkdir(src)
     env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
     subprocess.check_call(["git", "init", "-q", "-b", "main"], cwd=src)
     subprocess.check_call(["git", "remote", "add", "origin", "https://github.com/blaskkaffe/DreamPiAutoToggle.git"], cwd=src)
     open(os.path.join(src, "install.sh"), "w").write("#!/bin/sh\n")
     subprocess.check_call(["git", "add", "."], cwd=src); subprocess.check_call(["git", "commit", "-q", "-m", "x"], cwd=src, env=env)
-    open(core.ADDON_SRC, "w").write(src); open(core.ADDON_COMMIT, "w").write("a"*40)
-    open(base_probes.ADDON_VERSION, "w").write("2026-09-30 12:00 (aaaaaaa)")
+    open(up.ADDON_SRC, "w").write(src); open(up.ADDON_COMMIT, "w").write("a"*40)
+    open(up.VERSION_FILE, "w").write("2026-09-30 12:00 (aaaaaaa)")
     def fake(url):
         if "/commits/" in url: return json.dumps({"sha": "b"*40, "commit": {"committer": {"date": "2026-10-02T10:00:00Z"}}})
         if "/compare/" in url: return json.dumps({"status": "ahead", "ahead_by": 4})
         return ""
     up.fetch = fake
-    up._spawn = lambda cmd: open(core.UPDATE_STATUS, "w").write("running")
+    up._spawn = lambda cmd: open(up.UPDATE_STATUS, "w").write("running")
     if os.environ.get("USB"):          # a USB stick with an update folder (the install itself is faked like the GitHub one)
         stick = os.path.join(tmp, "media", "STICK", "update")
         os.makedirs(os.path.join(stick, "base")); os.makedirs(os.path.join(stick, "modules"))
         open(os.path.join(stick, "base", "base_web.py"), "w").close(); open(os.path.join(stick, "install.sh"), "w").write("#!/bin/sh\n")
         up.USB_ROOTS = [os.path.join(tmp, "media", "*")]
     if os.environ.get("FAKELOG"):      # a finished update with a messy log: long lines, colour codes, progress
-        open(core.UPDATE_STATUS, "w").write("failed")
-        open(core.UPDATE_LOG, "w").write("Updating /home/pi/checkout from origin/main\nFrom https://github.com/blaskkaffe/DreamPiAutoToggle\n"
+        open(up.UPDATE_STATUS, "w").write("failed")
+        open(up.UPDATE_LOG, "w").write("Updating /home/pi/checkout from origin/main\nFrom https://github.com/blaskkaffe/DreamPiAutoToggle\n"
             " * branch            main       -> FETCH_HEAD\nReceiving objects:  10%\rReceiving objects: 100% (42/42), done.\n"
             "Updating 3baa024..21d1ad8\nFast-forward\n page/widgets.js | 84 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
             " 4 files changed, 64 insertions(+), 37 deletions(-)\n\x1b[31mERROR\x1b[0m: could not write /etc/systemd/system/checkin-board.service (Read-only file system)\n"

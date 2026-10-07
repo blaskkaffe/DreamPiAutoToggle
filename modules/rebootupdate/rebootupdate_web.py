@@ -8,6 +8,8 @@
 # The update logic is in rebootupdate_update.py next to this file. Without the module the page has no update or
 # reboot controls and these paths answer 404.
 import json
+import os
+import re
 import subprocess
 import time
 
@@ -22,6 +24,22 @@ def _spawn_reboot():
     (which the reboot stops). Replaced by the tests."""
     subprocess.Popen(["sh", "-c", "sleep 2; systemctl reboot || reboot"],
                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def in_call():
+    """DreamPi is in a call now (the state file says so and DreamPi is still running)."""
+    m = re.search(r"pid=(\d+)", core.read_file(STATUS) or "")
+    if m and not os.path.exists("/proc/" + m.group(1)):          # DreamPi is not running any more
+        return False
+    return (core.read_file(STATE) or "").startswith("call ")
+
+
+def mark_reboot():
+    try:
+        with open(REBOOT_MARK, "w") as f:
+            f.write("%f" % time.time())
+    except (IOError, OSError):
+        pass
 
 
 def start_reboot():

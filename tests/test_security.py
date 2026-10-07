@@ -11,6 +11,8 @@ from support import sandbox, cleanup, core, web
 import rebootupdate_web as ru
 import base_security as sec
 import rebootupdate_update as up
+import clock_web as clock
+import checkin_web as checkin
 
 
 class HostAndOriginTests(unittest.TestCase):
@@ -134,17 +136,17 @@ class HttpSecurityTests(unittest.TestCase):
                 status, _b, _r = self.req("POST", path, dict(evil, **extra), b"{}")
                 self.assertEqual(status, 403, (path, extra))
         self.assertEqual(self.spawned, [])
-        self.assertFalse(os.path.exists(core.CHECKIN))
+        self.assertFalse(os.path.exists(checkin.CHECKIN))
 
     def test_post_without_header_or_origin_is_refused(self):
         self.assertEqual(self.req("POST", "/checkin/toggle")[0], 403)
-        self.assertFalse(os.path.exists(core.CHECKIN))
+        self.assertFalse(os.path.exists(checkin.CHECKIN))
 
     def test_same_site_post_without_the_page_header_still_works(self):
         status, _b, _r = self.req("POST", "/clock/cities", {"Origin": "http://127.0.0.1:%d" % self.port,
                                                            "Host": "127.0.0.1:%d" % self.port}, b'{"cities": ["Tokyo"]}')
         self.assertEqual(status, 200)                      # the page's own origin is enough for a module's own (unprotected) POST
-        self.assertEqual(json.load(open(core.CLOCK_CONFIG))["cities"], ["Tokyo"])
+        self.assertEqual(json.load(open(clock.CLOCK_CONFIG))["cities"], ["Tokyo"])
 
     def test_reboot_form_post_is_never_enough(self):
         status, _b, _r = self.req("POST", "/reboot", {"Origin": "http://127.0.0.1:%d" % self.port,
@@ -158,10 +160,10 @@ class HttpSecurityTests(unittest.TestCase):
         for path in ("/reboot", "/update/start"):
             sec.reset_for_tests()
             self.assertEqual(self.req("POST", path, h, b"{}")[0], 401, path)
-            self.assertEqual(self.req("POST", path, dict(h, **{"X-Checkin-Pin": "1111"}), b"{}")[0], 401, path)
+            self.assertEqual(self.req("POST", path, dict(h, **{"X-Pin": "1111"}), b"{}")[0], 401, path)
         self.assertEqual(self.spawned, [])
         sec.reset_for_tests()
-        status, body, _r = self.req("POST", "/reboot", dict(h, **{"X-Checkin-Pin": "4821"}))
+        status, body, _r = self.req("POST", "/reboot", dict(h, **{"X-Pin": "4821"}))
         self.assertEqual((status, json.loads(body.decode())["started"]), (200, True))
         self.assertEqual(self.spawned, [1])
         # the check for updates and everyday check-ins need no PIN
@@ -175,7 +177,7 @@ class HttpSecurityTests(unittest.TestCase):
 
     def test_lockout_answers_429(self):
         sec.set_pin("4821")
-        h = {"X-Requested-With": "x", "X-Checkin-Pin": "0000"}
+        h = {"X-Requested-With": "x", "X-Pin": "0000"}
         codes = [self.req("POST", "/reboot", h)[0] for _ in range(sec.FAIL_LIMIT + 1)]
         self.assertEqual(codes[:sec.FAIL_LIMIT], [401] * sec.FAIL_LIMIT)
         self.assertEqual(codes[-1], 429)
@@ -193,12 +195,12 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertFalse(os.path.exists(core.SCREEN))
         for path in ("/checkin/toggle", "/checkin/status", "/contacts/photo"):            # the board's own actions stay open (they answer 400 for a made-up person)
             self.assertEqual(self.req("POST", path, h, b'{"id": "nobody"}')[0], 400, path)
-        ok = dict(h, **{"X-Checkin-Pin": "4821"})
+        ok = dict(h, **{"X-Pin": "4821"})
         sec.reset_for_tests()
         self.assertEqual(self.req("POST", "/screen/stretch", ok, b'{"value": true}')[0], 200)
         self.assertTrue(core.screen_settings()["stretch"])
         self.assertEqual(self.req("POST", "/pin/check", ok, b"{}")[0], 200)
-        self.assertEqual(self.req("POST", "/pin/check", dict(h, **{"X-Checkin-Pin": "0000"}), b"{}")[0], 401)
+        self.assertEqual(self.req("POST", "/pin/check", dict(h, **{"X-Pin": "0000"}), b"{}")[0], 401)
         self.assertEqual(self.req("POST", "/settings-pin", ok, b'{"value": false}')[0], 200)        # unlocked again: settings are open
         self.assertEqual(self.req("POST", "/screen/stretch", h, b'{"value": false}')[0], 200)
 
@@ -208,12 +210,12 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertEqual(self.req("POST", "/pin", h, b'{"pin": "4821"}')[0], 200)
         self.assertTrue(sec.pin_required())
         self.assertEqual(self.req("POST", "/pin", h, b'{"pin": "9999"}')[0], 401)                  # changing it needs the old one
-        old = dict(h, **{"X-Checkin-Pin": "4821"})
+        old = dict(h, **{"X-Pin": "4821"})
         self.assertEqual(self.req("POST", "/pin", old, b'{"pin": "9999"}')[0], 200)
         sec.reset_for_tests()
         self.assertTrue(sec.check_pin("9999")[0])
         core.save_settings_pin(True)
-        self.assertEqual(self.req("POST", "/pin", dict(h, **{"X-Checkin-Pin": "9999"}), b'{"pin": ""}')[0], 200)
+        self.assertEqual(self.req("POST", "/pin", dict(h, **{"X-Pin": "9999"}), b'{"pin": ""}')[0], 200)
         self.assertFalse(sec.pin_required())
         self.assertFalse(core.settings_pin_on())                                                    # no PIN: the lock goes with it
         self.assertFalse(sec.settings_locked())
@@ -240,7 +242,7 @@ class UpdateOriginTests(unittest.TestCase):
         open(os.path.join(self.src, "install.sh"), "w").write("#!/bin/sh\n")
         subprocess.check_call(["git", "add", "."], cwd=self.src)
         subprocess.check_call(["git", "commit", "-q", "-m", "x"], cwd=self.src, env=env)
-        open(core.ADDON_SRC, "w").write(self.src)
+        open(up.ADDON_SRC, "w").write(self.src)
         self._spawn, self.spawned = up._spawn, []
         up._spawn = self.spawned.append
 
@@ -269,7 +271,7 @@ class UpdateOriginTests(unittest.TestCase):
         self.assertEqual(self.spawned, [])
 
     def test_origin_must_match_what_was_installed(self):
-        open(core.UPDATE_ORIGIN, "w").write("https://github.com/blaskkaffe/DreamPiAutoToggle.git\n")
+        open(up.UPDATE_ORIGIN, "w").write("https://github.com/blaskkaffe/DreamPiAutoToggle.git\n")
         self.assertIsNone(up.origin_problem())
         self.set_origin("https://github.com/someone-else/Fork.git")
         self.assertIn("changed", up.origin_problem())
@@ -292,10 +294,10 @@ class UpdateOriginTests(unittest.TestCase):
 
     def test_status_file_is_not_written_through_a_link(self):
         target = os.path.join(self.tmp, "victim")
-        os.symlink(target, core.UPDATE_STATUS)
+        os.symlink(target, up.UPDATE_STATUS)
         up._write_status("running")
         self.assertFalse(os.path.exists(target))
-        self.assertEqual(open(core.UPDATE_STATUS).read(), "running")
+        self.assertEqual(open(up.UPDATE_STATUS).read(), "running")
 
 
 if __name__ == "__main__":

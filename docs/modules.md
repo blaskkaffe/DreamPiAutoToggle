@@ -2,6 +2,17 @@
 
 Read before adding, removing or restructuring a feature. Back to [CLAUDE.md](../CLAUDE.md).
 
+## Base and project (the base is reusable)
+
+`base/` is a framework that knows no project: `base_core.py` (paths from `project.json`, the module state, the palette and its editor's logic, the theme and screen settings, the PIN lock, `service()` / `module_announcements()`), `base_modules.py` (the module loader), `base_web.py` (HTTP), `base_security.py`, `base_tz.py`, `layout.json` (the base's own Settings boxes: Appearance with the palette editor, screen layout, theme, PIN, and the Global colours box) and `page/`. `project.json` (name, page title, data folder, `/tmp` prefix, service name, host name, icons) is the only place the project names itself; everything that is the project (the check-in board, the contacts, the clock ...) is a module. `tests/test_base_neutral.py` fails when a project word gets into `base/`. The base's Settings boxes come before the modules' boxes (Appearance, Global colours, then the modules in picker order, System last).
+
+The rules that keep it so:
+
+- **A module owns its code and its state files.** It defines its own path constants from `core.BASE_DIR` / `core.TMP_PREFIX` (never in `base_core.py`); `tests/support.py` imports every module file and `sandbox()` redirects all of those paths into a temp dir.
+- **Modules never import each other.** A module that needs another's state reads that module's **file** (its documented format) or asks `/api`: the check-in board reads `contacts.json` and the photos folder, the contacts module's files.
+- **What many modules fill together goes through the base**: `core.module_announcements(key)` (module.json lists), `modules.collect("about_rows")` (each module's `about_rows()` adds rows to the About table) and `core.service(name)` (a module's web entry lists `SERVICES = {"name": fn}`; the base calls it while the module is on).
+- **The base never imports module code** and never names a module.
+
 ## The idea
 
 The base is small. It **scans `modules/`**, loads what is there, owns the **theme** (the global colours and the page kit) and the

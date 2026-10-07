@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Check-in add-on - the web service: the page, the API, HTTPS and the watchdog. Everything the page shows comes from the modules
-# in modules/ (base_modules.py loads them); settings and state are in base_core.py. Python 3.
+# Base - the web service: the HTTP side (page, API, HTTPS, watchdog). Settings and state are in base_core.py, the features
+# (and what they measure) are modules in modules/ that base_modules.py loads. Works on Python 3 and 2.7.
 import gzip
 import io
 import json
@@ -39,11 +39,18 @@ CERT = os.path.join(core.BASE_DIR, "https.crt")   # self-signed, made by install
 KEY = os.path.join(core.BASE_DIR, "https.key")
 
 
+def palette_json():
+    """The palette as the page needs it: id, name, group, ui, ui_l; a colour token (a colour a module adds, like "Selected network") also says which
+    palette colour it is right now ("follows")."""
+    return [dict({"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"], "ui_l": c["ui_l"]}, **({"follows": c["follows"]} if c.get("follows") else {}))
+            for c in core.colours()]
+
+
 def api_state(have_palette=""):
     """The /api answer. The base only has the page-wide parts (PIN flag, warnings, time, the modules' colours); everything
-    else is added by the enabled modules' api() hooks (the check-in board adds who is in)."""
+    else is added by the enabled modules' api() hooks (each module adds its own part)."""
     warnings = ["Module %s is not loaded: %s" % (name, why) for name, why in sorted(modules.errors().items())]
-    d = {"pin": security.pin_required(),     # the page asks for it before update / restart
+    d = {"pin": security.pin_required(),     # the page asks for it before an action a module marks PROTECTED
          "colours": modules.live_colours(), "tints": modules.live_tints(), "primary": {}, "primary_key": {}, "enabled": modules.enabled_map(),
          "warnings": warnings, "now": int(time.time()),
          "highlight": {},       # {dashboard box id: why}: a module asks for one of its boxes to stand out for a while (an event soon, say)
@@ -51,11 +58,11 @@ def api_state(have_palette=""):
          "theme": {"highlight": core.highlight_style()},
          "screen": core.screen_settings(), "tile_layout": core.tile_layout(),
          "settings_pin": {"on": security.settings_locked(), "pin": security.pin_required()}}
-    modules.apply_api(d, warnings)          # what the enabled modules add: the board, the clock ...
+    modules.apply_api(d, warnings)          # what the enabled modules add: each module's data
     version = core.palette_version()
     d["palette_v"] = version
     if have_palette != version:             # the palette (and its CSS) only when the page does not have this version: it changes when the user edits it
-        d["palette"] = [{"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"], "ui_l": c["ui_l"]} for c in core.colours()]
+        d["palette"] = palette_json()
         d["palette_css"] = core.colours_css()
     return d
 
@@ -89,7 +96,7 @@ def _screen_reply():
 
 def _palette_reply(extra=None):
     """The colour palette editor (Settings > Appearance > Colour palette): the palette in its order, with what the editor needs. The modules' own
-    colours (Selected network) are not in it. What the LED shows for a colour is the LED module's."""
+    colours (Selected network) are not in it. What another module shows for a colour is that module's."""
     out = []
     for c in core.colours():
         if c.get("token"):
@@ -114,7 +121,7 @@ def _layout_script():
     """window.LAYOUT: the boxes, data sources, colours and backgrounds of the enabled modules (base_modules.layout()),
     plus the palette. Put in a <script> tag, so a "</" inside a text is escaped."""
     lay = modules.layout()
-    lay["palette"] = [{"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"], "ui_l": c["ui_l"]} for c in core.colours()]
+    lay["palette"] = palette_json()
     return "window.LAYOUT=" + json.dumps(lay).replace("</", "<\\/") + ";"
 
 
@@ -142,13 +149,14 @@ def _gzip(body):
     return buf.getvalue()
 
 
+_static_cache = {}
 _page_state = {"sig": None}
 _page_lock = threading.Lock()
 PAGE = PAGE_BYTES = None
 
 
 def _page_signature():
-    sig = [PAGE_DIR]
+    sig = [PAGE_DIR, json.dumps(modules.live_colours(), sort_keys=True)]    # the colours are built into the page
     for f in BASE_PAGE_FILES:
         try:
             sig.append(os.path.getmtime(os.path.join(PAGE_DIR, f)))
@@ -232,7 +240,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _safely(self, handler):
         """Run a request handler; an unexpected error answers 500 and is
-        logged (journalctl -u checkin-board) instead of dropping the
+        logged (journalctl -u <the service>) instead of dropping the
         connection."""
         try:
             handler()
@@ -242,7 +250,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             sys.stderr.write("request %s failed:\n%s" % (self.path, traceback.format_exc()))
             try:
-                self.send("Internal error, see journalctl -u checkin-board\n",
+                self.send("Internal error, see journalctl -u " + core.PROJECT.get("service", "app") + "\n",
                           "text/plain; charset=utf-8", status=500)
             except Exception:
                 pass
@@ -254,8 +262,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get("Content-Length") not in (None, "0"):
             self.close_connection = True      # a GET with a body: don't try to parse the body as the next request
         if not security.host_allowed(self.headers.get("Host")):
-            return self._refuse(421, "Unknown host name: use the Pi's IP address or its .local name "
-                                     "(or list the name in /opt/checkin-board/allowed_hosts)")
+            return self._refuse(421, "Unknown host name: use the machine's IP address or its .local name "
+                                     "(or list the name in " + core.ALLOWED_HOSTS + ")")
         self._safely(self._get)
 
     def do_POST(self):
@@ -328,14 +336,14 @@ class Handler(BaseHTTPRequestHandler):
         refresh_page()
         path = self.path.split("?")[0]
         # Everything here changes something, and some of it runs as root: only the page itself may ask
-        # (not another site's form or script), and the paths a module marks PROTECTED (reboot, update)
-        # also need the PIN when one is set.
+        # (not another site's form or script), and the paths a module marks PROTECTED (the PROTECTED ones
+        # connect) also need the PIN when one is set.
         # With Settings locked (Appearance > Ask for the PIN) every POST that is not a dashboard action (a module's OPEN list) needs it too.
         need_pin = modules.protected(path) or path in ("/pin", "/pin/check") or (security.settings_locked() and not modules.open_post(path))
         if not security.post_allowed(self.headers, strict=need_pin):
             return self._refuse(403, "Refused: this request did not come from the page")
         if need_pin:
-            ok, message = security.check_pin(self.headers.get("X-Checkin-Pin") or "")
+            ok, message = security.check_pin(self.headers.get("X-Pin") or "")
             if not ok:
                 core.log("web page: %s refused (%s)" % (path, message))
                 self.send(json.dumps({"started": False, "message": message}), "application/json",
@@ -349,12 +357,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_settings_pin()
         if path == "/modules":
             return self._post_modules()
+        if path == "/modules/dashboard-layout":
+            return self._post_dashboard_layout()
         if path == "/modules/order":
             return self._post_module_order()
         if path == "/modules/dashboard-order":
             return self._post_dashboard_order()
-        if path == "/modules/dashboard-layout":
-            return self._post_dashboard_layout()
         if path == "/colour":
             return self._post_colour()
         if path == "/highlight":
@@ -497,7 +505,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _post_pin(self):
         """Set, change or remove the PIN: {"pin": "1234"} (4 to 64 characters) or {"pin": ""} (remove it, and with it the lock on Settings).
-        The PIN in use (when there is one) was checked before this: the page sends it in X-Checkin-Pin."""
+        The PIN in use (when there is one) was checked before this: the page sends it in X-Pin."""
         try:
             pin = json.loads(self._body(1024).decode("utf-8")).get("pin")
             if not isinstance(pin, type(u"")):
@@ -555,7 +563,7 @@ class Handler(BaseHTTPRequestHandler):
 class Server(ThreadingMixIn, HTTPServer):
     """One thread per request, so a slow client never blocks the page.
     Listens on IPv6 and IPv4 when it can: phones often try the IPv6 address
-    of the .local name first, and an IPv4-only server makes them wait."""
+    of the machine's .local name first, and an IPv4-only server makes them wait."""
     daemon_threads = True
     allow_reuse_address = True
     request_queue_size = 64   # browsers open several connections at once
@@ -579,7 +587,7 @@ class Server(ThreadingMixIn, HTTPServer):
         HTTPServer.server_bind(self)
 
     def server_name_lookup(self):
-        return "checkin"
+        return core.PROJECT.get("hostname", "localhost")
 
     def handle_error(self, request, client_address):
         # dropped connections and rejected certificates are normal; log the rest
@@ -654,5 +662,5 @@ if __name__ == "__main__":
         t.start()
     start_https()
     refresh_page()
-    modules.start_background()           # modules' own background work (the update check for the LEDs ...)
+    modules.start_background()           # modules' own background work (an update check, a service ...)
     Server(("", PORT), Handler).serve_forever()

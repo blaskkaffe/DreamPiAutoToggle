@@ -22,7 +22,7 @@
  .dot{display:inline-block;width:.65em;height:.65em;border-radius:50%;margin-right:8px;background:#888}
  @keyframes blink{50%{opacity:.12}} @keyframes breathe{50%{opacity:.45}}
  @keyframes dotb1{0%{opacity:1}9%,100%{opacity:.12}} @keyframes dotb2{0%,18%{opacity:1}9%,27%,100%{opacity:.12}} @keyframes dotb3{0%,18%,36%{opacity:1}9%,27%,45%,100%{opacity:.12}}
- @keyframes dotrainbow{0%,100%{background:#e33}17%{background:#dd3}33%{background:#3c5}50%{background:#3cc}67%{background:#46f}83%{background:#c4c}}   /* the status dot's preview of the LED effects */
+ @keyframes dotrainbow{0%,100%{background:#e33}17%{background:#dd3}33%{background:#3c5}50%{background:#3cc}67%{background:#46f}83%{background:#c4c}}   /* the status dot's preview of the light effects */
  .ok{background:var(--ok)} .busy,.warn{background:var(--warn)} .call{background:var(--call)} .bad,.off{background:var(--bad)}
  .warnbox{background:var(--notice-bg);border:var(--bw) solid var(--notice-line);padding:10px 20px;border-radius:var(--r-box);margin:0 0 12px;font-size:var(--fs-md)}
  /* a notice: a banner that is not a warning (an event starting soon), in the page's colour, with a dismiss button */
@@ -44,7 +44,7 @@
  @keyframes hlrainbow{to{background-position:-200% 0}}
  @keyframes hlwhite{0%,100%{box-shadow:0 0 4px 0 rgba(255,255,255,.25)}50%{box-shadow:0 0 20px 3px rgba(255,255,255,.6)}}
  @media(prefers-reduced-motion:reduce){.dbox.hl:not(.plain) .now,body.hl-rainbow .dbox.hl:not(.plain) .now,body.hl-rainbow .dbox.hl:not(.plain) .now::before{animation:none}}
- /* status rows inside a box: closed = just the status,
+ /* status rows inside the network box: closed = just the first status,
     centred under the network name; open = all rows with their labels */
  .now .row{font-size:var(--fs-md);line-height:1.35;padding:10px 0;border-top:1px solid rgba(var(--box-rgb),.18);text-align:left}
  .now .row.main{justify-content:center;border-top:0;padding:8px 0 2px}
@@ -173,8 +173,8 @@
  .pop .frow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0} .pop .frow > span{color:var(--text-2);font-size:var(--fs-sm)}
  .btns{display:flex;gap:8px;flex:none} .srow.foot{padding:12px 0 8px}
  .srow.lk .pill-s,.srow.lk .tag{background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb));text-shadow:0 1px 2px rgba(0,0,0,.55);color:#fff} .srow.lk .tag button{color:#fff}
- /* a row that shows an LED look: coloured buttons and tags that run the effect between the row's colour and the default dark grey of a
-    button (the LED "off"); the text keeps its colour. */
+ /* a row that shows a light look: coloured buttons and tags that run the effect between the row's colour and the default dark grey of a
+    button (the light "off"); the text keeps its colour. Periods as in the module that drives the light, slow and fast. */
  @keyframes lkblink{50%{background:var(--btn-bg);border-color:var(--btn-line)}}
  @keyframes lkfade{0%,100%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}50%{background:var(--btn-bg);border-color:var(--btn-line)}}
  @keyframes lkb1{0%{background:rgba(var(--primary-rgb),.82);border-color:rgb(var(--primary-l-rgb))}9%,100%{background:var(--btn-bg);border-color:var(--btn-line)}}

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Check-in add-on - time zones with summer time on any Python, and a list of cities to pick a zone from (base; used by
+# Base - time zones with summer time on any Python, and a list of cities to pick a zone from (base; used by
 # the clock and the events modules).
 #
 # Python 3.9+ has zoneinfo, which reads the system's tz database. Older Python has nothing for "the time in New York": only the

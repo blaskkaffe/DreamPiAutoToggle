@@ -15,7 +15,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   page.on('dialog', d => { alerts.push(d.message()); return d.accept(); });
   // the PIN pad: round keys; type the digits on them and press OK
   const enterPin = async pin => { await page.waitForSelector('.pinm .pinkey'); pinDialogs++; for (const c of pin) await page.click('.pinm [data-k="' + c + '"]'); await page.click('.pinm .pinok'); };
-  const post = (path, body, pin) => page.evaluate(([p, b, pn]) => fetch(p, { method: 'POST', headers: Object.assign({ 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, pn ? { 'X-Checkin-Pin': pn } : {}), body: JSON.stringify(b || {}) }).then(r => r.status), [path, body, pin]);
+  const post = (path, body, pin) => page.evaluate(([p, b, pn]) => fetch(p, { method: 'POST', headers: Object.assign({ 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, pn ? { 'X-Pin': pn } : {}), body: JSON.stringify(b || {}) }).then(r => r.status), [path, body, pin]);
   const load = async () => { await page.goto(URL, { waitUntil: 'networkidle' }); await settle(1200); };
   const info = () => page.evaluate(() => {
     const d = document.getElementById('dash'), cols = d.querySelectorAll(':scope > .dcol'), b = document.body;

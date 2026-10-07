@@ -57,7 +57,7 @@ if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
-cp "$SRC"/base/base_*.py "$SRC/project.json" "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
+cp "$SRC"/base/base_*.py "$SRC/base/layout.json" "$SRC/project.json" "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/kiosk"
 cp "$SRC"/base/page/index.html "$SRC"/base/page/page.css "$SRC"/base/page/page.js "$SRC"/base/page/widgets.js "$SRC"/base/page/boot.js "$DEST/page/"
 cp "$SRC"/kiosk/* "$DEST/kiosk/"
@@ -69,7 +69,7 @@ for ns_old in dreampi-netswitch-led dreampi-netswitch-buttons dreampi-netswitch-
         rm -f "/etc/systemd/system/$ns_old.service"
     fi
 done
-rm -f "$DEST/netswitch_probes.py" "$DEST/netswitch_core.py" "$DEST/netswitch_modules.py" "$DEST/netswitch_web.py" "$DEST/netswitch_security.py" "$DEST/netswitch_tz.py" "$DEST/netswitch_hook.py" "$DEST/netswitch_gpio.py" "$DEST/netswitch_buttons.py" "$DEST/netswitch_update.py" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" \
+rm -f "$DEST/netswitch_probes.py" "$DEST/base_probes.py" "$DEST/netswitch_core.py" "$DEST/netswitch_modules.py" "$DEST/netswitch_web.py" "$DEST/netswitch_security.py" "$DEST/netswitch_tz.py" "$DEST/netswitch_hook.py" "$DEST/netswitch_gpio.py" "$DEST/netswitch_buttons.py" "$DEST/netswitch_update.py" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" \
       "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" "$DEST/netswitch_players.py" "$DEST/netswitch_wifi_setup.py" "$DEST/wifi_button" "$DEST/wifi_button_enabled"
 # The Wi-Fi setup module is gone: its service (removed above), module folder, state files and /tmp state
 rm -rf "$DEST/modules/wifi"

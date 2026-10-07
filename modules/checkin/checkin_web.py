@@ -1,6 +1,6 @@
 # Check-in add-on - the check-in board (web service side), after CheckinChicken.
-# The people come from the contacts module's roster (core.CONTACTS); this module keeps who is in, and each person's status, in
-# core.CHECKIN. There is one copy of that state: the web service of the host (every other screen is a browser that opens the
+# The people come from the contacts module's roster (CONTACTS); this module keeps who is in, and each person's status, in
+# CHECKIN. There is one copy of that state: the web service of the host (every other screen is a browser that opens the
 # host's address, in kiosk mode if you like), and every /api answer carries the whole board with a revision number, so a change
 # made on one screen shows on all of them within a second. A button is grey while the person is out, in the colour of their
 # department (or building) while in, and in the colour of the status once one is set. Colours are palette ids only. Python 3.
@@ -12,6 +12,10 @@ import threading
 import time
 
 import base_core as core
+
+CHECKIN = os.path.join(core.BASE_DIR, "checkin.json")       # {"rev", "config", "statuses", "people": {id: {in, status, detail, at}}}: this module's live state, shared by every screen
+CONTACTS = os.path.join(core.BASE_DIR, "contacts.json")     # {"people": [{id, name, department, role, phone, location, restrictToLocation, active, order}]}: the contacts module's roster (imported from a CSV)
+PHOTOS_DIR = os.path.join(core.BASE_DIR, "photos")           # <person id>.jpg / .png: the small profile photos (written by the contacts module, read by the check-in board)
 
 # [code, label, palette colour, needs, checks out]; the list CheckinChicken starts with. "needs": "time", "date", "note" or "".
 # IN / OUT are the two fixed ones; the others can be changed in checkin.json "statuses" (a list of objects with these keys).
@@ -47,7 +51,7 @@ def _default_state():
 
 def _load():
     try:
-        with io.open(core.CHECKIN, encoding="utf-8") as f:
+        with io.open(CHECKIN, encoding="utf-8") as f:
             data = json.load(f)
     except (IOError, OSError, ValueError):
         data = None
@@ -64,10 +68,10 @@ def _load():
 
 def _save(data):
     data["rev"] = int(data.get("rev", 0)) + 1
-    tmp = core.CHECKIN + ".tmp"
+    tmp = CHECKIN + ".tmp"
     with io.open(tmp, "w", encoding="utf-8") as f:
         f.write(json.dumps(data, ensure_ascii=False))
-    os.rename(tmp, core.CHECKIN)
+    os.rename(tmp, CHECKIN)
     _cache["key"] = None
 
 
@@ -154,11 +158,11 @@ def config(data=None):
 def _roster_stamp():
     """Changes when the contacts module writes the roster or a photo, so a screen draws the board again after an import."""
     try:
-        stamp = os.stat(core.CONTACTS).st_mtime_ns
+        stamp = os.stat(CONTACTS).st_mtime_ns
     except OSError:
         stamp = 0
     try:
-        stamp += int(os.stat(core.PHOTOS_DIR).st_mtime_ns)
+        stamp += int(os.stat(PHOTOS_DIR).st_mtime_ns)
     except OSError:
         pass
     return stamp
@@ -168,14 +172,14 @@ def _photos():
     """{person id: url} of the photos the contacts module stored (the version in the url changes when a photo does)."""
     out = {}
     try:
-        names = os.listdir(core.PHOTOS_DIR)
+        names = os.listdir(PHOTOS_DIR)
     except OSError:
         return out
     for n in names:
         pid, _dot, ext = n.rpartition(".")
         if ext in ("jpg", "png") and re.match(r"^p[0-9a-f]{10}$", pid):
             try:
-                out[pid] = "/contacts/photo/%s?v=%d" % (pid, os.stat(os.path.join(core.PHOTOS_DIR, n)).st_mtime_ns // 1000000)
+                out[pid] = "/contacts/photo/%s?v=%d" % (pid, os.stat(os.path.join(PHOTOS_DIR, n)).st_mtime_ns // 1000000)
             except OSError:
                 pass
     return out
@@ -183,7 +187,7 @@ def _photos():
 
 def _roster():
     try:
-        with io.open(core.CONTACTS, encoding="utf-8") as f:
+        with io.open(CONTACTS, encoding="utf-8") as f:
             people = json.load(f).get("people", [])
     except (IOError, OSError, ValueError, AttributeError):
         people = []

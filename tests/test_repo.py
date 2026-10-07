@@ -13,14 +13,11 @@ from support import ROOT
 class LayeringTests(unittest.TestCase):
     """The small services must not drag the web server in."""
     def test_services_do_not_import_the_web_module(self):
-        for mod in ("base_core", "base_probes", "contacts_web", "checkin_web"):
+        for mod in ("base_core", "contacts_web", "checkin_web"):
             code = ("import sys; sys.path[:0] = %r; import %s; sys.exit(1 if 'base_web' in sys.modules else 0)"
                     % ([ROOT, os.path.join(ROOT, "base")] + [os.path.join(ROOT, "modules", m) for m in os.listdir(os.path.join(ROOT, "modules"))], mod))
             self.assertEqual(subprocess.call(["python3", "-c", code]), 0, mod)
 
-    def test_core_does_not_import_probes(self):
-        code = "import sys; sys.path[:0] = %r; import base_core; sys.exit(1 if 'base_probes' in sys.modules else 0)" % [ROOT, os.path.join(ROOT, "base")]
-        self.assertEqual(subprocess.call(["python3", "-c", code]), 0)
 
 
 class DocsTests(unittest.TestCase):

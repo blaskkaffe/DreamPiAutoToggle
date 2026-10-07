@@ -62,7 +62,7 @@ class ClockView(unittest.TestCase):
         cleanup(self.tmp)
 
     def test_the_settings_are_a_core_path_and_default_to_24h_only(self):
-        self.assertTrue(core.CLOCK_CONFIG.startswith(self.tmp))
+        self.assertTrue(clock.CLOCK_CONFIG.startswith(self.tmp))
         self.assertEqual(clock.read_config(), {"format": "24h", "beat": False, "world": False, "large": False, "zone": "", "cities": clock.DEFAULT_CITIES})
         self.assertEqual(clock.save_config({"format": " 12H "})["format"], "12h")
         self.assertEqual(clock.save_config({"format": "12h-ampm"})["format"], "12h-ampm")
@@ -72,18 +72,27 @@ class ClockView(unittest.TestCase):
         self.assertEqual((got["beat"], got["world"]), (True, True))
         self.assertEqual(clock.save_config({"beat": False})["world"], True)               # a key that is not given stays as it was
         self.assertEqual(clock.save_config({"zone": "Asia/Tokyo"})["zone"], "")             # the time zone is not the clock's setting any more ...
-        self.assertNotIn("zone", json.load(open(core.CLOCK_CONFIG)))
+        self.assertNotIn("zone", json.load(open(clock.CLOCK_CONFIG)))
         self.assertEqual(core.save_time_zone("Asia/Tokyo"), "Asia/Tokyo")                  # ... it is the common one (Settings > About)
         self.assertEqual(clock.read_config()["zone"], "Asia/Tokyo")
         self.assertEqual(core.save_time_zone("../../etc/passwd"), "")                      # only zones of the list
         self.assertEqual(core.save_time_zone("Mars/Olympus"), "")
 
     def test_an_older_clock_json_zone_is_carried_over_to_the_common_one(self):
-        with open(core.CLOCK_CONFIG, "w") as f:
+        with open(clock.CLOCK_CONFIG, "w") as f:
             json.dump({"format": "24h", "zone": "Europe/Stockholm"}, f)
+        clock.read_config()                                                               # the clock module carries it over when it reads its settings
         self.assertEqual(core.time_zone(), "Europe/Stockholm")
         core.save_time_zone("")                                                           # once set (even to the Pi's own) the file wins
         self.assertEqual(core.time_zone(), "")
+
+    def test_an_older_mode_file_is_carried_over(self):
+        with open(clock.CLOCK_MODE, "w") as f:
+            f.write("beat")
+        self.assertEqual((clock.read_config()["format"], clock.read_config()["beat"]), ("24h", True))
+        with open(clock.CLOCK_MODE, "w") as f:
+            f.write("12h")
+        self.assertEqual((clock.read_config()["format"], clock.read_config()["beat"]), ("12h", False))
 
     def test_the_map_puts_the_clocks_own_place_in_its_winter_band(self):
         cfg = {"zone": "Europe/Stockholm", "format": "24h"}

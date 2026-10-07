@@ -61,19 +61,19 @@ class ImageBg(unittest.TestCase):
         self.assertEqual(self.api()["version"], v["version"])
         self.assertEqual(self.call("POST", "/imagebg/remove", b"{}")[0], 200)
         self.assertFalse(self.api()["has"])
-        self.assertFalse(os.path.exists(core.IMAGEBG_FILE))
+        self.assertFalse(os.path.exists(ib.IMAGEBG_FILE))
         self.assertEqual(self.call("GET", "/imagebg/image")[0], 404)
 
     def test_only_pictures_are_taken(self):
         for bad in (b"hello", b"<svg onload=alert(1)>", b""):
             self.assertEqual(self.call("POST", "/imagebg/upload", bad)[0], 400, bad)
         self.assertFalse(self.api()["has"])
-        self.assertFalse(os.path.exists(core.IMAGEBG_FILE))
+        self.assertFalse(os.path.exists(ib.IMAGEBG_FILE))
 
     def test_a_picture_that_is_too_big_is_refused(self):
         status, _b, _r = self.call("POST", "/imagebg/upload", PNG, {"Content-Length": str(ib.MAX_BYTES + 1)})
         self.assertIn(status, (413, 400))
-        self.assertFalse(os.path.exists(core.IMAGEBG_FILE))
+        self.assertFalse(os.path.exists(ib.IMAGEBG_FILE))
 
     def test_the_type_comes_from_the_bytes_not_from_the_header(self):
         self.call("POST", "/imagebg/upload", JPEG, {"Content-Type": "text/html"})
@@ -90,7 +90,7 @@ class ImageBg(unittest.TestCase):
 
     def test_a_missing_file_means_no_picture(self):
         self.call("POST", "/imagebg/upload", PNG)
-        os.remove(core.IMAGEBG_FILE)
+        os.remove(ib.IMAGEBG_FILE)
         self.assertFalse(self.api()["has"])
 
     def test_a_cross_site_upload_is_refused(self):
