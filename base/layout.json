@@ -125,7 +125,8 @@
       "type": "toggle",
       "bind": "@settings_pin.on",
       "post": "/settings-pin",
-      "label": "Ask for the PIN to open Settings"
+      "label": "Ask for the PIN to open Settings",
+      "ensure_pin": true
      }
     },
     {
@@ -145,7 +146,7 @@
     {
      "type": "row",
      "title": "Global main colour",
-     "sub": "Pick Global main for a box or a row of lights to give them this colour",
+     "sub": "Pick Global main for a box or a button to give it this colour",
      "control": {
       "type": "colourpick",
       "id": "global",
