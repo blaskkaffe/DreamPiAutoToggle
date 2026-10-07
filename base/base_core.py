@@ -187,6 +187,50 @@ def save_dashboard_order(names):
     return save_module_order(new)
 
 
+# ---- where the tiles of the main screen are, per number of columns: {"3": [[box ids of column 1], [column 2], [column 3]], "1": [[...]]}
+# (written when the user rearranges the tiles; a tile that is not named keeps to the shortest column, a name that is gone is skipped)
+TILE_LAYOUT = os.path.join(BASE_DIR, "tile_layout.json")
+_TILE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
+
+
+def tile_layout():
+    """{"<columns>": [[ids] per column]}: the saved places of the tiles, only what is valid (a bad or missing file gives {})."""
+    try:
+        with open(TILE_LAYOUT) as f:
+            data = json.load(f)
+    except (IOError, OSError, ValueError):
+        return {}
+    out = {}
+    for k, cols in (data.items() if isinstance(data, dict) else []):
+        if k.isdigit() and 1 <= int(k) <= MAX_COLUMNS and isinstance(cols, list) and len(cols) == int(k) and all(isinstance(c, list) for c in cols):
+            seen, clean = set(), []
+            for c in cols:
+                col = []
+                for i in c:
+                    if isinstance(i, _STR) and _TILE_ID.match(i) and i not in seen:
+                        seen.add(i)
+                        col.append(i)
+                clean.append(col)
+            out[k] = clean
+    return out
+
+
+def save_tile_layout(count, columns):
+    """The user moved a tile: `columns` are the ids of the tiles in each of `count` columns, top to bottom. Returns the saved layout, or None for something
+    that is not a list of that many lists of ids."""
+    if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= MAX_COLUMNS:
+        return None
+    if not isinstance(columns, list) or len(columns) != count or not all(isinstance(c, list) and len(c) <= 200 and all(isinstance(i, _STR) and _TILE_ID.match(i) for i in c) for c in columns):
+        return None
+    data = tile_layout()
+    data[str(count)] = columns
+    tmp = TILE_LAYOUT + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, sort_keys=True)
+    os.rename(tmp, TILE_LAYOUT)
+    return tile_layout()
+
+
 def modules_state():
     try:
         with open(MODULES_STATE) as f:

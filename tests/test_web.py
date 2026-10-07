@@ -137,6 +137,21 @@ class HttpTests(unittest.TestCase):
         reply = json.loads(self.get("/screen")[2].decode())
         self.assertEqual([o["value"] for o in reply["options"]["themes"]], ["dark", "light", "auto"])
 
+    def test_the_places_of_the_tiles_are_kept_per_number_of_columns(self):
+        self.assertEqual(json.loads(self.get("/api")[2].decode())["tile_layout"], {})
+        r = json.loads(self.post("/modules/dashboard-layout", {"cols": 3, "columns": [["clock"], ["checkin", "checkin-kok"], []]})[1].decode())
+        self.assertEqual(r["tile_layout"]["3"], [["clock"], ["checkin", "checkin-kok"], []])
+        self.post("/modules/dashboard-layout", {"cols": 1, "columns": [["checkin", "clock"]]})
+        got = json.loads(self.get("/api")[2].decode())["tile_layout"]
+        self.assertEqual(sorted(got), ["1", "3"])                                              # each number of columns has its own
+        for bad in ({"cols": 3, "columns": [["a"], ["b"]]}, {"cols": 2, "columns": "x"}, {"cols": 2, "columns": [["a"], [1]]}, {"cols": 9, "columns": []},
+                    {"cols": 2, "columns": [["../x"], []]}, {"cols": True, "columns": [[]]}):
+            with self.assertRaises(HTTPError) as e:
+                self.post("/modules/dashboard-layout", bad)
+            self.assertEqual(e.exception.code, 400, bad)
+        open(core.TILE_LAYOUT, "w").write('{"2": [["a", "a"], ["b"]], "x": [], "3": [["c"]]}')
+        self.assertEqual(core.tile_layout(), {"2": [["a"], ["b"]]})                            # a double is dropped, a wrong count of columns is ignored
+
     def test_a_bad_screen_file_gives_the_defaults(self):
         open(core.SCREEN, "w").write("[1, 2")
         self.assertEqual(core.screen_settings(), core.SCREEN_DEFAULTS)

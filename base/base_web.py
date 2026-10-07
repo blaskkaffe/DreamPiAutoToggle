@@ -49,7 +49,7 @@ def api_state(have_palette=""):
          "highlight": {},       # {dashboard box id: why}: a module asks for one of its boxes to stand out for a while (an event soon, say)
          "notices": [],         # banners over the boxes that are not warnings: {"id", "text", "post" (dismiss: POST {"id"} there)}
          "theme": {"highlight": core.highlight_style()},
-         "screen": core.screen_settings(),
+         "screen": core.screen_settings(), "tile_layout": core.tile_layout(),
          "settings_pin": {"on": security.settings_locked(), "pin": security.pin_required()}}
     modules.apply_api(d, warnings)          # what the enabled modules add: the board, the clock ...
     version = core.palette_version()
@@ -353,6 +353,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_module_order()
         if path == "/modules/dashboard-order":
             return self._post_dashboard_order()
+        if path == "/modules/dashboard-layout":
+            return self._post_dashboard_layout()
         if path == "/colour":
             return self._post_colour()
         if path == "/highlight":
@@ -406,6 +408,17 @@ class Handler(BaseHTTPRequestHandler):
         core.log("web page: main screen tiles moved, modules now %s" % ", ".join(order))
         refresh_page(force=True)
         self.send(json.dumps({"modules": modules.listing()}), "application/json")
+
+    def _post_dashboard_layout(self):
+        """The tiles of the main screen were moved: {"cols": n, "columns": [[box ids] for each of the n columns]}; the places are kept per number of columns."""
+        try:
+            body = json.loads(self._body(16384).decode("utf-8"))
+            saved = core.save_tile_layout(body.get("cols"), body.get("columns"))
+        except (ValueError, AttributeError, IOError, OSError) as e:
+            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
+        if saved is None:
+            return self.send("Bad request: cols and a list of that many lists of tile ids needed", "text/plain; charset=utf-8", status=400)
+        self.send(json.dumps({"tile_layout": saved}), "application/json")
 
     def _post_module_order(self):
         """The module picker: {"order": [name, ...]}, first = highest priority."""

@@ -21,7 +21,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
     const d = document.getElementById('dash'), cols = d.querySelectorAll(':scope > .dcol'), b = document.body;
     const boxes = Array.from(d.querySelectorAll('.dbox')).filter(x => x.offsetHeight);
     return { cols: cols.length, bodyMax: b.style.maxWidth, dashW: Math.round(d.getBoundingClientRect().width), zoom: getComputedStyle(boxes[0]).zoom,
-             boxW: Math.round(boxes[0].getBoundingClientRect().width), n: boxes.length, inCols: cols.length ? Array.from(cols).map(c => c.querySelectorAll('.dbox').length) : [] };
+             boxW: Math.round(boxes[0].getBoundingClientRect().width), n: boxes.length, inCols: cols.length ? Array.from(cols).map(c => Array.from(c.querySelectorAll('.dbox')).filter(x => x.offsetHeight).length) : [] };
   });
   await load();
   // ---- the defaults: one column, as before
@@ -71,38 +71,61 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   // ---- rearranging the main screen
   await page.setViewportSize({ width: 1500, height: 2000 });
   const tiles = () => page.evaluate(() => Array.from(document.querySelectorAll('#dash .dbox')).filter(b => b.offsetHeight).map(b => b.getAttribute('data-box')));
-  const seq = () => page.evaluate(() => Array.from(document.querySelectorAll('#dash .dbox')).filter(b => b.offsetHeight).sort((a, b) => a._ord - b._ord).map(b => b.getAttribute('data-box')));
+  // the columns as they are: the tile ids in each column, top to bottom (one list when the dashboard has one column)
+  const cols = () => page.evaluate(() => { const d = document.getElementById('dash'), cs = Array.from(d.querySelectorAll(':scope > .dcol')), ids = box => Array.from(box.querySelectorAll(':scope > .dbox')).filter(b => b.offsetHeight).map(b => b.getAttribute('data-box')); return cs.length ? cs.map(ids) : [ids(d)]; });
   const modList = () => page.evaluate(() => fetch('/modules').then(r => r.json()).then(j => j.modules.map(m => m.name + ':' + m.group)));
   ok((await page.locator('#dash .tilegrip:visible').count()) === 0, 'no handles on the tiles until the setting is on');
   ok(await post('/screen/drag', { value: true }) === 200, 'Rearrange the main screen saved');
   await settle(1500);
   const n0 = (await tiles()).length;
   ok(n0 >= 4 && await page.locator('#dash .tilegrip:visible').count() === n0, 'every tile has a handle (' + n0 + ')');
-  const drag = async (fromIdx, toIdx, below) => {
-    const g = await page.evaluate(i => { const t = Array.from(document.querySelectorAll('#dash .dbox')).filter(b => b.offsetHeight).sort((a, b) => a._ord - b._ord)[i].querySelector('.tilegrip').getBoundingClientRect(); return { x: t.left + t.width / 2, y: t.top + t.height / 2 }; }, fromIdx);
-    const d = await page.evaluate(([i, below]) => { const r = Array.from(document.querySelectorAll('#dash .dbox')).filter(b => b.offsetHeight).sort((a, b) => a._ord - b._ord)[i].getBoundingClientRect(); return { x: r.left + r.width / 2, y: below ? r.bottom - 4 : r.top + 4 }; }, [toIdx, !!below]);
+  const drag = async (fromId, toId, below) => {
+    const g = await page.evaluate(id => { const t = document.querySelector('#dash .dbox[data-box="' + id + '"] .tilegrip').getBoundingClientRect(); return { x: t.left + t.width / 2, y: t.top + t.height / 2 }; }, fromId);
+    const d = await page.evaluate(([id, below]) => { const r = document.querySelector('#dash .dbox[data-box="' + id + '"]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: below ? r.bottom - 4 : r.top + 4 }; }, [toId, !!below]);
     await page.mouse.move(g.x, g.y); await page.mouse.down(); await page.mouse.move((g.x + d.x) / 2, (g.y + d.y) / 2, { steps: 4 }); await page.mouse.move(d.x, d.y, { steps: 4 });
     const bar = await page.evaluate(() => getComputedStyle(document.querySelector('.dropbar')).display);
     await page.mouse.up(); await settle(1200); return bar;
   };
-  let before = await seq();
-  const bar = await drag(before.length - 1, 0, false);
-  let after = await seq();
+  let before = (await cols())[0];
+  const bar = await drag(before[before.length - 1], before[0], false);
+  let after = (await cols())[0];
   ok(bar === 'block', 'a bar shows where the tile will land');
-  ok(after[0] === before[before.length - 1] && after.slice(1).join() === before.slice(0, -1).join(), 'dragging the last tile above the first moves it to the top (' + after.join(' ') + ')');
+  ok(after[0] === before[before.length - 1] && after.slice(1).join() === before.slice(0, -1).join(), 'one column: dragging the last tile above the first moves it to the top (' + after.join(' ') + ')');
   const mods = await modList();
   ok(mods.map(x => x.split(':')[1]).join('').match(/^0*1*2*$/) !== null, 'the modules stay grouped: dashboard ones, settings-only ones, backgrounds (' + mods.join(' ') + ')');
   await load(); await settle(800);
-  ok((await seq()).join() === after.join(), 'after a reload the tiles are where they were put');
-  // in several columns: a tile dropped after another one in a different column
+  ok((await cols())[0].join() === after.join(), 'after a reload the tiles are where they were put');
+  // in several columns: a tile keeps the column and the place in it where it is dropped, and the others do not move
   await post('/screen', { values: { dash_cols: 3, set_cols: 4 } }); await load(); await settle(500);
-  before = await seq();
-  await drag(0, 2, true); after = await seq();
-  ok(after.join() !== before.join() && after.slice().sort().join() === before.slice().sort().join() && after[2] === before[0], 'three columns: a tile dropped after the third one is third (' + after.join(' ') + ')');
-  // the keyboard
-  const firstBox = (await seq())[0];
-  await page.locator('#dash .dbox[data-box="' + firstBox + '"] .tilegrip').focus(); await page.keyboard.press('ArrowRight'); await settle(1000);
-  ok((await seq())[1] === firstBox, 'an arrow key moves a tile one place on');
+  const where = list => { const m = {}; list.forEach((c, ci) => c.forEach((id, k) => { m[id] = ci + ':' + k; })); return m; };
+  let c3 = await cols();
+  ok(c3.length === 3 && c3.every(c => c.length > 0), 'three columns with tiles in each (' + JSON.stringify(c3) + ')');
+  const mover = c3[0][0], target = c3[2][c3[2].length - 1];
+  await drag(mover, target, true);
+  let c3b = await cols();
+  ok(c3b[2][c3b[2].length - 1] === mover && c3b[2].length === c3[2].length + 1, 'dropped below the last tile of the third column: it is the last tile of the third column (' + JSON.stringify(c3b) + ')');
+  ok(c3b[0].join() === c3[0].slice(1).join() && c3b[1].join() === c3[1].join() && c3b[2].slice(0, -1).join() === c3[2].join(), 'and no other tile changed column or place');
+  await load(); await settle(800);
+  ok(JSON.stringify(await cols()) === JSON.stringify(c3b), 'after a reload they are where they were put');
+  const kept = await page.evaluate(() => fetch('/api').then(r => r.json()).then(d => d.tile_layout['3'])), shownNow = [].concat.apply([], c3b);
+  ok(JSON.stringify(kept.map(c => c.filter(id => shownNow.includes(id)))) === JSON.stringify(c3b), 'the host keeps the places (so another screen shows the same)');
+  // into the middle of a column
+  const mid = c3b[1][0], mover2 = c3b[2][c3b[2].length - 1];
+  await drag(mover2, mid, true);
+  let c3c = await cols();
+  ok(c3c[1][1] === mover2 && c3c[1][0] === mid, 'dropped below the first tile of the second column: it is the second tile there (' + JSON.stringify(c3c) + ')');
+  // one column again, then three: each count keeps its own places
+  await post('/screen', { values: { dash_cols: 1 } }); await load(); await settle(500);
+  ok((await cols())[0].join() === after.join(), 'with one column again the earlier places of one column are back');
+  await post('/screen', { values: { dash_cols: 3 } }); await load(); await settle(500);
+  ok(JSON.stringify(await cols()) === JSON.stringify(c3c), 'and with three columns again the places of three columns');
+  // the keyboard: right = the next column at the same height, down = one place down
+  const first = (await cols())[0][0];
+  await page.locator('#dash .dbox[data-box="' + first + '"] .tilegrip').focus(); await page.keyboard.press('ArrowRight'); await settle(1000);
+  let c3d = await cols();
+  ok(c3d[1][0] === first && c3d[0].length === c3c[0].length - 1, 'the right arrow moves a tile to the next column (' + JSON.stringify(c3d) + ')');
+  await page.locator('#dash .dbox[data-box="' + first + '"] .tilegrip').focus(); await page.keyboard.press('ArrowDown'); await settle(1000);
+  ok((await cols())[1][1] === first, 'and the down arrow one place down');
   ok(await post('/screen/drag', { value: false }) === 200, 'switched off again'); await settle(1500);
   ok(await page.locator('#dash .tilegrip:visible').count() === 0, 'and the handles are gone');
   await post('/screen', { values: { dash_cols: 1, set_cols: 4 } });

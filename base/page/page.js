@@ -105,18 +105,26 @@ function colsFor(max,W){return Math.max(1,Math.min(max,Math.floor((W+SGAP)/(COLW
 function scrZoom(n,W){return SCR.stretch&&SCR.scale?Math.max(1,((W-SGAP*(n-1))/n)/COLW):1}
 // The dashboard's boxes in dn columns: each box goes to the column that is shortest so far, in the order of the layout (so the first boxes are at
 // the top); they stay where they are put when their content changes. Placed again when the number of columns or the set of shown boxes changes.
-var dashKey="";
+var dashKey="",dashN=1,tileLocal=null;     // tileLocal: {dn, columns, until}: a move that was just made here (the answer of the next /api may still be the old layout)
 function dashTiles(){var kids=Array.prototype.slice.call($("dash").querySelectorAll(".dbox"));
  kids.forEach(function(b,i){if(b._ord===undefined)b._ord=i});
  return kids.sort(function(a,b){return a._ord-b._ord})}
-function layoutDash(dn){var dash=$("dash"),kids=dashTiles();
+// where the tiles are saved to be, for dn columns: [[box ids] per column], or null (nothing saved: they go round the columns in their order)
+function savedLayout(dn){if(tileLocal&&tileLocal.dn===dn&&Date.now()<tileLocal.until)return tileLocal.columns;var L=(S.tile_layout||{})[String(dn)];return L&&L.length===dn?L:null}
+function layoutDash(dn){var dash=$("dash"),kids=dashTiles();dashN=dn;
  if(!kids.length)return;
- var key=dn+"/"+kids.map(function(b){return b.offsetHeight?1:0}).join("");if(key===dashKey)return;dashKey=key;
+ var L=savedLayout(dn),key=dn+"/"+kids.map(function(b){return b.offsetHeight?1:0}).join("")+"/"+JSON.stringify(L);if(key===dashKey)return;dashKey=key;
  Array.prototype.slice.call(dash.querySelectorAll(":scope > .dcol")).forEach(function(c){c.parentNode.removeChild(c)});
  kids.forEach(function(b){dash.appendChild(b)});
- if(dn<2)return;
- var cols=[],i,k=0;for(i=0;i<dn;i++){var c=document.createElement("div");c.className="dcol";dash.appendChild(c);cols.push(c)}
- kids.forEach(function(b){if(b.offsetHeight)cols[k++%dn].appendChild(b);else cols[0].appendChild(b)})}      // the shown tiles go round the columns in their order, so a place in a column means a place in the order
+ if(dn<2&&!L)return;
+ var cols=[],i,k=0,byId={},rest=[];
+ if(dn>1)for(i=0;i<dn;i++){var c=document.createElement("div");c.className="dcol";dash.appendChild(c);cols.push(c)}
+ kids.forEach(function(b){byId[b.getAttribute("data-box")]=b});
+ if(L){      // the places the user gave them, column by column, top to bottom; a tile that is new goes to the shortest column
+  L.forEach(function(ids,ci){ids.forEach(function(id){var b=byId[id];if(b){(dn>1?cols[ci]:dash).appendChild(b);byId[id]=null}})});
+  kids.forEach(function(b){if(byId[b.getAttribute("data-box")])rest.push(b)});
+  rest.forEach(function(b){if(dn<2){dash.appendChild(b);return}var low=0;cols.forEach(function(c,ci){if(c.offsetHeight<cols[low].offsetHeight)low=ci});cols[low].appendChild(b)});return}
+ kids.forEach(function(b){if(b.offsetHeight)cols[k++%dn].appendChild(b);else cols[0].appendChild(b)})}      // no saved places: the shown tiles go round the columns in their order
 // ---- rearranging the main screen (Settings > Appearance): a handle on each tile, drag it before or after another; the modules follow the
 // tiles' order (POST /modules/dashboard-order). While Settings is locked with the PIN this needs the PIN to have been given.
 function tilesMovable(){return !!SCR.drag&&!(S.settings_pin&&S.settings_pin.on&&!pinValue)}
@@ -125,23 +133,37 @@ var dragTile=null,dropBar=null;
 function tileTitle(b){var t=b.querySelector("b,h2,.nlabel");return t?t.textContent.trim():b.getAttribute("data-box")}
 function applyGrips(){var on=tilesMovable();$("dash").classList.toggle("movable",on);
  dashTiles().forEach(function(b){if(!b._grip){var g=h("button",{type:"button","class":"grip tilegrip keep",title:"Drag to move (or use the arrow keys)",html:GRIP_SVG});b._grip=g;b.insertBefore(g,b.firstChild);gripEvents(b,g)}
-  sh(b._grip,on);b._grip.setAttribute("aria-label","Move "+tileTitle(b)+": drag, or use the arrow keys")})}
+  sh(b._grip,on&&!!b.offsetHeight);b._grip.setAttribute("aria-label","Move "+tileTitle(b)+": drag, or use the arrow keys")})}
 // where a tile dropped at (x,y) goes: {tile, after} = next to the tile under or nearest to the point
 function dropSpot(x,y,moving){var best=null,bd=1e9;
  shownTiles().forEach(function(t){if(t===moving)return;var r=t.getBoundingClientRect(),dx=x<r.left?r.left-x:(x>r.right?x-r.right:0),dy=y<r.top?r.top-y:(y>r.bottom?y-r.bottom:0),d=dx*dx+dy*dy;
   if(d<bd){bd=d;best={tile:t,after:y>r.top+r.height/2,r:r}}});return best}
-function moveTile(tile,spot){var seq=shownTiles().filter(function(t){return t!==tile}),at=seq.indexOf(spot.tile)+(spot.after?1:0);seq.splice(at,0,tile);commitTiles(seq)}
-function commitTiles(seq){var ords=shownTiles().map(function(b){return b._ord}).sort(function(a,b){return a-b}),moved=false;
- seq.forEach(function(b,i){if(b._ord!==ords[i]){moved=true;b._ord=ords[i]}});if(!moved)return;
- dashKey="";layoutDash(colsFor(SCR.dash_cols,document.documentElement.clientWidth-(SCR.stretch&&document.documentElement.clientWidth>=900?48:32)));
+// the tiles as they are on the screen now: the ids in each column, top to bottom (all tiles, shown or not)
+function captureLayout(){var dash=$("dash"),cols=Array.prototype.slice.call(dash.querySelectorAll(":scope > .dcol"));
+ function ids(box){return Array.prototype.slice.call(box.querySelectorAll(":scope > .dbox")).map(function(b){return b.getAttribute("data-box")})}
+ return cols.length?cols.map(ids):[ids(dash)]}
+function shownRowMajor(){var cols=Array.prototype.slice.call($("dash").querySelectorAll(":scope > .dcol")),out=[],i,more=true;
+ var lists=(cols.length?cols:[$("dash")]).map(function(c){return Array.prototype.slice.call(c.querySelectorAll(":scope > .dbox")).filter(function(b){return b.offsetHeight||b===dragTile})});
+ for(i=0;more;i++){more=false;lists.forEach(function(l){if(l[i]){out.push(l[i]);more=true}})}return out}
+// a tile was put somewhere (dropped, or moved with the arrow keys): it keeps that column and that place in it, here and on every other screen
+function moveTile(tile,spot){var par=spot.tile.parentNode;if(spot.after)par.insertBefore(tile,spot.tile.nextSibling);else par.insertBefore(tile,spot.tile);commitTiles()}
+function commitTiles(){var seq=shownRowMajor(),cols=captureLayout(),dn=cols.length,ords=seq.map(function(b){return b._ord}).sort(function(a,b){return a-b});
+ seq.forEach(function(b,i){b._ord=ords[i]});          // the order of the tiles round the columns, row by row, is also the order the modules and the groups are kept in
+ tileLocal={dn:dn,columns:cols,until:Date.now()+4000};(S.tile_layout=S.tile_layout||{})[String(dn)]=cols;dashKey="";layoutDash(dn);
  fire("tiles-moved",seq);
  var names=[],boxes={};(LAY.dashboard||[]).forEach(function(b){boxes[b.id]=b});
  seq.forEach(function(b){((boxes[b.getAttribute("data-box")]||{}).mods||[]).forEach(function(m){if(names.indexOf(m)<0)names.push(m)})});
+ post("/modules/dashboard-layout",{cols:dn,columns:cols},function(r){if(!r){alert("The new places were not saved.");location.reload()}});
  post("/modules/dashboard-order",{order:names},function(r){if(!r){alert("The new order was not saved.");location.reload()}})}
+// the arrow keys on a handle: up / down one place in the column, left / right to the next column at the same height
+function nudgeTile(tile,key){var par=tile.parentNode,vis=function(box){return Array.prototype.slice.call(box.querySelectorAll(":scope > .dbox")).filter(function(b){return b.offsetHeight})},mine=vis(par),i=mine.indexOf(tile);
+ if(key==="ArrowUp"||key==="ArrowDown"){var other=mine[i+(key==="ArrowUp"?-1:1)];if(!other)return false;par.insertBefore(tile,key==="ArrowUp"?other:other.nextSibling);return true}
+ var cols=Array.prototype.slice.call($("dash").querySelectorAll(":scope > .dcol")),ci=cols.indexOf(par),to=cols[ci+(key==="ArrowLeft"?-1:1)];
+ if(!to)return false;var there=vis(to);if(there[i])to.insertBefore(tile,there[i]);else to.appendChild(tile);return true}
 function gripEvents(tile,grip){
  grip.addEventListener("click",function(e){e.stopPropagation()});
- grip.addEventListener("keydown",function(e){var back=e.key==="ArrowUp"||e.key==="ArrowLeft",fwd=e.key==="ArrowDown"||e.key==="ArrowRight";if(!back&&!fwd)return;e.preventDefault();
-  var seq=shownTiles(),i=seq.indexOf(tile),j=i+(back?-1:1);if(j<0||j>=seq.length)return;seq.splice(i,1);seq.splice(j,0,tile);commitTiles(seq);grip.focus()});
+ grip.addEventListener("keydown",function(e){if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.key)<0)return;e.preventDefault();
+  if(nudgeTile(tile,e.key)){commitTiles();grip.focus()}});
  grip.addEventListener("pointerdown",function(e){if(e.pointerType==="mouse"&&e.button!==0)return;e.preventDefault();
   var pid=e.pointerId,spot=null,last=e,r0=tile.getBoundingClientRect(),z=tile.offsetWidth?r0.width/tile.offsetWidth:1,offX=e.clientX-r0.left,offY=e.clientY-r0.top;
   dragTile=tile;try{grip.setPointerCapture(pid)}catch(x){}
