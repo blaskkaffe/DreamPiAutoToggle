@@ -82,7 +82,7 @@ class KitTests(unittest.TestCase):
             self.assertNotIn(literal, body, "%s is used raw; use its token" % literal)
 
     def test_the_kit_defines_its_tokens_once(self):
-        css = strip_comments(read(CSS))
+        css = strip_comments(read(CSS)).split("html{color-scheme:dark}")[0]       # the light theme (after it) sets the colour tokens again on purpose
         for token in ("--r-box", "--r-ctl", "--r-pill", "--h-ctl", "--text-1", "--text-2", "--text-3", "--fs-xs", "--fs-sm", "--fs-md", "--fs-lg", "--fs-xl"):
             self.assertEqual(len(re.findall(re.escape(token) + r":", css)), 1, token)
 

@@ -70,7 +70,7 @@ def _save(data):
 
 def _palette_id(v, default):
     v = core.LEGACY_COLOURS.get(v, v)
-    return v if v in core.PALETTE_IDS and v != "network" else default
+    return v if v in core.palette_ids() else default
 
 
 def statuses(data=None):
@@ -193,7 +193,8 @@ def group_colours(people, kind, cfg):
     """{name: palette id} for every department (or building): the user's pick, else one from AUTO by the name's place in the sorted list."""
     names = sorted(set(_key_of(p, kind) for p in people), key=lambda s: s.lower())
     mine = cfg["colours"].get(kind, {})
-    return dict((n, mine.get(n) or AUTO[i % len(AUTO)]) for i, n in enumerate(names))
+    auto = [c for c in AUTO if c in core.palette_ids()] or [core.DEFAULT_COLOUR]        # the Colour palette module may have deleted some
+    return dict((n, mine.get(n) or auto[i % len(auto)]) for i, n in enumerate(names))
 
 
 def _status_text(st, detail):
@@ -424,7 +425,7 @@ def _config_reply():
             "options": {"groups": [{"value": "department", "label": "Department"}, {"value": "building", "label": "Building"}],
                         "roles": [{"value": r, "label": r} for r in roles], "buildings": [{"value": b, "label": b} for b in buildings]},
             "texts": {"show_title": "Shown" if c["show_title"] else "Hidden", "group_by": c["group_by"].capitalize(), "colour_by": c["colour_by"].capitalize()},
-            "colours": kinds, "palette_exclude": ["network"], "total": snap["total"]}
+            "colours": kinds, "total": snap["total"]}
 
 
 def _get_config(h):

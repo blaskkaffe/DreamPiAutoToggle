@@ -223,7 +223,7 @@ def _primary_of(name, manifest):
     cols = core.module_colours(name)
     if want in cols:
         return cols[want]
-    return want if want in core.PALETTE_IDS else None
+    return want if want in core.palette_ids() else None
 
 
 def _module_file(name, filename):

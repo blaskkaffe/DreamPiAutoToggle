@@ -28,7 +28,7 @@ CERT = os.path.join(core.BASE_DIR, "https.crt")   # self-signed, made by install
 KEY = os.path.join(core.BASE_DIR, "https.key")
 
 
-def api_state():
+def api_state(have_palette=""):
     """The /api answer. The base only has the page-wide parts (PIN flag, warnings, time, the modules' colours); everything
     else is added by the enabled modules' api() hooks (the check-in board adds who is in)."""
     warnings = ["Module %s is not loaded: %s" % (name, why) for name, why in sorted(modules.errors().items())]
@@ -41,6 +41,11 @@ def api_state():
          "screen": core.screen_settings(),
          "settings_pin": {"on": security.settings_locked(), "pin": security.pin_required()}}
     modules.apply_api(d, warnings)          # what the enabled modules add: the board, the clock ...
+    version = core.palette_version()
+    d["palette_v"] = version
+    if have_palette != version:             # the palette (and its CSS) only when the page does not have this version: it changes when the user edits it
+        d["palette"] = [{"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"], "ui_l": c["ui_l"]} for c in core.colours()]
+        d["palette_css"] = core.colours_css()
     return d
 
 
@@ -64,8 +69,10 @@ def _screen_reply():
     """The form widget's answer for Appearance > Max columns (the two toggles under it read S.screen from /api)."""
     cur = core.screen_settings()
     opts = [{"value": n, "label": str(n)} for n in range(1, core.MAX_COLUMNS + 1)]
-    return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"]}, "options": {"cols": opts},
-            "texts": {"dash_cols": "Up to %d" % cur["dash_cols"] + (" column" if cur["dash_cols"] == 1 else " columns"),
+    themes = [{"value": "dark", "label": "Dark"}, {"value": "light", "label": "Light"}, {"value": "auto", "label": "Like the device"}]
+    return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"], "theme": cur["theme"]}, "options": {"cols": opts, "themes": themes},
+            "texts": {"theme": dict((t["value"], t["label"]) for t in themes)[cur["theme"]],
+                      "dash_cols": "Up to %d" % cur["dash_cols"] + (" column" if cur["dash_cols"] == 1 else " columns"),
                       "set_cols": "Up to %d" % cur["set_cols"] + (" column" if cur["set_cols"] == 1 else " columns")}}
 
 
@@ -94,7 +101,7 @@ def build_page():
             return f.read()
     extra = modules.page_parts()
     js = _layout_script() + "\n" + part("page.js") + "\n" + part("widgets.js") + "\n" + extra["js"] + "\n" + part("boot.js")
-    html = part("index.html").replace("@@CSS@@", core.colours_css() + part("page.css") + "\n" + extra["css"]).replace("@@JS@@", js)
+    html = part("index.html").replace("@@THEME@@", core.screen_settings()["theme"]).replace("@@CSS@@", core.colours_css() + part("page.css") + "\n" + extra["css"]).replace("@@JS@@", js)
     return html
 
 
@@ -247,7 +254,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/ping":
             self.send("ok\n", "text/plain")
         elif path == "/api":
-            self.send(json.dumps(api_state()), "application/json")
+            query = dict(p.split("=", 1) for p in (self.path.split("?", 1)[1] if "?" in self.path else "").split("&") if "=" in p)
+            self.send(json.dumps(api_state(query.get("pv", "")[:16])), "application/json")
         elif path == "/modules":
             self.send(json.dumps({"modules": modules.listing()}), "application/json")
         elif path == "/colours":
@@ -300,7 +308,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_highlight()
         if path == "/timezone":
             return self._post_timezone()
-        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/drag", "/screen/noscroll"):
+        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/fit", "/screen/drag", "/screen/noscroll"):
             return self._post_screen(path)
         if path == "/palette":
             return self._post_palette()
@@ -433,7 +441,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             data = json.loads(self._body(1024).decode("utf-8"))
             if path == "/screen":
-                core.save_screen_settings(dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols")))
+                core.save_screen_settings(dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols", "theme")))
+                refresh_page(force=True)                # the page is built with the theme it starts in (no flash of the other one)
             else:
                 core.save_screen_settings({path.rsplit("/", 1)[1]: data.get("value")})
         except (ValueError, AttributeError, IOError, OSError) as e:

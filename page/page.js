@@ -16,6 +16,8 @@ function fire(name,arg){var handled=false;(HOOKS[name]||[]).forEach(function(f){
 // =====
 var ui={version:2,_pops:[]};   // keep in step with UI_KIT in netswitch_modules.py
 ui.closePopups=function(except){ui._pops.forEach(function(p){if(p!==except)p.close()})};
+// the drag handle (list rows and main-screen tiles): two columns of three dots, drawn, so it looks the same in every font
+var GRIP_SVG='<svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>';
 ui.popup=function(el){
  var p={el:el,anchor:null,onclose:null};
  el.classList.add("pop");el.setAttribute("role","dialog");
@@ -98,7 +100,7 @@ window.addEventListener("resize",function(){applyScreen();if($("settings").class
 // ---- the screen layout (Settings > Appearance; S.screen from /api): how many columns the dashboard and Settings use on a wide screen and
 // whether they stretch. A column is about COLW px wide; there are as many as fit, up to the setting. Stretch: the columns share the whole width
 // (the boxes are wider). Scale content: a stretched box is drawn bigger (CSS zoom) in step with its width, so it is taller too.
-var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,noscroll:false},COLW=428,SGAP=20,scrKey="";
+var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,noscroll:false,fit:false,theme:"dark"},COLW=428,SGAP=20,scrKey="";
 function colsFor(max,W){return Math.max(1,Math.min(max,Math.floor((W+SGAP)/(COLW+SGAP))))}
 function scrZoom(n,W){return SCR.stretch&&SCR.scale?Math.max(1,((W-SGAP*(n-1))/n)/COLW):1}
 // The dashboard's boxes in dn columns: each box goes to the column that is shortest so far, in the order of the layout (so the first boxes are at
@@ -122,8 +124,8 @@ function shownTiles(){return dashTiles().filter(function(b){return b.offsetHeigh
 var dragTile=null,dropBar=null;
 function tileTitle(b){var t=b.querySelector("b,h2,.nlabel");return t?t.textContent.trim():b.getAttribute("data-box")}
 function applyGrips(){var on=tilesMovable();$("dash").classList.toggle("movable",on);
- dashTiles().forEach(function(b){if(!b._grip){var g=h("button",{type:"button","class":"tilegrip keep",title:"Drag to move this tile (or use the arrow keys)",html:"&#8942;&#8942;"});b._grip=g;b.insertBefore(g,b.firstChild);gripEvents(b,g)}
-  sh(b._grip,on);b._grip.setAttribute("aria-label","Move the "+tileTitle(b)+" tile: drag, or use the arrow keys")})}
+ dashTiles().forEach(function(b){if(!b._grip){var g=h("button",{type:"button","class":"grip tilegrip keep",title:"Drag to move (or use the arrow keys)",html:GRIP_SVG});b._grip=g;b.insertBefore(g,b.firstChild);gripEvents(b,g)}
+  sh(b._grip,on);b._grip.setAttribute("aria-label","Move "+tileTitle(b)+": drag, or use the arrow keys")})}
 // where a tile dropped at (x,y) goes: {tile, after} = next to the tile under or nearest to the point
 function dropSpot(x,y,moving){var best=null,bd=1e9;
  shownTiles().forEach(function(t){if(t===moving)return;var r=t.getBoundingClientRect(),dx=x<r.left?r.left-x:(x>r.right?x-r.right:0),dy=y<r.top?r.top-y:(y>r.bottom?y-r.bottom:0),d=dx*dx+dy*dy;
@@ -141,27 +143,53 @@ function gripEvents(tile,grip){
  grip.addEventListener("keydown",function(e){var back=e.key==="ArrowUp"||e.key==="ArrowLeft",fwd=e.key==="ArrowDown"||e.key==="ArrowRight";if(!back&&!fwd)return;e.preventDefault();
   var seq=shownTiles(),i=seq.indexOf(tile),j=i+(back?-1:1);if(j<0||j>=seq.length)return;seq.splice(i,1);seq.splice(j,0,tile);commitTiles(seq);grip.focus()});
  grip.addEventListener("pointerdown",function(e){if(e.pointerType==="mouse"&&e.button!==0)return;e.preventDefault();
-  var pid=e.pointerId,spot=null;dragTile=tile;try{grip.setPointerCapture(pid)}catch(x){}
+  var pid=e.pointerId,spot=null,last=e,r0=tile.getBoundingClientRect(),z=tile.offsetWidth?r0.width/tile.offsetWidth:1,offX=e.clientX-r0.left,offY=e.clientY-r0.top;
+  dragTile=tile;try{grip.setPointerCapture(pid)}catch(x){}
+  // the dragged tile is lifted like a row of a list: a copy with a shadow follows the pointer, the tile itself stays as a dimmed gap
+  var inner=tile.cloneNode(true),ghost=h("div",{"class":"tile-ghost"},[inner]);
+  Array.prototype.forEach.call(inner.querySelectorAll("[id]"),function(n){n.removeAttribute("id")});inner.removeAttribute("data-box");
+  inner.style.zoom=z;inner.style.width=tile.offsetWidth+"px";ghost.style.width=r0.width+"px";ghost.style.height=r0.height+"px";document.body.appendChild(ghost);
+  function lift(ev){ghost.style.left=(ev.clientX-offX)+"px";ghost.style.top=(ev.clientY-offY)+"px"}lift(e);
+  var edge=setInterval(function(){var y=last.clientY,hh=window.innerHeight;if(y<70)window.scrollBy(0,-14);else if(y>hh-70)window.scrollBy(0,14);else return;show(last)},16);      // near the top / bottom edge the page scrolls along, as Settings does
   tile.classList.add("tile-drag");document.body.classList.add("dragging");
   if(!dropBar){dropBar=h("div",{"class":"dropbar"});document.body.appendChild(dropBar)}
   function show(ev){spot=dropSpot(ev.clientX,ev.clientY,tile);if(!spot){dropBar.style.display="none";return}
    dropBar.style.display="block";dropBar.style.left=spot.r.left+"px";dropBar.style.width=spot.r.width+"px";dropBar.style.top=((spot.after?spot.r.bottom:spot.r.top)-3)+"px"}
-  function move(ev){if(ev.pointerId===pid)show(ev)}
+  function move(ev){if(ev.pointerId===pid){last=ev;lift(ev);show(ev)}}
   function end(cancel){grip.removeEventListener("pointermove",move);grip.removeEventListener("pointerup",up);grip.removeEventListener("pointercancel",lost);document.removeEventListener("keydown",esc,true);
    try{grip.releasePointerCapture(pid)}catch(x){}
+   clearInterval(edge);document.body.removeChild(ghost);
    tile.classList.remove("tile-drag");document.body.classList.remove("dragging");dropBar.style.display="none";dragTile=null;
    if(!cancel&&spot)moveTile(tile,spot)}
   function up(ev){if(ev.pointerId===pid)end(false)}
   function lost(ev){if(ev.pointerId===pid)end(true)}
   function esc(ev){if(ev.key==="Escape"){ev.stopPropagation();end(true)}}
   grip.addEventListener("pointermove",move);grip.addEventListener("pointerup",up);grip.addEventListener("pointercancel",lost);document.addEventListener("keydown",esc,true);show(e)})}
-function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;
- var vw=document.documentElement.clientWidth,pad=SCR.stretch&&vw>=900?24:16,W=vw-2*pad,dn=colsFor(SCR.dash_cols,W),dz=scrZoom(dn,W),
+// the theme: "dark", "light" or "auto" (the device's own setting); the page is built with it, this follows a change made here or on another device
+var themeMedia=window.matchMedia?matchMedia("(prefers-color-scheme: light)"):null;
+function applyLook(){var pref=SCR.theme||"dark",d=document.documentElement,want=pref==="auto"?(themeMedia&&themeMedia.matches?"light":"dark"):pref;
+ if(d.getAttribute("data-pref")!==pref)d.setAttribute("data-pref",pref);if(d.getAttribute("data-theme")!==want)d.setAttribute("data-theme",want);
+ var m=document.querySelector('meta[name=theme-color]'),c=getComputedStyle(document.body).backgroundColor;if(m&&c&&c.indexOf("rgba(0, 0, 0, 0)")!==0)m.setAttribute("content",c)}
+if(themeMedia&&themeMedia.addEventListener)themeMedia.addEventListener("change",function(){applyLook()});
+// Fit to screen: the main screen is drawn as big as it can be without scrolling, so there is no empty space under it. The columns fill the width
+// (as with Stretch boxes) and the zoom is the biggest one (found by trying, ten steps) at which the bottom of the page is still on the screen; never
+// smaller than 1 (a screen that is too small for it scrolls as usual) and never so big that a column is narrower than 280 px of content.
+var fitState={key:"",z:1};
+function pageBottom(){return $("dash").getBoundingClientRect().bottom+window.scrollY+(parseFloat(getComputedStyle(document.body).marginBottom)||0)}
+function fitZoom(dn,W){var dash=$("dash"),vh=window.innerHeight,key=[W,vh,dn,Math.round(pageBottom())].join("/");
+ if(key===fitState.key)return fitState.z;
+ function put(z){dash.style.setProperty("--z",z)}
+ var lo=1,hi=Math.min(3.5,Math.max(1,((W-SGAP*(dn-1))/dn)/280)),i;put(1);
+ if(pageBottom()<=vh)for(i=0;i<10;i++){var mid=(lo+hi)/2;put(mid);if(pageBottom()<=vh)lo=mid;else hi=mid}
+ put(lo);fitState={key:[W,vh,dn,Math.round(pageBottom())].join("/"),z:lo};return lo}
+function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;applyLook();
+ var vw=document.documentElement.clientWidth,wide=(SCR.stretch||SCR.fit),pad=wide&&vw>=900?24:16,W=vw-2*pad,dn=colsFor(SCR.dash_cols,W),dz=scrZoom(dn,W),
   sn=colsFor(SCR.set_cols,W),key=[dn,dz,sn,pad,SCR.stretch,SCR.set_cols].join("/");
  var dash=$("dash"),b=document.body,inn=document.querySelector("#settings .in");
  document.documentElement.classList.toggle("noscroll",!!SCR.noscroll);
- b.style.maxWidth=SCR.stretch?"none":(dn*COLW+(dn-1)*SGAP+2*pad)+"px";b.style.paddingLeft=b.style.paddingRight=pad+"px";
- dash.style.setProperty("--z",dz);dash.classList.toggle("multi",dn>1);layoutDash(dn);applyGrips();
+ b.style.maxWidth=wide?"none":(dn*COLW+(dn-1)*SGAP+2*pad)+"px";b.style.paddingLeft=b.style.paddingRight=pad+"px";
+ dash.style.setProperty("--z",SCR.fit?fitState.z:dz);dash.classList.toggle("multi",dn>1);layoutDash(dn);applyGrips();
+ if(SCR.fit)dash.style.setProperty("--z",fitZoom(dn,W));else fitState={key:"",z:1};
  if(inn){inn.style.maxWidth=SCR.stretch?"none":(sn*COLW+(sn-1)*SGAP+2*pad)+"px";inn.style.paddingLeft=inn.style.paddingRight=pad+"px"}
  if(key!==scrKey){scrKey=key;if(!fromSettings&&$("settings").classList.contains("open"))layoutColumns(true)}
  fire("screen")}
@@ -202,8 +230,16 @@ function unlockThen(go){if(!(S.settings_pin&&S.settings_pin.on)||pinValue)return
 $("cog").onclick=function(){unlockThen(function(){showSettings(true)})};
 $("close-settings").onclick=function(){showSettings(false)};
 document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(!fire("escape"))showSettings(false)}});
-function refresh(){var x=new XMLHttpRequest();x.open("GET","/api",true);
- x.onload=function(){if(x.status==200)render(JSON.parse(x.responseText));bootDone("api")};x.onerror=function(){bootDone("api")};x.send()}
+// the palette (/api "palette" and "palette_css") comes only when it is not the version the page has (PV); it changes when the Colour palette module edits it
+var PV="";
+function PAL(){return S.palette||LAY.palette||[]}
+function applyPalette(d){PV=d.palette_v;S.palette=d.palette;
+ var st=document.getElementById("palette-css");if(!st){st=document.createElement("style");st.id="palette-css";document.head.appendChild(st)}
+ st.textContent=d.palette_css;
+ var inl=document.documentElement.style,i,drop=[];for(i=0;i<inl.length;i++)if(inl[i].indexOf("--c-")===0)drop.push(inl[i]);drop.forEach(function(k){inl.removeProperty(k)});      // a colour changed on this page (the Global main picker) is the server's now
+ if(window.engineUpdate)engineUpdate()}
+function refresh(){var x=new XMLHttpRequest();x.open("GET","/api?pv="+PV,true);
+ x.onload=function(){if(x.status==200){var r=JSON.parse(x.responseText);render(r);if(r.palette)applyPalette(r)}bootDone("api")};x.onerror=function(){bootDone("api")};x.send()}
 // The first draw waits for /api and for the data sources that have no kept answer from an earlier visit (at most BOOT_LIMIT ms), then every
 // box is shown at once: nothing pops in one box after the other
 var BOOT_LIMIT=1500,bootPending={api:1};

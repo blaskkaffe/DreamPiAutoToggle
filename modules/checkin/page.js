@@ -4,7 +4,7 @@
 custom("checkin-statuses",function(host){var box=host.querySelector(".cstatuses"),modal=h("div",{"class":"rp-modal keep-visible",style:"display:none"}),key="",items=[],editing=-1;
  document.body.appendChild(modal);
  var NEEDS=[["","Nothing"],["time","A time"],["date","A date"],["note","A note (free text)"]];
- function colours(){return (LAY.palette||[]).filter(function(c){return c.id!=="network"})}
+ function colours(){return PAL()}
  function summary(s){var t=[];if(s.needs)t.push({time:"asks for a time",date:"asks for a date",note:"asks for a note"}[s.needs]);if(s.out)t.push("checks out");if(s.sticky)t.push("sticky");if(s.dots)t.push(s.dots+" dot"+(s.dots>1?"s":""));return t.join(" · ")}
  function save(list,done){post("/checkin/statuses",{statuses:list},function(r,st,b){if(r&&r.ok){refresh();if(done)done(true,b)}else if(done)done(false,b)})}
  function paint(list){items=list||[];var k=JSON.stringify(items);if(k===key)return;key=k;box.innerHTML="";

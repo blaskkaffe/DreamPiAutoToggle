@@ -32,7 +32,11 @@ function colourClass(el,ref,mod){el.setAttribute("data-own-colour","1");
   if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._cc=id}
  apply();UPD.push(apply)}
 // ---- talking to the server
-function post(url,body,done){xhrJson("POST",url,function(r,st,b){if(done)done(r,st,b)},body)}
+// A POST that worked may have changed what any box shows (a switch in Settings changes the clock on the main page, a colour changes a row's text ...),
+// so the page asks again for /api and for every data source soon after it, not when their timers run out (a quick burst of POSTs, a slider, is one question).
+var afterPostTimer=null;
+function settledSoon(){clearTimeout(afterPostTimer);afterPostTimer=setTimeout(function(){refresh();reloadData()},250)}
+function post(url,body,done){xhrJson("POST",url,function(r,st,b){if(r&&!/^\/wbtest/.test(url))settledSoon();if(done)done(r,st,b)},body)}
 // after a button's POST: "reload" the page, "wait" until the Pi is back (a reboot), or just look at the new state
 function afterPost(s,r,el){
  if(r&&r.started===false){alert(r.message||"That did not start");return}
@@ -183,20 +187,20 @@ W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.l
 W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx))};
 // ---- the module's own colour choice: a "Colour" button in the chosen colour that opens a pop-up with the palette's colours;
 // the pick is kept for the module (core.set_module_colour)
-// the palette in the server's order, without the ids a pick leaves out ("exclude": palette ids a pick leaves out)
-function paletteOrder(s){return (LAY.palette||[]).filter(function(c){return (s.exclude||[]).indexOf(c.id)<0})}
-function colourOfId(id){var r=null;(LAY.palette||[]).forEach(function(p){if(p.id===id)r=p});return r}
+// the palette in the server's order, without the ids a pick leaves out ("exclude": the network colours cannot be "Selected network", that would be a circle)
+function paletteOrder(s){return PAL().filter(function(c){return (s.exclude||[]).indexOf(c.id)<0})}
+function colourOfId(id){var r=null;PAL().forEach(function(p){if(p.id===id)r=p});return r}
 function mixWhite(hex){var n=[1,3,5].map(function(i){var v=parseInt(hex.substr(i,2),16);return Math.round(v+(255-v)*0.45)});return "#"+n.map(function(v){return (v<16?"0":"")+v.toString(16)}).join("")}
 function rgbOf(hex){return parseInt(hex.substr(1,2),16)+","+parseInt(hex.substr(3,2),16)+","+parseInt(hex.substr(5,2),16)}
 // a palette colour changed on the page: every box that uses it follows at once (the next page load has it from the server)
 function applyPaletteVars(c){var s=document.documentElement.style,l=mixWhite(c.ui);
  s.setProperty("--c-"+c.id,c.ui);s.setProperty("--c-"+c.id+"-l",l);s.setProperty("--c-"+c.id+"-rgb",rgbOf(c.ui));s.setProperty("--c-"+c.id+"-l-rgb",rgbOf(l));
- (LAY.palette||[]).forEach(function(p){if(p.id===c.id){p.ui=c.ui;p.ui_l=l}})}
+ PAL().forEach(function(p){if(p.id===c.id){p.ui=c.ui;p.ui_l=l}})}
 // a colour picker for one palette colour (Global main): it changes the colour everywhere it is used. It looks like the other colour picks
 // (a small Colour button in its own colour); the system's colour chooser is an input laid invisibly over the button, so a tap opens it.
 W.colourpick=function(s,ctx){var inp=h("input",{type:"color","class":"cp-native","aria-label":(s.label||"Colour")}),timer=null,
  btn=h("button",{type:"button","class":"pill-s pri c-"+s.id,text:"Colour",tabindex:"-1","aria-hidden":"true"}),el=h("span",{"class":"colourpick cp-wrap"},[btn,inp]);
- (LAY.palette||[]).forEach(function(p){if(p.id===s.id)inp.value=p.ui});
+ PAL().forEach(function(p){if(p.id===s.id)inp.value=p.ui});
  inp.oninput=function(){var ui=inp.value;applyPaletteVars({id:s.id,ui:ui});clearTimeout(timer);timer=setTimeout(function(){post("/palette",{id:s.id,ui:ui},function(r){if(r)ctx.saved()})},250)};
  return el};
 // a colour well: a Colour button in a colour of any #rrggbb (the LED colour editor); the system's colour chooser lies over it, cb(value) is called on every change
@@ -204,17 +208,19 @@ function colourWell(value,label,cb){var inp=h("input",{type:"color","class":"cp-
  btn=h("button",{type:"button","class":"pill-s well",text:"Colour",tabindex:"-1","aria-hidden":"true"}),el=h("span",{"class":"colourpick cp-wrap"},[btn,inp]);
  function paint(){btn.style.setProperty("--well",inp.value);btn.style.setProperty("--well-l",mixWhite(inp.value))}
  inp.oninput=function(){paint();cb(inp.value)};paint();return el}
-W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri",text:s.label||"Colour","aria-haspopup":"dialog"}),
+W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri",text:s.label||"Colour","aria-haspopup":"dialog"}),builtPV=null,
  grid=h("span",{"class":"swatches grid"}),pop=h("div",{"class":"colours"},[h("div",{"class":"t",text:s.title||"Pick a colour"}),grid]),
  tint=s.tint?h("input",{type:"checkbox","class":"cbox pri",title:"Highlight: a coloured background (off = a neutral one)","aria-label":(s.title||"Colour")+": highlight with a coloured background"}):null,
  el=h("span",{"class":"colourpick"},[tint,btn,pop]),btns={},names={},p=ui.popup(pop);
  if(tint)colourClass(tint,s.key,s.mod);          // the tick box has the colour of its pick
  if(tint)tint.onchange=function(){var want=tint.checked;post("/colour",{module:s.mod,key:s.key,tint:want},function(r){if(r){refresh();ctx.saved()}else tint.checked=!want})};
- paletteOrder(s).forEach(function(c){names[c.id]=c.name;
-  var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui+";--cl:"+c.ui_l,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
-  b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){p.close();refresh();ctx.saved()}})};grid.appendChild(b)});
+ function buildGrid(){builtPV=PV;grid.innerHTML="";btns={};names={};      // the palette can be edited while the page is open (the Colour palette module): the balls are made again then
+  paletteOrder(s).forEach(function(c){names[c.id]=c.name;
+   var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui+";--cl:"+c.ui_l,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
+   b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){p.close();refresh();ctx.saved()}})};grid.appendChild(b)})}
+ buildGrid();
  btn.onclick=function(e){p.toggle(btn,e)};
- function paint(){var cur=(((S.colours||{})[s.mod])||{})[s.key]||"",real=cur;
+ function paint(){if(builtPV!==PV)buildGrid();var cur=(((S.colours||{})[s.mod])||{})[s.key]||"",real=realColour(cur);
   if(btn._cc!==real){if(btn._cc)btn.classList.remove("c-"+btn._cc);if(real)btn.classList.add("c-"+real);btn._cc=real;
    btn.setAttribute("aria-label",(s.label||"Colour")+": "+(names[cur]||cur||"not set"))}
   for(var id in btns){var on=id===cur;btns[id].classList.toggle("sel",on);btns[id].setAttribute("aria-pressed",on?"true":"false")}}
@@ -576,7 +582,7 @@ W.triggers=function(s,ctx){var el=h("div",{"class":"wtrig"}),cfg=null,timer=null
   cfg.rows.forEach(function(row){ids[row.id]=1;
    var e=editRow({title:row.title,button:R.edit_label||"Edit",aria:(R.edit_label||"Edit")+" "+row.title});rowEls.push(e);
    e.setSub(row.sub||"");e.setList(row.items.map(label));var lk=lookOf(row);if(lk)e.setLook(lk[0],lk[1],lk[2]);
-   if(R.sort){var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+row.title+": drag, or use the up and down arrow keys",html:"&#8942;&#8942;"});
+   if(R.sort){var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+row.title+": drag, or use the up and down arrow keys",html:GRIP_SVG});
     e.el.insertBefore(grip,e.el.firstChild);e.el.setAttribute("data-id",row.id)}
    e.btn.onclick=function(ev){ev.stopPropagation();var ed=editor(row);ed.row=row;if(ed.p.isOpen())ed.p.close();else{fillEditor(row);ed.p.open(e.btn)}};list.appendChild(e.el);
    var q=editors[row.id];if(q&&q.p.isOpen())q.p.open(e.btn);                       // an open editor follows its row (the row's height changes with its tags)
@@ -808,7 +814,7 @@ bind(s.source,function(d){if(d)document.body.classList.toggle("no-title",d.show_
 function rosterColours(s,ctx){var el=h("div",{"class":"roster-cols"}),R=null;
  function paint(){if(!R)return;var html="";["department","building"].forEach(function(kind){var rows=(R.colours||{})[kind]||[];if(!rows.length)return;
   html+='<div class="t rp-ct">'+(kind==="department"?"Departments":"Buildings")+'</div>'+rows.map(function(r){
-   var opts='<option value="">Automatic</option>'+(LAY.palette||[]).map(function(c){return '<option value="'+esc(c.id)+'"'+(r.own&&r.colour===c.id?" selected":"")+'>'+esc(c.name)+'</option>'}).join("");
+   var opts='<option value="">Automatic</option>'+PAL().map(function(c){return '<option value="'+esc(c.id)+'"'+(r.own&&r.colour===c.id?" selected":"")+'>'+esc(c.name)+'</option>'}).join("");
    return '<div class="srow"><span><span class="dot c-'+esc(r.colour)+' rp-sw"></span>'+esc(r.name)+'</span><select class="ord" data-kind="'+kind+'" data-name="'+esc(r.key)+'" aria-label="Colour of '+esc(r.name)+'">'+opts+'</select></div>'}).join("")});
   setHtml(el,html||'<div class="sub">Import people to pick colours for their departments and buildings.</div>')}
  el.addEventListener("change",function(e){var sl=e.target;if(!sl.getAttribute||!sl.getAttribute("data-kind"))return;
@@ -983,7 +989,7 @@ function buildPicker(cols){
    if(m.group!==shownGroup){shownGroup=m.group;list.appendChild(h("div",{"class":"sub grp",text:GROUPS[m.group]||""}))}      // a heading is not a row: a module moves inside its group
    if(m.visible===false)cb=h("span",{"class":"sub fixed",text:"Always on"});                     // can be moved, not switched off
    else{cb=h("input",{type:"checkbox","class":"cbox neutral","data-module":m.name,"aria-label":m.title});cb.checked=m.enabled;boxes[m.name]=cb}
-   var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+m.title+": drag, or use the up and down arrow keys",html:"&#8942;&#8942;"}),
+   var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+m.title+": drag, or use the up and down arrow keys",html:GRIP_SVG}),
     left=h("span",{},[document.createTextNode(m.title),h("span",{"class":"sub",html:esc(m.description)+(m.note?"<br>"+esc(m.note):"")+(m.error?'<br><b class="modbad">Could not load: '+esc(m.error)+"</b>":"")})]);
    list.appendChild(h("div",{"class":"srow","data-id":m.name},[grip,left,cb]))});
   sortable(list,function(){})}                                                                       // the order is read from the page when Done is pressed

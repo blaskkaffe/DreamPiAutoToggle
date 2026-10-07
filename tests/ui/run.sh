@@ -29,4 +29,6 @@ run screen.js CLOCK=1
 run imagebg.js IMGBG=1
 # a group too long for one column is split over the next ones; No scrolling; the saved order of the boxes
 run columns.js PEOPLE=$(pwd)/long.csv
+# the Colour palette module: add, edit, rearrange, delete and reset colours; the rest of the page follows at once
+run palette.js CLOCK=1
 exit $RESULT

@@ -80,6 +80,7 @@ Everything the page shows is a module, one folder in `modules/`. **Settings > Sy
 | Clock | The time on the board page: 12 / 24-hour, `.beat`, world times, time zone map | on |
 | About | Versions, the time zone, the global colours, a link to the project (always on) | on |
 | Background image | A picture of your own as the page's background: choose it in Settings > Background image (big pictures are shrunk in the browser first), fit and darken it | **off** |
+| Colour palette | Edit, add, rearrange, delete and reset the palette's colours (Settings > Colour palette) | on |
 | Reboot and Update | Update the add-on from GitHub, reboot the host | on |
 
 Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), [docs/checkin.md](docs/checkin.md) (the board and the contacts), [docs/web.md](docs/web.md). `CLAUDE.md` is the short guide for working on the code.
@@ -98,7 +99,7 @@ Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), 
 The main page is the board (and the clock box above it when that module is on). The cogwheel opens **Settings**:
 
 - **Check-in board:** what to group by and what to colour by (department or building), a colour for every department and building (Automatic or your pick), **All out** (the start of the day) and **All in**.
-- **Appearance / Global colours:** the module's colour, the global main colour, the highlight look, **Max columns** for the dashboard and for Settings (1 to 6; as many as fit at about 430 px each), **Stretch boxes** (the columns share the whole screen width) with **Scale content**, **Rearrange the main screen** (drag the tiles; the department boxes move too and their order is kept on the host, so every screen follows), **No scrolling** (the main screen never scrolls; Settings still does), and with more than one column a department with more people than fit under each other in the screen height is split into near-equal parts in the next columns, "Kök (1/2)", "Kök (2/2)", and the **PIN** with **Ask for the PIN to open Settings** (the board itself keeps working without it).
+- **Appearance / Global colours:** the module's colour, the global main colour, the highlight look, **Max columns** for the dashboard and for Settings (1 to 6; as many as fit at about 430 px each), **Stretch boxes** (the columns share the whole screen width) with **Scale content**, **Rearrange the main screen** (drag the tiles; the department boxes move too and their order is kept on the host, so every screen follows), **Fit to screen** (the main screen is scaled up until its bottom reaches the bottom of the window), **Theme** (dark, light or like the device), **No scrolling** (the main screen never scrolls; Settings still does), and with more than one column a department with more people than fit under each other in the screen height is split into near-equal parts in the next columns, "Kök (1/2)", "Kök (2/2)", and the **PIN** with **Ask for the PIN to open Settings** (the board itself keeps working without it).
 - **Contacts:** how many people, import (a file or pasted text), Export.
 - **About:** versions, the address, the time zone, GitHub. **System:** Modules, Updates, Reboot.
 

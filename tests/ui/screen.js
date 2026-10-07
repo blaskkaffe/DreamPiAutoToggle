@@ -128,6 +128,44 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await post('/checkin/toggle', { id: 'nobody' }) === 400, 'tapping people in and out still works without it (answered, not refused)');
   await post('/screen/drag', { value: false }, '4821');
   ok(await post('/pin', { pin: '' }, '4821') === 200 && await post('/colour', { module: 'checkin', key: 'checkin', colour: 'blue' }) === 200, 'removing the PIN removes the lock');
+  // ---- fit to screen: the main screen is as big as it can be without scrolling
+  const room = () => page.evaluate(() => { const d = document.getElementById('dash').getBoundingClientRect(); return { z: parseFloat(getComputedStyle(document.querySelector('#dash .dbox')).zoom), bottom: Math.round(d.bottom + scrollY + 24), vh: innerHeight, scroll: document.documentElement.scrollHeight - innerHeight }; });
+  await page.setViewportSize({ width: 600, height: 1400 }); await load(); let f = await room();
+  ok(f.z === 1 && f.bottom < f.vh - 300, 'a tall window leaves empty space at the bottom without it (' + JSON.stringify(f) + ')');
+  ok(await post('/screen/fit', { value: true }) === 200, 'Fit to screen saved'); await settle(1800); f = await room();
+  ok(f.z > 1.1 && f.bottom <= f.vh && f.vh - f.bottom < 60 && f.scroll <= 0, 'the page is scaled up until its bottom reaches the bottom of the window, with no scrolling (' + JSON.stringify(f) + ')');
+  await page.setViewportSize({ width: 600, height: 1200 }); await settle(1500); const f2 = await room();
+  ok(f2.z < f.z && f2.bottom <= f2.vh && f2.vh - f2.bottom < 60, 'a shorter window gets a smaller scale (' + f2.z.toFixed(2) + ' < ' + f.z.toFixed(2) + ')');
+  await page.setViewportSize({ width: 420, height: 300 }); await settle(1500); const f3 = await room();
+  ok(f3.z === 1, 'a window too small for the page is not shrunk: it scrolls as usual (zoom ' + f3.z + ')');
+  await page.setViewportSize({ width: 1500, height: 900 }); await settle(1500); const f4 = await room();
+  ok(f4.z >= 1 && f4.bottom <= Math.max(f4.vh, f4.bottom), 'a wide window keeps its columns');
+  ok(await post('/screen/fit', { value: false }) === 200, 'Fit to screen switched off'); await settle(1800);
+  ok((await room()).z === 1, 'and the scale is back to 1');
+  // ---- the theme
+  const look = () => page.evaluate(() => ({ theme: document.documentElement.getAttribute('data-theme'), bg: getComputedStyle(document.body).backgroundColor, ink: getComputedStyle(document.body).color,
+    box: getComputedStyle(document.querySelector('.dbox .now')).backgroundColor, boxInk: getComputedStyle(document.querySelector('.dbox .now')).color }));
+  let t = await look();
+  ok(t.theme === 'dark' && t.bg === 'rgb(17, 17, 17)', 'dark is the default (' + t.bg + ')');
+  ok(await post('/screen', { values: { theme: 'light' } }) === 200, 'the theme is saved'); await load(); t = await look();
+  ok(t.theme === 'light' && t.bg === 'rgb(236, 238, 242)' && t.ink === 'rgb(27, 28, 32)' && t.box === 'rgb(255, 255, 255)' && t.boxInk === 'rgb(27, 28, 32)', 'light: a light page with dark ink, and a white box with dark text (' + JSON.stringify(t) + ')');
+  ok(await post('/screen', { values: { theme: 'auto' } }) === 200, 'auto is saved');
+  await page.emulateMedia({ colorScheme: 'light' }); await load(); t = await look();
+  ok(t.theme === 'light', 'auto follows a light device');
+  await page.emulateMedia({ colorScheme: 'dark' }); await settle(500); t = await look();
+  ok(t.theme === 'dark', 'and goes dark when the device does, without a reload');
+  await post('/screen', { values: { theme: 'light' } }); await settle(1500);
+  ok((await look()).theme === 'light', 'a change made elsewhere shows without a reload');
+  await post('/screen', { values: { theme: 'dark' } }); await page.emulateMedia({ colorScheme: null }); await settle(1500);
+  // ---- a setting that was saved is shown everywhere at once: after any successful POST the page asks /api and every data source again (not when their timers run out)
+  await load(); await settle(1500);
+  let asked = 0, askedApi = 0; page.on('request', r => { if (/\/players($|\?)/.test(r.url())) asked++; if (/\/api\?/.test(r.url())) askedApi++; });
+  asked = 0; askedApi = 0;
+  await page.evaluate(() => new Promise(res => post('/screen/drag', { value: false }, res))); await settle(700);
+  ok(asked >= 1, 'a saved setting makes the data sources (here the Online players, which is read only once a minute) be read again at once (' + asked + ')');
+  ok(askedApi >= 1, 'and /api too');
+  asked = 0; await page.evaluate(() => { post('/wbtest', { colour: '#ffffff' }); }); await settle(700);
+  ok(asked === 0, 'but not for the white-balance test, which posts every second');
   // switching "Ask for the PIN" on with no PIN set asks for a new one on the PIN pad, then locks Settings
   await load(); await page.click('#cog'); await settle(900);
   await page.locator('[data-box="appearance"] .srow:has-text("Ask for the PIN") input[type=checkbox]').click(); await enterPin('7315'); await enterPin('7315'); await settle(1200);
