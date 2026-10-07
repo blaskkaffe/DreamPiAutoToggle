@@ -54,10 +54,10 @@ const AUDIT = () => {
     await check('board closed');
     await page.locator('.rp-t').first().click(); await page.waitForTimeout(300); await check('board status menu');
     await page.locator('.rp-sheet button[data-code="LATE"]').click(); await page.waitForTimeout(300); await check('board status needs a time');
-    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
     await page.screenshot({ path: `/tmp/dpns-audit-main-${w}.png`, fullPage: true });
     await page.click('#cog'); await page.waitForTimeout(1500); await check('settings');
-    await page.click('[data-box="check-in"] .srow:has-text("Group people by") > button'); await page.waitForTimeout(300); await check('settings group-by pop-up');
+    await page.locator('[data-box="contacts"] .cpeople .srow').first().locator('span').first().click(); await page.waitForTimeout(300); await check('settings person editor');
     await page.keyboard.press('Escape');
     await page.screenshot({ path: `/tmp/dpns-audit-settings-${w}.png`, fullPage: true });
     summary[w] = problems;
