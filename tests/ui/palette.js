@@ -27,7 +27,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await rows.count() === 15, 'the editor lists the 15 colours of the palette (' + await rows.count() + ')');
   ok(!(await order()).includes('network'), 'Selected network is not in it');
   let b = await balls();
-  ok(b.length === 16 && b[b.length - 1] === 'network', 'the colour picks offer the palette and then Selected network, which the network switcher adds (' + b.length + ')');
+  ok(b.length === 15 && !b.includes('network'), 'the colour picks offer the 15 colours of the palette (' + b.length + ')');
   // ---- add and edit
   await openEditor();
   await page.locator('.pop.open button', { hasText: 'Add colour' }).click(); await settle(1200);
@@ -39,7 +39,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await page.locator('.pop.open button', { hasText: 'Done' }).click(); await settle(300);
   // ---- the rest of the page follows without a reload
   b = await balls();
-  ok(b.includes('new-colour') && b.length === 17, 'the colour picks offer it at once, without reloading the page');
+  ok(b.includes('new-colour') && b.length === 16, 'the colour picks offer it at once, without reloading the page');
   await clockPick().click(); await settle(300); await page.locator('.pop.open .swatch[data-id="new-colour"]').click(); await settle(1800);
   const bg = await page.evaluate(() => getComputedStyle(document.querySelector('[data-box="appearance"] .srow .colourpick > button.c-new-colour')).backgroundColor);
   ok(/^rgba?\(153, 255, 0/.test(bg), 'a box can use it: the Clock colour button is lime (' + bg + ')');
@@ -61,7 +61,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(after.indexOf('red') === before.indexOf('red') + 1, 'a colour moves down one place (' + after.slice(0, 4).join(' ') + ')');
   await page.locator('.pop.open button', { hasText: 'Done' }).click(); await settle(300);
   b = await balls();
-  ok(b.slice(0, after.length).join() === after.join() && b[b.length - 1] === 'network', 'and the colour picks follow the new order');
+  ok(b.slice(0, after.length).join() === after.join(), 'and the colour picks follow the new order');
   // ---- delete
   await openEditor();
   ok(!(await page.locator('.pop.open .srow.pal[data-id="orange"] button[title^="Delete"]').isVisible()) && !(await page.locator('.pop.open .srow.pal[data-id="global"] button[title^="Delete"]').isVisible()), 'Orange and Global main have no Delete button');
