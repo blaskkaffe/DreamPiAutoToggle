@@ -8,7 +8,7 @@ import sys
 import time
 
 BASE_DIR = "/opt/dreampi-netswitch"
-PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the Colour palette module's list: {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui"}]}
+PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the user's changes to the list of the palette (Appearance > Colour palette): {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui"}]}
 PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb"}}: palette colours the user changed
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
 MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"checkin": {"checkin": "green", ...}}: the global-palette colours each module uses
@@ -200,7 +200,7 @@ def save_module_enabled(name, on):
 
 
 # ---------------------------------------------------------------- colours
-# The page's colours: one global palette of 16 named colours (8 hues, each normal and bright, like a terminal's 16),
+# The page's colours: one global palette of 15 named colours (7 hues, each normal and bright, and "Global main"),
 # defined only here. A module never writes a colour of its own; it names one from the palette by its id ("orange",
 # "bright-blue" ...), either in module.json  "colours": {"checkin": "green", ...}  (the user can change these in the
 # module's own settings, see module_colour()) or as its  "primary"  colour, the one used on its borders and buttons.
@@ -215,7 +215,6 @@ PALETTE = (
     ("cyan", "Cyan", "cyan", "#1fb5c9", "#7fdbe6"),
     ("blue", "Blue", "blue", "#1c6fe8", "#80b1f6"),
     ("purple", "Purple", "purple", "#8a4fd6", "#bf9ae8"),
-    ("teal", "Teal", "cyan", "#17a398", "#7fd9d0"),
     ("white", "White", "white", "#b8bec9", "#e6e9ee"),
     ("bright-red", "Bright red", "red", "#ff5a5f", "#ffa6a9"),
     ("bright-green", "Bright green", "green", "#4cd964", "#a6efb6"),
@@ -224,10 +223,10 @@ PALETTE = (
     ("bright-purple", "Bright purple", "purple", "#b070ff", "#d3b0ff"),
     ("bright-pink", "Bright pink", "pink", "#ff6ab8", "#ffaad6"),
 )
-PALETTE_IDS = tuple(c[0] for c in PALETTE)       # the ones the add-on ships; palette_ids() is the list in use (the Colour palette module can delete and add colours)
+PALETTE_IDS = tuple(c[0] for c in PALETTE)       # the ones the add-on ships; palette_ids() is the list in use (the colour palette editor can delete and add colours)
 FIXED_COLOURS = ("global", "orange")   # never deleted: "Global main" is not a colour of its own, orange is the one everything falls back to
 # colours that were in the palette once: what a saved choice of them becomes
-LEGACY_COLOURS = {"bright-orange": "orange", "bright-yellow": "yellow", "pink": "bright-pink"}
+LEGACY_COLOURS = {"bright-orange": "orange", "bright-yellow": "yellow", "pink": "bright-pink", "teal": "cyan"}
 DEFAULT_COLOUR = "orange"
 
 
@@ -248,11 +247,9 @@ MAX_CUSTOM_COLOURS = 40
 
 
 def palette_layout():
-    """The Colour palette module's list over the shipped palette, made safe: {"order", "deleted", "names", "custom"}. Empty while that module is
-    off (the shipped palette is then in use, with the changes of the Global main colour picker in palette.json)."""
+    """The user's changes to the list of the palette (Settings > Appearance > Colour palette) over the shipped palette, made safe:
+    {"order", "deleted", "names", "custom"}. The screen colours the user changed are in palette.json."""
     out = {"order": [], "deleted": [], "names": {}, "custom": []}
-    if not module_enabled("palette"):
-        return out
     try:
         with open(PALETTE_CUSTOM) as f:
             data = json.load(f)
@@ -298,8 +295,9 @@ def palette_overrides():
     except (IOError, OSError, ValueError):
         return {}
     out = {}
+    ids = palette_ids()
     for ident, v in (data.items() if isinstance(data, dict) else []):
-        if ident in palette_ids() and isinstance(v, dict):
+        if ident in ids and isinstance(v, dict):
             keep = dict((k, str(v[k]).lower()) for k in ("ui",) if isinstance(v.get(k), _STR) and _HEX.match(v[k]))
             if keep:
                 out[ident] = keep
@@ -341,7 +339,7 @@ def set_palette_colour(ident, ui=None):
 
 
 def reset_palette(ident=None):
-    """Put one palette colour (or all of them) back to the shipped values."""
+    """Put one palette colour (or all of them) back to the shipped colour."""
     over = palette_overrides()
     if ident is None:
         over = {}
@@ -351,13 +349,14 @@ def reset_palette(ident=None):
 
 
 def _write_palette(over):
+    """Keep what is changed on screen in palette.json."""
     tmp = PALETTE_FILE + ".tmp"
     with open(tmp, "w") as f:
         json.dump(over, f)
     os.rename(tmp, PALETTE_FILE)
 
 
-# ---- the Colour palette module's changes (they only count while that module is on; see palette_layout())
+# ---- the changes the colour palette editor makes (see palette_layout())
 def _raw_layout():
     try:
         with open(PALETTE_CUSTOM) as f:
@@ -414,11 +413,9 @@ def palette_edit(ident, name=None, ui=None):
             _write_layout(data)
     if ui is not None:
         if custom:
-            for key, value in (("ui", ui),):
-                if value is not None:
-                    if not (isinstance(value, _STR) and _HEX.match(value)):
-                        return False
-                    custom[0][key] = value.lower()
+            if not (isinstance(ui, _STR) and _HEX.match(ui)):
+                return False
+            custom[0]["ui"] = ui.lower()
             _write_layout(data)
         elif not set_palette_colour(ident, ui):
             return False
@@ -429,6 +426,7 @@ def palette_delete(ident):
     """Take a colour out of the palette. What used it falls back (a module's pick to its default, a highlight to the rainbow). False for one that cannot be deleted (FIXED_COLOURS) or does not exist."""
     if ident in FIXED_COLOURS or ident not in palette_ids():
         return False
+    over = palette_overrides()                  # read while the colour is still in the palette: its changes go with it
     data = _raw_layout()
     if ident in PALETTE_IDS:
         if ident not in data["deleted"]:
@@ -438,7 +436,6 @@ def palette_delete(ident):
     data["names"].pop(ident, None)
     data["order"] = [i for i in data["order"] if i != ident]
     _write_layout(data)
-    over = palette_overrides()
     if over.pop(ident, None) is not None:
         _write_palette(over)
     picks = _saved_module_colours()
@@ -469,13 +466,14 @@ def palette_order(ids):
 
 
 def palette_reset(ident=None):
-    """Back to the colours the add-on ships: the whole palette (all colours, names, order, changes) or one shipped colour (its name and colours)."""
+    """Back to the colours the add-on ships: the whole palette (all colours, names, order, screen colours) or one shipped colour (its name and screen
+    colour). What the LED shows for a colour is the LED module's and stays."""
     if ident is None:
-        for path in (PALETTE_CUSTOM, PALETTE_FILE):
-            try:
-                os.remove(path)
-            except OSError:
-                pass
+        reset_palette()
+        try:
+            os.remove(PALETTE_CUSTOM)
+        except OSError:
+            pass
         return True
     if ident not in PALETTE_IDS or ident not in palette_ids():
         return False

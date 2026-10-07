@@ -40,7 +40,7 @@ UI_KIT = 2       # the version of the page kit (ui in page/page.js, the kit bloc
 _PAGE_FILES = ("page.css", "page.js")
 # the standard widgets the page can draw from a layout (docs/modules.md, "Layout"); "custom" hands a box to the module's own page.js
 WIDGETS = ("text", "row", "button", "toggle", "swatches", "colourpick", "link", "form", "infobox", "status", "bar", "carousel", "worldmap", "triggers",
-           "picker", "list", "links", "console", "info", "pinset", "roster", "custom")
+           "picker", "list", "links", "console", "info", "pinset", "roster", "palette", "custom")
 CONTROLS = ("select", "choice", "number", "text", "toggle", "colour", "slider", "range")      # what a form field may hold (W.form, control() in page/widgets.js)
 SECTIONS = ("dashboard", "settings")
 BACKGROUND_TYPES = ("fullscreen", "part")
@@ -58,7 +58,7 @@ def _read(path):
 def signature():
     """Changes whenever a module is added, removed, switched or edited."""
     parts = [core.MODULES_DIR]
-    for path in (core.MODULES_STATE, core.MODULE_ORDER, core.MODULE_COLOURS, core.MODULE_TINTS, core.PALETTE_FILE):       # what the picker, the colour pickers and the palette editor write
+    for path in (core.MODULES_STATE, core.MODULE_ORDER, core.MODULE_COLOURS, core.MODULE_TINTS, core.PALETTE_FILE, core.PALETTE_CUSTOM):       # what the picker, the colour pickers and the palette editor write
         try:
             parts.append(os.path.getmtime(path))
         except OSError:

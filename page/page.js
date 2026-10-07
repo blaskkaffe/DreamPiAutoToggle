@@ -230,7 +230,7 @@ function unlockThen(go){if(!(S.settings_pin&&S.settings_pin.on)||pinValue)return
 $("cog").onclick=function(){unlockThen(function(){showSettings(true)})};
 $("close-settings").onclick=function(){showSettings(false)};
 document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(!fire("escape"))showSettings(false)}});
-// the palette (/api "palette" and "palette_css") comes only when it is not the version the page has (PV); it changes when the Colour palette module edits it
+// the palette (/api "palette" and "palette_css") comes only when it is not the version the page has (PV); it changes when the user edits it (Appearance > Colour palette)
 var PV="";
 function PAL(){return S.palette||LAY.palette||[]}
 function applyPalette(d){PV=d.palette_v;S.palette=d.palette;

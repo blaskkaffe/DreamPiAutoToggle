@@ -171,6 +171,41 @@ W.pinset=function(s,ctx){var set=h("button",{type:"button","class":"pill-s",text
  rem.onclick=function(e){e.stopPropagation();if(confirm("Remove the PIN?"))send("","The PIN is removed.")};
  function paint(){var has=!!(S.settings_pin&&S.settings_pin.pin);set.textContent=has?"Change PIN":"Set PIN";sh(rem,has)}
  UPD.push(paint);paint();return el};
+// "palette": the colour palette editor (Settings > Appearance): a row with an Edit button; its pop-up lists the palette, one row per colour: a handle (drag to move),
+// the colour (tap to change it), its name, Default (a changed colour of the add-on) and Delete. Add colour and Reset palette are under the list. Saved as it is done;
+// the rest of the page follows at once (/api carries a changed palette). What the LED shows for a colour is the LED module's.
+W.palette=function(s,ctx){var r=editRow({title:"Colour palette",button:"Edit",aria:"Edit the colour palette"}),el=h("div"),list=h("div",{"class":"poplist mlist"}),data=[],timers={},lastPV=null,
+ addB=h("button",{type:"button","class":"pill-s",text:"Add colour"}),resetB=h("button",{type:"button","class":"pill-s danger",text:"Reset palette"}),doneB=h("button",{type:"button","class":"pill-s",text:"Done"}),
+ pop=h("div",{},[h("div",{"class":"t",text:"Colours: tap a colour to change it, edit its name, drag the handle to move it. A colour you delete is taken out of every colour pick."}),list,h("div",{"class":"bar"},[addB,resetB,doneB])]),p=ui.popup(pop);
+ el.appendChild(r.el);el.appendChild(pop);
+ function byId(id){var f=null;data.forEach(function(c){if(c.id===id)f=c});return f}
+ function rowOf(id){return list.querySelector('[data-id="'+id+'"]')}
+ function flags(){data.forEach(function(c){var row=rowOf(c.id);if(!row)return;sh(row._back,!!c.changed);if(document.activeElement!==row._well)row._well.value=c.ui;})}      // after an edit: only what changed is touched, the field being typed in keeps its focus
+ function take(res,rebuild){if(!res||!res.colours)return;data=res.colours;sh(addB,res.can_add!==false);r.setSub(data.length+" colours");if(rebuild)build();else flags()}
+ function save(id,body){clearTimeout(timers[id]);timers[id]=setTimeout(function(){body.id=id;post("/palette/edit",body,function(res){take(res,false);ctx.saved()})},250)}
+ function build(){list.innerHTML="";
+  data.forEach(function(c){
+   var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+c.name+": drag, or use the up and down arrow keys",html:GRIP_SVG}),
+    well=h("input",{type:"color","aria-label":"Colour of "+c.name}),name=h("input",{type:"text",maxlength:"24","class":"pal-name","aria-label":"Name of the colour"}),
+    back=h("button",{type:"button","class":"pill-s pal-btn",text:"\u21ba",title:"Back to the colour the add-on ships","aria-label":"Back to the default colour of "+c.name}),
+    del=h("button",{type:"button","class":"pill-s pal-btn",text:"\u2715",title:"Delete this colour","aria-label":"Delete "+c.name}),
+    row=h("div",{"class":"srow pal","data-id":c.id},[grip,well,name,back,del]);
+   well.value=c.ui;name.value=c.name;row._well=well;row._back=back;sh(back,!!c.changed&&!c.custom);sh(del,!c.fixed);
+   well.oninput=function(){save(c.id,{ui:well.value})};
+   name.onchange=function(){if(name.value.trim())save(c.id,{name:name.value});else name.value=(byId(c.id)||c).name};
+   back.onclick=function(){post("/palette/reset",{id:c.id},function(res){take(res,true);ctx.saved()})};
+   del.onclick=function(){if(confirm("Delete the colour "+(byId(c.id)||c).name+"? Whatever uses it goes back to its default colour."))post("/palette/delete",{id:c.id},function(res){if(res){take(res,true);ctx.saved()}else alert("That colour cannot be deleted.")})};
+   list.appendChild(row)});
+  sortable(list,function(names){post("/palette/order",{order:names},function(res){take(res,false);ctx.saved()})})}
+ function load(){xhrJson("GET","/palette/list",function(res){take(res,!list.classList.contains("dragging"))})}
+ addB.onclick=function(e){e.stopPropagation();post("/palette/add",{name:"New colour",ui:"#8890a0"},function(res){if(!res){alert("The palette is full.");return}take(res,true);ctx.saved();
+  var row=rowOf(res.id);if(row){row.scrollIntoView({block:"nearest"});row.querySelector(".pal-name").focus();row.querySelector(".pal-name").select()}})};
+ resetB.onclick=function(e){e.stopPropagation();if(confirm("Bring back the colours the add-on ships, with their names and order? Your own colours and your changes are lost (what the LED shows is kept)."))post("/palette/reset",{},function(res){if(res){take(res,true);ctx.saved()}})};
+ doneB.onclick=function(){p.close()};
+ r.btn.onclick=function(e){e.stopPropagation();if(p.isOpen()){p.close();return}load();p.open(r.btn)};
+ hook("settingsClose",function(){p.close()});
+ UPD.push(function(){if(PV!==lastPV){lastPV=PV;if(!list.contains(document.activeElement)&&!list.classList.contains("dragging"))load()}});
+ load();return el};
 W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.look||"neutral"),"aria-label":s.label||""}),el=box;
  if(s.text){el=h("label",{"class":"sub tgl"},[box,document.createTextNode(s.text)])}
  if(s.colour)colourClass(box,s.colour,s.mod);
@@ -214,7 +249,7 @@ W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri
  el=h("span",{"class":"colourpick"},[tint,btn,pop]),btns={},names={},p=ui.popup(pop);
  if(tint)colourClass(tint,s.key,s.mod);          // the tick box has the colour of its pick
  if(tint)tint.onchange=function(){var want=tint.checked;post("/colour",{module:s.mod,key:s.key,tint:want},function(r){if(r){refresh();ctx.saved()}else tint.checked=!want})};
- function buildGrid(){builtPV=PV;grid.innerHTML="";btns={};names={};      // the palette can be edited while the page is open (the Colour palette module): the balls are made again then
+ function buildGrid(){builtPV=PV;grid.innerHTML="";btns={};names={};      // the palette can be edited while the page is open (Appearance > Colour palette): the balls are made again then
   paletteOrder(s).forEach(function(c){names[c.id]=c.name;
    var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui+";--cl:"+c.ui_l,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
    b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){p.close();refresh();ctx.saved()}})};grid.appendChild(b)})}

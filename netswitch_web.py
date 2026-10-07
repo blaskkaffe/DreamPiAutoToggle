@@ -76,6 +76,22 @@ def _screen_reply():
                       "set_cols": "Up to %d" % cur["set_cols"] + (" column" if cur["set_cols"] == 1 else " columns")}}
 
 
+def _palette_reply(extra=None):
+    """The colour palette editor (Settings > Appearance > Colour palette): the palette in its order, with what the editor needs. The modules' own
+    colours (Selected network) are not in it. What the LED shows for a colour is the LED module's."""
+    out = []
+    for c in core.colours():
+        if c.get("token"):
+            continue
+        shipped = [s for s in core.PALETTE if s[0] == c["id"]]
+        out.append({"id": c["id"], "name": c["name"], "ui": c["ui"], "ui_l": c["ui_l"], "ui_default": c["ui_default"],
+                    "fixed": c["id"] in core.FIXED_COLOURS, "custom": not shipped,
+                    "changed": bool(shipped) and (c["ui"] != c["ui_default"] or c["name"] != shipped[0][1])})
+    body = {"colours": out, "can_add": len([c for c in out if c["custom"]]) < core.MAX_CUSTOM_COLOURS}
+    body.update(extra or {})
+    return body
+
+
 def _timezone_reply():
     """The form widget's answer for the common time zone (Settings > About)."""
     import netswitch_tz as tz
@@ -264,6 +280,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(json.dumps(_highlight_reply()), "application/json")
         elif path == "/timezone":
             self.send(json.dumps(_timezone_reply()), "application/json")
+        elif path == "/palette/list":
+            self.send(json.dumps(_palette_reply()), "application/json")
         elif path == "/screen":
             self.send(json.dumps(_screen_reply()), "application/json")
         elif modules.route("GET", path):
@@ -312,6 +330,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_screen(path)
         if path == "/palette":
             return self._post_palette()
+        if path.startswith("/palette/") and path[len("/palette/"):] in ("edit", "add", "delete", "order", "reset"):
+            return self._post_palette_edit(path[len("/palette/"):])
         if modules.route("POST", path):
             if modules.route("POST", path)(self) is True:    # an enabled module's own endpoint; True = it has answered
                 return
@@ -395,6 +415,30 @@ class Handler(BaseHTTPRequestHandler):
             return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
         refresh_page(force=True)       # the palette is built into the page
         self.send(json.dumps({"palette": core.colours()}), "application/json")
+
+    def _post_palette_edit(self, what):
+        """Settings > Appearance > Colour palette: edit {"id", "name"?, "ui"?} | add {"name", "ui"} | delete {"id"} | order {"order": [ids]} | reset {} or {"id"}.
+        Every answer is the palette again (an add also says the new id)."""
+        try:
+            d = json.loads(self._body(4096).decode("utf-8"))
+            d = d if isinstance(d, dict) else {}
+        except ValueError:
+            d = {}
+        extra = None
+        if what == "edit":
+            ok = core.palette_edit(d.get("id"), d.get("name"), d.get("ui"))
+        elif what == "add":
+            ident = core.palette_add(d.get("name"), d.get("ui"))
+            ok, extra = ident is not None, {"id": ident}
+        elif what == "delete":
+            ok = core.palette_delete(d.get("id"))
+        elif what == "order":
+            ok = core.palette_order(d.get("order"))
+        else:
+            ok = core.palette_reset(d.get("id") or None)
+        if not ok:
+            return self.send("Not possible (an unknown colour, not #rrggbb, one that cannot be deleted, or the palette is full)", "text/plain; charset=utf-8", status=400)
+        self.send(json.dumps(_palette_reply(extra)), "application/json")
 
     def _post_highlight(self):
         """Settings > Appearance > Notification highlight: {"values": {"style": "rainbow" | palette id}} (the form widget's format)."""

@@ -18,7 +18,7 @@ class PaletteCore(unittest.TestCase):
         cleanup(self.tmp)
 
     def ids(self):
-        return [c["id"] for c in core.colours()]
+        return [c["id"] for c in core.colours() if not c.get("token")]            # the palette (the switcher's Selected network is not in it)
 
     def test_the_shipped_palette_is_what_is_used_to_begin_with(self):
         self.assertEqual(tuple(self.ids()), core.PALETTE_IDS)
@@ -54,7 +54,7 @@ class PaletteCore(unittest.TestCase):
         self.assertFalse(core.palette_order("blue"))
 
     def test_delete_and_what_used_it(self):
-        for fixed in core.FIXED_COLOURS:
+        for fixed in core.FIXED_COLOURS + ("network",):
             self.assertFalse(core.palette_delete(fixed), fixed)
         self.assertTrue(core.palette_delete("blue"))
         self.assertNotIn("blue", self.ids())
@@ -80,16 +80,8 @@ class PaletteCore(unittest.TestCase):
         self.assertFalse(core.palette_reset("mine"))                                            # not one the add-on ships
         self.assertTrue(core.palette_reset())
         self.assertEqual(tuple(self.ids()), core.PALETTE_IDS)
-        self.assertFalse(os.path.exists(core.PALETTE_CUSTOM) or os.path.exists(core.PALETTE_FILE))
-
-    def test_the_list_only_counts_while_the_module_is_on(self):
-        core.palette_add("Mine", "#123456")
-        core.palette_delete("cyan")
-        self.assertIn("mine", self.ids())
-        core.save_module_enabled("palette", False)
-        self.assertEqual(tuple(self.ids()), core.PALETTE_IDS)                                   # the file is still there, but the shipped palette is in use
-        core.save_module_enabled("palette", True)
-        self.assertIn("mine", self.ids())
+        self.assertFalse(os.path.exists(core.PALETTE_CUSTOM))
+        self.assertEqual(core.palette_overrides(), {})
 
     def test_the_version_follows_the_palette(self):
         v = core.palette_version()
@@ -132,6 +124,7 @@ class PaletteHttp(unittest.TestCase):
         self.assertEqual(st, 200)
         self.assertEqual([c["id"] for c in got["colours"]], list(core.PALETTE_IDS))
         self.assertTrue(all(c["fixed"] for c in got["colours"] if c["id"] in ("global", "orange")))
+        self.assertTrue(all("led" not in c for c in got["colours"]))
         st, got = self.call("POST", "/palette/add", {"name": "Lime", "ui": "#99ff00"})
         self.assertEqual((st, got["id"]), (200, "lime"))
         self.assertEqual(got["colours"][-1]["custom"], True)
@@ -159,7 +152,7 @@ class PaletteHttp(unittest.TestCase):
         self.assertIn("palette", api)
         self.assertIn("palette_css", api)
         v = api["palette_v"]
-        self.assertEqual(len(api["palette"]), 16)
+        self.assertEqual(len(api["palette"]), 15)
         st, again = self.call("GET", "/api?pv=" + v)
         self.assertNotIn("palette", again)                                                      # the page has this version: no list, no CSS
         self.assertEqual(again["palette_v"], v)
