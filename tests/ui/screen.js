@@ -152,6 +152,15 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await post('/screen', { values: { theme: 'light' } }); await settle(1500);
   ok((await look()).theme === 'light', 'a change made elsewhere shows without a reload');
   await post('/screen', { values: { theme: 'dark' } }); await page.emulateMedia({ colorScheme: null }); await settle(1500);
+  // ---- a setting that was saved is shown everywhere at once: after any successful POST the page asks /api and every data source again (not when their timers run out)
+  await load(); await settle(1500);
+  let asked = 0, askedApi = 0; page.on('request', r => { if (/\/players($|\?)/.test(r.url())) asked++; if (/\/api\?/.test(r.url())) askedApi++; });
+  asked = 0; askedApi = 0;
+  await page.evaluate(() => new Promise(res => post('/screen/drag', { value: false }, res))); await settle(700);
+  ok(asked >= 1, 'a saved setting makes the data sources (here the Online players, which is read only once a minute) be read again at once (' + asked + ')');
+  ok(askedApi >= 1, 'and /api too');
+  asked = 0; await page.evaluate(() => { post('/wbtest', { colour: '#ffffff' }); }); await settle(700);
+  ok(asked === 0, 'but not for the white-balance test, which posts every second');
   ok(errors.length === 0, 'no JavaScript or console errors' + (errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''));
   await browser.close();
   console.log(failed ? failed + ' check(s) failed' : 'all checks passed');

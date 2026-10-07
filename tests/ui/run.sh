@@ -66,4 +66,10 @@ SERVER=$!
 sleep 3
 PORT=8742 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node imagebg.js || RESULT=1
 kill $SERVER 2>/dev/null
+# the Colour palette module: add, edit, rearrange, delete and reset colours; the rest of the page follows at once
+CLOCK=1 PORT=8743 python3 demo_server.py > /tmp/dpns-demo-palette.log 2>&1 &
+SERVER=$!
+sleep 3
+PORT=8743 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node palette.js || RESULT=1
+kill $SERVER 2>/dev/null
 exit $RESULT

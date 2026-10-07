@@ -34,7 +34,11 @@ function colourClass(el,ref,mod){el.setAttribute("data-own-colour","1");
   if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._cc=id}
  apply();UPD.push(apply)}
 // ---- talking to the server
-function post(url,body,done){xhrJson("POST",url,function(r,st,b){if(done)done(r,st,b)},body)}
+// A POST that worked may have changed what any box shows (a switch in Settings changes the clock on the main page, a colour changes a row's text ...),
+// so the page asks again for /api and for every data source soon after it, not when their timers run out (a quick burst of POSTs, a slider, is one question).
+var afterPostTimer=null;
+function settledSoon(){clearTimeout(afterPostTimer);afterPostTimer=setTimeout(function(){refresh();reloadData()},250)}
+function post(url,body,done){xhrJson("POST",url,function(r,st,b){if(r&&!/^\/wbtest/.test(url))settledSoon();if(done)done(r,st,b)},body)}
 // after a button's POST: "reload" the page, "wait" until the Pi is back (a reboot), or just look at the new state
 function afterPost(s,r,el){
  if(r&&r.started===false){alert(r.message||"That did not start");return}
@@ -178,19 +182,19 @@ W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(
 // ---- the module's own colour choice: a "Colour" button in the chosen colour that opens a pop-up with the palette's colours;
 // the pick is kept for the module (core.set_module_colour)
 // the palette in the server's order, without the ids a pick leaves out ("exclude": the network colours cannot be "Selected network", that would be a circle)
-function paletteOrder(s){return (LAY.palette||[]).filter(function(c){return (s.exclude||[]).indexOf(c.id)<0})}
-function colourOfId(id){var r=null;(LAY.palette||[]).forEach(function(p){if(p.id===id)r=p});return r}
+function paletteOrder(s){return PAL().filter(function(c){return (s.exclude||[]).indexOf(c.id)<0})}
+function colourOfId(id){var r=null;PAL().forEach(function(p){if(p.id===id)r=p});return r}
 function mixWhite(hex){var n=[1,3,5].map(function(i){var v=parseInt(hex.substr(i,2),16);return Math.round(v+(255-v)*0.45)});return "#"+n.map(function(v){return (v<16?"0":"")+v.toString(16)}).join("")}
 function rgbOf(hex){return parseInt(hex.substr(1,2),16)+","+parseInt(hex.substr(3,2),16)+","+parseInt(hex.substr(5,2),16)}
 // a palette colour changed on the page: every box that uses it follows at once (the next page load has it from the server)
 function applyPaletteVars(c){var s=document.documentElement.style,l=mixWhite(c.ui);
  s.setProperty("--c-"+c.id,c.ui);s.setProperty("--c-"+c.id+"-l",l);s.setProperty("--c-"+c.id+"-rgb",rgbOf(c.ui));s.setProperty("--c-"+c.id+"-l-rgb",rgbOf(l));
- (LAY.palette||[]).forEach(function(p){if(p.id===c.id){p.ui=c.ui;p.ui_l=l}})}
+ PAL().forEach(function(p){if(p.id===c.id){p.ui=c.ui;p.ui_l=l}})}
 // a colour picker for one palette colour (Global main): it changes the colour everywhere it is used. It looks like the other colour picks
 // (a small Colour button in its own colour); the system's colour chooser is an input laid invisibly over the button, so a tap opens it.
 W.colourpick=function(s,ctx){var inp=h("input",{type:"color","class":"cp-native","aria-label":(s.label||"Colour")}),timer=null,
  btn=h("button",{type:"button","class":"pill-s pri c-"+s.id,text:"Colour",tabindex:"-1","aria-hidden":"true"}),el=h("span",{"class":"colourpick cp-wrap"},[btn,inp]);
- (LAY.palette||[]).forEach(function(p){if(p.id===s.id)inp.value=p.ui});
+ PAL().forEach(function(p){if(p.id===s.id)inp.value=p.ui});
  inp.oninput=function(){var ui=inp.value;applyPaletteVars({id:s.id,ui:ui});clearTimeout(timer);timer=setTimeout(function(){post("/palette",{id:s.id,ui:ui},function(r){if(r)ctx.saved()})},250)};
  return el};
 // a colour well: a Colour button in a colour of any #rrggbb (the LED colour editor); the system's colour chooser lies over it, cb(value) is called on every change
@@ -198,17 +202,19 @@ function colourWell(value,label,cb){var inp=h("input",{type:"color","class":"cp-
  btn=h("button",{type:"button","class":"pill-s well",text:"Colour",tabindex:"-1","aria-hidden":"true"}),el=h("span",{"class":"colourpick cp-wrap"},[btn,inp]);
  function paint(){btn.style.setProperty("--well",inp.value);btn.style.setProperty("--well-l",mixWhite(inp.value))}
  inp.oninput=function(){paint();cb(inp.value)};paint();return el}
-W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri",text:s.label||"Colour","aria-haspopup":"dialog"}),
+W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri",text:s.label||"Colour","aria-haspopup":"dialog"}),builtPV=null,
  grid=h("span",{"class":"swatches grid"}),pop=h("div",{"class":"colours"},[h("div",{"class":"t",text:s.title||"Pick a colour"}),grid]),
  tint=s.tint?h("input",{type:"checkbox","class":"cbox pri",title:"Highlight: a coloured background (off = a neutral one)","aria-label":(s.title||"Colour")+": highlight with a coloured background"}):null,
  el=h("span",{"class":"colourpick"},[tint,btn,pop]),btns={},names={},p=ui.popup(pop);
  if(tint)colourClass(tint,s.key,s.mod);          // the tick box has the colour of its pick
  if(tint)tint.onchange=function(){var want=tint.checked;post("/colour",{module:s.mod,key:s.key,tint:want},function(r){if(r){refresh();ctx.saved()}else tint.checked=!want})};
- paletteOrder(s).forEach(function(c){names[c.id]=c.name;
-  var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui+";--cl:"+c.ui_l,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
-  b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){p.close();refresh();ctx.saved()}})};grid.appendChild(b)});
+ function buildGrid(){builtPV=PV;grid.innerHTML="";btns={};names={};      // the palette can be edited while the page is open (the Colour palette module): the balls are made again then
+  paletteOrder(s).forEach(function(c){names[c.id]=c.name;
+   var b=h("button",{type:"button","class":"swatch",style:"--c:"+c.ui+";--cl:"+c.ui_l,"aria-label":c.name,"data-id":c.id});btns[c.id]=b;
+   b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){p.close();refresh();ctx.saved()}})};grid.appendChild(b)})}
+ buildGrid();
  btn.onclick=function(e){p.toggle(btn,e)};
- function paint(){var cur=(((S.colours||{})[s.mod])||{})[s.key]||"",real=realColour(cur);
+ function paint(){if(builtPV!==PV)buildGrid();var cur=(((S.colours||{})[s.mod])||{})[s.key]||"",real=realColour(cur);
   if(btn._cc!==real){if(btn._cc)btn.classList.remove("c-"+btn._cc);if(real)btn.classList.add("c-"+real);btn._cc=real;
    btn.setAttribute("aria-label",(s.label||"Colour")+": "+(names[cur]||cur||"not set"))}
   if(btns.network){var nw=colourOfId(realColour("network"));if(nw)btns.network.style.cssText="--c:"+nw.ui+";--cl:"+nw.ui_l}      // the ball shows the network's colour now

@@ -1,0 +1,11 @@
+{
+ "settings": [
+  {
+   "box": "palette",
+   "title": "Colour palette",
+   "items": [
+    {"type": "custom", "name": "palette-editor"}
+   ]
+  }
+ ]
+}

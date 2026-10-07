@@ -213,8 +213,16 @@ function unlockThen(go){if(!(S.settings_pin&&S.settings_pin.on)||pinValue)return
 $("cog").onclick=function(){unlockThen(function(){showSettings(true)})};
 $("close-settings").onclick=function(){showSettings(false)};
 document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(!fire("escape"))showSettings(false)}});
-function refresh(){var x=new XMLHttpRequest();x.open("GET","/api",true);
- x.onload=function(){if(x.status==200)render(JSON.parse(x.responseText));bootDone("api")};x.onerror=function(){bootDone("api")};x.send()}
+// the palette (/api "palette" and "palette_css") comes only when it is not the version the page has (PV); it changes when the Colour palette module edits it
+var PV="";
+function PAL(){return S.palette||LAY.palette||[]}
+function applyPalette(d){PV=d.palette_v;S.palette=d.palette;
+ var st=document.getElementById("palette-css");if(!st){st=document.createElement("style");st.id="palette-css";document.head.appendChild(st)}
+ st.textContent=d.palette_css;
+ var inl=document.documentElement.style,i,drop=[];for(i=0;i<inl.length;i++)if(inl[i].indexOf("--c-")===0)drop.push(inl[i]);drop.forEach(function(k){inl.removeProperty(k)});      // a colour changed on this page (the Global main picker) is the server's now
+ if(window.engineUpdate)engineUpdate()}
+function refresh(){var x=new XMLHttpRequest();x.open("GET","/api?pv="+PV,true);
+ x.onload=function(){if(x.status==200){var r=JSON.parse(x.responseText);render(r);if(r.palette)applyPalette(r)}bootDone("api")};x.onerror=function(){bootDone("api")};x.send()}
 // The first draw waits for /api and for the data sources that have no kept answer from an earlier visit (at most BOOT_LIMIT ms), then every
 // box is shown at once: nothing pops in one box after the other
 var BOOT_LIMIT=1500,bootPending={api:1};

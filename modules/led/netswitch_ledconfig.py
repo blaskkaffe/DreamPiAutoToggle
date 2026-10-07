@@ -164,7 +164,7 @@ def order_by_priority(groups, priority):
 
 
 def _valid_colour(c):
-    return isinstance(c, _TEXT) and (c in TOKEN_IDS or c in core.PALETTE_IDS or c in core.LEGACY_COLOURS)
+    return isinstance(c, _TEXT) and (c in TOKEN_IDS or c in core.palette_ids() or c in core.LEGACY_COLOURS)
 
 
 def clean_groups(data):

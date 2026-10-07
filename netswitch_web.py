@@ -40,7 +40,7 @@ CERT = os.path.join(core.BASE_DIR, "https.crt")   # self-signed, made by install
 KEY = os.path.join(core.BASE_DIR, "https.key")
 
 
-def api_state():
+def api_state(have_palette=""):
     """The /api answer. The base only has the page-wide parts (PIN flag, warnings, time, the modules' colours); everything
     else is added by the enabled modules' api() hooks (the network switcher adds the network and the status rows)."""
     warnings = ["Module %s is not loaded: %s" % (name, why) for name, why in sorted(modules.errors().items())]
@@ -53,6 +53,11 @@ def api_state():
          "screen": core.screen_settings(),
          "settings_pin": {"on": security.settings_locked(), "pin": security.pin_required()}}
     modules.apply_api(d, warnings)          # what the enabled modules add: network, status, debug, wifi, the dot's LED look ...
+    version = core.palette_version()
+    d["palette_v"] = version
+    if have_palette != version:             # the palette (and its CSS) only when the page does not have this version: it changes when the user edits it
+        d["palette"] = [{"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"], "ui_l": c["ui_l"]} for c in core.colours()]
+        d["palette_css"] = core.colours_css()
     return d
 
 
@@ -275,7 +280,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/ping":
             self.send("ok\n", "text/plain")
         elif path == "/api":
-            self.send(json.dumps(api_state()), "application/json")
+            query = dict(p.split("=", 1) for p in (self.path.split("?", 1)[1] if "?" in self.path else "").split("&") if "=" in p)
+            self.send(json.dumps(api_state(query.get("pv", "")[:16])), "application/json")
         elif path == "/tag":
             # For openMenu over the PPP link: a tiny HTTP/1.0 answer, no markup, no caching.
             code = core.tag()

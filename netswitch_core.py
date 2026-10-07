@@ -10,6 +10,7 @@ import time
 
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
+PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the Colour palette module's list: {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui", "led"}]}
 PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb", "led": "#rrggbb"}}: palette colours the user changed (on screen, on the LED)
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
 MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"switcher": {"dcnow": "orange", ...}}: the global-palette colours each module uses
@@ -327,7 +328,8 @@ PALETTE = (
     ("bright-purple", "Bright purple", "purple", "#b070ff", "#d3b0ff", "#cc66ff"),
     ("bright-pink", "Bright pink", "pink", "#ff6ab8", "#ffaad6", "#ff70b0"),
 )
-PALETTE_IDS = tuple(c[0] for c in PALETTE)
+PALETTE_IDS = tuple(c[0] for c in PALETTE)       # the ones the add-on ships; palette_ids() is the list in use (the Colour palette module can delete and add colours)
+FIXED_COLOURS = ("global", "network", "orange")   # never deleted: "Global main" and "Selected network" are not colours of their own, orange is the one everything falls back to
 # colours that were in the palette once: what a saved choice of them becomes
 LEGACY_COLOURS = {"bright-orange": "orange", "bright-yellow": "yellow", "pink": "bright-pink"}
 DEFAULT_COLOUR = "orange"
@@ -352,6 +354,54 @@ def lighter(ui, share=0.45):
     return "#%02x%02x%02x" % tuple(int(round(int(ui[i:i + 2], 16) + (255 - int(ui[i:i + 2], 16)) * share)) for i in (1, 3, 5))
 
 
+_CUSTOM_ID = re.compile(r"^[a-z][a-z0-9-]{0,23}$")
+MAX_CUSTOM_COLOURS = 40
+
+
+def palette_layout():
+    """The Colour palette module's list over the shipped palette, made safe: {"order", "deleted", "names", "custom"}. Empty while that module is
+    off (the shipped palette is then in use, with the changes of the LED colour editor in palette.json)."""
+    out = {"order": [], "deleted": [], "names": {}, "custom": []}
+    if not module_enabled("palette"):
+        return out
+    try:
+        with open(PALETTE_CUSTOM) as f:
+            data = json.load(f)
+    except (IOError, OSError, ValueError):
+        return out
+    if not isinstance(data, dict):
+        return out
+    seen = set(PALETTE_IDS)
+    for c in data.get("custom") if isinstance(data.get("custom"), list) else []:
+        if (isinstance(c, dict) and isinstance(c.get("id"), _STR) and _CUSTOM_ID.match(c["id"]) and c["id"] not in seen and isinstance(c.get("ui"), _STR)
+                and _HEX.match(c["ui"]) and len(out["custom"]) < MAX_CUSTOM_COLOURS):
+            seen.add(c["id"])
+            led = c.get("led") if isinstance(c.get("led"), _STR) and _HEX.match(c.get("led")) else c["ui"]
+            out["custom"].append({"id": c["id"], "name": str(c.get("name") or c["id"])[:24], "ui": c["ui"].lower(), "led": led.lower()})
+    if isinstance(data.get("deleted"), list):
+        out["deleted"] = [i for i in data["deleted"] if i in PALETTE_IDS and i not in FIXED_COLOURS]
+    if isinstance(data.get("names"), dict):
+        out["names"] = dict((k, str(v).strip()[:24]) for k, v in data["names"].items() if k in seen and isinstance(v, _STR) and str(v).strip())
+    if isinstance(data.get("order"), list):
+        out["order"] = [i for i in data["order"] if isinstance(i, _STR)]
+    return out
+
+
+def _palette_entries():
+    """The palette in use as tuples like PALETTE: the shipped colours that were not deleted and the custom ones, renamed and in the user's order."""
+    lay = palette_layout()
+    entries = [c for c in PALETTE if c[0] not in lay["deleted"]]
+    entries += [(c["id"], c["name"], "custom", c["ui"], lighter(c["ui"]), c["led"]) for c in lay["custom"]]
+    entries = [(c[0], lay["names"].get(c[0], c[1])) + tuple(c[2:]) for c in entries]
+    rank = dict((i, n) for n, i in enumerate(lay["order"]))
+    return sorted(entries, key=lambda c: rank.get(c[0], len(rank)))          # a stable sort: what the order does not name keeps its place at the end
+
+
+def palette_ids():
+    """The ids of the palette in use (see palette_layout())."""
+    return tuple(c[0] for c in _palette_entries())
+
+
 def palette_overrides():
     """{id: {"ui": "#rrggbb", "led": "#rrggbb"}}: what the user changed in the palette editor (only valid entries)."""
     try:
@@ -361,7 +411,7 @@ def palette_overrides():
         return {}
     out = {}
     for ident, v in (data.items() if isinstance(data, dict) else []):
-        if ident in PALETTE_IDS and ident != "network" and isinstance(v, dict):
+        if ident in palette_ids() and ident != "network" and isinstance(v, dict):
             keep = dict((k, str(v[k]).lower()) for k in ("ui", "led") if isinstance(v.get(k), _STR) and _HEX.match(v[k]))
             if keep:
                 out[ident] = keep
@@ -371,7 +421,7 @@ def palette_overrides():
 def colours():
     """The palette as dicts: id, name, group, ui, ui_l, led, and the defaults (ui_default, led_default) as the add-on ships them."""
     over, out = palette_overrides(), []
-    for c in PALETTE:
+    for c in _palette_entries():
         o = over.get(c[0], {})
         ui = o.get("ui", c[3])
         out.append({"id": c[0], "name": c[1], "group": c[2], "ui": ui, "ui_l": lighter(ui) if "ui" in o else c[4],
@@ -389,9 +439,9 @@ def colours():
 def set_palette_colour(ident, ui=None, led=None):
     """Change a palette colour on screen (ui) and / or on the LED (led), "#rrggbb". A value equal to the default is not kept.
     Returns False for an unknown id or a value that is not a colour."""
-    if ident not in PALETTE_IDS or ident == "network" or any(v is not None and not (isinstance(v, _STR) and _HEX.match(v)) for v in (ui, led)):
+    if ident not in palette_ids() or ident == "network" or any(v is not None and not (isinstance(v, _STR) and _HEX.match(v)) for v in (ui, led)):
         return False
-    base = [c for c in PALETTE if c[0] == ident][0]
+    base = [c for c in _palette_entries() if c[0] == ident][0]
     over = palette_overrides()
     entry = over.get(ident, {})
     for key, value, default in (("ui", ui, base[3]), ("led", led, base[5])):
@@ -426,13 +476,154 @@ def _write_palette(over):
     os.rename(tmp, PALETTE_FILE)
 
 
+# ---- the Colour palette module's changes (they only count while that module is on; see palette_layout())
+def _raw_layout():
+    try:
+        with open(PALETTE_CUSTOM) as f:
+            data = json.load(f)
+    except (IOError, OSError, ValueError):
+        data = {}
+    data = data if isinstance(data, dict) else {}
+    for key, empty in (("order", []), ("deleted", []), ("custom", []), ("names", {})):
+        if not isinstance(data.get(key), type(empty)):
+            data[key] = empty
+    return data
+
+
+def _write_layout(data):
+    tmp = PALETTE_CUSTOM + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f)
+    os.rename(tmp, PALETTE_CUSTOM)
+
+
+def palette_add(name, ui, led=None):
+    """A new colour at the end of the palette. Returns its id, or None for a bad colour or when there are too many."""
+    if not (isinstance(ui, _STR) and _HEX.match(ui)) or (led is not None and not (isinstance(led, _STR) and _HEX.match(led))):
+        return None
+    data = _raw_layout()
+    if len(data["custom"]) >= MAX_CUSTOM_COLOURS:
+        return None
+    name = re.sub(r"\s+", " ", str(name or "")).strip()[:24] or "New colour"
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:18]
+    base = slug if slug and slug[0].isalpha() else "colour-" + slug if slug else "colour"
+    taken = set(PALETTE_IDS) | set(c.get("id") for c in data["custom"] if isinstance(c, dict))
+    ident, n = base, 1
+    while ident in taken or not _CUSTOM_ID.match(ident):
+        n += 1
+        ident = "%s-%d" % (base, n)
+    data["custom"].append({"id": ident, "name": name, "ui": ui.lower(), "led": (led or ui).lower()})
+    _write_layout(data)
+    return ident
+
+
+def palette_edit(ident, name=None, ui=None, led=None):
+    """Rename a colour and / or change its screen / LED colour. "Selected network" cannot change colour, only be renamed. False when it does not exist."""
+    if ident not in palette_ids():
+        return False
+    data = _raw_layout()
+    custom = [c for c in data["custom"] if isinstance(c, dict) and c.get("id") == ident]
+    if name is not None:
+        name = re.sub(r"\s+", " ", str(name)).strip()[:24]
+        if name:
+            if custom:
+                custom[0]["name"] = name
+            else:
+                data["names"][ident] = name
+            _write_layout(data)
+    if ui is not None or led is not None:
+        if custom:
+            for key, value in (("ui", ui), ("led", led)):
+                if value is not None:
+                    if not (isinstance(value, _STR) and _HEX.match(value)):
+                        return False
+                    custom[0][key] = value.lower()
+            _write_layout(data)
+        elif not set_palette_colour(ident, ui, led):
+            return False
+    return True
+
+
+def palette_delete(ident):
+    """Take a colour out of the palette. What used it falls back (a module's pick to its default, a highlight to the rainbow, an LED row to
+    orange). False for one that cannot be deleted (FIXED_COLOURS) or does not exist."""
+    if ident in FIXED_COLOURS or ident not in palette_ids():
+        return False
+    data = _raw_layout()
+    if ident in PALETTE_IDS:
+        if ident not in data["deleted"]:
+            data["deleted"].append(ident)
+    else:
+        data["custom"] = [c for c in data["custom"] if not (isinstance(c, dict) and c.get("id") == ident)]
+    data["names"].pop(ident, None)
+    data["order"] = [i for i in data["order"] if i != ident]
+    _write_layout(data)
+    over = palette_overrides()
+    if over.pop(ident, None) is not None:
+        _write_palette(over)
+    picks = _saved_module_colours()
+    changed = False
+    for mod in list(picks):
+        if isinstance(picks[mod], dict):
+            for key in [k for k, v in picks[mod].items() if v == ident]:
+                del picks[mod][key]
+                changed = True
+    if changed:
+        tmp = MODULE_COLOURS + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(picks, f, sort_keys=True)
+        os.rename(tmp, MODULE_COLOURS)
+    if (read_file(HIGHLIGHT) or "").strip() == ident:
+        save_highlight_style("rainbow")
+    return True
+
+
+def palette_order(ids):
+    """The order of the palette: a list of ids (the ones it does not name keep their place after them). Returns False for something else."""
+    if not isinstance(ids, list) or not all(isinstance(i, _STR) for i in ids):
+        return False
+    data = _raw_layout()
+    data["order"] = [i for n, i in enumerate(ids) if i in palette_ids() and i not in ids[:n]]
+    _write_layout(data)
+    return True
+
+
+def palette_reset(ident=None):
+    """Back to the colours the add-on ships: the whole palette (all colours, names, order, changes) or one shipped colour (its name and colours)."""
+    if ident is None:
+        for path in (PALETTE_CUSTOM, PALETTE_FILE):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+        return True
+    if ident not in PALETTE_IDS or ident not in palette_ids():
+        return False
+    data = _raw_layout()
+    data["names"].pop(ident, None)
+    _write_layout(data)
+    reset_palette(ident)
+    return True
+
+
+def palette_version():
+    """A short tag of the palette as the page draws it (ids, names, colours): the page asks for the palette again only when it changes."""
+    import hashlib
+    text = json.dumps([[c["id"], c["name"], c["ui"], c["ui_l"], c["led"]] for c in colours()], sort_keys=True)
+    return hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
+
+
 def colour(ident):
     """One palette entry as a dict (orange when the id is unknown)."""
     ident = LEGACY_COLOURS.get(ident, ident)
-    for c in colours():
+    every = colours()
+    for c in every:
         if c["id"] == ident:
             return c
-    return colour(DEFAULT_COLOUR)
+    for c in every:
+        if c["id"] == DEFAULT_COLOUR:
+            return c
+    return every[0]
 
 
 def colours_css():
@@ -465,9 +656,11 @@ def module_colours(name):
     wanted = manifest.get("colours")
     if not isinstance(wanted, dict):
         return {}
+    ids = palette_ids()
+
     def ok(k, v):       # the network colours cannot be "the selected network's" (that would be a circle)
         v = LEGACY_COLOURS.get(v, v)
-        return v in PALETTE_IDS and not (_network_key(name, k) and v == "network")
+        return v in ids and not (_network_key(name, k) and v == "network")
     out = dict((k, LEGACY_COLOURS.get(v, v) if ok(k, v) else DEFAULT_COLOUR) for k, v in wanted.items())
     mine = _saved_module_colours().get(name)
     if isinstance(mine, dict):
@@ -479,24 +672,33 @@ def module_colours(name):
         if len(set(out[k] for k in uniq)) < len(uniq):
             for k in uniq:
                 out[k] = LEGACY_COLOURS.get(wanted[k], wanted[k]) if ok(k, wanted[k]) else DEFAULT_COLOUR
+            used = set()
+            for k in uniq:                       # still the same colour twice (a default was deleted from the palette): the first ones that are free
+                if out[k] in used:
+                    out[k] = ([i for i in ids if i not in used and i not in ("global", "network")] or [DEFAULT_COLOUR])[0]
+                used.add(out[k])
     return out
 
 
 # ---- highlight: a module can ask for one of its dashboard boxes to stand out for a while (an event starts soon, say): /api
 # "highlight" {box id: why}. A grey box (the Dreamcast background) turns its own colour; a coloured box takes the highlight look
 # set here, the same for every module: an animated rainbow edge or one palette colour that glows.
-HIGHLIGHT_STYLES = ("rainbow",) + PALETTE_IDS
+HIGHLIGHT_STYLES = ("rainbow",) + PALETTE_IDS        # as shipped; highlight_styles() is the list in use
 DEFAULT_HIGHLIGHT = "rainbow"
+
+
+def highlight_styles():
+    return ("rainbow",) + palette_ids()
 
 
 def highlight_style():
     s = (read_file(HIGHLIGHT) or "").strip()
-    return s if s in HIGHLIGHT_STYLES else DEFAULT_HIGHLIGHT
+    return s if s in highlight_styles() else DEFAULT_HIGHLIGHT
 
 
 def save_highlight_style(value):
     value = str(value or "").strip()
-    if value not in HIGHLIGHT_STYLES:
+    if value not in highlight_styles():
         value = DEFAULT_HIGHLIGHT
     tmp = HIGHLIGHT + ".tmp"
     with open(tmp, "w") as f:
@@ -574,7 +776,7 @@ def set_module_colour(name, key, ident):
     module, key or colour is unknown."""
     cur = module_colours(name)
     ident = LEGACY_COLOURS.get(ident, ident)
-    if key not in cur or ident not in PALETTE_IDS or (_network_key(name, key) and ident == "network"):
+    if key not in cur or ident not in palette_ids() or (_network_key(name, key) and ident == "network"):
         return None
     if (module_manifest(name) or {}).get("colours_unique"):
         uniq = [k for k in cur if _network_key(name, k)] or list(cur)
