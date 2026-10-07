@@ -98,12 +98,12 @@ class OrderTests(PickerBase):
         self.assertLess(names.index("checkin"), names.index("contacts"))
 
     def test_the_saved_order_wins_and_new_modules_go_last(self):
-        core.save_module_order(["wifi", "contacts", "nosuchmodule"])
+        core.save_module_order(["rebootupdate", "contacts", "nosuchmodule"])
         settings_only = lambda: [n for n in core.module_names() if core.module_group(n) == 1]          # the order is kept inside each group
-        self.assertEqual(settings_only()[:2], ["wifi", "contacts"])
+        self.assertEqual(settings_only()[:2], ["rebootupdate", "contacts"])
         self.assertNotIn("nosuchmodule", core.module_names())
         self.add("later", {"name": "Later", "description": "d", "enabled": True, "order": 1})
-        self.assertEqual(settings_only()[:2], ["wifi", "contacts"])
+        self.assertEqual(settings_only()[:2], ["rebootupdate", "contacts"])
         self.assertEqual(settings_only()[-1], "later")                # not in the saved list yet: after it
 
     def test_a_bad_order_is_refused_and_a_broken_file_is_ignored(self):
@@ -114,8 +114,8 @@ class OrderTests(PickerBase):
         self.assertEqual(core.module_names()[0], "checkin")
 
     def test_a_partial_order_keeps_the_others_in_their_places(self):
-        new = core.save_module_order(["wifi"])
-        self.assertEqual(new[0], "wifi")
+        new = core.save_module_order(["rebootupdate"])
+        self.assertEqual(new[0], "rebootupdate")
         self.assertEqual(sorted(new), sorted(core.module_names()))
 
 
@@ -147,9 +147,9 @@ class HttpOrderTests(PickerBase):
     def test_api_carries_which_modules_are_on(self):
         en = json.loads(urlopen(self.base + "/api", timeout=10).read())["enabled"]
         self.assertTrue(en["system"] and en["contacts"])
-        self.assertFalse(en["wifi"])                                       # off by default, but listed
-        self.post("/modules", {"name": "wifi", "enabled": True})
-        self.assertTrue(json.loads(urlopen(self.base + "/api", timeout=10).read())["enabled"]["wifi"])
+        self.assertFalse(en["imagebg"])                                       # off by default, but listed
+        self.post("/modules", {"name": "imagebg", "enabled": True})
+        self.assertTrue(json.loads(urlopen(self.base + "/api", timeout=10).read())["enabled"]["imagebg"])
 
     def test_post_order_rejects_junk(self):
         with self.assertRaises(HTTPError) as e:

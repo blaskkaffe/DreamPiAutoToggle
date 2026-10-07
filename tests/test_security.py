@@ -94,7 +94,6 @@ class HttpSecurityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = sandbox(up)
-        core.save_module_enabled("wifi", True)      # off by default: /wificonnect only exists (and is protected) while it is on
         cls.srv = web.Server(("127.0.0.1", 0), web.Handler)
         cls.port = cls.srv.server_address[1]
         threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
@@ -130,7 +129,7 @@ class HttpSecurityTests(unittest.TestCase):
 
     def test_cross_site_posts_are_refused(self):
         evil = {"Host": "127.0.0.1:%d" % self.port, "Origin": "http://evil.example.com"}
-        for path in ("/checkin/toggle", "/checkin/status", "/contacts/import", "/wificonnect", "/reboot", "/update/start"):
+        for path in ("/checkin/toggle", "/checkin/status", "/contacts/import", "/reboot", "/update/start"):
             for extra in ({}, {"X-Requested-With": "x"}, {"Content-Type": "text/plain"}):
                 status, _b, _r = self.req("POST", path, dict(evil, **extra), b"{}")
                 self.assertEqual(status, 403, (path, extra))
@@ -141,12 +140,11 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertEqual(self.req("POST", "/checkin/toggle")[0], 403)
         self.assertFalse(os.path.exists(core.CHECKIN))
 
-    def test_same_site_form_post_still_works_without_javascript(self):
-        status, _b, r = self.req("POST", "/wifitoggle", {"Origin": "http://127.0.0.1:%d" % self.port,
-                                                         "Host": "127.0.0.1:%d" % self.port})
-        self.assertEqual(status, 303)                      # a module's POST that does not answer itself is followed by a redirect to the page
-        self.assertTrue(os.path.exists(core.WIFI_START))
-        os.remove(core.WIFI_START)
+    def test_same_site_post_without_the_page_header_still_works(self):
+        status, _b, _r = self.req("POST", "/clock/cities", {"Origin": "http://127.0.0.1:%d" % self.port,
+                                                           "Host": "127.0.0.1:%d" % self.port}, b'{"cities": ["Tokyo"]}')
+        self.assertEqual(status, 200)                      # the page's own origin is enough for a module's own (unprotected) POST
+        self.assertEqual(json.load(open(core.CLOCK_CONFIG))["cities"], ["Tokyo"])
 
     def test_reboot_form_post_is_never_enough(self):
         status, _b, _r = self.req("POST", "/reboot", {"Origin": "http://127.0.0.1:%d" % self.port,
@@ -157,7 +155,7 @@ class HttpSecurityTests(unittest.TestCase):
     def test_pin_guards_reboot_and_update(self):
         sec.set_pin("4821")
         h = {"X-Requested-With": "x"}
-        for path in ("/reboot", "/update/start", "/wificonnect"):
+        for path in ("/reboot", "/update/start"):
             sec.reset_for_tests()
             self.assertEqual(self.req("POST", path, h, b"{}")[0], 401, path)
             self.assertEqual(self.req("POST", path, dict(h, **{"X-Netswitch-Pin": "1111"}), b"{}")[0], 401, path)
@@ -229,22 +227,6 @@ class HttpSecurityTests(unittest.TestCase):
     def test_negative_content_length_does_not_hang(self):
         status, _b, _r = self.req("POST", "/contacts/import", {"X-Requested-With": "x", "Content-Length": "-5"})
         self.assertEqual(status, 400)
-
-    def test_wifi_connect_cuts_long_values(self):
-        core.save_module_enabled("wifi", True)
-        body = json.dumps({"ssid": "s" * 100, "password": "p" * 200}).encode()
-        self.assertEqual(self.req("POST", "/wificonnect", {"X-Requested-With": "x"}, body)[0], 204)
-        got = json.load(open(core.WIFI_CONNECT))
-        self.assertEqual((len(got["ssid"]), len(got["password"])), (32, 63))
-        core.save_module_enabled("wifi", False)
-
-
-class WifiApTests(unittest.TestCase):
-    def test_the_open_setup_access_point_closes_itself(self):
-        import netswitch_wifi_setup as wifi
-        self.assertEqual(wifi.AP_TIMEOUT, 600)
-        self.assertFalse(wifi.ap_expired(time.time() + 5))
-        self.assertTrue(wifi.ap_expired(time.time() - 1))
 
 
 class UpdateOriginTests(unittest.TestCase):

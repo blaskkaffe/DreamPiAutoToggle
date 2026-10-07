@@ -5,16 +5,11 @@
 #   sudo ./install.sh 8080         use another port for the web page
 #   sudo ./install.sh --https-port=8443   HTTPS on another port (default 443)
 #   sudo ./install.sh --no-https   plain HTTP only
-#   The check-in board, the contacts, the clock, Wi-Fi setup and the system controls are modules, one folder each in
+#   The check-in board, the contacts, the clock and the system controls are modules, one folder each in
 #   modules/ (see docs/modules.md): a folder that is not there is not installed (and one that was installed before is
 #   removed). Which modules are on is the page's Settings > System > Modules.
-#   sudo ./install.sh --wifi       add Wi-Fi setup (a temporary access point for joining a network
-#                                  without a keyboard; hostapd + dnsmasq are installed with every install)
-#   sudo ./install.sh --no-wifi    switch Wi-Fi setup off again
-#   sudo ./install.sh --wifi-demo  try Wi-Fi setup on dummy networks (no hostapd, nothing is changed on the
-#                                  Pi's network; password "demo" connects); --no-wifi-demo ends it
 #   sudo ./install.sh --pin        ask for a PIN that the page then wants before it updates, restarts
-#                                  the Pi, joins Wi-Fi or imports contacts (--pin=1234 gives it on the command line,
+#                                  the Pi or imports contacts (--pin=1234 gives it on the command line,
 #                                  which shows in the shell history); --no-pin removes it. It is kept
 #                                  across updates. Without a PIN anybody on your network can use those.
 #
@@ -31,19 +26,13 @@ if [ -f "$DEST/install_ports" ]; then
     case "$OLD_PORT" in ''|*[!0-9]*) ;; *) PORT=$OLD_PORT ;; esac
     case "$OLD_HTTPS" in ''|*[!0-9]*) ;; *) HTTPS_PORT=$OLD_HTTPS ;; esac
 fi
-WIFI=keep
-WIFI_DEMO=keep
 PIN=keep
 for arg in "$@"; do
     case "$arg" in
-        --wifi) WIFI=on ;;
-        --no-wifi) WIFI=off ;;
         --pin) PIN=ask ;;
         --pin=*) PIN="${arg#--pin=}"
                   if [ "${#PIN}" -lt 4 ] || [ "${#PIN}" -gt 64 ]; then echo "The PIN must be 4 to 64 characters"; exit 1; fi ;;
         --no-pin) PIN=off ;;
-        --wifi-demo) WIFI_DEMO=on ;;
-        --no-wifi-demo) WIFI_DEMO=off ;;
         --https-port=*) HTTPS_PORT="${arg#--https-port=}" ;;
         --no-https) HTTPS_PORT=0 ;;
         [0-9]*) PORT="$arg" ;;
@@ -51,7 +40,7 @@ for arg in "$@"; do
     esac
 done
 
-if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--wifi|--no-wifi|--wifi-demo|--no-wifi-demo]"; exit 1; fi
+if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https]"; exit 1; fi
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
@@ -62,7 +51,7 @@ cp "$SRC"/page/index.html "$SRC"/page/page.css "$SRC"/page/page.js "$SRC"/page/w
 cp "$SRC"/kiosk/* "$DEST/kiosk/"
 chmod +x "$DEST/kiosk/kiosk-browser.sh"
 # Files of the DreamPi add-on this one grew out of (an install over it is cleaned up: the hook, the buttons and the LED service are gone)
-for ns_old in dreampi-netswitch-led dreampi-netswitch-buttons; do
+for ns_old in dreampi-netswitch-led dreampi-netswitch-buttons dreampi-netswitch-wifi; do
     if [ -f "/etc/systemd/system/$ns_old.service" ]; then
         systemctl disable --now "$ns_old.service" 2>/dev/null || true
         rm -f "/etc/systemd/system/$ns_old.service"
@@ -70,6 +59,9 @@ for ns_old in dreampi-netswitch-led dreampi-netswitch-buttons; do
 done
 rm -f "$DEST/netswitch_hook.py" "$DEST/netswitch_gpio.py" "$DEST/netswitch_buttons.py" "$DEST/netswitch_update.py" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" \
       "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" "$DEST/netswitch_players.py" "$DEST/netswitch_wifi_setup.py" "$DEST/wifi_button" "$DEST/wifi_button_enabled"
+# The Wi-Fi setup module is gone: its service (removed above), module folder, state files and /tmp state
+rm -rf "$DEST/modules/wifi"
+rm -f "$DEST"/wifi_* /tmp/dreampi-netswitch.wifi
 rm -rf "$DEST/static"
 if [ -f "$DEST/pth_locations" ]; then       # the hook was loaded into every Python through .pth files
     while read -r ns_pth; do rm -f "$ns_pth"; done < "$DEST/pth_locations"
@@ -121,7 +113,7 @@ if command -v git >/dev/null 2>&1; then
     git -c safe.directory="$SRC" -C "$SRC" config --get remote.origin.url > "$DEST/update_origin" 2>/dev/null || rm -f "$DEST/update_origin"
 fi
 
-# Optional PIN for update / restart / Wi-Fi connect on the page (stored as a salted hash)
+# Optional PIN for update / restart on the page (stored as a salted hash)
 if [ "$PIN" = ask ]; then
     printf "New PIN (4-64 characters, not shown): "
     stty -echo 2>/dev/null || true
@@ -133,7 +125,7 @@ fi
 case "$PIN" in
     keep) ;;
     off) (cd "$DEST" && python3 netswitch_security.py clear) && echo "PIN removed" ;;
-    *) (cd "$DEST" && NS_PIN="$PIN" python3 netswitch_security.py set) && echo "PIN set: the page asks for it before an update, restart or Wi-Fi connect" ;;
+    *) (cd "$DEST" && NS_PIN="$PIN" python3 netswitch_security.py set) && echo "PIN set: the page asks for it before an update or restart" ;;
 esac
 PIN=
 
@@ -194,14 +186,11 @@ WantedBy=multi-user.target
 EOF
 
 # ------------------------------------------------------------------ modules
-# Each installed module may have an install.sh, sourced here (it sees $DEST, $SRC, $WIFI, $WIFI_DEMO)
-# and adds the systemd units it needs to NS_SERVICES. See modules/wifi.
+# Each installed module may have an install.sh, sourced here (it sees $DEST and $SRC)
+# and adds the systemd units it needs to NS_SERVICES. See docs/modules.md.
 NS_SERVICES=
 for ns_dir in "$DEST"/modules/*/; do
     [ -f "$ns_dir/install.sh" ] && . "$ns_dir/install.sh"
-done
-for ns_flag in "$WIFI$WIFI_DEMO"; do
-    case "$ns_flag" in *on*|*off*) [ -d "$DEST/modules/wifi" ] || echo "Wi-Fi options ignored: the Wi-Fi setup module is not in this folder." ;; esac
 done
 
 systemctl daemon-reload

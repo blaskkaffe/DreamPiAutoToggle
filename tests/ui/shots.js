@@ -1,6 +1,6 @@
 // Screenshots of the whole dashboard and the whole Settings overlay at four widths, for before / after comparisons of a styling change:
 //   node shots.js <output dir> [label]   (run against a demo server with every module on:
-//   FAKEPLAYERS=1 CLOCK=1 EVENTS=1 EVENTSOON=1 WIFIDEMO=1 PORT=8791 python3 demo_server.py)
+//   FAKEPLAYERS=1 CLOCK=1 EVENTS=1 EVENTSOON=1 PORT=8791 python3 demo_server.py)
 const { chromium } = require('playwright');
 const fs = require('fs');
 const URL = 'http://127.0.0.1:' + (process.env.PORT || 8791) + '/';

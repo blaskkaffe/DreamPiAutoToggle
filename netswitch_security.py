@@ -5,7 +5,7 @@
 #     internet that points its own name at the Pi's address and then talks to it from the browser);
 #   - Origin / Referer: a browser's POST from another site is refused (CSRF);
 #   - the custom X-Requested-With header (a page of another site can't add it) for the actions
-#     that reboot, update or change Wi-Fi;
+#     that reboot or update;
 #   - an optional PIN (set with install.sh --pin, never from the page) for those same actions,
 #     with a lock-out after repeated wrong tries.
 # Python 3 (imports only core).

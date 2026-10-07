@@ -14,11 +14,11 @@ from urllib.request import Request, urlopen
 from support import ROOT, web, core, sandbox, cleanup
 
 REAL_MODULES = os.path.join(ROOT, "modules")
-NAMES = ["checkin", "clock", "contacts", "imagebg", "rebootupdate", "wifi"]      # the modules the picker can switch
+NAMES = ["checkin", "clock", "contacts", "imagebg", "rebootupdate"]      # the modules the picker can switch
 HIDDEN = ["system"]                                                # always on, not in the picker
 ALL = sorted(NAMES + HIDDEN)
 # a path only that module answers (GET, or POST when None)
-ENDPOINT = {"checkin": ("GET", "/checkin"), "clock": ("GET", "/clock"), "contacts": ("GET", "/contacts"), "imagebg": ("GET", "/imagebg"), "wifi": ("POST", "/wifitoggle"), "rebootupdate": ("GET", "/update")}
+ENDPOINT = {"checkin": ("GET", "/checkin"), "clock": ("GET", "/clock"), "contacts": ("GET", "/contacts"), "imagebg": ("GET", "/imagebg"), "rebootupdate": ("GET", "/update")}
 HIDDEN_ENDPOINT = {"system": ("GET", "/about")}
 BASE_IDS = ('id="dash"', 'id="set-boxes"', 'id="settings"', 'id="bg"', 'id="warnings"')
 
@@ -45,7 +45,6 @@ def inline_script(html):
 
 class Base(unittest.TestCase):
     """A web service on a private copy of modules/, so a test can add, remove and break modules freely."""
-    ENABLE_WIFI = True
 
     def setUp(self):
         self.tmp = sandbox()
@@ -53,8 +52,6 @@ class Base(unittest.TestCase):
         shutil.copytree(REAL_MODULES, self.modules, ignore=shutil.ignore_patterns("__pycache__"))
         self.saved_dir, core.MODULES_DIR = core.MODULES_DIR, self.modules
         core.save_module_enabled("imagebg", True)        # off by default: the tests want to see it
-        if self.ENABLE_WIFI:
-            core.save_module_enabled("wifi", True)
         web.refresh_page(force=True)
         self.srv = web.Server(("127.0.0.1", 0), web.Handler)
         threading.Thread(target=self.srv.serve_forever, daemon=True).start()
@@ -127,7 +124,7 @@ class RepoModules(unittest.TestCase):
 
     def test_defaults(self):
         on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["enabled"]) for n in ALL)
-        self.assertEqual(on, {"checkin": True, "clock": True, "contacts": True, "imagebg": False, "rebootupdate": True, "system": True, "wifi": False})
+        self.assertEqual(on, {"checkin": True, "clock": True, "contacts": True, "imagebg": False, "rebootupdate": True, "system": True})
         hidden = [n for n in ALL if json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["visible"] is False]
         self.assertEqual(hidden, HIDDEN)                   # the system info can't be switched off
 
@@ -150,7 +147,7 @@ class WithEverything(Base):
     def test_boxes_are_shared_by_name_between_modules(self):
         lay = layout_of(self.page())
         system = [b for b in lay["settings"] if b["id"] == "system"][0]
-        self.assertEqual(system["mods"], ["wifi", "rebootupdate"])
+        self.assertEqual(system["mods"], ["rebootupdate"])
         self.assertEqual([w["type"] for w in system["items"] if w["mod"] == "rebootupdate"][-1], "row")      # the Reboot row ends the System box
         ids = [b["id"] for b in lay["settings"]]
         self.assertEqual(ids[-1], "system")                                                                # System is the very last box
@@ -161,7 +158,7 @@ class WithEverything(Base):
         self.assertEqual([b["id"] for b in lay["settings"]], ["check-in", "appearance", "clock", "contacts", "colours", "about", "background-image", "system"])
 
     def test_the_picker_lists_dashboard_modules_then_settings_only_then_backgrounds(self):
-        core.save_module_order(["imagebg", "wifi", "contacts", "clock", "system", "checkin"])      # the user's own mix
+        core.save_module_order(["imagebg", "rebootupdate", "contacts", "clock", "system", "checkin"])      # the user's own mix
         names = core.module_names()
         groups = [core.module_group(n) for n in names]
         self.assertEqual(groups, sorted(groups))
@@ -169,15 +166,15 @@ class WithEverything(Base):
         self.assertLess(names.index("clock"), names.index("checkin"))                       # inside a group the user's order stays: clock was before checkin
 
     def test_moving_tiles_on_the_main_screen_reorders_those_modules_only(self):
-        core.save_module_order(["checkin", "clock", "contacts", "system", "wifi", "rebootupdate", "imagebg"])
+        core.save_module_order(["checkin", "clock", "contacts", "system", "rebootupdate", "imagebg"])
         new = core.save_dashboard_order(["clock", "checkin"])                                # two tiles moved: they take each other's places
         self.assertEqual(new[:2], ["clock", "checkin"])
-        self.assertEqual(new[2:], ["contacts", "system", "wifi", "rebootupdate", "imagebg"])
+        self.assertEqual(new[2:], ["contacts", "system", "rebootupdate", "imagebg"])
         self.assertEqual(core.save_dashboard_order(["nope", "checkin"])[:2], ["clock", "checkin"])      # unknown names are ignored
         self.assertIsNone(core.save_dashboard_order("clock"))
 
     def test_system_is_the_last_settings_box_whatever_the_picker_order(self):
-        core.save_module_order(["rebootupdate", "wifi", "system", "contacts", "clock", "checkin"])
+        core.save_module_order(["rebootupdate", "system", "contacts", "clock", "checkin"])
         lay = layout_of(self.page())
         self.assertEqual([b["id"] for b in lay["settings"]][-1], "system")
         self.assertEqual(len([b for b in lay["settings"] if b["id"] == "system"]), 1)
@@ -193,13 +190,13 @@ class WithEverything(Base):
 
     def test_protected_paths_are_the_modules_own_post_routes(self):
         import netswitch_modules as mods
-        self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/wificonnect", "/contacts/import", "/contacts/active", "/contacts/person"})
+        self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/contacts/import", "/contacts/active", "/contacts/person"})
         for path in mods._state["protected"]:
             self.assertTrue(mods.route("POST", path), path)
 
     def test_modules_menu_lists_them_all(self):
         got = self.json("/modules")["modules"]
-        self.assertEqual([m["name"] for m in got], ["checkin", "clock", "contacts", "system", "wifi", "rebootupdate", "imagebg"])   # picker order, the always-on modules included
+        self.assertEqual([m["name"] for m in got], ["checkin", "clock", "contacts", "system", "rebootupdate", "imagebg"])   # picker order, the always-on modules included
         self.assertEqual([m["name"] for m in got if m["visible"] is False], ["system"])                     # which the page lists without a switch
         self.assertTrue(all(m["enabled"] for m in got))
         self.assertTrue(all(m["title"] and m["description"] for m in got))
@@ -231,7 +228,6 @@ class WithNothing(Base):
     def test_everything_in_the_base_still_works(self):
         d = self.json("/api")
         self.assertNotIn("checkin", d)
-        self.assertNotIn("wifi", d)
         self.assertEqual(self.status("GET", "/about"), 200)
         self.assertEqual([m["name"] for m in self.json("/modules")["modules"]], ["system"])      # only the always-on one is left
 
@@ -243,8 +239,6 @@ class WithNothing(Base):
 class OneModuleGone(Base):
     def test_each_module_can_be_deleted_alone(self):
         for gone in NAMES:
-            if gone == "wifi":
-                continue
             folder = os.path.join(self.modules, gone)
             backup = os.path.join(self.tmp, "backup-" + gone)
             shutil.move(folder, backup)
@@ -359,33 +353,6 @@ class BrokenAndNewModules(Base):
         self.assertIn("marker-for-the-test", self.page())
 
 
-class Services(unittest.TestCase):
-    """The Wi-Fi service follows the Modules menu."""
-    def setUp(self):
-        self.tmp = sandbox()
-
-    def tearDown(self):
-        cleanup(self.tmp)
-
-    def test_wifi_service_idles_while_module_is_off_and_runs_a_requested_setup(self):
-        import netswitch_wifi_service as svc
-        import netswitch_wifi_setup as wifi
-        calls = []
-        old = (wifi.wifi_iface, wifi.setup_cycle)
-        wifi.wifi_iface = lambda: "wlan0"
-        wifi.setup_cycle = lambda iface: calls.append(iface)
-        try:
-            core.save_module_enabled("wifi", True)
-            open(core.WIFI_START, "w").close()
-            svc.run_once()
-            self.assertEqual(calls, ["wlan0"])
-            self.assertFalse(os.path.exists(core.WIFI_START))       # the request was consumed
-            svc.run_once()                                          # nothing asked: nothing runs
-            self.assertEqual(calls, ["wlan0"])
-        finally:
-            wifi.wifi_iface, wifi.setup_cycle = old
-
-
 class InstallerTests(unittest.TestCase):
     """The module handling of install.sh (sync_modules), run on temp folders; and the module scripts parse."""
     def snippet(self):
@@ -424,16 +391,16 @@ class InstallerTests(unittest.TestCase):
     def test_a_module_dropped_from_the_folder_is_removed_and_cleans_up_after_itself(self):
         self.run_sync(self.src, self.dest)
         marker = os.path.join(self.tmp, "removed-marker")
-        with open(os.path.join(self.dest, "modules", "wifi", "remove.sh"), "w") as f:      # what its remove.sh would do
+        with open(os.path.join(self.dest, "modules", "rebootupdate", "remove.sh"), "w") as f:      # what its remove.sh would do
             f.write('echo gone > "%s"\n' % marker)
-        shutil.rmtree(os.path.join(self.src, "modules", "wifi"))
+        shutil.rmtree(os.path.join(self.src, "modules", "rebootupdate"))
         shutil.rmtree(os.path.join(self.src, "modules", "contacts"))
         out = self.run_sync(self.src, self.dest)
-        self.assertFalse(os.path.exists(os.path.join(self.dest, "modules", "wifi")))
+        self.assertFalse(os.path.exists(os.path.join(self.dest, "modules", "rebootupdate")))
         self.assertFalse(os.path.exists(os.path.join(self.dest, "modules", "contacts")))
         self.assertTrue(os.path.exists(os.path.join(self.dest, "modules", "clock")))
         self.assertEqual(open(marker).read().strip(), "gone")
-        self.assertIn("wifi", out)
+        self.assertIn("rebootupdate", out)
 
     def test_a_module_added_to_the_folder_is_installed_and_old_copies_are_replaced(self):
         self.run_sync(self.src, self.dest)
@@ -454,10 +421,13 @@ class InstallerTests(unittest.TestCase):
                 path = os.path.join(REAL_MODULES, n, script)
                 if os.path.exists(path):
                     self.assertEqual(subprocess.run(["sh", "-n", path]).returncode, 0, path)
-        wifi = open(os.path.join(REAL_MODULES, "wifi", "install.sh")).read()
-        for needle in ('NS_SERVICES="$NS_SERVICES dreampi-netswitch-wifi.service"',):
-            self.assertIn(needle, wifi)
-        self.assertIn("disable --now dreampi-netswitch-wifi.service", open(os.path.join(REAL_MODULES, "wifi", "remove.sh")).read())
+
+    def test_installer_cleans_up_the_removed_wifi_setup_module(self):
+        text = open(os.path.join(ROOT, "install.sh")).read()
+        self.assertIn("dreampi-netswitch-wifi", text)                        # its service is stopped and its unit deleted
+        self.assertIn('rm -rf "$DEST/modules/wifi"', text)
+        self.assertIn('rm -f "$DEST"/wifi_* /tmp/dreampi-netswitch.wifi', text)
+        self.assertFalse(os.path.exists(os.path.join(REAL_MODULES, "wifi")))
 
     def test_installer_copies_the_loader_and_the_base_only(self):
         text = open(os.path.join(ROOT, "install.sh")).read()

@@ -32,7 +32,7 @@ def api_state():
     """The /api answer. The base only has the page-wide parts (PIN flag, warnings, time, the modules' colours); everything
     else is added by the enabled modules' api() hooks (the check-in board adds who is in)."""
     warnings = ["Module %s is not loaded: %s" % (name, why) for name, why in sorted(modules.errors().items())]
-    d = {"pin": security.pin_required(),     # the page asks for it before update / restart / Wi-Fi connect
+    d = {"pin": security.pin_required(),     # the page asks for it before update / restart
          "colours": modules.live_colours(), "tints": modules.live_tints(), "primary": {}, "primary_key": {}, "enabled": modules.enabled_map(),
          "warnings": warnings, "now": int(time.time()),
          "highlight": {},       # {dashboard box id: why}: a module asks for one of its boxes to stand out for a while (an event soon, say)
@@ -40,7 +40,7 @@ def api_state():
          "theme": {"highlight": core.highlight_style()},
          "screen": core.screen_settings(),
          "settings_pin": {"on": security.settings_locked(), "pin": security.pin_required()}}
-    modules.apply_api(d, warnings)          # what the enabled modules add: the board, wifi, the clock ...
+    modules.apply_api(d, warnings)          # what the enabled modules add: the board, the clock ...
     return d
 
 
@@ -269,8 +269,8 @@ class Handler(BaseHTTPRequestHandler):
         refresh_page()
         path = self.path.split("?")[0]
         # Everything here changes something, and some of it runs as root: only the page itself may ask
-        # (not another site's form or script), and the paths a module marks PROTECTED (reboot, update, Wi-Fi
-        # connect) also need the PIN when one is set.
+        # (not another site's form or script), and the paths a module marks PROTECTED (reboot, update)
+        # also need the PIN when one is set.
         # With Settings locked (Appearance > Ask for the PIN) every POST that is not a dashboard action (a module's OPEN list) needs it too.
         need_pin = modules.protected(path) or path in ("/pin", "/pin/check") or (security.settings_locked() and not modules.open_post(path))
         if not security.post_allowed(self.headers, strict=need_pin):

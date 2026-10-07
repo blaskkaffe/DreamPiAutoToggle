@@ -294,7 +294,7 @@ def layout():
                     b["items"].append(w)
         for ns, spec in (lay.get("data") or {}).items():
             out["data"].setdefault(ns, dict(spec, mod=name))      # the first module to ask for a name keeps it
-    out["settings"].sort(key=lambda b: b["id"] == "system")   # System (the module picker, Wi-Fi, update, reboot) is always the last box of Settings, whatever the picker order (a stable sort: the others keep theirs)
+    out["settings"].sort(key=lambda b: b["id"] == "system")   # System (the module picker, update, reboot) is always the last box of Settings, whatever the picker order (a stable sort: the others keep theirs)
     return out
 
 
@@ -365,7 +365,7 @@ def open_post(path):
 
 def protected(path):
     """True for a POST path that an enabled module marked PROTECTED: it needs the page's own header and, when one is
-    set, the PIN (rebooting, updating, joining a Wi-Fi network)."""
+    set, the PIN (rebooting, updating)."""
     return path in _state["protected"]
 
 

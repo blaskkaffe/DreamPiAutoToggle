@@ -140,7 +140,7 @@ class KitTests(unittest.TestCase):
         self.assertGreaterEqual(found, 1)
 
     def test_module_css_does_not_redefine_a_base_class(self):
-        """`.srow{...}` in a module would change every row in the app. Scoped rules (`#wifi-list .srow`) and a module's own
+        """`.srow{...}` in a module would change every row in the app. Scoped rules (`#clock-list .srow`) and a module's own
         classes are fine; so are themes."""
         base = base_classes()
         for path in glob.glob(os.path.join(MODULES, "*", "page.css")):
