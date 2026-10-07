@@ -4,6 +4,8 @@ import os
 import unittest
 
 from support import ledconfig, core, sandbox, cleanup
+import netswitch_update as up  # noqa: E402
+import netswitch_rebootupdate as reb  # noqa: E402
 import netswitch_led as led
 
 def announced():
@@ -343,8 +345,8 @@ class LookTests(Base):
         self.assertIsNone(ledconfig.dreampi_look())                               # no group for any DreamPi message: no look
 
     def test_gather_reads_the_files_the_other_services_write(self):
-        core.write_update_info(True, False)
-        core.mark_reboot()
+        up.write_update_info(True, False)
+        reb.mark_reboot()
         open(core.FLAG, "w").close()
         c = ledconfig.gather()
         self.assertEqual((c["selected"], c["reboot"], c["update_info"].get("addon")), ("dcnet", True, True))

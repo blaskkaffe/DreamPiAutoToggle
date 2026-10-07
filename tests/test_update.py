@@ -33,9 +33,9 @@ class CheckTests(unittest.TestCase):
     def setUp(self):
         self.tmp = sandbox(up)
         self._fetch = up.fetch
-        with open(core.ADDON_COMMIT, "w") as f:
+        with open(up.ADDON_COMMIT, "w") as f:
             f.write(LOCAL)
-        with open(core.VERSION_FILE, "w") as f:
+        with open(up.VERSION_FILE, "w") as f:
             f.write("2026-09-30 12:00 (aaaaaaa)")
         up._info.update({"time": 0, "started": 0, "checking": False, "addon": None, "dreampi": None, "error": None})
 
@@ -74,7 +74,7 @@ class CheckTests(unittest.TestCase):
         self.assertIn("local changes", a["note"])
 
     def test_no_recorded_commit(self):
-        os.remove(core.ADDON_COMMIT)
+        os.remove(up.ADDON_COMMIT)
         up.fetch = fake_github()
         self.assertIsNone(up.check_addon()["available"])
 
@@ -105,15 +105,15 @@ class CheckTests(unittest.TestCase):
         self.assertEqual(len([u for u in started if "api.github.com" in u]), 1)
 
     def test_a_new_check_replaces_the_result_of_the_last_update(self):
-        with open(core.UPDATE_STATUS, "w") as f:
+        with open(up.UPDATE_STATUS, "w") as f:
             f.write("ok\n")
-        os.utime(core.UPDATE_STATUS, (time.time() - 5, time.time() - 5))
+        os.utime(up.UPDATE_STATUS, (time.time() - 5, time.time() - 5))
         up.fetch = fake_github(down=True)
         self.assertEqual(up.update_state(), "ok")                 # right after the update: announced
         up.check()
         self.assertEqual(up.update_state(), "idle")               # checking again takes over
         self.assertIn("Couldn't reach GitHub", up.status()["error"])
-        with open(core.UPDATE_STATUS, "w") as f:                  # a later update announces itself again
+        with open(up.UPDATE_STATUS, "w") as f:                  # a later update announces itself again
             f.write("failed\n")
         self.assertEqual(up.update_state(), "failed")
 
@@ -159,7 +159,7 @@ class UpdateRunTests(unittest.TestCase):
             f.write("#!/bin/sh\n")
         subprocess.check_call(["git", "add", "."], cwd=self.src)
         subprocess.check_call(["git", "commit", "-q", "-m", "x"], cwd=self.src, env=env)
-        with open(core.ADDON_SRC, "w") as f:
+        with open(up.ADDON_SRC, "w") as f:
             f.write(self.src)
         self._spawn = up._spawn
         self.spawned = []
@@ -174,14 +174,14 @@ class UpdateRunTests(unittest.TestCase):
         self.assertTrue(up.can_update())
 
     def test_no_checkout_means_no_self_update(self):
-        os.remove(core.ADDON_SRC)
+        os.remove(up.ADDON_SRC)
         self.assertFalse(up.can_update())
         started, message = up.start_update()
         self.assertFalse(started)
         self.assertEqual(self.spawned, [])
 
     def test_start_runs_the_script_detached_with_the_remembered_ports(self):
-        with open(core.INSTALL_PORTS, "w") as f:
+        with open(up.INSTALL_PORTS, "w") as f:
             f.write("8080 0")
         started, message = up.start_update()
         self.assertTrue(started)
@@ -208,15 +208,15 @@ class UpdateRunTests(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stderr.decode())
 
     def test_finished_status_expires(self):
-        with open(core.UPDATE_STATUS, "w") as f:
+        with open(up.UPDATE_STATUS, "w") as f:
             f.write("ok")
         self.assertEqual(up.update_state(), "ok")
         old = time.time() - 3600
-        os.utime(core.UPDATE_STATUS, (old, old))
+        os.utime(up.UPDATE_STATUS, (old, old))
         self.assertEqual(up.update_state(), "idle")
-        with open(core.UPDATE_STATUS, "w") as f:
+        with open(up.UPDATE_STATUS, "w") as f:
             f.write("running")
-        os.utime(core.UPDATE_STATUS, (old, old))
+        os.utime(up.UPDATE_STATUS, (old, old))
         self.assertEqual(up.update_state(), "running")           # a running update never expires
 
 
@@ -231,7 +231,7 @@ class LogTests(unittest.TestCase):
     def test_tail_skips_blank_lines_and_keeps_the_end(self):
         tmp = sandbox(up)
         try:
-            with open(core.UPDATE_LOG, "w") as f:
+            with open(up.UPDATE_LOG, "w") as f:
                 f.write("\n".join(["line %d" % i if i % 3 else "" for i in range(60)]) + "\n")
             tail = up._log_tail()
             self.assertEqual(len(tail), 14)
@@ -274,7 +274,7 @@ class RealScriptTests(unittest.TestCase):
     def test_pulls_then_installs_with_the_ports(self):
         self.commit(self.origin, "two")
         self.run_script()
-        self.assertEqual(core.read_file(core.UPDATE_STATUS).strip(), "ok")
+        self.assertEqual(core.read_file(up.UPDATE_STATUS).strip(), "ok")
         with open(os.path.join(self.src, "file")) as f:
             self.assertIn("two", f.read())
         with open(os.path.join(self.tmp, "installer.out")) as f:
@@ -284,9 +284,9 @@ class RealScriptTests(unittest.TestCase):
         self.commit(self.src, "local only")
         self.commit(self.origin, "remote only")
         self.run_script()
-        self.assertEqual(core.read_file(core.UPDATE_STATUS).strip(), "failed")
+        self.assertEqual(core.read_file(up.UPDATE_STATUS).strip(), "failed")
         self.assertFalse(os.path.exists(os.path.join(self.tmp, "installer.out")))
-        with open(core.UPDATE_LOG) as f:
+        with open(up.UPDATE_LOG) as f:
             self.assertIn("Updating", f.read())
 
 

@@ -19,6 +19,16 @@ except ImportError:   # Python 2.7
 
 import base_core as core
 
+# the update module's files (the LEDs read UPDATE_STATUS, UPDATE_INFO: see modules/led/netswitch_led_inputs.py)
+ADDON_COMMIT = os.path.join(core.BASE_DIR, "version_commit")  # full commit hash of the checkout that was installed (install.sh)
+ADDON_SRC = os.path.join(core.BASE_DIR, "src_dir")            # that checkout's folder, used by the web update
+INSTALL_PORTS = os.path.join(core.BASE_DIR, "install_ports")  # "<http port> <https port>", so an update keeps them
+UPDATE_ORIGIN = os.path.join(core.BASE_DIR, "update_origin")  # the checkout's git origin URL when installed; "Update now" refuses another one
+VERSION_FILE = os.path.join(core.BASE_DIR, "version")         # written by install.sh: date and commit of the installed checkout
+UPDATE_STATUS = core.TMP_PREFIX + ".update"                   # running / ok / failed, written by the update script
+UPDATE_LOG = core.TMP_PREFIX + ".update.log"
+UPDATE_INFO = core.TMP_PREFIX + ".updateinfo"                 # {"addon": bool|None, "dreampi": bool, "time"}: the latest check
+
 DEFAULT_REPO = "blaskkaffe/DreamPiAutoToggle"
 DEFAULT_BRANCH = "main"
 DREAMPI_DIR = "/home/pi/dreampi"
@@ -37,7 +47,7 @@ def fetch(url):
 
 
 def _git(args):
-    src = core.read_file(core.ADDON_SRC)
+    src = core.read_file(ADDON_SRC)
     if not src or not os.path.isdir(src.strip()):
         return None
     try:
@@ -50,7 +60,7 @@ def _git(args):
 
 def source():
     """(repo "owner/name", branch, checkout folder or None) of this install."""
-    src = (core.read_file(core.ADDON_SRC) or "").strip() or None
+    src = (core.read_file(ADDON_SRC) or "").strip() or None
     if src and not os.path.isdir(src):
         src = None
     repo, branch = DEFAULT_REPO, DEFAULT_BRANCH
@@ -65,14 +75,14 @@ def source():
 
 
 def local_commit():
-    c = (core.read_file(core.ADDON_COMMIT) or "").strip()
+    c = (core.read_file(ADDON_COMMIT) or "").strip()
     return c if re.match(r"^[0-9a-f]{40}$", c) else None
 
 
 def check_addon():
     repo, branch, _src = source()
     commit = local_commit()
-    out = {"current": (core.read_file(core.VERSION_FILE) or "unknown").strip(), "repo": repo, "branch": branch,
+    out = {"current": (core.read_file(VERSION_FILE) or "unknown").strip(), "repo": repo, "branch": branch,
            "available": None, "latest": None, "latest_date": None, "behind": None, "note": None}
     head = json.loads(fetch("https://api.github.com/repos/%s/commits/%s" % (repo, branch)))
     out["latest"] = head["sha"][:7]
@@ -103,6 +113,30 @@ def _raw_version(text):
 
 def _pretty(v):
     return "%s-%s-%s %s:%s" % (v[:4], v[4:6], v[6:8], v[8:10], v[10:12]) if v and len(v) == 12 else (v or "not found")
+
+
+def update_status():
+    """running / ok / failed, or idle. A finished result is only reported for 10 minutes, so an old update isn't announced for ever."""
+    text = (core.read_file(UPDATE_STATUS) or "").strip()
+    if text not in ("running", "ok", "failed"):
+        return "idle"
+    try:
+        if text != "running" and time.time() - os.path.getmtime(UPDATE_STATUS) > 600:
+            return "idle"
+    except OSError:
+        return "idle"
+    return text
+
+
+def write_update_info(addon, dreampi):
+    """Tells the LEDs what the latest check found (addon: True = a newer add-on exists)."""
+    tmp = UPDATE_INFO + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump({"addon": addon, "dreampi": bool(dreampi), "time": time.time()}, f)
+        os.rename(tmp, UPDATE_INFO)
+    except (IOError, OSError):
+        pass
 
 
 def check_dreampi():
@@ -157,7 +191,7 @@ def _run():
             _info.update(result)
             _info["checking"] = False
         a, d = result.get("addon"), result.get("dreampi")
-        core.write_update_info(None if not a else a.get("available"), bool(d and d.get("newer")))      # for the LEDs
+        write_update_info(None if not a else a.get("available"), bool(d and d.get("newer")))      # for the LEDs
 
 
 def check_in_background():
@@ -168,13 +202,13 @@ def check_in_background():
 
 
 def update_state():
-    """running / ok / failed, or idle (a finished result is only reported for 10 minutes: core.update_status()). A new check
+    """running / ok / failed, or idle (a finished result is only reported for 10 minutes: update_status()). A new check
     replaces a finished result: after an update the page showed "The add-on was updated." for ten minutes whatever the user
     pressed, so checking again looked dead."""
-    state = core.update_status()
+    state = update_status()
     if state in ("ok", "failed"):
         try:
-            if _info.get("started", 0) > os.path.getmtime(core.UPDATE_STATUS):
+            if _info.get("started", 0) > os.path.getmtime(UPDATE_STATUS):
                 return "idle"
         except OSError:
             return "idle"
@@ -196,7 +230,7 @@ def _clean_line(line):
 
 def _log_tail(n=14):
     try:
-        with open(core.UPDATE_LOG, "rb") as f:
+        with open(UPDATE_LOG, "rb") as f:
             f.seek(0, 2)
             f.seek(max(0, f.tell() - 16384))
             text = f.read().decode("utf-8", "replace")
@@ -218,13 +252,13 @@ def status():
         out = dict(_info)
     out.update({"state": update_state(), "log": _log_tail() if update_state() != "idle" else [],
                 "can_update": can_update(), "src": src, "repo": repo, "branch": branch,
-                "version_file": (core.read_file(core.VERSION_FILE) or "unknown").strip()})
+                "version_file": (core.read_file(VERSION_FILE) or "unknown").strip()})
     return out
 
 
 def _ports():
     try:
-        http, https = (core.read_file(core.INSTALL_PORTS) or "80 443").split()[:2]
+        http, https = (core.read_file(INSTALL_PORTS) or "80 443").split()[:2]
         return int(http), int(https)
     except ValueError:
         return 80, 443
@@ -247,7 +281,7 @@ def origin_problem():
     url = origin_url()
     if not url or not ORIGIN_RE.match(url):
         return "the checkout's git origin isn't a GitHub address"
-    recorded = (core.read_file(core.UPDATE_ORIGIN) or "").strip()
+    recorded = (core.read_file(UPDATE_ORIGIN) or "").strip()
     if recorded and recorded != url:
         return "the checkout's git origin changed since the add-on was installed (run install.sh by hand to accept it)"
     return None
@@ -273,19 +307,19 @@ def update_script(src, branch, http_port, https_port, url=None):
         "P=; [ \"$U\" != origin ] && P='env GIT_ALLOW_PROTOCOL=https:ssh'\n"
         "if [ \"$(id -u)\" = 0 ] && [ \"$OWNER\" != root ]; then G=\"runuser -u $OWNER -- $P git\"; else G=\"$P git\"; fi\n"
         "cd \"$S\" && $G fetch \"$U\" \"$B\" && $G merge --ff-only FETCH_HEAD && sh \"$S/install.sh\" %s && echo ok >| \"$ST\" || echo failed >| \"$ST\"\n"
-    ) % ("'%s'" % src, "'%s'" % branch, "'%s'" % core.UPDATE_LOG, "'%s'" % core.UPDATE_STATUS,
+    ) % ("'%s'" % src, "'%s'" % branch, "'%s'" % UPDATE_LOG, "'%s'" % UPDATE_STATUS,
                                                           "'%s'" % (url or "origin"), " ".join(ports))
 
 
 def _write_status(text):
     """Write the status file without following a link that someone left at its (predictable) /tmp path."""
     try:
-        if os.path.islink(core.UPDATE_STATUS):
-            os.remove(core.UPDATE_STATUS)
+        if os.path.islink(UPDATE_STATUS):
+            os.remove(UPDATE_STATUS)
     except OSError:
         pass
     flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(core.UPDATE_STATUS, flags, 0o644)
+    fd = os.open(UPDATE_STATUS, flags, 0o644)
     with os.fdopen(fd, "w") as f:
         f.write(text)
 

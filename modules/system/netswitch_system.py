@@ -9,6 +9,7 @@ import base_modules as modules
 import base_security as security
 
 DREAMPI_DIR = "/home/pi/dreampi"
+VERSION_FILE = os.path.join(core.BASE_DIR, "version")      # written by install.sh: date and commit of the installed checkout
 
 
 def script_version(path):
@@ -38,7 +39,7 @@ def about():
                     osname = line.split("=", 1)[1].strip().strip('"')
     except (IOError, OSError):
         pass
-    rows = [("Add-on", core.read_file(core.VERSION_FILE) or "unknown")]
+    rows = [("Add-on", core.read_file(VERSION_FILE) or "unknown")]
     for name in ("dreampi.py", "netlink.py", "dcnow.py"):
         rows.append((name, script_version(os.path.join(DREAMPI_DIR, name)) or "not found"))
     rows.append(("Raspberry Pi", (model or "unknown").replace("\x00", "")))

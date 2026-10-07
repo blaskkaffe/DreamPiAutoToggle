@@ -5,10 +5,10 @@ BG=1 (the Dreamcast background module on), IMGBG=1 (the Background image module 
 players; PLAYERSFAST=1 makes the downloads slow and the list stale after 3 s), OFF=led,wifi,... (modules switched off in the module picker; OFF=all = every module the picker can switch, only the always-on ones stay), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
 import sys, os, threading, time, json
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-from support import web, core, sandbox
+from support import web, core, sandbox, ledconfig
 import netswitch_wifi_setup as wifi
 tmp = sandbox(wifi)
-with open(core.LED_COUNT, 'w') as f: f.write(os.environ.get('LEDS', '3'))
+with open(ledconfig.LED_COUNT, 'w') as f: f.write(os.environ.get('LEDS', '3'))
 core.save_module_enabled("debuglog", True)     # off by default; on here so the page shows it (OFF=debuglog switches it off again)
 if os.environ.get("BG"): core.save_module_enabled("background", True)
 if os.environ.get("IMGBG"): core.save_module_enabled("imagebg", True)
@@ -59,8 +59,8 @@ if os.environ.get("FAKEUPDATE"):
     subprocess.check_call(["git", "remote", "add", "origin", "https://github.com/blaskkaffe/DreamPiAutoToggle.git"], cwd=src)
     open(os.path.join(src, "install.sh"), "w").write("#!/bin/sh\n")
     subprocess.check_call(["git", "add", "."], cwd=src); subprocess.check_call(["git", "commit", "-q", "-m", "x"], cwd=src, env=env)
-    open(core.ADDON_SRC, "w").write(src); open(core.ADDON_COMMIT, "w").write("a"*40)
-    open(core.VERSION_FILE, "w").write("2026-09-30 12:00 (aaaaaaa)")
+    open(up.ADDON_SRC, "w").write(src); open(up.ADDON_COMMIT, "w").write("a"*40)
+    open(up.VERSION_FILE, "w").write("2026-09-30 12:00 (aaaaaaa)")
     dp = os.path.join(tmp, "dp"); os.mkdir(dp); netswitch_system.DREAMPI_DIR = up.DREAMPI_DIR = dp
     open(os.path.join(dp, "dreampi.py"), "w").write("#dreampi.py_version=202601010000\n")
     def fake(url):
@@ -68,10 +68,10 @@ if os.environ.get("FAKEUPDATE"):
         if "/compare/" in url: return json.dumps({"status": "ahead", "ahead_by": 4})
         return "#dreampi.py_version=202608171113\n"
     up.fetch = fake
-    up._spawn = lambda cmd: open(core.UPDATE_STATUS, "w").write("running")
+    up._spawn = lambda cmd: open(up.UPDATE_STATUS, "w").write("running")
     if os.environ.get("FAKELOG"):      # a finished update with a messy log: long lines, colour codes, progress
-        open(core.UPDATE_STATUS, "w").write("failed")
-        open(core.UPDATE_LOG, "w").write("Updating /home/pi/DreamPiAutoToggle from origin/main\nFrom https://github.com/blaskkaffe/DreamPiAutoToggle\n"
+        open(up.UPDATE_STATUS, "w").write("failed")
+        open(up.UPDATE_LOG, "w").write("Updating /home/pi/DreamPiAutoToggle from origin/main\nFrom https://github.com/blaskkaffe/DreamPiAutoToggle\n"
             " * branch            main       -> FETCH_HEAD\nReceiving objects:  10%\rReceiving objects: 100% (42/42), done.\n"
             "Updating 3baa024..21d1ad8\nFast-forward\n page/players.js | 84 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
             " 4 files changed, 64 insertions(+), 37 deletions(-)\n\x1b[31mERROR\x1b[0m: could not write /etc/systemd/system/dreampi-netswitch.service (Read-only file system)\n"

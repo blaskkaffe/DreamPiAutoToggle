@@ -3,7 +3,7 @@ but only ever removes the line it added itself."""
 import os
 import unittest
 
-from support import core, sandbox, cleanup
+from support import core, sandbox, cleanup, ledconfig
 import netswitch_led as led
 import netswitch_led_spi as spi
 
@@ -39,19 +39,19 @@ class SpiTests(unittest.TestCase):
         self.assertIn("reboot", said)                                   # the device didn't appear: it applies after a reboot
         self.assertIn("dtparam=spi=on  # added by dreampi-netswitch\n", self.read())
         self.assertTrue(self.read().startswith("arm_64bit=1\ndtparam=audio=on\n"))
-        self.assertEqual(core.read_file(core.SPI_ADDED), self.config)
+        self.assertEqual(core.read_file(spi.SPI_ADDED), self.config)
         self.assertIn(("dtparam", "spi=on"), self.ran)                  # and the running system was asked right away
         spi.ensure_spi(True)                                            # again: nothing is added twice
         self.assertEqual(self.read().count("dtparam=spi=on"), 1)
         self.assertIn("taken out", spi.ensure_spi(False))
         self.assertNotIn("spi=on", self.read())
         self.assertTrue(self.read().startswith("arm_64bit=1\ndtparam=audio=on"))
-        self.assertFalse(os.path.exists(core.SPI_ADDED))
+        self.assertFalse(os.path.exists(spi.SPI_ADDED))
 
     def test_an_spi_setting_the_user_made_is_left_alone(self):
         self.write("dtparam=spi=on\n")
         self.assertEqual(spi.ensure_spi(True), "")
-        self.assertFalse(os.path.exists(core.SPI_ADDED))
+        self.assertFalse(os.path.exists(spi.SPI_ADDED))
         self.assertEqual(spi.ensure_spi(False), "")
         self.assertEqual(self.read(), "dtparam=spi=on\n")
 
@@ -66,10 +66,10 @@ class SpiTests(unittest.TestCase):
 
     def test_sync_follows_the_pin_setting(self):
         self.write("")
-        with open(core.LED_GPIO, "w") as f:
+        with open(ledconfig.LED_GPIO, "w") as f:
             f.write("10")
         self.assertIn("switched on", spi.sync())
-        with open(core.LED_GPIO, "w") as f:
+        with open(ledconfig.LED_GPIO, "w") as f:
             f.write("18")
         self.assertIn("taken out", spi.sync())
 

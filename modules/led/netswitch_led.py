@@ -21,6 +21,7 @@ sys.path.insert(0, _HERE)                                            # this modu
 sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (base_core ...)
 import base_core as core  # noqa: E402  (module on/off)
 import netswitch_ledconfig as ledconfig  # noqa: E402  (led.json, messages: shared with the web service)
+import netswitch_led_inputs as inputs  # noqa: E402  (what the messages are made from)
 import netswitch_led_drivers as drivers  # noqa: E402  (open_output(), wire orders)
 import netswitch_led_spi as spi  # noqa: E402  (SPI on/off in config.txt for GPIO10)
 
@@ -301,16 +302,15 @@ def _stamp(path):
 
 def watched_files():
     """What the files that settings and the network selection are kept in look like now (changes when one is written or removed)."""
-    return tuple(_stamp(p) for p in (core.FLAG, core.LED_CONFIG, core.PALETTE_FILE, core.LED_COLOURS, core.PALETTE_CUSTOM, core.MODULE_COLOURS, core.LED_COUNT, core.LED_GPIO,
-                                     core.MODULES_STATE, core.WB_TEST))
+    return tuple(_stamp(p) for p in (inputs.FLAG, ledconfig.LED_CONFIG, core.PALETTE_FILE, core.LED_COLOURS, core.PALETTE_CUSTOM, core.MODULE_COLOURS, ledconfig.LED_COUNT, ledconfig.LED_GPIO,
+                                     core.MODULES_STATE, ledconfig.WB_TEST))
 
 
 def watched_state_files():
     """What the files other programs write while they work (DreamPi's state, the network, Wi-Fi setup, updates, the reboot mark, the
     players, the reminders) look like now. They are written in one go (a rename), so a change shows in the stamp at once: the loop
     then reads quickly for a moment instead of waiting for the next REFRESH."""
-    return tuple(_stamp(p) for p in (core.STATE, core.STATUS, core.NET_STATE, core.WIFI_STATE, core.UPDATE_STATUS, core.UPDATE_INFO,
-                                     core.REBOOT_MARK, core.PLAYERS_WATCH, core.EVENT_REMINDERS))
+    return tuple(_stamp(p) for p in inputs.state_paths())
 
 
 def main(halt=None):

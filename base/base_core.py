@@ -40,22 +40,13 @@ MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["switcher", "
 BOOT_ID = os.path.join(BASE_DIR, "boot_id")              # the kernel's id of the boot the selection was last reset for
 KERNEL_BOOT_ID = "/proc/sys/kernel/random/boot_id"
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
-ADDON_COMMIT = os.path.join(BASE_DIR, "version_commit")  # full commit hash of the checkout that was installed (install.sh)
-ADDON_SRC = os.path.join(BASE_DIR, "src_dir")            # that checkout's folder, used by the web update
-INSTALL_PORTS = os.path.join(BASE_DIR, "install_ports")  # "<http port> <https port>", so an update keeps them
-UPDATE_ORIGIN = os.path.join(BASE_DIR, "update_origin")  # the checkout's git origin URL when installed; "Update now" refuses another one
 ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for update/restart/Wi-Fi (install.sh --pin)
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
-UPDATE_STATUS = TMP_PREFIX + ".update"          # running / ok / failed, written by the update script
-UPDATE_LOG = TMP_PREFIX + ".update.log"
-UPDATE_INFO = TMP_PREFIX + ".updateinfo"        # {"addon": bool|None, "dreampi": bool, "time"}: the latest check, written by the update module for the LEDs
-REBOOT_MARK = TMP_PREFIX + ".reboot"            # unix time a reboot was asked for (the LEDs show "about to reboot")
 PLAYERS_SOURCES = os.path.join(BASE_DIR, "players_sources.json")   # JSON addresses for the optional online-players list
 PLAYERS_CACHE = os.path.join(BASE_DIR, "players_cache.json")   # the last list the players module read (shown again after a restart while the new one loads)
 PLAYERS_FAVORITES = os.path.join(BASE_DIR, "players_favorites.json")   # {"games": [names], "players": [names]} the user watches
 OPENMENU_GAMES = os.path.join(BASE_DIR, "openmenu_games.json")   # {"hash", "time", "games": [...]}: the game list the Dreamcast's openMenu uploaded (openMenu link module)
 IMAGEBG_FILE = os.path.join(BASE_DIR, "background_image")     # the picture of the Background image module (any of PNG, JPEG, GIF, WebP; its type is in the config)
-VERSION_FILE = os.path.join(BASE_DIR, "version")        # written by install.sh: date and commit of the installed checkout
 IMAGEBG_CONFIG = os.path.join(BASE_DIR, "imagebg.json")  # {"fit", "dim", "type", "version"} of the Background image module
 NUMBERS = os.path.join(BASE_DIR, "numbers.json")     # phone numbers per action, edited on the page, read by the hook
 CLOCK_MODE = os.path.join(BASE_DIR, "clock_mode")    # older versions: "24h", "12h" or "beat" (read once to carry the choice over to clock.json)
@@ -67,10 +58,6 @@ EVENTS_CONFIG = os.path.join(BASE_DIR, "events.json")   # its settings: reminder
 EVENT_REMINDERS = os.path.join(BASE_DIR, "event_reminders.json")   # the DC99 events the user asked to be reminded of (events module, read by the LEDs)
 CLOCK_CONFIG = os.path.join(BASE_DIR, "clock.json")  # {"format": "24h"|"12h"|"12h-ampm", "beat": bool, "world": bool, "large": bool, "cities": [...]}: the clock module's settings
 TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the Pi's own (Settings > About)
-LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness, colours, wire order, white balance
-LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs, editable from the page
-LED_GPIO = os.path.join(BASE_DIR, "led_gpio")        # output pin (10, 12, 18 or 21), likewise
-SPI_ADDED = os.path.join(BASE_DIR, "spi_added")      # the config.txt this add-on put dtparam=spi=on into (so it can take it out again)
 STATUS = TMP_PREFIX + ".active"
 STATE = TMP_PREFIX + ".state"
 MODEM = TMP_PREFIX + ".modem"
@@ -1124,42 +1111,6 @@ def wifi_state():
     return data
 
 
-def update_status():
-    """running / ok / failed, or idle. A finished result is only reported for 10 minutes, so an old update isn't
-    announced for ever (the update module and the LEDs both ask)."""
-    text = (read_file(UPDATE_STATUS) or "").strip()
-    if text not in ("running", "ok", "failed"):
-        return "idle"
-    try:
-        if text != "running" and time.time() - os.path.getmtime(UPDATE_STATUS) > 600:
-            return "idle"
-    except OSError:
-        return "idle"
-    return text
-
-
-def write_update_info(addon, dreampi):
-    """The update module tells the LEDs what its latest check found (addon: True = a newer add-on exists)."""
-    tmp = UPDATE_INFO + ".tmp"
-    try:
-        with open(tmp, "w") as f:
-            json.dump({"addon": addon, "dreampi": bool(dreampi), "time": time.time()}, f)
-        os.rename(tmp, UPDATE_INFO)
-    except (IOError, OSError):
-        pass
-
-
-def update_info():
-    """{"addon": bool|None, "dreampi": bool} from the latest manual check, {} when there is none (the file is in /tmp: a reboot clears
-    it). Nothing checks for updates by itself, so the answer is kept until the next check."""
-    try:
-        with open(UPDATE_INFO) as f:
-            data = json.load(f)
-        return data
-    except (IOError, OSError, ValueError, AttributeError):
-        return {}
-
-
 def event_reminder(now=None):
     """The reminded DC99 event that is due now, or None: {"id", "title", "start"}. The events module writes EVENT_REMINDERS
     ({"lead": minutes before, "after": minutes after the start, "items": [{"id", "title", "start"}], "dismissed": [ids]}) whenever
@@ -1188,22 +1139,6 @@ def next_event(now=None):
     except (IOError, OSError, ValueError, AttributeError, KeyError, TypeError):
         return None
     return min(coming, key=lambda i: i["start"]) if coming else None
-
-
-def mark_reboot():
-    try:
-        with open(REBOOT_MARK, "w") as f:
-            f.write("%f" % time.time())
-    except (IOError, OSError):
-        pass
-
-
-def reboot_pending():
-    """True for a minute after a reboot was asked for (the Pi is about to go down)."""
-    try:
-        return time.time() - float(read_file(REBOOT_MARK) or "0") < 60
-    except ValueError:
-        return False
 
 
 def poke(name):
@@ -1331,4 +1266,3 @@ def save_wifi_button(v):
     os.rename(tmp, WIFI_BUTTON_FILE)
 
 
-WB_TEST = TMP_PREFIX + ".wbtest"   # unix time, touched while the white-balance test is on

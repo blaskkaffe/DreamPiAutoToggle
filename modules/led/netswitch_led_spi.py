@@ -3,7 +3,7 @@
 #
 # GPIO10 drives the LEDs through the kernel's SPI driver, which only exists when config.txt has dtparam=spi=on. The LED
 # service calls ensure_spi() whenever the output pin is GPIO10 (at start and when the pin is changed on the page), and
-# ensure_spi(False) when it leaves GPIO10. A line is only ever taken out again if this add-on put it there (core.SPI_ADDED
+# ensure_spi(False) when it leaves GPIO10. A line is only ever taken out again if this add-on put it there (SPI_ADDED
 # remembers which config.txt); an SPI setting you made yourself is left alone. install.sh runs "netswitch_led_spi.py sync".
 # After editing config.txt it also asks the running system to switch SPI on right away (dtparam), which works on current
 # Raspberry Pi OS; if the device still doesn't show up, the change applies after the next reboot.
@@ -16,6 +16,8 @@ import sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (base_core)
 import base_core as core  # noqa: E402
+
+SPI_ADDED = os.path.join(core.BASE_DIR, "spi_added")      # the config.txt this add-on put dtparam=spi=on into (so it can take it out again)
 
 CONFIG_CANDIDATES = ["/boot/firmware/config.txt", "/boot/config.txt"]
 MARKER = "dtparam=spi=on  # added by dreampi-netswitch"
@@ -53,7 +55,7 @@ def ensure_spi(on=True):
         if not _ON.search(text):
             with open(path, "a") as f:
                 f.write(("" if text.endswith("\n") or not text else "\n") + MARKER + "\n")
-            with open(core.SPI_ADDED, "w") as f:
+            with open(SPI_ADDED, "w") as f:
                 f.write(path + "\n")
             said = "SPI switched on in %s for GPIO10" % path
         if not os.path.exists(SPI_DEVICE):
@@ -62,7 +64,7 @@ def ensure_spi(on=True):
             if not os.path.exists(SPI_DEVICE) and said:
                 said += "; it applies after a reboot"
         return said
-    path = (core.read_file(core.SPI_ADDED) or "").strip()
+    path = (core.read_file(SPI_ADDED) or "").strip()
     if not path:
         return ""
     try:
@@ -73,7 +75,7 @@ def ensure_spi(on=True):
     except (IOError, OSError):
         pass
     try:
-        os.remove(core.SPI_ADDED)
+        os.remove(SPI_ADDED)
     except OSError:
         pass
     _run("dtparam", "spi=off")

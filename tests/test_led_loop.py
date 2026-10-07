@@ -30,7 +30,7 @@ class LoopTests(unittest.TestCase):
         led.drivers.open_output = lambda count, gpio: self.out
         signal.signal = lambda *a, **k: None
         led._realtime = lambda: None
-        with open(core.LED_COUNT, "w") as f:
+        with open(ledconfig.LED_COUNT, "w") as f:
             f.write("1")
         self.stop = threading.Event()
         self.thread = threading.Thread(target=led.main, args=(self.stop,))

@@ -163,7 +163,7 @@ class UpdateView(unittest.TestCase):
             d = {}
             ru.api(d, [])
             self.assertNotIn("call", d["reboot"]["confirm"])
-            with open(core.STATE, "w") as f:
+            with open(ru.STATE, "w") as f:
                 f.write("call dcnow 123")
             ru.api(d, [])
             self.assertIn("A call is in progress", d["reboot"]["confirm"])

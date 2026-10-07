@@ -277,7 +277,7 @@ class UpdateOriginTests(unittest.TestCase):
         open(os.path.join(self.src, "install.sh"), "w").write("#!/bin/sh\n")
         subprocess.check_call(["git", "add", "."], cwd=self.src)
         subprocess.check_call(["git", "commit", "-q", "-m", "x"], cwd=self.src, env=env)
-        open(core.ADDON_SRC, "w").write(self.src)
+        open(up.ADDON_SRC, "w").write(self.src)
         self._spawn, self.spawned = up._spawn, []
         up._spawn = self.spawned.append
 
@@ -306,7 +306,7 @@ class UpdateOriginTests(unittest.TestCase):
         self.assertEqual(self.spawned, [])
 
     def test_origin_must_match_what_was_installed(self):
-        open(core.UPDATE_ORIGIN, "w").write("https://github.com/blaskkaffe/DreamPiAutoToggle.git\n")
+        open(up.UPDATE_ORIGIN, "w").write("https://github.com/blaskkaffe/DreamPiAutoToggle.git\n")
         self.assertIsNone(up.origin_problem())
         self.set_origin("https://github.com/someone-else/Fork.git")
         self.assertIn("changed", up.origin_problem())
@@ -329,10 +329,10 @@ class UpdateOriginTests(unittest.TestCase):
 
     def test_status_file_is_not_written_through_a_link(self):
         target = os.path.join(self.tmp, "victim")
-        os.symlink(target, core.UPDATE_STATUS)
+        os.symlink(target, up.UPDATE_STATUS)
         up._write_status("running")
         self.assertFalse(os.path.exists(target))
-        self.assertEqual(open(core.UPDATE_STATUS).read(), "running")
+        self.assertEqual(open(up.UPDATE_STATUS).read(), "running")
 
 
 if __name__ == "__main__":

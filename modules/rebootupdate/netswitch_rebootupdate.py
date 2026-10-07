@@ -7,10 +7,17 @@
 # The update logic is in netswitch_update.py next to this file. Without the module the page has no update or
 # reboot controls and these paths answer 404.
 import json
+import os
+import re
 import subprocess
+import time
 
 import base_core as core
 import netswitch_update as updater
+
+REBOOT_MARK = core.TMP_PREFIX + ".reboot"        # the unix time a reboot was asked for (the LEDs show "about to reboot")
+STATUS = core.TMP_PREFIX + ".active"             # DreamPi's hook: "active pid=N" while it runs (written by the network switcher's hook)
+STATE = core.TMP_PREFIX + ".state"               # "<starting|ready|call dcnow|call dcnet> <unix time>" (the same hook)
 
 PROTECTED = ("/reboot", "/update/start")      # run as root: the PIN is asked for when one is set
 
@@ -22,15 +29,31 @@ def _spawn_reboot():
                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
+def in_call():
+    """DreamPi is in a call now (the state file says so and DreamPi is still running)."""
+    m = re.search(r"pid=(\d+)", core.read_file(STATUS) or "")
+    if m and not os.path.exists("/proc/" + m.group(1)):          # DreamPi is not running any more
+        return False
+    return (core.read_file(STATE) or "").startswith("call ")
+
+
+def mark_reboot():
+    try:
+        with open(REBOOT_MARK, "w") as f:
+            f.write("%f" % time.time())
+    except (IOError, OSError):
+        pass
+
+
 def start_reboot():
     """Reboot the whole Raspberry Pi (DreamPi starts again with it). Returns (started, message)."""
-    in_call = core.dreampi_state()[0].startswith("call")
+    called = in_call()
     try:
         _spawn_reboot()
     except OSError as e:
         return False, "Could not reboot (%s)" % e
-    core.mark_reboot()                                    # the LEDs say so while the Pi goes down
-    core.debug_log("web page: reboot requested%s" % (" (a call was in progress)" if in_call else ""))
+    mark_reboot()                                    # the LEDs say so while the Pi goes down
+    core.debug_log("web page: reboot requested%s" % (" (a call was in progress)" if called else ""))
     return True, "Rebooting"
 
 
@@ -101,8 +124,8 @@ def _post_update(h):
 
 def api(d, warnings):
     """The text the Reboot button asks to confirm (it says so when a call is in progress)."""
-    in_call = core.dreampi_state()[0].startswith("call")
-    d["reboot"] = {"confirm": ("A call is in progress and will be cut. " if in_call else "") + "Reboot the Raspberry Pi now? It is back in about a minute."}
+    called = in_call()
+    d["reboot"] = {"confirm": ("A call is in progress and will be cut. " if called else "") + "Reboot the Raspberry Pi now? It is back in about a minute."}
 
 
 GET = {"/update": _get_update}

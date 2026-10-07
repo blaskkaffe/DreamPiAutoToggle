@@ -10,10 +10,11 @@ import os
 
 import base_core as core
 import netswitch_ledconfig as ledconfig
+import netswitch_led_inputs as inputs
 
 
 def _config_reply():
-    sel = "dcnet" if os.path.exists(core.FLAG) else "dcnow"
+    sel = inputs.selected()
     cfg = ledconfig.led_config()
     return {"config": {"max_brightness": cfg["max_brightness"], "white_balance": cfg["white_balance"], "order": cfg["order"]},
             "token_ui": {t: {"ui": core.network_colour(n)["ui"], "ui_l": core.network_colour(n)["ui_l"]} for t, n in (("dcnow", "dcnow"), ("dcnet", "dcnet"), ("network", sel))},
@@ -214,7 +215,7 @@ def api(d, warnings):
     """The DreamPi dot previews the look of the LED message that is showing (the network switcher fills in the rest); the
     page hides the LED settings while the LED count is 0."""
     count = ledconfig.led_count()
-    sel = "dcnet" if os.path.exists(core.FLAG) else "dcnow"
+    sel = inputs.selected()
     tokens = dict((t, {"ui": core.network_colour(n)["ui"], "ui_l": core.network_colour(n)["ui_l"]}) for t, n in (("dcnow", "dcnow"), ("dcnet", "dcnet"), ("network", sel)))
     d["led"] = {"installed": count > 0, "count": count, "title": "Status LED" + (" (%d LEDs)" % count if count > 1 else ""), "tokens": tokens}
     d.setdefault("dreampi", {})["look"] = ledconfig.dreampi_dot()

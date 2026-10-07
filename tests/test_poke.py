@@ -7,6 +7,7 @@ import unittest
 from unittest import mock
 
 from support import core, probes, sandbox, cleanup, ROOT
+import netswitch_update as up  # noqa: E402
 import sys
 sys.path.insert(0, os.path.join(ROOT, "modules", "led"))
 import netswitch_led as led  # noqa: E402
@@ -113,7 +114,7 @@ class LedQuickLookTests(unittest.TestCase):
             a = led.watched_state_files()
             self.assertEqual(led.watched_state_files(), a)
             for name, path in (("DreamPi's state", core.STATE), ("the network", core.NET_STATE), ("Wi-Fi setup", core.WIFI_STATE),
-                               ("the active mark", core.STATUS), ("the update", core.UPDATE_STATUS)):
+                               ("the active mark", core.STATUS), ("the update", up.UPDATE_STATUS)):
                 before = led.watched_state_files()
                 with open(path, "w") as f:
                     f.write("x")

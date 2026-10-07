@@ -11,6 +11,12 @@ import os
 import time
 
 import base_core as core
+import netswitch_led_inputs as inputs
+
+LED_CONFIG = os.path.join(core.BASE_DIR, "led.json")     # brightness, colours, wire order, white balance, the groups
+LED_COUNT = os.path.join(core.BASE_DIR, "led_count")      # number of LEDs, editable from the page
+LED_GPIO = os.path.join(core.BASE_DIR, "led_gpio")        # output pin (10, 12, 18 or 21), likewise
+WB_TEST = core.TMP_PREFIX + ".wbtest"                     # unix time, touched while the white-balance test is on
 
 # -------------------------------------------------------------------- the messages
 # The messages themselves are announced by the modules (module.json "led_messages"); the detection of when each is true is
@@ -89,7 +95,7 @@ def led_count():
     the LED service then idles and the page hides the LED settings. Set at
     install time (install.sh --leds=N) and editable from the page."""
     try:
-        return max(0, min(300, int((core.read_file(core.LED_COUNT) or "1").strip())))
+        return max(0, min(300, int((core.read_file(LED_COUNT) or "1").strip())))
     except ValueError:
         return 1
 
@@ -99,10 +105,10 @@ def save_led_count(n):
         n = max(0, min(300, int(n)))
     except (TypeError, ValueError):
         return
-    tmp = core.LED_COUNT + ".tmp"
+    tmp = LED_COUNT + ".tmp"
     with open(tmp, "w") as f:
         f.write(str(n))
-    os.rename(tmp, core.LED_COUNT)
+    os.rename(tmp, LED_COUNT)
 
 
 GPIO_PINS = (10, 12, 18, 21)   # allowed LED output pins; see netswitch_led.py for what each needs
@@ -111,7 +117,7 @@ DEFAULT_GPIO = 18
 
 def led_gpio():
     try:
-        n = int((core.read_file(core.LED_GPIO) or "").strip())
+        n = int((core.read_file(LED_GPIO) or "").strip())
         return n if n in GPIO_PINS else DEFAULT_GPIO
     except ValueError:
         return DEFAULT_GPIO
@@ -124,10 +130,10 @@ def save_led_gpio(n):
         return
     if n not in GPIO_PINS:
         return
-    tmp = core.LED_GPIO + ".tmp"
+    tmp = LED_GPIO + ".tmp"
     with open(tmp, "w") as f:
         f.write(str(n))
-    os.rename(tmp, core.LED_GPIO)
+    os.rename(tmp, LED_GPIO)
 
 
 LED_ORDERS = ("RGB", "RBG", "GRB", "GBR", "BRG", "BGR")   # wire order of the WS2812 strip; most are GRB
@@ -235,7 +241,7 @@ def clean_led_config(data):
 
 def led_config():
     try:
-        with open(core.LED_CONFIG) as f:
+        with open(LED_CONFIG) as f:
             return clean_led_config(json.load(f))
     except (IOError, OSError, ValueError):
         return default_led_config()
@@ -243,10 +249,10 @@ def led_config():
 
 def save_led_config(data):
     cfg = clean_led_config(data)
-    tmp = core.LED_CONFIG + ".tmp"
+    tmp = LED_CONFIG + ".tmp"
     with open(tmp, "w") as f:
         json.dump(cfg, f, indent=1, sort_keys=True)
-    os.rename(tmp, core.LED_CONFIG)   # the LED service never sees a half-written file
+    os.rename(tmp, LED_CONFIG)   # the LED service never sees a half-written file
     return cfg
 
 
@@ -270,7 +276,7 @@ WB_TEST_STALE = 3   # seconds; a closed/crashed tab stops driving the LED after 
 
 def _wb_test_file():
     """(time, colour) written by the page while a test is open: white for the white balance, or the colour being calibrated."""
-    raw = (core.read_file(core.WB_TEST) or "").split()
+    raw = (core.read_file(WB_TEST) or "").split()
     if not raw:
         return None, None
     try:
@@ -295,30 +301,24 @@ def wb_test_colour():
 
 
 def touch_wb_test(colour=None):
-    tmp = core.WB_TEST + ".tmp"
+    tmp = WB_TEST + ".tmp"
     with open(tmp, "w") as f:
         f.write("%f %s" % (time.time(), colour if isinstance(colour, _TEXT) and re.match(r"^#[0-9a-fA-F]{6}$", colour) else "#ffffff"))
-    os.rename(tmp, core.WB_TEST)
+    os.rename(tmp, WB_TEST)
 
 
 def clear_wb_test():
     try:
-        os.remove(core.WB_TEST)
+        os.remove(WB_TEST)
     except OSError:
         pass
 
 
 # -------------------------------------------------------------------- what is true right now
 def gather(live=True):
-    """What the messages are made from, read from the files the other services write. live=False is only what DreamPi is doing and
-    which network is selected (the status dot's preview)."""
-    ctx = {"state": core.dreampi_state()[0], "selected": "dcnet" if os.path.exists(core.FLAG) else "dcnow",
-           "net": {}, "players": {}, "wifi": "idle", "update": "idle", "update_info": {}, "reboot": False, "dcnet_problem": False, "event": None}
-    if live:
-        ctx.update(net=core.network_state() or {}, wifi=core.wifi_state().get("state", "idle"), update=core.update_status(),
-                   update_info=core.update_info(), reboot=core.reboot_pending(), players=core.players_watch(), dcnet_problem=bool(core.dcnet_problem()),
-                   event=core.event_reminder())
-    return ctx
+    """What the messages are made from, read from the files the other services write (netswitch_led_inputs.py). live=False is only
+    what DreamPi is doing and which network is selected (the status dot's preview)."""
+    return inputs.gather(live)
 
 
 def active_keys(ctx):
