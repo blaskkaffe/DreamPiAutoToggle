@@ -152,7 +152,7 @@ if [ "$HTTPS_PORT" != 0 ] && [ ! -f "$DEST/https.crt" ]; then
             case "$IP" in *:*) ;; *) SAN="$SAN,IP:$IP" ;; esac
         done
         CNF=$(mktemp)
-        printf '[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=$HOST.local\nO=Check-in\n[ext]\nsubjectAltName=%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n' "$SAN" > "$CNF"
+        printf '[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=%s.local\nO=Check-in\n[ext]\nsubjectAltName=%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n' "$HOST" "$SAN" > "$CNF"
         if openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 820 \
                 -keyout "$DEST/https.key" -out "$DEST/https.crt" -config "$CNF" >/dev/null 2>&1; then
             chmod 600 "$DEST/https.key"
