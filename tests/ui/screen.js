@@ -128,6 +128,11 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await post('/checkin/toggle', { id: 'nobody' }) === 400, 'tapping people in and out still works without it (answered, not refused)');
   await post('/screen/drag', { value: false }, '4821');
   ok(await post('/pin', { pin: '' }, '4821') === 200 && await post('/colour', { module: 'checkin', key: 'checkin', colour: 'blue' }) === 200, 'removing the PIN removes the lock');
+  // switching "Ask for the PIN" on with no PIN set asks for a new one on the PIN pad, then locks Settings
+  await load(); await page.click('#cog'); await settle(900);
+  await page.locator('[data-box="appearance"] .srow:has-text("Ask for the PIN") input[type=checkbox]').click(); await enterPin('7315'); await enterPin('7315'); await settle(1200);
+  ok(await page.evaluate(() => fetch('/api').then(r => r.json())).then(d => d.settings_pin.on && d.settings_pin.pin), 'switching the Settings lock on without a PIN asks for one on the PIN pad, and locks');
+  ok(await post('/settings-pin', { value: false }, '7315') === 200 && await post('/pin', { pin: '' }, '7315') === 200, 'and it can be undone with that PIN');
   ok(errors.length === 0, 'no JavaScript or console errors' + (errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''));
   await browser.close();
   console.log(failed ? failed + ' check(s) failed' : 'all checks passed');

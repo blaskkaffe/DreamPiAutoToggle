@@ -154,11 +154,16 @@ W.button=function(s,ctx){var pill=s.style==="pill",
 // a switch: bound to a value on the server and POSTed ({value: true/false}) on change, or kept only in this page with "local": "name" (S._local.name)
 S._local={};
 // "pinset": the buttons that set, change or remove the PIN (the page asks for the old one first when there is one)
+// choosePin(ok, cancelled): the PIN pad twice (new PIN, again), then POST /pin; ok() when it is saved, cancelled() when the two differ or it is refused (not when the pad is closed)
+function choosePin(ok,cancelled){
+ askPin("New PIN (4 to 64 characters)",function(a){askPin("Enter the new PIN again",function(b){if(b!==a){alert("The two PINs are not the same.");if(cancelled)cancelled();return}
+  withPin(function(){post("/pin",{pin:a},function(r,st){if(r){pinValue=a;refresh();if(ok)ok()}else{alert(st===400?"The PIN must be 4 to 64 characters.":"The PIN was not changed.");if(cancelled)cancelled()}})})})});
+}
 W.pinset=function(s,ctx){var set=h("button",{type:"button","class":"pill-s",text:"Set PIN"}),rem=h("button",{type:"button","class":"pill-s",text:"Remove"}),
  el=h("span",{"class":"optrow"},[set,rem]);
  function send(pin,okText){withPin(function(){post("/pin",{pin:pin},function(r,st){if(r){pinValue=pin;alert(okText);refresh();ctx.saved()}
   else alert(st===400?"The PIN must be 4 to 64 characters.":"The PIN was not changed.")})})}
- set.onclick=function(e){e.stopPropagation();askPin("New PIN (4 to 64 characters)",function(a){askPin("Enter the new PIN again",function(b){if(b!==a){alert("The two PINs are not the same.");return}send(a,"The PIN is set.")})})};
+ set.onclick=function(e){e.stopPropagation();choosePin(function(){alert("The PIN is set.");ctx.saved()})};
  rem.onclick=function(e){e.stopPropagation();if(confirm("Remove the PIN?"))send("","The PIN is removed.")};
  function paint(){var has=!!(S.settings_pin&&S.settings_pin.pin);set.textContent=has?"Change PIN":"Set PIN";sh(rem,has)}
  UPD.push(paint);paint();return el};
@@ -170,7 +175,10 @@ W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.l
   box.onchange=function(){box.disabled=true;post("/modules",{name:s.module,enabled:box.checked},function(r){
    if(!r){box.disabled=false;box.checked=!box.checked;return}reloadInSettings()})};return el}
  bind(s.bind,function(v){box.checked=!!v});
- box.onchange=function(){var want=box.checked;post(s.post,s.body?Object.assign({value:want},s.body):{value:want},function(){refresh();ctx.saved()})};return el};
+ box.onchange=function(){var want=box.checked;
+  // "ensure_pin": switching it on with no PIN set first asks for a new one on the PIN pad (the server refuses the lock without one)
+  if(s.ensure_pin&&want&&!(S.settings_pin&&S.settings_pin.pin)){box.checked=false;choosePin(function(){box.checked=true;post(s.post,{value:true},function(){refresh();ctx.saved()})});return}
+  post(s.post,s.body?Object.assign({value:want},s.body):{value:want},function(){refresh();ctx.saved()})};return el};
 // a row of widgets side by side (wraps)
 W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx))};
 // ---- the module's own colour choice: a "Colour" button in the chosen colour that opens a pop-up with the palette's colours;
