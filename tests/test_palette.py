@@ -26,10 +26,10 @@ class PaletteCore(unittest.TestCase):
         self.assertEqual(core.palette_ids(), core.PALETTE_IDS)
 
     def test_add_edit_and_use_a_custom_colour(self):
-        ident = core.palette_add("Hot  Pink!", "#FF00AA", "#ff0099")
+        ident = core.palette_add("Hot  Pink!", "#FF00AA")
         self.assertEqual(ident, "hot-pink")
         c = core.colour("hot-pink")
-        self.assertEqual((c["name"], c["ui"], c["led"], c["group"]), ("Hot Pink!", "#ff00aa", "#ff0099", "custom"))
+        self.assertEqual((c["name"], c["ui"], c["led"], c["group"]), ("Hot Pink!", "#ff00aa", "#ff00aa", "custom"))      # its LED colour starts as its screen colour
         self.assertEqual(self.ids()[-1], "hot-pink")
         self.assertEqual(core.palette_add("Hot Pink", "#112233"), "hot-pink-2")                 # the same name again: another id
         self.assertEqual(core.palette_add("1 2 3", "#112233"), "colour-1-2-3")                  # an id starts with a letter
@@ -41,9 +41,9 @@ class PaletteCore(unittest.TestCase):
         self.assertIn("--c-hot-pink:#aa0000", core.colours_css())
 
     def test_edit_a_shipped_colour(self):
-        self.assertTrue(core.palette_edit("red", name="Cherry", ui="#c00000", led="#ff1010"))
+        self.assertTrue(core.palette_edit("red", name="Cherry", ui="#c00000"))
         c = core.colour("red")
-        self.assertEqual((c["name"], c["ui"], c["led"]), ("Cherry", "#c00000", "#ff1010"))
+        self.assertEqual((c["name"], c["ui"], c["led"]), ("Cherry", "#c00000", "#ff0000"))                 # the LED colour is not touched
         self.assertTrue(core.palette_edit("network", name="Whatever is selected"))             # a rename is fine ...
         self.assertFalse(core.palette_edit("network", ui="#000000"))                           # ... a colour is not
         self.assertFalse(core.palette_edit("nope", name="x"))
@@ -90,7 +90,36 @@ class PaletteCore(unittest.TestCase):
         self.assertFalse(core.palette_reset("mine"))                                            # not one the add-on ships
         self.assertTrue(core.palette_reset())
         self.assertEqual(tuple(self.ids()), core.PALETTE_IDS)
-        self.assertFalse(os.path.exists(core.PALETTE_CUSTOM) or os.path.exists(core.PALETTE_FILE))
+        self.assertFalse(os.path.exists(core.PALETTE_CUSTOM))
+        self.assertEqual(core.palette_overrides(), {})
+
+    def test_the_led_colours_are_the_led_modules_not_the_palettes(self):
+        core.set_led_colour("red", "#00ffff")
+        core.palette_edit("red", name="Cherry", ui="#c00000")
+        self.assertEqual(json.load(open(core.LED_COLOURS)), {"red": "#00ffff"})                                # two owners, two files
+        self.assertEqual(json.load(open(core.PALETTE_FILE)), {"red": {"ui": "#c00000"}})
+        self.assertTrue(core.palette_reset())                                                                  # the palette module's reset keeps what the LED shows ...
+        self.assertEqual((core.colour("red")["ui"], core.colour("red")["led"]), ("#d9363e", "#00ffff"))
+        core.palette_edit("red", ui="#c00000")
+        core.reset_led_colours()                                                                               # ... and the LED module's keeps what the screen shows
+        self.assertEqual((core.colour("red")["ui"], core.colour("red")["led"]), ("#c00000", "#ff0000"))
+        core.palette_reset("red")
+        self.assertTrue(core.colour("red")["ui"] == "#d9363e")
+        mine = core.palette_add("Mine", "#102030")
+        core.set_led_colour(mine, "#a0b0c0")
+        core.palette_edit(mine, ui="#405060")
+        self.assertEqual((core.colour(mine)["ui"], core.colour(mine)["led"]), ("#405060", "#a0b0c0"))
+        core.palette_delete(mine)
+        self.assertNotIn(mine, json.load(open(core.LED_COLOURS)))                                              # a deleted colour takes its LED value with it
+        self.assertFalse(core.set_led_colour("red", "red"))
+        self.assertFalse(core.set_led_colour("network", "#ffffff"))
+
+    def test_an_older_palette_file_with_led_values_still_counts(self):
+        json.dump({"red": {"ui": "#c00000", "led": "#00ffff"}, "blue": {"led": "#0000aa"}}, open(core.PALETTE_FILE, "w"))
+        self.assertEqual((core.colour("red")["ui"], core.colour("red")["led"], core.colour("blue")["led"]), ("#c00000", "#00ffff", "#0000aa"))
+        core.set_led_colour("green", "#00aa00")                                                                # the next write sorts them into their own files
+        self.assertEqual(json.load(open(core.PALETTE_FILE)), {"red": {"ui": "#c00000"}})
+        self.assertEqual(json.load(open(core.LED_COLOURS)), {"blue": "#0000aa", "green": "#00aa00", "red": "#00ffff"})
 
     def test_the_list_only_counts_while_the_module_is_on(self):
         core.palette_add("Mine", "#123456")
@@ -142,10 +171,11 @@ class PaletteHttp(unittest.TestCase):
         self.assertEqual(st, 200)
         self.assertEqual([c["id"] for c in got["colours"]], list(core.PALETTE_IDS))
         self.assertTrue(all(c["fixed"] for c in got["colours"] if c["id"] in ("global", "network", "orange")))
+        self.assertTrue(all("led" not in c for c in got["colours"]))                                           # what the LED shows is not here
         st, got = self.call("POST", "/palette/add", {"name": "Lime", "ui": "#99ff00"})
         self.assertEqual((st, got["id"]), (200, "lime"))
         self.assertEqual(got["colours"][-1]["custom"], True)
-        self.call("POST", "/palette/edit", {"id": "lime", "name": "Lime time", "led": "#88ff00"})
+        self.call("POST", "/palette/edit", {"id": "lime", "name": "Lime time", "ui": "#88ff00"})
         self.call("POST", "/palette/edit", {"id": "red", "ui": "#c00000"})
         st, got = self.call("POST", "/palette/order", {"order": ["lime", "red"]})
         self.assertEqual([c["id"] for c in got["colours"]][:2], ["lime", "red"])

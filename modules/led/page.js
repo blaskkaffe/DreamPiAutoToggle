@@ -35,16 +35,15 @@ function setWb(on){if(on){startHold("#ffffff");$("wb-preview").classList.add("on
 $("wb-preview").onclick=function(){setWb(!wbOn)};
 $("wb-reset").onclick=function(){cfg.white_balance={r:1,g:1,b:1};showCal();save()};
 $("led-bright").oninput=function(){cfg.max_brightness=Math.round(sliderToBright(this.value)*1000)/1000;$("led-bright-v").textContent=pct(cfg.max_brightness);save()};
-// ---- Colours: how each palette colour looks on screen and on the LED (the LED's red need not be the page's red)
+// ---- Colours: how the LED shows each palette colour (the LED's red need not be the page's red). How a colour looks on screen is set in the Colour palette module.
 var colRow=editRow({title:"Colours",button:"Adjust",aria:"Adjust the colours"}),colPop=h("div",{"class":"gpop"}),pCol=ui.popup(colPop),colSel=null,colPreview=null,colChanged=false,colTimer=null,pal=[];
-colRow.setSub("How each colour looks on screen and on the LED");
+colRow.setSub("How the LED shows each colour");
 host.appendChild(colRow.el);host.appendChild(colPop);
-function applyVars(c){applyPaletteVars(c)}      // the page follows at once (applyPaletteVars is the base's)
 function colSave(body,after){post("/ledcolours",body,function(r){if(r&&r.colours){pal=r.colours;if(after)after()}})}
 function openCol(btn,e){if(pCol.isOpen()){pCol.toggle(btn,e);return}
  xhrJson("GET","/ledcolours",function(r){if(!r)return;pal=r.colours;colChanged=false;fillCol();pCol.toggle(btn,e)})}
 function fillCol(){colPop.innerHTML="";var cur=null;pal.forEach(function(c){if(c.id===colSel)cur=c});if(!cur&&pal.length){cur=pal[0];colSel=cur.id}
- colPop.appendChild(h("div",{"class":"t",text:"Colours: the left half of a ball is how it looks on screen, the right half how it is sent to the LED"}));
+ colPop.appendChild(h("div",{"class":"t",text:"LED colours: the left half of a ball is how the colour looks on screen (set in Colour palette), the right half how it is sent to the LED"}));
  var grid=h("span",{"class":"swatches grid"});
  pal.forEach(function(c){
   var b=h("button",{type:"button","class":"swatch"+(c.id===colSel?" sel":""),style:"--c:linear-gradient(90deg,"+c.ui+" 50%,"+c.led+" 50%);--cl:"+mixWhite(c.ui),"aria-label":c.name});
@@ -53,23 +52,21 @@ function fillCol(){colPop.innerHTML="";var cur=null;pal.forEach(function(c){if(c
  if(!cur)return;
  if(cur.fixed){colPop.appendChild(h("div",{"class":"sub",text:cur.name+" is the colour of the selected network, DCNow! or DCNET: it follows the switch and has no value of its own (set the network colours in Appearance)."}));
   var d0=h("button",{type:"button","class":"pill-s",text:"Done"});d0.onclick=function(){pCol.close()};colPop.appendChild(h("div",{"class":"bar end"},[d0]));return}
- var uiWell=colourWell(cur.ui,cur.name+" on screen",function(v){cur.ui=v;applyVars(cur);colChanged=true;clearTimeout(colTimer);colTimer=setTimeout(function(){colSave({id:cur.id,ui:cur.ui})},250)}),
-  ledWell=colourWell(cur.led,cur.name+" on the LED",function(v){cur.led=v;colChanged=true;if(wbOn&&colPreview.classList.contains("on"))startHold(cur.led);
+ var ledWell=colourWell(cur.led,cur.name+" on the LED",function(v){cur.led=v;colChanged=true;if(wbOn&&colPreview.classList.contains("on"))startHold(cur.led);
    clearTimeout(colTimer);colTimer=setTimeout(function(){colSave({id:cur.id,led:cur.led})},250)}),
-  changed=cur.ui!==cur.ui_default||cur.led!==cur.led_default;
+  changed=cur.led!==cur.led_default;
  colPreview=h("button",{type:"button","class":"pill-s fixw"+(wbOn&&holdColour===cur.led?" on":""),text:wbOn&&holdColour===cur.led?"Stop preview":"Preview on LED"});
  colPreview.onclick=function(){if(wbOn&&colPreview.classList.contains("on")){stopHold();return}startHold(cur.led);colPreview.classList.add("on");colPreview.textContent="Stop preview"};
- colPop.appendChild(h("div",{"class":"frow"},[h("span",{text:cur.name+" on screen"}),uiWell]));
  colPop.appendChild(h("div",{"class":"frow"},[h("span",{text:cur.name+" on the LED"}),h("span",{"class":"ctls"},[ledWell,colPreview])]));
  var reset=h("button",{type:"button","class":"pill-s",text:"Reset this colour"}),resetAll=h("button",{type:"button","class":"pill-s danger",text:"Reset all"}),done=h("button",{type:"button","class":"pill-s",text:"Done"});
  reset.disabled=!changed;
  reset.onclick=function(){stopHold();colChanged=true;colSave({reset:cur.id},fillCol)};
- resetAll.onclick=function(){if(!confirm("Put every colour back to the values the add-on shipped with?"))return;stopHold();colChanged=true;colSave({reset:"all"},fillCol)};
+ resetAll.onclick=function(){if(!confirm("Put every colour back to the LED values the add-on shipped with?"))return;stopHold();colChanged=true;colSave({reset:"all"},fillCol)};
  done.onclick=function(){pCol.close()};
  colPop.appendChild(h("div",{"class":"bar"},[reset,resetAll,done]));
  colPop.appendChild(h("div",{"class":"sub",text:"The LED value is the colour asked for, before the white balance and the brightness. Use Preview on LED to see it."}))}
 colRow.btn.onclick=function(e){openCol(colRow.btn,e)};
-pCol.onclose=function(){stopHold();if(colChanged){colChanged=false;reloadInSettings()}};
+pCol.onclose=function(){stopHold();colChanged=false};
 // ---- the page's hooks
 hook("settingsOpen",load);
 hook("settingsClose",function(){stopHold()});

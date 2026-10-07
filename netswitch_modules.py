@@ -58,7 +58,7 @@ def _read(path):
 def signature():
     """Changes whenever a module is added, removed, switched or edited."""
     parts = [core.MODULES_DIR]
-    for path in (core.MODULES_STATE, core.MODULE_ORDER, core.MODULE_COLOURS, core.MODULE_TINTS, core.PALETTE_FILE):       # what the picker, the colour pickers and the palette editor write
+    for path in (core.MODULES_STATE, core.MODULE_ORDER, core.MODULE_COLOURS, core.MODULE_TINTS, core.PALETTE_FILE, core.PALETTE_CUSTOM):       # what the picker, the colour pickers and the palette editor write
         try:
             parts.append(os.path.getmtime(path))
         except OSError:

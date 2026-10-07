@@ -178,8 +178,9 @@ def _post_wbtest_done(h):
 
 
 def _colours_reply():
-    return {"colours": [{"id": c["id"], "name": c["name"], "ui": c["ui"], "led": c["led"], "ui_default": c["ui_default"],
-                         "led_default": c["led_default"], "fixed": c["id"] == "network"} for c in core.colours()]}
+    """Every palette colour with how it looks on screen (set in the Colour palette module; shown here for reference) and how the LED shows it (set here)."""
+    return {"colours": [{"id": c["id"], "name": c["name"], "ui": c["ui"], "led": c["led"], "led_default": c["led_default"],
+                         "fixed": c["id"] == "network"} for c in core.colours()]}
 
 
 def _get_colours(h):
@@ -187,14 +188,15 @@ def _get_colours(h):
 
 
 def _post_colours(h):
-    """The palette editor: {"id", "ui", "led"} changes a colour on screen and / or on the LED; {"reset": id | "all"} puts it back."""
+    """The LED colours: {"id", "led"} changes how the LED shows a palette colour; {"reset": id | "all"} puts it back. How a colour looks on screen is the
+    Colour palette module's."""
     try:
         body = json.loads(h._body(1024).decode("utf-8"))
         if not isinstance(body, dict):
             raise ValueError("not an object")
         if "reset" in body:
-            core.reset_palette(None if body["reset"] == "all" else body["reset"])
-        elif not core.set_palette_colour(body.get("id"), body.get("ui"), body.get("led")):
+            core.reset_led_colours(None if body["reset"] == "all" else body["reset"])
+        elif not core.set_led_colour(body.get("id"), body.get("led")):
             raise ValueError("not a palette colour")
     except (ValueError, IOError, OSError) as e:
         h.send(str(e), "text/plain; charset=utf-8", status=400)

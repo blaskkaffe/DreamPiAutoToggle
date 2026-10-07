@@ -245,14 +245,13 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('.pop.open .swatch[aria-label="Red"]').click(); await settle(300);
   await page.locator('.pop.open input[aria-label="Red on the LED"]').fill('#e01000'); await settle(900);
   const led1 = await page.evaluate(async () => (await (await fetch('/ledcolours')).json()).colours.find(c => c.id === 'red'));
-  ok(led1.led === '#e01000' && led1.ui === led1.ui_default, 'the LED value is saved and the page colour is not touched (' + led1.led + ' / ' + led1.ui + ')');
-  await page.locator('.pop.open input[aria-label="Red on screen"]').fill('#aa2222'); await settle(900);
-  ok(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--c-red').trim()) === '#aa2222', 'a page colour changes the page at once');
+  ok(led1.led === '#e01000' && led1.ui === '#d9363e', 'the LED value is saved and the page colour is not touched (' + led1.led + ' / ' + led1.ui + ')');
+  ok(await page.locator('.pop.open input[aria-label="Red on screen"]').count() === 0, 'the screen colour is not edited here (that is the Colour palette module)');
   await page.locator('.pop.open button', { hasText: 'Reset all' }).click(); await settle(900);
   const led2 = await page.evaluate(async () => (await (await fetch('/ledcolours')).json()).colours.find(c => c.id === 'red'));
-  ok(led2.led === led2.led_default && led2.ui === led2.ui_default, 'Reset all puts the shipped colours back');
-  await page.locator('.pop.open button', { hasText: 'Done' }).click(); await page.waitForLoadState('networkidle'); await settle(2000);
-  ok(await page.locator('#settings.open').count() === 1, 'closing it after a change builds the page again with Settings still open');
+  ok(led2.led === led2.led_default, 'Reset all puts the shipped LED colours back');
+  await page.locator('.pop.open button', { hasText: 'Done' }).click(); await settle(500);
+  ok(await page.locator('#settings.open').count() === 1, 'closing it leaves Settings open (nothing on the page changed, so nothing is built again)');
   // Priority: the order of the rows, the top one wins
   const ledOrder = () => led.locator('.wtrig .srow[data-id]').evaluateAll(els => els.map(e => e.getAttribute('data-id')));
   const o0 = await ledOrder();
