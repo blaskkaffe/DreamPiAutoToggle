@@ -161,6 +161,43 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await page.locator('.mlist .srow').count() >= 5, 'the module picker lists the modules');
   await page.keyboard.press('Escape'); await closeSettings();
 
+  // ---- roles and buildings on the rows, the touch keyboard, the carousel in a wide row
+  const cfg = v => page.evaluate(x => fetch('/checkin/config', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ values: x }) }).then(r => r.status), v);
+  await cfg({ show_buildings: true, roles_shown: ['Chef'] }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  const sides = await page.locator('.rp-r .rp-s').allTextContents();
+  ok(sides.some(t => /Chef . Område/.test(t)) && sides.every(t => !/Vikarie|Medarbetare/.test(t)) && sides.some(t => /^Område/.test(t)), 'a row shows the building after the role, and only the roles picked in Settings');
+  await cfg({ show_roles: false }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  ok((await page.locator('.rp-r .rp-s').allTextContents()).every(t => !/Chef/.test(t)), 'Display roles off hides the roles');
+  await openSettings();
+  ok(await page.locator('[data-box="check-in"] .srow:has-text("Display roles") button:has-text("Edit")').count() === 1, 'Display roles has an Edit button');
+  await page.locator('[data-box="check-in"] .srow:has-text("Display buildings") button:has-text("Edit")').click(); await settle(300);
+  ok(await page.locator('.pop.open .chkbox input[type=checkbox]').count() >= 2, 'Display buildings lists the buildings to pick from');
+  await page.keyboard.press('Escape'); await closeSettings();
+  await cfg({ show_roles: true, show_buildings: false, roles_shown: null, keyboard: true }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  await page.locator('.rp-t').nth(3).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code="DOCTOR"]').click(); await settle(300);
+  ok(await page.locator('.rp-need2 .rp-kb [data-k=d5]').count() === 1 && await page.locator('.rp-need2 input').count() === 0, 'with the touch keyboard on, a time is typed on a number pad');
+  for (const k of ['d0', 'd9', 'd1', 'd5']) await page.click('[data-k="' + k + '"]');
+  await page.click('.rp-need2 [data-set]'); await settle(700);
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'L\u00e4karbes\u00f6k \u00b7 09:15')), 'the time typed on the pad is kept (24 h clock)');
+  await page.locator('.rp-t').nth(4).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code="OTHER"]').click(); await settle(300);
+  for (const k of ['shift', 'cO', 'ck', 'layersym', 'c7', 'c!']) await page.click('[data-k="' + k + '"]');
+  await page.click('.rp-need2 [data-k=done]'); await settle(700);
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'Annat \u00b7 Ok7!')), 'a note is typed on the text keyboard (letters, numbers, special characters)');
+  await page.locator('.rp-t').nth(5).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code="DOCTOR"]').click(); await settle(300);
+  await page.click('.rp-need2 [data-set]'); await settle(300);
+  ok(/Type the time/.test(await page.locator('.rp-cmsg').textContent()) && await page.locator('.rp-need2').count() === 1, 'an unfinished time is refused with a message');
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+  await cfg({ keyboard: false });
+  await page.setViewportSize({ width: 1500, height: 900 });
+  await page.evaluate(() => Promise.all([['/screen', { values: { dash_cols: 2 } }], ['/screen/stretch', { value: true }]].map(([u, b]) => fetch(u, { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify(b) }))));
+  await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  const copies = await page.locator('.rp-trk').first().evaluate(t => t.children.length);
+  ok(copies > 2 && copies % 2 === 0, 'in a stretched wide row the carousel has more copies of its text to fill it (' + copies + ')');
+  await page.evaluate(() => Promise.all([['/screen', { values: { dash_cols: 1 } }], ['/screen/stretch', { value: false }]].map(([u, b]) => fetch(u, { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify(b) }))));
+
   ok(errors.length === 0, 'no JavaScript errors (' + errors.slice(0, 3).join(' | ') + ')');
   await browser.close();
   console.log(failed ? failed + ' check(s) failed' : 'all checks passed');

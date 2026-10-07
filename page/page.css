@@ -198,7 +198,7 @@
  .roster{display:block} .rp-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px} .rp-chips:empty{display:none}
  html.noscroll:has(body:not(.settings-open)){overflow:hidden;height:100%} html.noscroll body:not(.settings-open){overflow:hidden;height:100vh;height:100dvh}   /* Settings > Appearance > No scrolling: the main screen stays put */
  .rp-tile{margin:0}  .rp-box{margin:0 0 12px;padding:0;overflow:hidden;border-radius:var(--r-box);background:var(--card);border:var(--bw) solid var(--line)}
- .rp-gh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0;padding:8px 16px 6px;font-size:var(--fs-lg)} .rp-gt{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .rp-gh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0;padding:10px 16px 8px;font-size:1.5em} .rp-gt{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
  .rp-r{display:flex;align-items:center;gap:8px;min-width:0;margin:0;padding:0 10px 0 0;border:0;border-top:1px solid var(--line);border-radius:0;background:var(--btn-bg);color:var(--text-2)}
  .rp-r.pri{background:rgba(var(--primary-rgb),.82);border-top-color:rgb(var(--primary-l-rgb));color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55)}
  .rp-t{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:4px 16px;background:none;text-align:left;font-size:1.75em;line-height:1.2;color:inherit;text-shadow:inherit}
@@ -222,6 +222,10 @@
  .rp-clear{display:flex;justify-content:center;margin-top:10px} .rp-clear .rp-so{width:calc((100% - 20px) / 3);min-width:0;flex:none}   /* centred, the size of one status button */
  .rp-so.on{box-shadow:0 0 0 3px #fff}
  .rp-edit{cursor:pointer} .rp-chk{display:flex;align-items:center;gap:10px;color:var(--text-1)} .rp-cmsg{min-height:1.4em;margin-top:10px}
+ .rp-withkb{width:clamp(320px,56vw,760px)} div.rp-shown{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100%;min-height:76px;margin:8px 0 12px;padding:8px 14px;font-size:2.4em;font-weight:600;letter-spacing:.1em;overflow-wrap:anywhere;background:var(--ctl);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl)}
+ .rp-kb{margin-top:4px} .rp-kr{display:flex;gap:6px;margin-top:6px} .rp-kr.pad{max-width:420px;margin-left:auto;margin-right:auto}
+ .rp-k{flex:1 1 0;min-width:0;min-height:56px;padding:0 4px;justify-content:center;font-size:1.3em} .rp-kr.pad .rp-k{min-height:64px;font-size:1.6em} .rp-kw{flex:1.5 1 0} .rp-ksp{flex:5 1 0} .rp-kn{visibility:hidden} .rp-k.on{box-shadow:0 0 0 3px var(--text-1)}
+ .chkbox{max-height:46vh;overflow-y:auto;margin-top:8px}
  .rp-modal2{z-index:31} .rp-need2{width:clamp(300px,42vw,620px)} .rp-nl{display:block;margin:18px 0 0;font-size:1.1em;color:var(--text-2)}
  input.rp-big{display:block;box-sizing:border-box;width:100%;height:auto;min-height:64px;margin:8px 0 0;padding:8px 14px;font:inherit;font-size:1.6em;color:var(--text-1);background:var(--ctl);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl)}
  .rp-nb{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:20px}

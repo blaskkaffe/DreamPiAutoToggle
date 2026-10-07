@@ -636,6 +636,53 @@ function rosterAvatar(p,cls){var h0=0,i,n=String(p.name||"");for(i=0;i<n.length;
  var parts=n.trim().split(/\s+/).filter(Boolean),ini=parts.length>1?(parts[0][0]+parts[parts.length-1][0]):(parts[0]||"?").slice(0,2);
  if(p.photo)return '<span class="rp-av '+cls+'" role="img" aria-label="'+esc(n)+'" style="background-image:url(\''+esc(p.photo)+'\')"></span>';
  return '<span class="rp-av '+cls+' c-'+ROSTER_TONES[h0%ROSTER_TONES.length]+'" aria-hidden="true">'+esc(ini.toUpperCase())+'</span>'}
+// ---- an on-screen keyboard for the status pop-up (Settings, Touch keyboard): a number pad for a time or a date, a text keyboard
+// (letters, numbers, special characters) for a note. kind: "time" | "date" | "text"; o: {value, twelve (12-hour clock), max}. Returns {el, show, value()};
+// value() is "HH:MM" (24 h), "YYYY-MM-DD" or the text, or null (with a message in o.say) when what was typed is not a time / date.
+function onScreenKeys(kind,o){
+ var el=h("div",{"class":"rp-kb"}),shown=h("div",{"class":"rp-big rp-shown",role:"textbox","aria-readonly":"true","aria-live":"polite"}),digits="",pm=false,txt=String(o.value||""),layer="abc",shift=false,fresh=true,max=o.max||60;
+ function key(label,act,cls,aria){var b=h("button",{type:"button","class":"pill-s rp-k"+(cls?" "+cls:""),"data-k":act,text:label});if(aria)b.setAttribute("aria-label",aria);return b}
+ function row(keys,cls){var r=h("div",{"class":"rp-kr"+(cls?" "+cls:"")});keys.forEach(function(k){r.appendChild(k)});el.appendChild(r)}
+ if(kind==="time"){var m=/^(\d\d):(\d\d)$/.exec(o.value||"");if(m){var hh=+m[1];if(o.twelve){pm=hh>=12;hh=hh%12||12}digits=(hh<10?"0":"")+hh+m[2]}}
+ function slots(){var d=digits;if(kind==="date")return d.slice(0,2).padEnd(2,"\u2012")+" / "+d.slice(2,4).padEnd(2,"\u2012");
+  var hl=d.length===3?1:2;return d.slice(0,hl).padEnd(2,"\u2012")+" : "+d.slice(hl,hl+2).padEnd(2,"\u2012")+(o.twelve?"  "+(pm?"PM":"AM"):"")}
+ function draw(){shown.textContent=kind==="text"?(txt||"\u00a0"):slots()}
+ function pad(){el.innerHTML="";el.appendChild(shown);
+  var k=function(n){return key(String(n),"d"+n)};
+  row([k(1),k(2),k(3)],"pad");row([k(4),k(5),k(6)],"pad");row([k(7),k(8),k(9)],"pad");
+  row([o.twelve&&kind==="time"?key(pm?"PM":"AM","ampm","rp-kw"):key("","none","rp-kn"),k(0),key("\u232b","back","rp-kw","Backspace")],"pad")}
+ var L={abc:[["q","w","e","r","t","y","u","i","o","p","\u00e5"],["a","s","d","f","g","h","j","k","l","\u00f6","\u00e4"],["z","x","c","v","b","n","m"]],
+  sym:[["1","2","3","4","5","6","7","8","9","0"],["-","/",":",";","(",")","\u20ac","&","@","\""],[".",",","?","!","'","#","%"]],
+  more:[["+","=","_","*","<",">","[","]","{","}"],["~","^","\\","|","$","\u00a3","\u00a7","`","\u00b0","\u00bd"],[".",",","?","!","'","\u201c","\u201d"]]};
+ function text(){el.innerHTML="";el.appendChild(shown);var rows=L[layer];
+  rows.forEach(function(r,i){var keys=r.map(function(c){var ch=layer==="abc"&&shift?c.toUpperCase():c;return key(ch,"c"+ch)});
+   if(i===2){keys.unshift(layer==="abc"?key("\u21e7","shift","rp-kw"+(shift?" on":""),"Shift"):key(layer==="sym"?"#+=":"123","layer"+(layer==="sym"?"more":"sym"),"rp-kw"));keys.push(key("\u232b","back","rp-kw","Backspace"))}
+   row(keys)});
+  row([key(layer==="abc"?"123":"ABC",layer==="abc"?"layersym":"layerabc","rp-kw"),key("space","c ","rp-ksp","Space"),key("\u2713","done","rp-kw pri","Done")])}
+ function render(){if(kind==="text")text();else pad();draw()}
+ function typed(c){if(c==="back"){if(kind==="text")txt=txt.slice(0,-1);else digits=digits.slice(0,-1);fresh=false;return}
+  if(kind==="text"){if(txt.length<max)txt+=c;if(shift){shift=false;render()}return}
+  if(fresh){digits="";fresh=false}if(digits.length<4)digits+=c}
+ el.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-k]");if(!b)return;e.stopPropagation();var a=b.getAttribute("data-k");
+  if(a==="none")return;
+  if(a==="ampm"){pm=!pm;render();return}
+  if(a==="shift"){shift=!shift;render();return}
+  if(a.indexOf("layer")===0){layer=a.slice(5);render();return}
+  if(a==="done"){if(el._done)el._done();return}
+  if(a==="back"){typed("back")}else if(a[0]==="d"){typed(a.slice(1))}else if(a[0]==="c"){typed(a.slice(1))}
+  draw()});
+ el.value=function(){if(kind==="text")return txt;
+  var d=digits;
+  if(kind==="time"){var hh,mm;if(d.length===4){hh=+d.slice(0,2);mm=+d.slice(2)}else if(d.length===3){hh=+d.slice(0,1);mm=+d.slice(1)}else{if(o.say)o.say("Type the time, for example "+(o.twelve?"0830":"0830"));return null}
+   if(o.twelve){if(hh<1||hh>12){if(o.say)o.say("The hour must be 1 to 12");return null}hh=hh%12+(pm?12:0)}else if(hh>23){if(o.say)o.say("The hour must be 0 to 23");return null}
+   if(mm>59){if(o.say)o.say("The minutes must be 0 to 59");return null}
+   return (hh<10?"0":"")+hh+":"+(mm<10?"0":"")+mm}
+  if(d.length!==4){if(o.say)o.say("Type the day and the month, for example 0107 for 1 July");return null}
+  var dd=+d.slice(0,2),mo=+d.slice(2),now=new Date(),y=now.getFullYear(),t=new Date(y,mo-1,dd);
+  if(mo<1||mo>12||dd<1||t.getMonth()!==mo-1){if(o.say)o.say("That date does not exist");return null}
+  if(t<new Date(y,now.getMonth(),now.getDate()))y++;
+  return y+"-"+(mo<10?"0":"")+mo+"-"+(dd<10?"0":"")+dd};
+ render();return el}
 W.roster=function(s,ctx){
  if(s.mode==="colours")return rosterColours(s,ctx);
  var el=h("div",{"class":"roster"}),chips=h("div",{"class":"rp-chips"}),msg=h("div"),
@@ -649,9 +696,12 @@ W.roster=function(s,ctx){
  function paintChips(){var b=(D&&D.buildings)||[],html=b.length<2?"":['<button type="button" class="pill-s'+(sel.length?"":" pri")+'" data-loc="">All</button>'].concat(b.map(function(n){
   return '<button type="button" class="pill-s'+(sel.indexOf(n)>=0?" pri":"")+'" data-loc="'+esc(n)+'">'+esc(n)+'</button>'})).join("");setHtml(chips,html)}
  // a row: tap it for the status menu; the button at its right is in (INNE, green) / out (UTE, red) and switches. With a status the name and the status scroll round like a carousel.
+ // the small grey text at the right of a row: the role and / or the building, as chosen in Settings (Display roles / Display buildings, each with a list of the ones to show)
+ function shownIn(list,v){return !!v&&(list==null||list.indexOf(v)>=0)}
+ function sideText(p){var out=[];if(D.show_roles!==false&&shownIn(D.roles_shown,p.role))out.push(p.role);if(D.show_buildings&&shownIn(D.buildings_shown,p.building))out.push(p.building);return out.join(" \u00b7 ")}
  function row(p){var text=p.name+(p.text?"  ·  "+p.text:""),state=p.text?p.text:(p.in?"in":"out"),
   inner=p.status?'<span class="rp-mq" style="--d:'+Math.max(8,Math.round(text.length*.45))+'s"><span class="rp-trk"><span>'+esc(text)+'</span><span>'+esc(text)+'</span></span></span>'
-   :'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-s">'+esc(p.role||"")+'</span>';
+   :'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-s">'+esc(sideText(p))+'</span>';
   return '<div class="rp-r '+(p.colour?"pri"+colourCls(p):"out")+'" data-id="'+esc(p.id)+'"><button type="button" class="rp-t" data-act="menu" aria-label="'+esc(p.name)+': '+esc(state)+', open the status menu">'+inner+'</button>'+
    '<button type="button" class="pill-s pri rp-io c-'+(p.in?"green":"red")+'" data-act="toggle" aria-label="'+esc(p.name)+': '+(p.in?"checked in, tap to check out":"checked out, tap to check in")+'">'+(p.in?"INNE":"UTE")+'</button></div>'}
  // Each group is a tile of the main screen (a .dbox beside the board's own), so the page's columns, stretch, scale and rearranging apply to them
@@ -680,8 +730,16 @@ W.roster=function(s,ctx){
   else{var ords=seq.map(function(t){return t._ord}).sort(function(x,y){return x-y});seq.forEach(function(t,i){t._ord=ords[i]})}
   setHtml(msg,!D.total?'<div class="sub rp-empty">'+esc(D.text)+'</div>':(n?'':'<div class="sub rp-empty">Nobody to show for the chosen buildings.</div>'));
   if(changed&&window.applyScreen)applyScreen(true);
+  fillCarousels();
   var c=capacity();if(c!==usedCap&&!again){usedCap=c;again=true;try{paint()}finally{again=false}}}
- var rz=null;window.addEventListener("resize",function(){clearTimeout(rz);rz=setTimeout(function(){if(D&&capacity()!==usedCap)paint()},150)});
+ // a carousel needs enough copies of its text to fill a wide row (stretched boxes): half of the track is at least as wide as the row, the track moves by half
+ function fillCarousels(){Array.prototype.forEach.call(document.querySelectorAll("#dash .rp-mq"),function(mq){var trk=mq.querySelector(".rp-trk");if(!trk||!trk.firstChild)return;
+  var one=trk.firstChild.getBoundingClientRect().width,w=mq.getBoundingClientRect().width;if(!one||!w)return;
+  var zoom=one/(trk.firstChild.offsetWidth||one);var k=Math.max(1,Math.ceil(w/one)),have=trk.children.length/2;
+  if(have!==k){var t=trk.firstChild.textContent;trk.innerHTML="";for(var i=0;i<2*k;i++){var sp=document.createElement("span");sp.textContent=t;trk.appendChild(sp)}}
+  mq.style.setProperty("--d",Math.max(8,Math.round(k*one/(70*(zoom||1))))+"s")})}
+ hook("screen",fillCarousels);
+ var rz=null;window.addEventListener("resize",function(){clearTimeout(rz);rz=setTimeout(function(){if(D&&capacity()!==usedCap)paint();else fillCarousels()},150)});
  // boxes dragged to a new place (Settings > Appearance > Rearrange): the order of the groups is kept on the host, so every screen follows
  hook("tiles-moved",function(seq){var ids=[];seq.forEach(function(b){if(b._owner===el&&ids.indexOf(b._gid)<0)ids.push(b._gid)});
   if(!ids.length||!D)return;D.groups.forEach(function(g){if(ids.indexOf(g.id)<0)ids.push(g.id)});post(s.order||"/checkin/order",{order:ids},take)});
@@ -700,17 +758,21 @@ W.roster=function(s,ctx){
    '</div><div class="rp-clear"><button type="button" class="pill-s rp-so" data-code="">Rensa status</button></div></div>'}
  function openMenu(id){var p=person(id);if(!p)return;cur=id;modal.innerHTML=menuHtml(p);modal.style.display="";var x=modal.querySelector(".rp-x");if(x&&x.focus)x.focus()}
  // a status that needs a time, a date or a note: its own pop-up on top of the menu, with a big field (Enter sets it, Esc or a tap outside goes back)
- function openNeed(code,st){var p=person(cur),type=st.needs==="time"?"time":st.needs==="date"?"date":"text",
-  what=st.needs==="time"?"At what time?":st.needs==="date"?"Until which date?":"What is it?";
-  modal2.innerHTML='<div class="rp-sheet rp-need2" role="dialog" aria-modal="true" aria-label="'+esc(st.label)+'"><button type="button" class="rp-x" data-back="1" title="Back" aria-label="Back">&#10005;</button>'+
-   '<div class="rp-wn">'+esc(st.label)+'</div><div class="rp-wl">'+esc(p?p.name:"")+'</div><label class="rp-nl">'+what+'<input class="rp-big" type="'+type+'" value="'+esc(st.default||"")+'" maxlength="60" aria-label="'+esc(st.label)+'"></label>'+
+ function openNeed(code,st){var p=person(cur),kind=st.needs,kb=!!(D&&D.keyboard),twelve=!!(S.clock&&/^12/.test(S.clock.format||"")),
+  what=kind==="time"?"At what time?":kind==="date"?"Until which date?":"What is it?",field;
+  var type=kind==="time"?"time":kind==="date"?"date":"text";
+  modal2.innerHTML='<div class="rp-sheet rp-need2'+(kb?' rp-withkb':'')+'" role="dialog" aria-modal="true" aria-label="'+esc(st.label)+'"><button type="button" class="rp-x" data-back="1" title="Back" aria-label="Back">&#10005;</button>'+
+   '<div class="rp-wn">'+esc(st.label)+'</div><div class="rp-wl">'+esc(p?p.name:"")+'</div><div class="rp-nl">'+what+'<div class="rp-field"></div></div><div class="rp-cmsg sub" aria-live="polite"></div>'+
    '<div class="rp-nb"><button type="button" class="pill-s rp-so" data-back="1">Cancel</button><button type="button" class="pill-s pri rp-so c-'+esc(st.colour)+'" data-set="'+esc(code)+'">Set</button></div></div>';
-  modal2.style.display="";var inp=modal2.querySelector("input");if(inp&&inp.focus)inp.focus()}
+  var host=modal2.querySelector(".rp-field"),msg=modal2.querySelector(".rp-cmsg");
+  if(kb){var keys=onScreenKeys(kind==="note"?"text":kind,{value:st.default||"",twelve:twelve,say:function(t){setText(msg,t)}});keys._done=function(){var b=modal2.querySelector("[data-set]");if(b)b.click()};host.appendChild(keys);modal2._get=function(){return keys.value()}}
+  else{field=h("input",{"class":"rp-big",type:type,value:st.default||"",maxlength:60,"aria-label":st.label});host.appendChild(field);modal2._get=function(){return field.value};if(field.focus)setTimeout(function(){field.focus()},0)}
+  modal2.style.display=""}
  function closeNeed(){modal2.style.display="none";modal2.innerHTML=""}
  modal2.addEventListener("click",function(e){if(e.target===modal2){closeNeed();return}
   var b=e.target.closest&&e.target.closest("button");if(!b)return;
   if(b.hasAttribute("data-back")){closeNeed();return}
-  if(b.hasAttribute("data-set")){var inp=modal2.querySelector("input"),code=b.getAttribute("data-set");closeNeed();send(code,inp?inp.value:"")}});
+  if(b.hasAttribute("data-set")){var v=modal2._get?modal2._get():"",code=b.getAttribute("data-set");if(v===null)return;closeNeed();send(code,v)}});
  modal2.addEventListener("keydown",function(e){if(e.key==="Enter"){var b=modal2.querySelector("[data-set]");if(b){e.preventDefault();b.click()}}});
  function closeMenu(){closeNeed();modal.style.display="none";modal.innerHTML="";cur=null}
  function send(code,detail){var id=cur;post(s.status,{id:id,code:code,detail:detail||""},function(r){take(r);closeMenu()})}
@@ -802,6 +864,17 @@ function control(spec,F,change){var key=spec.key,el,paint;
   paint=function(){var m=mode(),v=F.values[key];Object.keys(segB).forEach(function(k){segB[k].classList.toggle("pri",k===m)});
    sh(line,m!=="all");ctl.innerHTML="";if(m==="all")return;ra.value=v[0];rb.value=v[1];setText(lab,m==="one"?"LED number":"From and to");ctl.appendChild(ra);if(m==="range")ctl.appendChild(rb)};
   el._paint=paint;return el}
+ // "checklist": the options as ticked boxes (null = all of them, shown ticked); a list of the ticked ones is kept when some are not
+ if(spec.type==="checklist"){el=h("div",{"class":"chklist"});var lastl="",boxes=[],tools=h("div",{"class":"frow"}),all=h("button",{type:"button","class":"pill-s",text:"All"}),none=h("button",{type:"button","class":"pill-s",text:"None"}),list=h("div",{"class":"chkbox"});
+  tools.appendChild(all);tools.appendChild(none);el.appendChild(tools);el.appendChild(list);
+  function commit(){var on=[];boxes.forEach(function(b){if(b.input.checked)on.push(b.value)});F.values[key]=on.length===boxes.length?null:on;change()}
+  all.onclick=function(e){e.stopPropagation();boxes.forEach(function(b){b.input.checked=true});commit()};none.onclick=function(e){e.stopPropagation();boxes.forEach(function(b){b.input.checked=false});commit()};
+  paint=function(){var opts=optionList(spec,F),k=JSON.stringify(opts);
+   if(k!==lastl){lastl=k;list.innerHTML="";boxes=opts.map(function(o){var inp=h("input",{type:"checkbox","class":"cbox neutral","aria-label":o.label});inp.onchange=commit;
+    list.appendChild(h("label",{"class":"srow"},[h("span",{text:o.label}),inp]));return {value:o.value,input:inp}});
+    if(!opts.length)list.appendChild(h("div",{"class":"sub",text:spec.empty||"Nothing on file yet"}))}
+   var v=F.values[key];boxes.forEach(function(b){b.input.checked=v==null||v.indexOf(b.value)>=0});sh(tools,boxes.length>0)};
+  el._paint=paint;return el}
  if(spec.type==="toggle"){el=h("input",{type:"checkbox","class":"cbox neutral","aria-label":spec.aria||spec.label||key});
   paint=function(){el.checked=!!F.values[key]};el.onchange=function(){F.values[key]=el.checked;change()};el._paint=paint;return el}
  el=h("input",{type:"text","aria-label":spec.aria||spec.label||key});
@@ -813,7 +886,12 @@ W.form=function(s,ctx){var el=h("div",{"class":"wform"}),F={values:{},options:{}
  (s.fields||[]).forEach(function(f){
   // "inline": the one control (a switch, a select) sits on the row itself, no Edit button and no pop-up
   if(f.inline&&(f.controls||[]).length===1){var c0=f.controls[0],e0=control(Object.assign({},c0,{aria:f.title||c0.label||c0.key}),F,save);ctls.push(e0);
-   el.appendChild(h("div",{"class":"srow"},[h("span",{text:f.title||c0.label||c0.key}),e0]));
+   var ctl=e0;
+   if(f.edit){var ce=control(Object.assign({},f.edit,{aria:f.edit.title||f.title}),F,save),pop0=h("div"),done0=h("button",{type:"button","class":"pill-s",text:"Done"}),eb=h("button",{type:"button","class":"pill-s",text:f.edit.button||"Edit","aria-label":"Edit: "+(f.edit.title||f.title||"")}),p0;
+    ctls.push(ce);pop0.appendChild(h("div",{"class":"t",text:f.edit.title||f.title||""}));pop0.appendChild(ce);pop0.appendChild(h("div",{"class":"bar end"},[done0]));
+    el.appendChild(pop0);p0=ui.popup(pop0);eb.onclick=function(e){p0.toggle(eb,e)};done0.onclick=function(){p0.close()};hook("settingsClose",function(){p0.close()});
+    ctl=h("span",{"class":"ctls"},[eb,e0])}
+   el.appendChild(h("div",{"class":"srow"},[h("span",{text:f.title||c0.label||c0.key}),ctl]));
    if(f.show!==undefined)bind(f.show,function(v){sh(e0.parentNode,!!v)});return}
   var r=editRow({title:f.title,button:f.button||"Edit",aria:"Edit "+(f.title||"")}),done=h("button",{type:"button","class":"pill-s",text:"Done"}),pop=h("div"),p;
   pop.appendChild(h("div",{"class":"t",text:f.popup_title||f.title||""}));

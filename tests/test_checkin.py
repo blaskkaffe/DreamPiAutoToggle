@@ -284,10 +284,19 @@ class HttpTests(Base):
 
     def test_settings_and_colour_endpoints(self):
         r = self.get("/checkin/config")
-        self.assertEqual(r["values"], {"show_title": True, "group_by": "department", "colour_by": "department"})
+        self.assertEqual(r["values"], {"show_title": True, "group_by": "department", "colour_by": "department", "show_roles": True, "show_buildings": False,
+                                       "keyboard": False, "roles_shown": None, "buildings_shown": None})
         self.assertEqual([x["key"] for x in r["colours"]["department"]], ["Kök", "No department", "Servering"])
         r = self.post("/checkin/config", {"values": {"colour_by": "building", "group_by": "nonsense", "show_title": False}})
-        self.assertEqual(r["values"], {"show_title": False, "group_by": "department", "colour_by": "building"})
+        self.assertEqual((r["values"]["show_title"], r["values"]["group_by"], r["values"]["colour_by"]), (False, "department", "building"))
+        r = self.post("/checkin/config", {"values": {"show_buildings": True, "keyboard": True, "roles_shown": ["Chef", 3], "buildings_shown": "x", "show_roles": "no"}})
+        v = r["values"]
+        self.assertEqual((v["show_buildings"], v["keyboard"], v["roles_shown"], v["buildings_shown"], v["show_roles"]), (True, True, ["Chef"], None, True))     # bad values are ignored
+        self.assertIn("Kökschef", [o["value"] for o in r["options"]["roles"]])
+        self.assertEqual([o["value"] for o in r["options"]["buildings"]], ["Område A", "Område B"])
+        board = self.get("/api")["checkin"]
+        self.assertEqual((board["show_buildings"], board["keyboard"], board["roles_shown"]), (True, True, ["Chef"]))
+        self.post("/checkin/config", {"values": {"roles_shown": None}})
         self.assertFalse(self.get("/api")["checkin"]["show_title"])
         r = self.post("/checkin/colour", {"kind": "department", "name": "Kök", "colour": "bright-pink"})
         self.assertEqual([x for x in r["colours"]["department"] if x["key"] == "Kök"][0]["colour"], "bright-pink")

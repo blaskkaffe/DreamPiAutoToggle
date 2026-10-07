@@ -163,7 +163,8 @@ function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;
  b.style.maxWidth=SCR.stretch?"none":(dn*COLW+(dn-1)*SGAP+2*pad)+"px";b.style.paddingLeft=b.style.paddingRight=pad+"px";
  dash.style.setProperty("--z",dz);dash.classList.toggle("multi",dn>1);layoutDash(dn);applyGrips();
  if(inn){inn.style.maxWidth=SCR.stretch?"none":(sn*COLW+(sn-1)*SGAP+2*pad)+"px";inn.style.paddingLeft=inn.style.paddingRight=pad+"px"}
- if(key!==scrKey){scrKey=key;if(!fromSettings&&$("settings").classList.contains("open"))layoutColumns(true)}}
+ if(key!==scrKey){scrKey=key;if(!fromSettings&&$("settings").classList.contains("open"))layoutColumns(true)}
+ fire("screen")}
 // The PIN (when one is set with install.sh --pin) is asked for once per page load, before update / restart.
 var pinNeeded=false,pinValue="";
 function withPin(go){if(!pinNeeded||pinValue)return go();var p=prompt("Enter the PIN");if(p===null)return;pinValue=p;go()}

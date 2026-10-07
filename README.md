@@ -11,7 +11,7 @@ What you get:
 - **Colours by department and/or building**, picked from the page's palette (automatic, or your own pick for each department / building).
 - **Screens in step in real time.** The Pi (the host) keeps everything; every other screen is only a browser that opens the host's address, in kiosk mode if you like (`kiosk/kiosk-browser.sh`). A change on one screen is on the others within about a second.
 - **A screen per building:** with several buildings a row of chips picks what a screen shows (kept in that browser; `?location=Område A` in the address sets it).
-- **Contacts:** import a CSV (a file or pasted text), export it again, switch people off, tap a person to edit their name, department, role, phone and building.
+- **Contacts:** import a CSV (a file or pasted text), export it again, switch people off, tap a person to edit their name, department, role, phone and building. The board can show each person's role and building (pick which ones), and has an optional on-screen number pad / keyboard for times, dates and notes.
 - A **clock** (12 or 24-hour, `.beat`, world times and a time zone map), **update and reboot buttons** on the page and an optional **PIN** for them.
 
 **Tested so far:** off the Pi only: unit tests (`sh tests/run.sh`) and the page driven in Chromium against a demo server (`sh tests/ui/run.sh`). See [docs/hardware-status.md](docs/hardware-status.md) for what has and has not been seen on real hardware.

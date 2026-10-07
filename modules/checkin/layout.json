@@ -63,6 +63,53 @@
         }
        ],
        "inline": true
+      },
+      {
+       "title": "Display roles",
+       "inline": true,
+       "controls": [
+        {
+         "type": "toggle",
+         "key": "show_roles",
+         "label": "Display roles"
+        }
+       ],
+       "edit": {
+        "type": "checklist",
+        "key": "roles_shown",
+        "options": "roles",
+        "title": "Roles to display",
+        "empty": "No roles on file yet"
+       }
+      },
+      {
+       "title": "Display buildings",
+       "inline": true,
+       "controls": [
+        {
+         "type": "toggle",
+         "key": "show_buildings",
+         "label": "Display buildings"
+        }
+       ],
+       "edit": {
+        "type": "checklist",
+        "key": "buildings_shown",
+        "options": "buildings",
+        "title": "Buildings to display",
+        "empty": "No buildings on file yet"
+       }
+      },
+      {
+       "title": "Touch keyboard",
+       "inline": true,
+       "controls": [
+        {
+         "type": "toggle",
+         "key": "keyboard",
+         "label": "On-screen keyboard for times, dates and notes"
+        }
+       ]
       }
      ]
     },
