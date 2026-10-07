@@ -78,7 +78,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(len(nums.save_numbers({"rows": [row("switcher.dcnow", ["12345"]) for _ in range(50)]})), nums.MAX_ROWS)
 
     def test_the_four_lists_of_an_older_file_become_rows(self):
-        with open(core.NUMBERS, "w") as f:
+        with open(nums.NUMBERS, "w") as f:
             json.dump({"toggle_dcnow": ["5550001#"], "toggle_dcnet": [], "call_dcnet": ["5550002"], "call_dcnow": ["11111", "1111111"]}, f)
         rows = nums.numbers()
         self.assertEqual([(r["action"], r["opts"]["hangup"], r["items"]) for r in rows],
@@ -98,7 +98,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual([r["items"] for r in load_rows()], [["11111"]])
 
     def test_broken_file_falls_back(self):
-        with open(core.NUMBERS, "w") as f:
+        with open(nums.NUMBERS, "w") as f:
             f.write("{not json")
         self.assertEqual(nums.numbers(), nums.default_rows())
         self.assertEqual([r["items"] for r in load_rows()], [["11111"]])

@@ -19,7 +19,7 @@
 #   EVENT <unix start> <due 0|1> <title>          the DC99 event to show: the one whose reminder is due (due 1), else the soonest (left out when none)
 # The module announces itself to the rest of the add-on in module.json ("launcher"): the card's games that are in the online game table
 # (GET /openmenu/games, "online": true) and how to start one, so the Online players and DC99 events lists can show a Start button.
-# The online players and the table of online games are read from the Online players module's file (core.PLAYERS_CACHE), never from its
+# The online players and the table of online games are read from the Online players module's file (PLAYERS_CACHE), never from its
 # code. Works on Python 3 and 2.7.
 import json
 import os
@@ -29,6 +29,9 @@ import time
 
 import base_core as core
 
+OPENMENU_GAMES = os.path.join(core.BASE_DIR, "openmenu_games.json")   # {"hash", "time", "games": [...]}: the game list the Dreamcast's openMenu uploaded (openMenu link module)
+PLAYERS_CACHE = os.path.join(core.BASE_DIR, "players_cache.json")      # the Online players module's last list (read, never fetched here)
+EVENT_REMINDERS = os.path.join(core.BASE_DIR, "event_reminders.json")   # the events module's reminders and upcoming events (read)
 SEEN_WINDOW = 15          # seconds: openMenu polls every 3, so it is "connected" while it was heard this recently
 LAUNCH_TTL = 60           # a launch nobody collected within this time is dropped
 MAX_BODY = 2000000
@@ -43,6 +46,36 @@ _state = {"seen": 0.0, "pending": None, "pending_time": 0.0, "launched": None, "
 
 
 # ------------------------------------------------------------------ game list
+def event_reminder(now=None):
+    """The reminded DC99 event that is due now, or None: {"id", "title", "start"}. The events module writes EVENT_REMINDERS
+    ({"lead": minutes before, "after": minutes after the start, "items": [{"id", "title", "start"}], "dismissed": [ids]}) whenever
+    it changes, so the LEDs know without the page being open. Due = from lead minutes before the start until after minutes after it."""
+    now = time.time() if now is None else now
+    try:
+        with open(EVENT_REMINDERS) as f:
+            data = json.load(f)
+        lead, after = float(data.get("lead", 15)) * 60, float(data.get("after", 10)) * 60
+        gone = set(data.get("dismissed") or [])
+        due = [i for i in data.get("items") or [] if i.get("id") not in gone and i["start"] - lead <= now < i["start"] + after]
+    except (IOError, OSError, ValueError, AttributeError, KeyError, TypeError):
+        return None
+    return min(due, key=lambda i: i["start"]) if due else None
+
+
+def next_event(now=None):
+    """The soonest DC99 event that has not ended its reminder window yet, or None: {"id", "title", "start"}. The events module writes the
+    next few into EVENT_REMINDERS ("upcoming", soonest first) whenever it changes, so the openMenu answer needs no page and no events code."""
+    now = time.time() if now is None else now
+    try:
+        with open(EVENT_REMINDERS) as f:
+            data = json.load(f)
+        after = float(data.get("after", 10)) * 60
+        coming = [i for i in data.get("upcoming") or [] if i["start"] + after > now]
+    except (IOError, OSError, ValueError, AttributeError, KeyError, TypeError):
+        return None
+    return min(coming, key=lambda i: i["start"]) if coming else None
+
+
 def _clean(text, limit):
     return re.sub(r"[\x00-\x1f]", " ", text).strip()[:limit]
 
@@ -81,7 +114,7 @@ def parse_games(text):
 
 def _load_games():
     try:
-        with open(core.OPENMENU_GAMES) as f:
+        with open(OPENMENU_GAMES) as f:
             data = json.load(f)
         if isinstance(data, dict) and isinstance(data.get("games"), list):
             return data
@@ -99,10 +132,10 @@ def games():
 
 def save_games(h, glist):
     data = {"hash": h, "time": int(time.time()), "games": glist}
-    tmp = core.OPENMENU_GAMES + ".tmp"
+    tmp = OPENMENU_GAMES + ".tmp"
     with open(tmp, "w") as f:
         json.dump(data, f)
-    os.rename(tmp, core.OPENMENU_GAMES)
+    os.rename(tmp, OPENMENU_GAMES)
     with _lock:
         _state["games"] = data
 
@@ -136,13 +169,13 @@ def match_game(title, glist):
 
 def players_file():
     """(players, table, age): who is in a game now and the table of games that work online, as the Online players module last wrote them
-    (core.PLAYERS_CACHE). players is [] while the list is older than PLAYERS_FRESH; table is a list of game names that are online or
+    (PLAYERS_CACHE). players is [] while the list is older than PLAYERS_FRESH; table is a list of game names that are online or
     work in progress, [] when the table has none, None when there is no table (that module is off or has not read it yet); age is
     the list's age in seconds, None without a file."""
     if not core.module_enabled("players"):
         return [], None, None
     try:
-        with open(core.PLAYERS_CACHE) as f:
+        with open(PLAYERS_CACHE) as f:
             data = json.load(f)
         age = time.time() - float(data.get("time") or 0)
         players = [p for p in data.get("players") or [] if isinstance(p, dict) and p.get("player") and p.get("game")] if age <= PLAYERS_FRESH else []
@@ -171,11 +204,11 @@ def playing_now(players):
 
 def event_line(now):
     """The EVENT line, or None: the event whose reminder is due now (due 1), else the soonest one. Both come from files the DC99 events
-    module writes (core.event_reminder(), core.next_event()); nothing when that module is off."""
+    module writes (event_reminder(), next_event()); nothing when that module is off."""
     if not core.module_enabled("events"):
         return None
-    due = core.event_reminder(now)
-    ev = due or core.next_event(now)
+    due = event_reminder(now)
+    ev = due or next_event(now)
     if not ev:
         return None
     title = re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f]", " ", ev["title"])).strip()[:60]

@@ -42,21 +42,9 @@ KERNEL_BOOT_ID = "/proc/sys/kernel/random/boot_id"
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
 ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for update/restart/Wi-Fi (install.sh --pin)
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
-PLAYERS_SOURCES = os.path.join(BASE_DIR, "players_sources.json")   # JSON addresses for the optional online-players list
-PLAYERS_CACHE = os.path.join(BASE_DIR, "players_cache.json")   # the last list the players module read (shown again after a restart while the new one loads)
-PLAYERS_FAVORITES = os.path.join(BASE_DIR, "players_favorites.json")   # {"games": [names], "players": [names]} the user watches
-OPENMENU_GAMES = os.path.join(BASE_DIR, "openmenu_games.json")   # {"hash", "time", "games": [...]}: the game list the Dreamcast's openMenu uploaded (openMenu link module)
-IMAGEBG_FILE = os.path.join(BASE_DIR, "background_image")     # the picture of the Background image module (any of PNG, JPEG, GIF, WebP; its type is in the config)
-IMAGEBG_CONFIG = os.path.join(BASE_DIR, "imagebg.json")  # {"fit", "dim", "type", "version"} of the Background image module
-NUMBERS = os.path.join(BASE_DIR, "numbers.json")     # phone numbers per action, edited on the page, read by the hook
-CLOCK_MODE = os.path.join(BASE_DIR, "clock_mode")    # older versions: "24h", "12h" or "beat" (read once to carry the choice over to clock.json)
 HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id: how a highlighted box looks (Settings > Appearance)
 SETTINGS_PIN = os.path.join(BASE_DIR, "settings_pin")   # exists = Settings asks for the PIN (when one is set) before it opens and changes anything
 SCREEN = os.path.join(BASE_DIR, "screen.json")         # how the page is laid out on a wide screen: max columns, stretch, scale (Settings > Appearance)
-EVENTS_DB = os.path.join(BASE_DIR, "events.db")        # SQLite: the DC99 events imported by the events module
-EVENTS_CONFIG = os.path.join(BASE_DIR, "events.json")   # its settings: reminder lead time, time zone, sync interval, picked events, series
-EVENT_REMINDERS = os.path.join(BASE_DIR, "event_reminders.json")   # the DC99 events the user asked to be reminded of (events module, read by the LEDs)
-CLOCK_CONFIG = os.path.join(BASE_DIR, "clock.json")  # {"format": "24h"|"12h"|"12h-ampm", "beat": bool, "world": bool, "large": bool, "cities": [...]}: the clock module's settings
 TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the Pi's own (Settings > About)
 STATUS = TMP_PREFIX + ".active"
 STATE = TMP_PREFIX + ".state"
@@ -77,8 +65,6 @@ WIFI_AP_SSID = "DreamPi WiFi Config"
 NET_STATE = TMP_PREFIX + ".net"   # shared with the LED service
 NET_STALE = 20        # ignore NET_STATE when older than this (web service down)
 POKE_PREFIX = TMP_PREFIX + ".poke."   # poke(name): "measure it again now", see poke()
-PLAYERS_WATCH = TMP_PREFIX + ".players"   # {"time", "games": [favourite games being played], "friends": [favourite players online]}, written by the players module for the LEDs
-PLAYERS_WATCH_STALE = 300     # ignore it when older than this (web service down / list not reachable)
 
 
 # ------------------------------------------------------------------ modules
@@ -902,15 +888,9 @@ def set_module_tint(name, key, coloured):
 
 def time_zone():
     """The common time zone setting: an IANA name from base_tz.ZONE_CHOICES, or "" = the Pi's own. Any module that shows a
-    time of day reads it here (the clock does; the events module still has a zone of its own). Older installs kept it in clock.json."""
+    time of day reads it here."""
     import base_tz as tz
     zone = read_file(TIME_ZONE)
-    if zone is None:
-        try:
-            with open(CLOCK_CONFIG) as f:
-                zone = json.load(f).get("zone")
-        except (IOError, OSError, ValueError, AttributeError):
-            zone = ""
     return zone if zone in tz.ZONE_CHOICES else ""
 
 
@@ -1083,18 +1063,6 @@ def network_state():
         return None
 
 
-def players_watch():
-    """{"games": [...], "friends": [...]} of favourites that are online now, written by the players module; empty when stale."""
-    try:
-        with open(PLAYERS_WATCH) as f:
-            data = json.load(f)
-        if time.time() - data.get("time", 0) > PLAYERS_WATCH_STALE:
-            return {"games": [], "friends": []}
-        return {"games": list(data.get("games") or []), "friends": list(data.get("friends") or [])}
-    except (IOError, OSError, ValueError, AttributeError, TypeError):
-        return {"games": [], "friends": []}
-
-
 def wifi_state():
     """Latest Wi-Fi setup state written by netswitch_buttons.py: state (idle /
     scanning / hosting / connecting / ok / failed), ssid, networks (scan
@@ -1109,36 +1077,6 @@ def wifi_state():
     if data.get("state", "idle") != "idle" and time.time() - data.get("time", 0) > WIFI_STALE:
         return {"state": "idle"}
     return data
-
-
-def event_reminder(now=None):
-    """The reminded DC99 event that is due now, or None: {"id", "title", "start"}. The events module writes EVENT_REMINDERS
-    ({"lead": minutes before, "after": minutes after the start, "items": [{"id", "title", "start"}], "dismissed": [ids]}) whenever
-    it changes, so the LEDs know without the page being open. Due = from lead minutes before the start until after minutes after it."""
-    now = time.time() if now is None else now
-    try:
-        with open(EVENT_REMINDERS) as f:
-            data = json.load(f)
-        lead, after = float(data.get("lead", 15)) * 60, float(data.get("after", 10)) * 60
-        gone = set(data.get("dismissed") or [])
-        due = [i for i in data.get("items") or [] if i.get("id") not in gone and i["start"] - lead <= now < i["start"] + after]
-    except (IOError, OSError, ValueError, AttributeError, KeyError, TypeError):
-        return None
-    return min(due, key=lambda i: i["start"]) if due else None
-
-
-def next_event(now=None):
-    """The soonest DC99 event that has not ended its reminder window yet, or None: {"id", "title", "start"}. The events module writes the
-    next few into EVENT_REMINDERS ("upcoming", soonest first) whenever it changes, so the openMenu answer needs no page and no events code."""
-    now = time.time() if now is None else now
-    try:
-        with open(EVENT_REMINDERS) as f:
-            data = json.load(f)
-        after = float(data.get("after", 10)) * 60
-        coming = [i for i in data.get("upcoming") or [] if i["start"] + after > now]
-    except (IOError, OSError, ValueError, AttributeError, KeyError, TypeError):
-        return None
-    return min(coming, key=lambda i: i["start"]) if coming else None
 
 
 def poke(name):

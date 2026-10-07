@@ -9,6 +9,7 @@ import re
 
 import base_core as core
 import netswitch_numbers_hook as hook
+NUMBERS = os.path.join(core.BASE_DIR, "numbers.json")     # phone numbers per action, edited on the page, read by the hook
 
 MIN_LEN, MAX_LEN, MAX_PER_ROW, MAX_ROWS = 3, 12, 10, 30
 _JUNK = re.compile(r"[^0-9*#]")
@@ -63,7 +64,7 @@ def clean_rows(data):
 def numbers():
     """The saved rows (the default row before anything was saved, or when the file can't be read)."""
     try:
-        with open(core.NUMBERS) as f:
+        with open(NUMBERS) as f:
             data = json.load(f)
     except (IOError, OSError, ValueError):
         return default_rows()
@@ -72,10 +73,10 @@ def numbers():
 
 def save_numbers(data):
     cleaned = clean_rows(data)
-    tmp = core.NUMBERS + ".tmp"
+    tmp = NUMBERS + ".tmp"
     with open(tmp, "w") as f:
         json.dump({"rows": cleaned}, f)
-    os.rename(tmp, core.NUMBERS)
+    os.rename(tmp, NUMBERS)
     return cleaned
 
 

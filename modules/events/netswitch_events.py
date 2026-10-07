@@ -9,12 +9,12 @@
 # DreamcastLive's own schedule gives "Game Night, Wednesdays 9:00 PM Eastern" and "Game Night UK, Sundays 8:00 PM UK", and DC99
 # lists them at 21:00 and 20:00: so a time is US Eastern (America/New_York), and UK time for an event with "UK" in its title.
 #
-# The importer keeps the events in SQLite (core.EVENTS_DB): new ones are added, changed ones updated, future ones that are gone
+# The importer keeps the events in SQLite (EVENTS_DB): new ones are added, changed ones updated, future ones that are gone
 # from DC99 marked removed. A failed or empty download changes nothing. It runs in the background every N minutes (Settings, or
 # DC99_SYNC_INTERVAL=15m) and on POST /api/sync. DC99_MOCK=1 (or "mock" in events.json) reads sample_events.json instead of DC99.
 #
 # Reminders: the user picks events (the bell on the dashboard) or whole series (Settings: always remind me of "US Game Night").
-# Their times go to core.EVENT_REMINDERS, so the LED service shows "Event starting soon" without the page open; the page shows a
+# Their times go to EVENT_REMINDERS, so the LED service shows "Event starting soon" without the page open; the page shows a
 # banner and highlights the clock box (and this module's box) from `lead` minutes before the start until 10 minutes after.
 #
 # A JSON API for other programs (an openMenu companion, say): GET /api/events, /api/events/upcoming, /api/events/<id>,
@@ -38,6 +38,9 @@ except ImportError:                       # Python 2
 
 import base_core as core
 import base_tz as tz
+EVENT_REMINDERS = os.path.join(core.BASE_DIR, "event_reminders.json")   # the DC99 events the user asked to be reminded of (events module, read by the LEDs)
+EVENTS_CONFIG = os.path.join(core.BASE_DIR, "events.json")   # its settings: reminder lead time, time zone, sync interval, picked events, series
+EVENTS_DB = os.path.join(core.BASE_DIR, "events.db")        # SQLite: the DC99 events imported by the events module
 
 SITE = "https://dc99.net"
 SOURCE_URL = SITE + "/community/"
@@ -70,7 +73,7 @@ def read_config():
     """{"lead": minutes, "zone": the common time zone (core.time_zone(): "" = the Pi's own, read only here), "interval": minutes,
     "picked": [event ids], "series": [titles], "dismissed": [event ids], "mock": bool}."""
     try:
-        with open(core.EVENTS_CONFIG) as f:
+        with open(EVENTS_CONFIG) as f:
             data = json.load(f)
     except (IOError, OSError, ValueError):
         data = {}
@@ -94,10 +97,10 @@ def save_config(values):
     cfg = read_config()
     cfg.update(values)
     cfg.pop("zone", None)                 # the time zone is the common setting (core.time_zone()), not kept here
-    tmp = core.EVENTS_CONFIG + ".tmp"
+    tmp = EVENTS_CONFIG + ".tmp"
     with open(tmp, "w") as f:
         json.dump(cfg, f)
-    os.rename(tmp, core.EVENTS_CONFIG)
+    os.rename(tmp, EVENTS_CONFIG)
     return read_config()
 
 
@@ -246,7 +249,7 @@ FIELDS = ("source", "source_event_id", "title", "game", "description", "start_ut
 
 
 def _connect():
-    db = sqlite3.connect(core.EVENTS_DB, timeout=10)
+    db = sqlite3.connect(EVENTS_DB, timeout=10)
     db.row_factory = sqlite3.Row
     db.executescript(SCHEMA)
     return db
@@ -410,11 +413,41 @@ def reminded(row, cfg):
     return str(row["id"]) in cfg["picked"] or row["title"] in cfg["series"]
 
 
-UPCOMING_KEPT = 5       # the soonest events (reminded or not) that EVENT_REMINDERS also holds, for core.next_event()
+def event_reminder(now=None):
+    """The reminded DC99 event that is due now, or None: {"id", "title", "start"}. The events module writes EVENT_REMINDERS
+    ({"lead": minutes before, "after": minutes after the start, "items": [{"id", "title", "start"}], "dismissed": [ids]}) whenever
+    it changes, so the LEDs know without the page being open. Due = from lead minutes before the start until after minutes after it."""
+    now = time.time() if now is None else now
+    try:
+        with open(EVENT_REMINDERS) as f:
+            data = json.load(f)
+        lead, after = float(data.get("lead", 15)) * 60, float(data.get("after", 10)) * 60
+        gone = set(data.get("dismissed") or [])
+        due = [i for i in data.get("items") or [] if i.get("id") not in gone and i["start"] - lead <= now < i["start"] + after]
+    except (IOError, OSError, ValueError, AttributeError, KeyError, TypeError):
+        return None
+    return min(due, key=lambda i: i["start"]) if due else None
+
+
+def next_event(now=None):
+    """The soonest DC99 event that has not ended its reminder window yet, or None: {"id", "title", "start"}. The events module writes the
+    next few into EVENT_REMINDERS ("upcoming", soonest first) whenever it changes, so the openMenu answer needs no page and no events code."""
+    now = time.time() if now is None else now
+    try:
+        with open(EVENT_REMINDERS) as f:
+            data = json.load(f)
+        after = float(data.get("after", 10)) * 60
+        coming = [i for i in data.get("upcoming") or [] if i["start"] + after > now]
+    except (IOError, OSError, ValueError, AttributeError, KeyError, TypeError):
+        return None
+    return min(coming, key=lambda i: i["start"]) if coming else None
+
+
+UPCOMING_KEPT = 5       # the soonest events (reminded or not) that EVENT_REMINDERS also holds, for next_event()
 
 
 def write_reminders(now=None):
-    """The reminded events of the next 30 days to core.EVENT_REMINDERS (the LEDs and the page read it); old picks are dropped. It also
+    """The reminded events of the next 30 days to EVENT_REMINDERS (the LEDs and the page read it); old picks are dropped. It also
     holds the soonest few events of all ("upcoming"), which the openMenu link tells the Dreamcast about."""
     now = time.time() if now is None else now
     cfg = read_config()
@@ -427,10 +460,10 @@ def write_reminders(now=None):
         cfg = save_config({"picked": keep_picked, "dismissed": keep_dismissed})
     coming = [{"id": str(r["id"]), "title": r["title"], "start": r["start_utc"]} for r in sorted(rows, key=lambda r: r["start_utc"])[:UPCOMING_KEPT]]
     data = {"lead": cfg["lead"], "after": AFTER, "items": items, "upcoming": coming, "dismissed": cfg["dismissed"], "written": int(now)}
-    tmp = core.EVENT_REMINDERS + ".tmp"
+    tmp = EVENT_REMINDERS + ".tmp"
     with open(tmp, "w") as f:
         json.dump(data, f)
-    os.rename(tmp, core.EVENT_REMINDERS)
+    os.rename(tmp, EVENT_REMINDERS)
     return data
 
 
@@ -491,7 +524,7 @@ def view(now=None):
 def reminder_view(now=None):
     """The due reminder for the banner and the highlight: (id, text) or None."""
     now = time.time() if now is None else now
-    due = core.event_reminder(now)
+    due = event_reminder(now)
     if not due:
         return None
     zone = display_zone()

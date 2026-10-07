@@ -10,6 +10,7 @@ from urllib.request import urlopen
 
 from support import core, web, sandbox, cleanup
 import netswitch_players as pl
+import netswitch_led_inputs as inputs
 
 
 def wait_for_background_refresh():
@@ -121,7 +122,7 @@ class SourceTests(unittest.TestCase):
         cleanup(self.tmp)
 
     def write_sources(self, data):
-        with open(core.PLAYERS_SOURCES, "w") as f:
+        with open(pl.PLAYERS_SOURCES, "w") as f:
             json.dump(data, f)
 
     def test_defaults_are_the_two_feeds_openmenu_uses(self):
@@ -319,7 +320,7 @@ class FavoritesTests(unittest.TestCase):
 
     def test_missing_or_broken_file_means_no_favorites(self):
         self.assertEqual(pl.favorites(), {"games": [], "players": []})
-        with open(core.PLAYERS_FAVORITES, "w") as f:
+        with open(pl.PLAYERS_FAVORITES, "w") as f:
             f.write("{broken")
         self.assertEqual(pl.favorites(), {"games": [], "players": []})
 
@@ -331,17 +332,17 @@ class FavoritesTests(unittest.TestCase):
 
     def test_refresh_writes_the_watch_file_the_leds_read(self):
         pl.save_favorites({"games": ["Phantasy Star Online"], "players": ["Ana"]})
-        self.assertEqual(core.players_watch(), {"games": [], "friends": []})     # nothing loaded yet
+        self.assertEqual(inputs.players_watch(), {"games": [], "friends": []})     # nothing loaded yet
         pl.fetch = lambda url: json.dumps(self.GAMES if "dreamcastlive" in url else DC99)
         pl.refresh()
-        self.assertEqual(core.players_watch(), {"games": ["Phantasy Star Online"], "friends": ["Ana"]})
+        self.assertEqual(inputs.players_watch(), {"games": ["Phantasy Star Online"], "friends": ["Ana"]})
         pl.save_favorites({"games": ["Quake III Arena"], "players": []})
-        self.assertEqual(core.players_watch(), {"games": [], "friends": []})
+        self.assertEqual(inputs.players_watch(), {"games": [], "friends": []})
 
     def test_stale_watch_file_is_ignored(self):
-        with open(core.PLAYERS_WATCH, "w") as f:
+        with open(pl.PLAYERS_WATCH, "w") as f:
             json.dump({"time": 1, "games": ["x"], "friends": ["y"]}, f)
-        self.assertEqual(core.players_watch(), {"games": [], "friends": []})
+        self.assertEqual(inputs.players_watch(), {"games": [], "friends": []})
 
     def test_choices_mark_what_is_not_fully_online(self):
         pl._cache.update({"time": 1, "games": pl.parse_games(self.GAMES),
@@ -452,7 +453,7 @@ class FavoritesTests(unittest.TestCase):
         pl.refresh()
         before = list(pl.status()["players"])
         self.assertTrue(before)
-        self.assertTrue(os.path.exists(core.PLAYERS_CACHE))
+        self.assertTrue(os.path.exists(pl.PLAYERS_CACHE))
         pl._cache.update({"time": 0, "players": [], "sources": [], "games": [], "restored": False})      # what a restarted service has
         pl._disk["tried"] = False
         pl.fetch = lambda url: (_ for _ in ()).throw(IOError("slow"))                                      # and the feeds are not answering yet
@@ -461,7 +462,7 @@ class FavoritesTests(unittest.TestCase):
         self.assertEqual(got["players"], before)                                                           # the old list is there at once ...
         self.assertTrue(got["restored"] and got["list"] and got["busy"])                                   # ... and the rows say they are being refreshed
         pl.save_favorites({"games": [], "players": [before[0]["player"]]})
-        self.assertEqual(core.players_watch(), {"games": [], "friends": []})                               # a list from disk does not light the LEDs
+        self.assertEqual(inputs.players_watch(), {"games": [], "friends": []})                               # a list from disk does not light the LEDs
 
     def test_nothing_is_said_about_a_list_that_is_not_known_yet(self):
         pl._cache.update({"time": 0, "refreshing": True, "players": [], "sources": []})

@@ -264,25 +264,25 @@ class Reminders(Base):
     def test_the_bell_and_the_reminder_file(self):
         v = self.remind("US Game Night")
         self.assertTrue([x for x in v["list"] if x["title"] == "US Game Night"][0]["reminded"])
-        data = json.load(open(core.EVENT_REMINDERS))
+        data = json.load(open(ev.EVENT_REMINDERS))
         self.assertEqual([i["title"] for i in data["items"]], ["US Game Night"])
         start = utc(2026, 10, 9, 1)
-        self.assertIsNone(core.event_reminder(start - 16 * 60))            # 15 minutes before by default
-        self.assertEqual(core.event_reminder(start - 15 * 60)["title"], "US Game Night")
-        self.assertEqual(core.event_reminder(start + 9 * 60)["title"], "US Game Night")
-        self.assertIsNone(core.event_reminder(start + 10 * 60))
+        self.assertIsNone(ev.event_reminder(start - 16 * 60))            # 15 minutes before by default
+        self.assertEqual(ev.event_reminder(start - 15 * 60)["title"], "US Game Night")
+        self.assertEqual(ev.event_reminder(start + 9 * 60)["title"], "US Game Night")
+        self.assertIsNone(ev.event_reminder(start + 10 * 60))
         self.remind("US Game Night", False)
-        self.assertIsNone(core.event_reminder(start))
+        self.assertIsNone(ev.event_reminder(start))
 
     def test_the_soonest_events_are_in_the_file_for_the_openmenu_link(self):
         self.remind("US Game Night")
-        data = json.load(open(core.EVENT_REMINDERS))
+        data = json.load(open(ev.EVENT_REMINDERS))
         self.assertEqual([i["title"] for i in data["upcoming"]][0], "US Game Night")             # reminded or not: the soonest first
         self.assertEqual(len(data["upcoming"]), 3)
         start = utc(2026, 10, 9, 1)
-        self.assertEqual(core.next_event(start - 3600)["title"], "US Game Night")
-        self.assertEqual(core.next_event(start + 9 * 60)["title"], "US Game Night")             # still counts while its reminder window lasts
-        self.assertNotEqual((core.next_event(start + 11 * 60) or {}).get("title"), "US Game Night")   # then the next one
+        self.assertEqual(ev.next_event(start - 3600)["title"], "US Game Night")
+        self.assertEqual(ev.next_event(start + 9 * 60)["title"], "US Game Night")             # still counts while its reminder window lasts
+        self.assertNotEqual((ev.next_event(start + 11 * 60) or {}).get("title"), "US Game Night")   # then the next one
 
     def test_banner_highlight_and_dismiss(self):
         self.remind("US Game Night")
@@ -296,19 +296,19 @@ class Reminders(Base):
         self.assertEqual(d["notices"][0]["post"], "/events/dismiss")
         self.assertEqual(set(d["highlight"]), {"clock", "events"})
         self.post("/events/dismiss", {"id": d["notices"][0]["id"]})
-        self.assertIsNone(core.event_reminder(start - 12 * 60))
+        self.assertIsNone(ev.event_reminder(start - 12 * 60))
 
     def test_a_series_reminds_of_every_event_with_that_name(self):
         r = self.post("/events/series", {"series": ["Game Night UK: F355 Challenge", "", 5]}).json()
         self.assertEqual(r["groups"][0]["items"], ["Game Night UK: F355 Challenge"])
         self.assertIn("US Game Night", [c["value"] for c in r["groups"][0]["choices"]])
-        self.assertEqual(core.event_reminder(utc(2026, 10, 11, 19) - 60)["title"], "Game Night UK: F355 Challenge")
+        self.assertEqual(ev.event_reminder(utc(2026, 10, 11, 19) - 60)["title"], "Game Night UK: F355 Challenge")
 
     def test_the_led_message(self):
         self.remind("US Game Night")
         self.assertIn("event-soon", [m["key"] for m in ledconfig.messages()])
         ctx = ledconfig.gather(live=False)
-        ctx["event"] = core.event_reminder(utc(2026, 10, 9, 1) - 60)
+        ctx["event"] = ev.event_reminder(utc(2026, 10, 9, 1) - 60)
         self.assertIn("event-soon", ledconfig.active_keys(ctx))
         ctx["event"] = None
         self.assertNotIn("event-soon", ledconfig.active_keys(ctx))
@@ -320,10 +320,10 @@ class Reminders(Base):
         r = self.post("/events/settings", {"values": {"lead": 30, "zone": "Europe/Stockholm", "interval": 7}}).json()
         self.assertEqual(r["values"], {"lead": 30, "interval": 60})                                  # 7 is not a choice; the zone is not an events setting
         self.assertEqual(core.time_zone(), "")                                                       # and posting one here does not change the common one
-        self.assertNotIn("zone", json.load(open(core.EVENTS_CONFIG)))
+        self.assertNotIn("zone", json.load(open(ev.EVENTS_CONFIG)))
         self.remind("US Game Night")
-        self.assertEqual(json.load(open(core.EVENT_REMINDERS))["lead"], 30)
-        self.assertEqual(core.event_reminder(utc(2026, 10, 9, 1) - 29 * 60)["title"], "US Game Night")
+        self.assertEqual(json.load(open(ev.EVENT_REMINDERS))["lead"], 30)
+        self.assertEqual(ev.event_reminder(utc(2026, 10, 9, 1) - 29 * 60)["title"], "US Game Night")
 
     def test_the_box_view(self):
         v = ev.view(NOW)

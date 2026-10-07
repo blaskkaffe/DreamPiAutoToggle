@@ -71,7 +71,7 @@ class OpenMenu(Base):
         got = json.loads(self.call("GET", "/openmenu/games")[1])
         self.assertEqual([g["name"] for g in got["games"]], ["Crazy Taxi", "Death", "Sonic Adventure 2 (USA)"])
         self.assertEqual(got["hash"], "abc12345")
-        self.assertTrue(os.path.exists(core.OPENMENU_GAMES))
+        self.assertTrue(os.path.exists(om.OPENMENU_GAMES))
         om._state["games"] = None                       # a restart reads it back
         self.assertEqual(len(om.games()["games"]), 3)
 
@@ -148,7 +148,7 @@ class LiveInfo(Base):
                "HDR-0001\t4\t1/1\tJ\tRacing games\tDeath Crimson 2\n")
 
     def players_file(self, players, games=None, age=0):
-        with open(core.PLAYERS_CACHE, "w") as f:
+        with open(om.PLAYERS_CACHE, "w") as f:
             json.dump({"time": int(time.time()) - age, "players": players,
                        "games": [{"name": "Sonic Adventure 2", "status": "online"}, {"name": "Quake III Arena", "status": "wip"},
                                  {"name": "Death Crimson 2", "status": "offline"}] if games is None else games}, f)
@@ -197,7 +197,7 @@ class LiveInfo(Base):
         now = int(time.time())
 
         def reminders(items, upcoming):
-            with open(core.EVENT_REMINDERS, "w") as f:
+            with open(om.EVENT_REMINDERS, "w") as f:
                 json.dump({"lead": 15, "after": 10, "items": items, "upcoming": upcoming, "dismissed": [], "written": now}, f)
         reminders([], [])
         self.assertFalse([l for l in self.poll_lines() if l.startswith("EVENT")])

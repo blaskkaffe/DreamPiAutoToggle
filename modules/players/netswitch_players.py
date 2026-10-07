@@ -22,6 +22,10 @@ import base_core as core
 # The defaults are the two feeds openMenu's player list uses: dc99.net's combined status page
 # (DCNow!, DCNET and any other network section such as KOSnet) and dreamcast.online's own
 # DCNow! feed. Players found in both are listed once.
+PLAYERS_WATCH = core.TMP_PREFIX + ".players"   # {"time", "games": [favourite games being played], "friends": [favourite players online]}, written by the players module for the LEDs
+PLAYERS_FAVORITES = os.path.join(core.BASE_DIR, "players_favorites.json")   # {"games": [names], "players": [names]} the user watches
+PLAYERS_CACHE = os.path.join(core.BASE_DIR, "players_cache.json")   # the last list the players module read (shown again after a restart while the new one loads)
+PLAYERS_SOURCES = os.path.join(core.BASE_DIR, "players_sources.json")   # JSON addresses for the optional online-players list
 DEFAULT_SOURCES = [{"name": "DC99", "url": "https://dc99.net/online/dcnet_status.php"},
                    {"name": "Dreamcast.online", "url": "https://dreamcast.online/now/api/users.json"}]
 # Game lists (sources with "kind": "games" in players_sources.json): which online games exist and how far each one works.
@@ -66,11 +70,11 @@ def _save_cache():
     """Keep the list on disk: after a restart of the service the page shows it at once, marked as old, while the new one loads."""
     with _lock:
         data = dict((k, _cache[k]) for k in ("time", "players", "sources", "games", "games_time", "games_live"))
-    tmp = core.PLAYERS_CACHE + ".tmp"
+    tmp = PLAYERS_CACHE + ".tmp"
     try:
         with open(tmp, "w") as f:
             json.dump(data, f)
-        os.rename(tmp, core.PLAYERS_CACHE)
+        os.rename(tmp, PLAYERS_CACHE)
     except (IOError, OSError):
         pass
 
@@ -84,7 +88,7 @@ def _load_cache():
         if _cache["time"]:
             return
     try:
-        with open(core.PLAYERS_CACHE) as f:
+        with open(PLAYERS_CACHE) as f:
             data = json.load(f)
         if not (isinstance(data, dict) and isinstance(data.get("players"), list) and isinstance(data.get("time"), int) and data["time"] > 0):
             return
@@ -260,7 +264,7 @@ def parse_players(data, default_network=""):
 
 def _all_sources():
     try:
-        with open(core.PLAYERS_SOURCES) as f:
+        with open(PLAYERS_SOURCES) as f:
             data = json.load(f)
         return [s for s in data if isinstance(s, dict) and str(s.get("url", "")).startswith(("http://", "https://"))]
     except (IOError, OSError, ValueError, TypeError):
@@ -402,7 +406,7 @@ def clean_names(raw):
 
 def favorites():
     try:
-        with open(core.PLAYERS_FAVORITES) as f:
+        with open(PLAYERS_FAVORITES) as f:
             data = json.load(f)
         return {"games": clean_names(data.get("games")), "players": clean_names(data.get("players"))}
     except (IOError, OSError, ValueError, AttributeError):
@@ -412,10 +416,10 @@ def favorites():
 def save_favorites(data):
     data = data if isinstance(data, dict) else {}
     cleaned = {"games": clean_names(data.get("games")), "players": clean_names(data.get("players"))}
-    tmp = core.PLAYERS_FAVORITES + ".tmp"
+    tmp = PLAYERS_FAVORITES + ".tmp"
     with open(tmp, "w") as f:
         json.dump(cleaned, f)
-    os.rename(tmp, core.PLAYERS_FAVORITES)
+    os.rename(tmp, PLAYERS_FAVORITES)
     write_watch()
     return cleaned
 
@@ -463,11 +467,11 @@ def write_watch():
         have, players = _cache["time"] and not _cache["restored"], list(_cache["players"])     # a list read from disk is not what is online now
     result = watch_result(players, favorites()) if have else {"games": [], "friends": []}
     result["time"] = int(time.time())
-    tmp = core.PLAYERS_WATCH + ".tmp"
+    tmp = PLAYERS_WATCH + ".tmp"
     try:
         with open(tmp, "w") as f:
             json.dump(result, f)
-        os.rename(tmp, core.PLAYERS_WATCH)
+        os.rename(tmp, PLAYERS_WATCH)
     except (IOError, OSError):
         pass
 
