@@ -30,15 +30,12 @@ def _read_project():
 PROJECT = _read_project()      # project.json: {"name", "title" (the page's), "data_dir", "tmp_prefix", "service", "icon", "touch_icon"}
 BASE_DIR = PROJECT.get("data_dir", "/opt/dreampi-netswitch")           # where the project keeps its settings and state
 TMP_PREFIX = PROJECT.get("tmp_prefix", "/tmp/dreampi-netswitch")       # the start of the names of its short-lived state files
-FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the user's changes to the list of the palette (Appearance > Colour palette): {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui", "led"}]}
 LED_COLOURS = os.path.join(BASE_DIR, "led_colours.json")   # {"red": "#rrggbb"}: how the LED shows a palette colour when that is not the default (Status LED > Colours, the LED module's)
 PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb"}}: palette colours the user changed on screen (Appearance > Colour palette; the LED colours are in led_colours.json)
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
 MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"switcher": {"dcnow": "orange", ...}}: the global-palette colours each module uses
 MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["switcher", "numbers", ...]: the order set in the module picker (top = first, wins)
-BOOT_ID = os.path.join(BASE_DIR, "boot_id")              # the kernel's id of the boot the selection was last reset for
-KERNEL_BOOT_ID = "/proc/sys/kernel/random/boot_id"
 DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
 ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for update/restart/Wi-Fi (install.sh --pin)
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
@@ -46,24 +43,12 @@ HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id:
 SETTINGS_PIN = os.path.join(BASE_DIR, "settings_pin")   # exists = Settings asks for the PIN (when one is set) before it opens and changes anything
 SCREEN = os.path.join(BASE_DIR, "screen.json")         # how the page is laid out on a wide screen: max columns, stretch, scale (Settings > Appearance)
 TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the Pi's own (Settings > About)
-STATUS = TMP_PREFIX + ".active"
-STATE = TMP_PREFIX + ".state"
-MODEM = TMP_PREFIX + ".modem"
 DTMF_LOG = TMP_PREFIX + "-dtmf.log"
 # Wi-Fi setup (netswitch_buttons.py, install.sh --wifi); the buttons themselves are always installed
-WIFI_DEMO = os.path.join(BASE_DIR, "wifi_demo")        # exists = Wi-Fi setup runs on dummy networks (install.sh --wifi-demo)
-WIFI_START = os.path.join(BASE_DIR, "wifi_start")   # touched to ask netswitch_buttons.py to start
-WIFI_STOP = os.path.join(BASE_DIR, "wifi_stop")     # touched to ask it to stop / cancel
-WIFI_CONNECT = os.path.join(BASE_DIR, "wifi_connect")   # {"ssid":..., "password":...}, an alternative
                                                          # to the setup access point's own /connect -
                                                          # lets the regular page pick a network too,
                                                          # useful when it's reachable some other way
                                                          # (e.g. Ethernet) while Wi-Fi is being set up
-WIFI_STATE = TMP_PREFIX + ".wifi"          # written by netswitch_buttons.py
-WIFI_STALE = 30       # ignore WIFI_STATE when older than this (the service is down)
-WIFI_AP_SSID = "DreamPi WiFi Config"
-NET_STATE = TMP_PREFIX + ".net"   # shared with the LED service
-NET_STALE = 20        # ignore NET_STATE when older than this (web service down)
 POKE_PREFIX = TMP_PREFIX + ".poke."   # poke(name): "measure it again now", see poke()
 
 
@@ -267,46 +252,6 @@ def save_module_enabled(name, on):
     return True
 
 
-def wifi_enabled():
-    """Wi-Fi setup module installed and on (the buttons and the Wi-Fi service ask)."""
-    return module_enabled("wifi")
-
-
-def reset_network_after_boot():
-    """DCNow! is the selected network after every reboot: the first service that starts in a boot (web page or
-    buttons) removes dcnet_mode; later calls in the same boot, and restarts of a service, leave the selection alone (so does
-    the first run after an install).
-    Uses the kernel's boot id, not the clock, because a Pi without a clock has a wrong time at boot."""
-    try:
-        with open(KERNEL_BOOT_ID) as f:
-            now = f.read().strip()
-    except (IOError, OSError):
-        return False
-    before = read_file(BOOT_ID)
-    if not now or before == now:
-        return False
-    try:
-        if before is not None and os.path.exists(FLAG):     # no record yet = the add-on was just installed: keep the selection
-            os.remove(FLAG)
-        with open(BOOT_ID, "w") as f:
-            f.write(now + "\n")
-    except OSError:
-        return False
-    if before is not None:
-        debug_log("new boot: DCNow! selected")
-    return before is not None
-
-
-# ---------------------------------------------------------------- colours
-# The page's colours: one global palette of 15 named colours (8 hues, each normal and bright, like a terminal's 16, and "Global main"),
-# defined only here (the user can edit it in Settings > Appearance > Colour palette). A module never writes a colour of its own; it names one from the palette by its id ("orange",
-# "bright-blue" ...), either in module.json  "colours": {"dcnow": "orange", ...}  (the user can change these in the
-# module's own settings, see module_colour()) or as its  "primary"  colour, the one used on its borders and buttons.
-# id, name, hue group, page colour, its lighter variant (borders, text), LED colour (the LED's own tuning: a screen
-# colour looks different lit on a NeoPixel).
-# "global" (Global main) is not a fixed colour: one colour the user picks, for boxes that should share it. A module can add a colour
-# of its own to what a colour pick offers (module.json "colour_tokens"; see colour_tokens()): the network switcher adds "network"
-# (Selected network: whichever colour DCNow! or DCNET has right now, it follows the switch). Those are not part of the palette.
 PALETTE = (
     ("global", "Global main", "global", "#6f7d99", "#b0b7c7", "#8090ff"),
     ("red", "Red", "red", "#d9363e", "#ef8a8f", "#ff0000"),
@@ -329,13 +274,12 @@ FIXED_COLOURS = ("global", "orange")   # never deleted: "Global main" is not a c
 # colours that were in the palette once: what a saved choice of them becomes
 LEGACY_COLOURS = {"bright-orange": "orange", "bright-yellow": "yellow", "pink": "bright-pink"}
 DEFAULT_COLOUR = "orange"
-# The switcher's two network colours (module.json "colours" keys "dcnow" / "dcnet"). Only these are real colours (never "Selected
-# network", which would be a circle) and, with "colours_unique", never the same; the module's other colour keys are free.
-NETWORKS = ("dcnow", "dcnet")
+# A module's colour keys listed in its module.json "colours_real" only hold real palette colours (never a module's colour token such as
+# "Selected network", which would be a circle) and, with "colours_unique", never the same one; its other colour keys are free.
 
 
-def _network_key(name, key):
-    return name == "switcher" and key in NETWORKS
+def _real_key(name, key):
+    return key in ((module_manifest(name) or {}).get("colours_real") or [])
 
 
 _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -405,6 +349,27 @@ def _read_dict(path):
     return data if isinstance(data, dict) else {}
 
 
+# ---- services: what one module offers the base (and, through the base, the others) without anyone importing it. A module's web entry
+# lists them in SERVICES = {"<name>": function}; the module loader (base_modules.py) is the finder. A service is only there in the web
+# service while its module is on, so an answer of None must always be handled (a service never has to exist).
+_finder = [None]
+
+
+def set_service_finder(fn):
+    _finder[0] = fn
+
+
+def service(name, *args):
+    """What the enabled module that offers `name` answers (None when there is none, or it fails)."""
+    fn = _finder[0](name) if _finder[0] else None
+    if fn is None:
+        return None
+    try:
+        return fn(*args)
+    except Exception:
+        return None
+
+
 def colour_tokens():
     """[{"id", "name", "module"}]: colours that the enabled modules add to what a colour pick offers (module.json "colour_tokens": [{"id", "name"}]), after
     the palette. Not part of the palette: it cannot be edited or deleted. The switcher's "network" (Selected network) follows the selected network."""
@@ -448,11 +413,11 @@ def colours():
         ui = o.get("ui", c[3])
         out.append({"id": c[0], "name": c[1], "group": c[2], "ui": ui, "ui_l": lighter(ui) if "ui" in o else c[4],
                     "led": o.get("led", c[5]), "ui_default": c[3], "led_default": c[5]})
-    # the modules' own colours (colour_tokens()); "network" (Selected network) is the colour of the selected network, as it is now (the switcher's pick for it)
-    sel = "dcnet" if os.path.exists(FLAG) else "dcnow"
-    pick = module_colours("switcher").get(sel) or {"dcnow": "orange", "dcnet": "blue"}[sel]
-    base = ([c for c in out if c["id"] == pick] or [c for c in out if c["id"] == DEFAULT_COLOUR] or out)[0]
+    # the modules' own colours (colour_tokens()): each is a palette colour that the module that added it names right now (its service
+    # "colour:<id>", see service()), e.g. "Selected network" is the colour of the network that is selected
     for t in colour_tokens():
+        pick = service("colour:" + t["id"])
+        base = ([c for c in out if c["id"] == pick] or [c for c in out if c["id"] == DEFAULT_COLOUR] or out)[0]
         out.append(dict(base, id=t["id"], name=t["name"], group="token", ui_default=base["ui"], led_default=base["led"], token=True))
     return out
 
@@ -713,7 +678,7 @@ def module_colours(name):
 
     def ok(k, v):       # the network colours cannot be "the selected network's" (that would be a circle)
         v = LEGACY_COLOURS.get(v, v)
-        return v in ids and not (_network_key(name, k) and v == "network")
+        return v in ids and not (k in (manifest.get("colours_real") or []) and v not in palette_ids())
     out = dict((k, LEGACY_COLOURS.get(v, v) if ok(k, v) else DEFAULT_COLOUR) for k, v in wanted.items())
     mine = _saved_module_colours().get(name)
     if isinstance(mine, dict):
@@ -721,7 +686,7 @@ def module_colours(name):
             if ok(k, mine.get(k)):
                 out[k] = LEGACY_COLOURS.get(mine[k], mine[k])
     if manifest.get("colours_unique"):
-        uniq = [k for k in out if _network_key(name, k)] or list(out)
+        uniq = [k for k in out if k in (manifest.get("colours_real") or [])] or list(out)
         if len(set(out[k] for k in uniq)) < len(uniq):
             for k in uniq:
                 out[k] = LEGACY_COLOURS.get(wanted[k], wanted[k]) if ok(k, wanted[k]) else DEFAULT_COLOUR
@@ -829,10 +794,10 @@ def set_module_colour(name, key, ident):
     module, key or colour is unknown."""
     cur = module_colours(name)
     ident = LEGACY_COLOURS.get(ident, ident)
-    if key not in cur or ident not in colour_ids() or (_network_key(name, key) and ident == "network"):
+    if key not in cur or ident not in colour_ids() or (_real_key(name, key) and ident not in palette_ids()):
         return None
     if (module_manifest(name) or {}).get("colours_unique"):
-        uniq = [k for k in cur if _network_key(name, k)] or list(cur)
+        uniq = [k for k in cur if _real_key(name, k)] or list(cur)
         for k, v in list(cur.items()):
             if k != key and v == ident and key in uniq and k in uniq:
                 cur[k] = cur[key]
@@ -905,14 +870,6 @@ def save_time_zone(value):
     return value
 
 
-def network_colour(net):
-    """The palette entry (dict: id, name, group, ui, ui_l, led) the network switcher gave "dcnow" or "dcnet". The LED
-    service and the page's status dot ask for the network colours here; without the switcher module they are orange
-    and blue."""
-    ident = module_colours("switcher").get(net) or {"dcnow": "orange", "dcnet": "blue"}.get(net, DEFAULT_COLOUR)
-    return colour(ident)
-
-
 # ---------------------------------------------------------------- file state
 
 def read_file(path):
@@ -923,97 +880,6 @@ def read_file(path):
         return None
 
 
-def hook_problem():
-    """None when DreamPi is running with the hook loaded, else a reason."""
-    status = read_file(STATUS)
-    if status is None:
-        return "DreamPi has not loaded the add-on yet (restart DreamPi or reboot)"
-    if not status.startswith("active"):
-        return status
-    m = re.search(r"pid=(\d+)", status)
-    if m and not os.path.exists("/proc/" + m.group(1)):
-        return "DreamPi is not running"
-    return None
-
-
-def _dcnet_check():
-    """(code, reason): (None, None) when DreamPi's DCNET support is switched on, else why not: code "noupdates" (/boot/noautoupdates.txt
-    exists), "config" (netlink_config.ini is not found) or "disabled" ([DCNet] enabled = yes is missing)."""
-    if os.path.exists("/boot/noautoupdates.txt"):
-        return "noupdates", ("/boot/noautoupdates.txt exists, so DreamPi skips netlink_config.ini "
-                             "and DCNET stays off")
-    for path in ("/boot/netlink_config.ini", "/home/pi/dreampi/netlink_config.ini"):
-        if os.path.isfile(path):
-            break
-    else:
-        return "config", "netlink_config.ini not found, so DCNET is off"
-    text = read_file(path) or ""
-    section = re.search(r"^\[DCNet\](.*?)(?=^\[|\Z)", text, re.M | re.S)
-    if not section or not re.search(r"^\s*enabled\s*=\s*yes\s*$", section.group(1), re.M):
-        return "disabled", "DCNET is not enabled in " + path + " ([DCNet] enabled = yes)"
-    return None, None
-
-
-def dcnet_problem():
-    """None when DreamPi's DCNET support is switched on, else a reason."""
-    return _dcnet_check()[1]
-
-
-def dcnet_code():
-    """"ok" when DreamPi's DCNET support is switched on, else a short code for why not (see _dcnet_check()), "inactive" when DreamPi is
-    not running the add-on (nothing is being switched then). openMenu gets it in the DCNET line of the poll."""
-    if hook_problem():
-        return "inactive"
-    return _dcnet_check()[0] or "ok"
-
-
-# The short tag served at GET /tag for openMenu (docs/openmenu.md): which network this
-# DreamPi is running. openMenu keeps its own list of what each code means; the texts
-# here are only a suggestion and what /tag?text returns.
-TAGS = (("DCNET", "Running DCNet!"), ("DCNOW", "Running DCNow!"),
-        ("DCNET_OFF", "DCNet is selected but not available"), ("INACTIVE", ""))
-
-
-def tag():
-    """One of the codes in TAGS for the current state of this DreamPi."""
-    if hook_problem():
-        return "INACTIVE"          # DreamPi isn't running the add-on: nothing is being switched
-    if os.path.exists(FLAG):
-        return "DCNET_OFF" if dcnet_problem() else "DCNET"
-    return "DCNOW"
-
-
-def dreampi_state():
-    """(state, text) for what DreamPi is doing right now."""
-    if hook_problem() == "DreamPi is not running":
-        return "off", "Not running"
-    parts = (read_file(STATE) or "").split()
-    if len(parts) < 2:
-        return "unknown", "State unknown"
-    state = " ".join(parts[:-1])
-    if state == "starting":
-        return "busy", "Starting up, not answering calls yet"
-    if state == "ready":
-        return "ok", "Ready for calls"
-    if state.startswith("call "):
-        kind = state[5:]
-        net = {"dcnow": "DCNow!", "dcnet": "DCNET"}.get(kind, kind)
-        return ("call-" + kind if kind in ("dcnow", "dcnet") else "call"), "In a call: " + net
-    return "unknown", "State unknown"
-
-
-def modem_state():
-    """(text, unix time) of the latest modem event DreamPi logged."""
-    if hook_problem() == "DreamPi is not running":
-        return "DreamPi not running", 0
-    raw = read_file(MODEM)
-    if not raw or " " not in raw:
-        return "Unknown", 0
-    since, text = raw.split(" ", 1)
-    try:
-        return text, int(since)
-    except ValueError:
-        return text, 0
 
 
 def debug_log(text):
@@ -1051,34 +917,6 @@ def trim_log():
         pass
 
 
-def network_state():
-    """Latest link + internet state written by the web service, or None."""
-    try:
-        with open(NET_STATE) as f:
-            data = json.load(f)
-        if time.time() - data.get("time", 0) > NET_STALE:
-            return None
-        return data
-    except (IOError, OSError, ValueError):
-        return None
-
-
-def wifi_state():
-    """Latest Wi-Fi setup state written by netswitch_buttons.py: state (idle /
-    scanning / hosting / connecting / ok / failed), ssid, networks (scan
-    results while hosting) and time. {"state": "idle"} when the service
-    hasn't run yet, or hasn't updated the file in a while (it isn't
-    running any more, or crashed mid-setup)."""
-    try:
-        with open(WIFI_STATE) as f:
-            data = json.load(f)
-    except (IOError, OSError, ValueError):
-        return {"state": "idle"}
-    if data.get("state", "idle") != "idle" and time.time() - data.get("time", 0) > WIFI_STALE:
-        return {"state": "idle"}
-    return data
-
-
 def poke(name):
     """Ask whoever measures `name` ("internet") to do it again now instead of when its timer runs out. Works from any process: the
     message is a file that is replaced (a new inode), and the receiver looks at poke_stamp() often, which costs next to nothing."""
@@ -1101,106 +939,10 @@ def poke_stamp(name):
         return None
 
 
-def _write_net_state(data):
-    tmp = NET_STATE + ".tmp"
-    try:
-        with open(tmp, "w") as f:
-            json.dump(data, f)
-        os.rename(tmp, NET_STATE)
-    except (IOError, OSError):
-        pass
 
-
-# ------------------------------------------------------------------ buttons
-# Up to two physical GPIO buttons (netswitch_buttons.py, always installed),
-# each independently wired to a pin and a short-press function; which one
-# (or both held together) triggers Wi-Fi setup on a 3-second hold is also
-# configurable. Unlike the LED output pins, a button needs no special
-# peripheral, so any header GPIO is allowed.
-BUTTON1_GPIO = os.path.join(BASE_DIR, "button1_gpio")
-BUTTON2_GPIO = os.path.join(BASE_DIR, "button2_gpio")
-BUTTON1_FUNCTION = os.path.join(BASE_DIR, "button1_function")
-BUTTON2_FUNCTION = os.path.join(BASE_DIR, "button2_function")
-WIFI_BUTTON_FILE = os.path.join(BASE_DIR, "wifi_button")   # "1", "2" or "12": which button(s) hold-to-start Wi-Fi setup
-
-BUTTON_GPIO_PINS = tuple(range(2, 28))   # BCM GPIO2-27 (0/1 are reserved for the ID EEPROM)
-BUTTON_DEFAULT_GPIO1 = 17
-BUTTON_DEFAULT_GPIO2 = 4
 # What a button does. Push buttons act on a short press. A toggle switch is wired
 # between the pin and GND and acts on its position: closed (pin low) = "on",
 # open = "off"; the position is also applied once at start.
 # (name, label, group, needs Wi-Fi setup installed, the line under the button's row on the page; "{pin}" becomes "GPIO17" for its pin)
-BUTTON_FUNCTIONS = (
-    ("off", "Off", "Push button", False, "{pin} is not used"),
-    ("toggle", "Toggle network", "Push button", False, "{pin} toggles DCNow! and DCNET"),
-    ("dcnow", "Select DCNow!", "Push button", False, "{pin} selects DCNow!"),
-    ("dcnet", "Select DCNET", "Push button", False, "{pin} selects DCNET"),
-    ("sw_dcnet", "On = DCNET", "Toggle switch", False, "{pin} closed: DCNET, open: DCNow!"),
-    ("sw_dcnow", "On = DCNow!", "Toggle switch", False, "{pin} closed: DCNow!, open: DCNET"),
-    ("sw_wifi", "On = Wi-Fi setup", "Toggle switch", True, "{pin} closed: Wi-Fi setup, open: normal mode"),
-    ("sw_wifi_off", "Off = Wi-Fi setup", "Toggle switch", True, "{pin} open: Wi-Fi setup, closed: normal mode"),
-)
-_BUTTON_FUNCTION_NAMES = tuple(f[0] for f in BUTTON_FUNCTIONS)
-BUTTON_DEFAULT_FUNCTION1 = "toggle"
-BUTTON_DEFAULT_FUNCTION2 = "off"
-WIFI_BUTTON_CHOICES = (("1", "Button 1"), ("2", "Button 2"), ("12", "Button 1 + 2"))
-_WIFI_BUTTON_NAMES = tuple(c[0] for c in WIFI_BUTTON_CHOICES)
-WIFI_BUTTON_DEFAULT = "1"
-
-
-def button_gpio(which):
-    """which: 1 or 2."""
-    path = BUTTON1_GPIO if which == 1 else BUTTON2_GPIO
-    default = BUTTON_DEFAULT_GPIO1 if which == 1 else BUTTON_DEFAULT_GPIO2
-    try:
-        n = int((read_file(path) or "").strip())
-        return n if n in BUTTON_GPIO_PINS else default
-    except ValueError:
-        return default
-
-
-def save_button_gpio(which, n):
-    try:
-        n = int(n)
-    except (TypeError, ValueError):
-        return
-    if n not in BUTTON_GPIO_PINS:
-        return
-    path = BUTTON1_GPIO if which == 1 else BUTTON2_GPIO
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        f.write(str(n))
-    os.rename(tmp, path)
-
-
-def button_function(which):
-    path = BUTTON1_FUNCTION if which == 1 else BUTTON2_FUNCTION
-    default = BUTTON_DEFAULT_FUNCTION1 if which == 1 else BUTTON_DEFAULT_FUNCTION2
-    v = (read_file(path) or "").strip()
-    return v if v in _BUTTON_FUNCTION_NAMES else default
-
-
-def save_button_function(which, v):
-    if v not in _BUTTON_FUNCTION_NAMES:
-        return
-    path = BUTTON1_FUNCTION if which == 1 else BUTTON2_FUNCTION
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        f.write(v)
-    os.rename(tmp, path)
-
-
-def wifi_button():
-    v = (read_file(WIFI_BUTTON_FILE) or "").strip()
-    return v if v in _WIFI_BUTTON_NAMES else WIFI_BUTTON_DEFAULT
-
-
-def save_wifi_button(v):
-    if v not in _WIFI_BUTTON_NAMES:
-        return
-    tmp = WIFI_BUTTON_FILE + ".tmp"
-    with open(tmp, "w") as f:
-        f.write(v)
-    os.rename(tmp, WIFI_BUTTON_FILE)
 
 

@@ -9,6 +9,8 @@ import re
 
 import base_core as core
 
+FLAG = os.path.join(core.BASE_DIR, "dcnet_mode")      # exists = DCNET is the selected network (the network switcher's)
+
 TEXT_TAIL = 256000    # "Newest 256 KB" shows this much unless ?all
 
 
@@ -67,7 +69,7 @@ def _post_debug(h):
         if os.path.exists(core.DTMF_LOG):
             os.remove(core.DTMF_LOG)  # start a fresh log
         core.debug_log("web page: debug log started (network: %s)" %
-                       ("DCNET" if os.path.exists(core.FLAG) else "DCNow!"))
+                       ("DCNET" if os.path.exists(FLAG) else "DCNow!"))
 
 
 def _post_clear(h):

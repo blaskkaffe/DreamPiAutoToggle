@@ -7,6 +7,8 @@ import unittest
 from unittest import mock
 
 from support import core, probes, sandbox, cleanup, ROOT
+import netswitch_wifi_setup as wf  # noqa: E402
+import netswitch_switcher_state as sw  # noqa: E402
 import netswitch_update as up  # noqa: E402
 import sys
 sys.path.insert(0, os.path.join(ROOT, "modules", "led"))
@@ -70,7 +72,7 @@ class CheckerTests(unittest.TestCase):
         cleanup(self.tmp)
 
     def written(self):
-        with open(core.NET_STATE) as f:
+        with open(sw.NET_STATE) as f:
             return json.load(f)
 
     def test_a_poke_makes_the_internet_check_run_now(self):
@@ -87,9 +89,9 @@ class CheckerTests(unittest.TestCase):
         seen = probes.new_checker_state()
         probes.checker_step(seen, now=100.0)
         self.assertTrue(self.written()["modem"])
-        stamp = os.stat(core.NET_STATE).st_ino
+        stamp = os.stat(sw.NET_STATE).st_ino
         probes.checker_step(seen, now=100.5)
-        self.assertEqual(os.stat(core.NET_STATE).st_ino, stamp)               # unchanged: not rewritten every half second
+        self.assertEqual(os.stat(sw.NET_STATE).st_ino, stamp)               # unchanged: not rewritten every half second
         with mock.patch.object(probes, "modem_plugged", return_value=False):
             probes.checker_step(seen, now=101.0)
         self.assertFalse(self.written()["modem"])                             # the modem was unplugged: written in the same round
@@ -113,8 +115,8 @@ class LedQuickLookTests(unittest.TestCase):
         try:
             a = led.watched_state_files()
             self.assertEqual(led.watched_state_files(), a)
-            for name, path in (("DreamPi's state", core.STATE), ("the network", core.NET_STATE), ("Wi-Fi setup", core.WIFI_STATE),
-                               ("the active mark", core.STATUS), ("the update", up.UPDATE_STATUS)):
+            for name, path in (("DreamPi's state", sw.STATE), ("the network", sw.NET_STATE), ("Wi-Fi setup", wf.WIFI_STATE),
+                               ("the active mark", sw.STATUS), ("the update", up.UPDATE_STATUS)):
                 before = led.watched_state_files()
                 with open(path, "w") as f:
                     f.write("x")

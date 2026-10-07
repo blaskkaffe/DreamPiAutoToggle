@@ -10,12 +10,13 @@ import time
 
 import base_core as core
 import netswitch_switcher_probes as probes
+import netswitch_switcher_state as state
 
 
 def start():
     """Called once by the web service: DCNow! is selected again after every reboot, and the checker (cables, Wi-Fi, internet, the
     modem, the Pi's health) starts measuring."""
-    core.reset_network_after_boot()
+    state.reset_network_after_boot()
     t = threading.Thread(target=probes.checker)
     t.daemon = True
     t.start()
@@ -72,21 +73,34 @@ def _modem_dot(dstate, plugged, compat):
     return "ok" if plugged else "unknown"
 
 
+def _network_colour_id(net):
+    """The palette id the user gave the network "dcnow" or "dcnet" (orange and blue by default)."""
+    return core.module_colours("switcher").get(net) or {"dcnow": "orange", "dcnet": "blue"}.get(net, core.DEFAULT_COLOUR)
+
+
+def _selected_colour():
+    """The service behind the colour "Selected network": the palette colour of the network that is selected now."""
+    return _network_colour_id("dcnet" if os.path.exists(state.FLAG) else "dcnow")
+
+
+SERVICES = {"colour:network": _selected_colour}
+
+
 def _selected():
-    dcnet = os.path.exists(core.FLAG)
+    dcnet = os.path.exists(state.FLAG)
     net = "dcnet" if dcnet else "dcnow"
     title = "DCNET" if dcnet else "DCNow!"
     return {"id": net, "title": title, "parts": [{"text": title, "colour": "switcher." + net}]}      # parts: the name in its network's colour, as in the players box
 
 
 def api(d, warnings):
-    dstate, dtext = core.dreampi_state()
-    mtext, msince = core.modem_state()
+    dstate, dtext = state.dreampi_state()
+    mtext, msince = state.modem_state()
     now = int(time.time())
-    problem = core.hook_problem()
+    problem = state.hook_problem()
     if problem:
         warnings.append("Add-on not active: %s. Calls are not affected until it is." % problem)
-    problem = core.dcnet_problem()
+    problem = state.dcnet_problem()
     if problem:
         warnings.append("DCNET unavailable: %s. All calls go to DCNow!" % problem)
     with probes._checks_lock:
@@ -98,7 +112,7 @@ def api(d, warnings):
     elif pi.get("problem"):
         warnings.append("Too hot: the Pi is at %.0f°C and slows itself down. Give it more air or a heatsink."
                         % (pi.get("temp") or 0))
-    net = core.network_state()
+    net = state.network_state()
     if net and not net.get("network"):
         warnings.append("No network: the Pi has no working network connection.")
     elif net and net.get("internet") is False:
@@ -127,7 +141,7 @@ def api(d, warnings):
               "hangup": {"busy": busy, "text": probes._hangup["text"] or "hanging up...",
                          "visible": dstate.startswith("call") or busy}})
     pick = core.module_colours("switcher").get("selector", "network")
-    d.setdefault("primary", {})["switcher"] = core.network_colour(sel["id"])["id"] if pick == "network" else pick      # the box and its borders: the selector's colour (the selected network's by default)
+    d.setdefault("primary", {})["switcher"] = _network_colour_id(sel["id"]) if pick == "network" else pick      # the box and its borders: the selector's colour (the selected network's by default)
     d.setdefault("primary_key", {})["switcher"] = "selector"                               # and the box follows the selector's background setting
 
 
@@ -154,11 +168,11 @@ def _select(net):
     def handler(h):
         who = _source(h)
         if net == "dcnet":
-            open(core.FLAG, "w").close()
+            open(state.FLAG, "w").close()
             core.debug_log("%s: DCNET selected" % who)
         else:
-            if os.path.exists(core.FLAG):
-                os.remove(core.FLAG)
+            if os.path.exists(state.FLAG):
+                os.remove(state.FLAG)
             core.debug_log("%s: DCNow! selected" % who)
     return handler
 
@@ -171,20 +185,20 @@ def _status(h):
     import base_web
     d = base_web.api_state()
     h.send("network=%s\ntag=%s\ndreampi=%s\nmodem=%s\ninternet=%s\npi=%s\n" % (
-        d["network"], core.tag(), d["dreampi"]["text"],
+        d["network"], state.tag(), d["dreampi"]["text"],
         d["modem"]["text"], d["internet"]["text"], d["pi"]["text"]), "text/plain; charset=utf-8")
 
 
 def _values():
-    return {"button1_function": core.button_function(1), "button1_gpio": core.button_gpio(1),
-            "button2_function": core.button_function(2), "button2_gpio": core.button_gpio(2)}
+    return {"button1_function": state.button_function(1), "button1_gpio": state.button_gpio(1),
+            "button2_function": state.button_function(2), "button2_gpio": state.button_gpio(2)}
 
 
 def button_texts(values):
     """The line under each button's row: what its function does, with its pin ("GPIO17 toggles DCNow! and DCNET")."""
     texts = {}
     for n in (1, 2):
-        template = [f[4] for f in core.BUTTON_FUNCTIONS if f[0] == values["button%d_function" % n]]
+        template = [f[4] for f in state.BUTTON_FUNCTIONS if f[0] == values["button%d_function" % n]]
         texts["button%d" % n] = (template[0] if template else "{pin} is not used").replace("{pin}", "GPIO%d" % values["button%d_gpio" % n])
     return texts
 
@@ -192,13 +206,13 @@ def button_texts(values):
 def _reply():
     values = _values()
     functions = []
-    for name, label, group, needs_wifi, sub in core.BUTTON_FUNCTIONS:
+    for name, label, group, needs_wifi, sub in state.BUTTON_FUNCTIONS:
         # the Wi-Fi switch functions only while the Wi-Fi module is on (or while one is already chosen)
-        if needs_wifi and not core.wifi_enabled() and name not in (values["button1_function"], values["button2_function"]):
+        if needs_wifi and not core.module_enabled("wifi") and name not in (values["button1_function"], values["button2_function"]):
             continue
         functions.append({"value": name, "label": label, "group": group})
     return {"values": values, "texts": button_texts(values),
-            "options": {"functions": functions, "gpios": [{"value": g, "label": "GPIO%d" % g} for g in core.BUTTON_GPIO_PINS]}}
+            "options": {"functions": functions, "gpios": [{"value": g, "label": "GPIO%d" % g} for g in state.BUTTON_GPIO_PINS]}}
 
 
 def _get_buttons(h):
@@ -215,16 +229,24 @@ def _post_buttons(h):
     except (KeyError, TypeError, ValueError):
         g1 = g2 = None
     if g1 is not None and g2 is not None and g1 != g2:   # reject if they'd collide on one pin
-        core.save_button_gpio(1, g1)
-        core.save_button_gpio(2, g2)
+        state.save_button_gpio(1, g1)
+        state.save_button_gpio(2, g2)
     if "button1_function" in data:
-        core.save_button_function(1, data["button1_function"])
+        state.save_button_function(1, data["button1_function"])
     if "button2_function" in data:
-        core.save_button_function(2, data["button2_function"])
+        state.save_button_function(2, data["button2_function"])
     h.send(json.dumps(_reply()), "application/json")
     return True
 
 
-GET = {"/status": _status, "/buttonconfig": _get_buttons}
+def _tag(h):
+    """GET /tag: for openMenu over the PPP link, a tiny HTTP/1.0 answer, no markup, no caching: which network this DreamPi runs
+    (docs/openmenu.md); /tag?text gives the suggested text instead of the code."""
+    code = state.tag()
+    text = dict(state.TAGS).get(code, "") if "text" in h.path else code
+    h.send(text + "\n", "text/plain; charset=utf-8")
+
+
+GET = {"/status": _status, "/buttonconfig": _get_buttons, "/tag": _tag}
 OPEN = ("/dcnow", "/dcnet", "/hangup")       # the dashboard's buttons (and openMenu's) work while Settings is locked with the PIN
 POST = {"/dcnow": _select("dcnow"), "/dcnet": _select("dcnet"), "/hangup": _hangup, "/buttonconfig": _post_buttons}

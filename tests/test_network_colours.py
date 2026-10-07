@@ -6,6 +6,7 @@ import unittest
 from urllib.request import urlopen, Request
 
 from support import web, core, ledconfig, sandbox, cleanup
+import netswitch_switcher_state as sw  # noqa: E402
 
 
 class PaletteTests(unittest.TestCase):
@@ -37,7 +38,7 @@ class PaletteTests(unittest.TestCase):
 
     def test_selected_network_is_the_colour_the_selected_network_has(self):
         self.assertEqual(core.colour("network")["ui"], core.colour("orange")["ui"])          # DCNow! is selected, and orange
-        open(core.FLAG, "w").close()
+        open(sw.FLAG, "w").close()
         self.assertEqual(core.colour("network")["ui"], core.colour("blue")["ui"])            # DCNET: blue
         core.set_module_colour("switcher", "dcnet", "green")
         self.assertEqual(core.colour("network")["led"], core.colour("green")["led"])
@@ -80,13 +81,13 @@ class ModuleColourTests(unittest.TestCase):
 
     def test_the_switcher_defaults_are_orange_and_blue(self):
         self.assertEqual(core.module_colours("switcher"), {"selector": "network", "dcnow": "orange", "dcnet": "blue"})
-        self.assertEqual(core.network_colour("dcnow")["ui"], "#e8761c")
-        self.assertEqual(core.network_colour("dcnet")["ui"], "#1c6fe8")
+        self.assertEqual(ledconfig.network_colour("dcnow")["ui"], "#e8761c")
+        self.assertEqual(ledconfig.network_colour("dcnet")["ui"], "#1c6fe8")
 
     def test_choice_persists_and_any_palette_colour_works(self):
         core.set_module_colour("switcher", "dcnow", "bright-pink")
         self.assertEqual(core.module_colours("switcher"), {"selector": "network", "dcnow": "bright-pink", "dcnet": "blue"})
-        self.assertEqual(core.network_colour("dcnow")["id"], "bright-pink")
+        self.assertEqual(ledconfig.network_colour("dcnow")["id"], "bright-pink")
 
     def test_the_selector_may_be_the_selected_network_but_the_networks_may_not_and_never_swap_with_it(self):
         self.assertEqual(core.module_colours("switcher")["selector"], "network")
@@ -163,7 +164,7 @@ class LedTests(unittest.TestCase):
         cfg = ledconfig.led_config()
         cfg["groups"] = [{"id": "g1", "colour": "dcnow", "messages": ["sel-dcnow"]}]
         ledconfig.save_led_config(cfg)
-        self.assertEqual(self.look()[0]["color"], core.network_colour("dcnow")["led"])
+        self.assertEqual(self.look()[0]["color"], ledconfig.network_colour("dcnow")["led"])
         core.set_module_colour("switcher", "dcnow", "green")
         self.assertEqual(self.look()[0]["color"], "#00ff00")
 
@@ -171,9 +172,9 @@ class LedTests(unittest.TestCase):
         cfg = ledconfig.led_config()
         cfg["groups"] = [{"id": "g1", "colour": "network", "messages": ["ready"]}]
         ledconfig.save_led_config(cfg)
-        self.assertEqual(self.look()[0]["color"], core.network_colour("dcnow")["led"])
-        open(core.FLAG, "w").close()
-        self.assertEqual(self.look()[0]["color"], core.network_colour("dcnet")["led"])
+        self.assertEqual(self.look()[0]["color"], ledconfig.network_colour("dcnow")["led"])
+        open(sw.FLAG, "w").close()
+        self.assertEqual(self.look()[0]["color"], ledconfig.network_colour("dcnet")["led"])
 
 
 class HttpTests(unittest.TestCase):

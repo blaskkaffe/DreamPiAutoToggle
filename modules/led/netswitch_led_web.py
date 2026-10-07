@@ -6,7 +6,6 @@
 #   POST /wbtest, /wbtestdone   hold the LED at solid white while the white balance is adjusted
 # api() gives the DreamPi dot on the main page the look of the LED message that is showing.
 import json
-import os
 
 import base_core as core
 import netswitch_ledconfig as ledconfig
@@ -17,7 +16,7 @@ def _config_reply():
     sel = inputs.selected()
     cfg = ledconfig.led_config()
     return {"config": {"max_brightness": cfg["max_brightness"], "white_balance": cfg["white_balance"], "order": cfg["order"]},
-            "token_ui": {t: {"ui": core.network_colour(n)["ui"], "ui_l": core.network_colour(n)["ui_l"]} for t, n in (("dcnow", "dcnow"), ("dcnet", "dcnet"), ("network", sel))},
+            "token_ui": {t: {"ui": ledconfig.network_colour(n)["ui"], "ui_l": ledconfig.network_colour(n)["ui_l"]} for t, n in (("dcnow", "dcnow"), ("dcnet", "dcnet"), ("network", sel))},
             "count": ledconfig.led_count(), "installed": ledconfig.led_count() > 0}
 
 
@@ -216,6 +215,6 @@ def api(d, warnings):
     page hides the LED settings while the LED count is 0."""
     count = ledconfig.led_count()
     sel = inputs.selected()
-    tokens = dict((t, {"ui": core.network_colour(n)["ui"], "ui_l": core.network_colour(n)["ui_l"]}) for t, n in (("dcnow", "dcnow"), ("dcnet", "dcnet"), ("network", sel)))
+    tokens = dict((t, {"ui": ledconfig.network_colour(n)["ui"], "ui_l": ledconfig.network_colour(n)["ui_l"]}) for t, n in (("dcnow", "dcnow"), ("dcnet", "dcnet"), ("network", sel)))
     d["led"] = {"installed": count > 0, "count": count, "title": "Status LED" + (" (%d LEDs)" % count if count > 1 else ""), "tokens": tokens}
     d.setdefault("dreampi", {})["look"] = ledconfig.dreampi_dot()

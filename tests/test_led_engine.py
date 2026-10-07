@@ -3,6 +3,7 @@ filter that stops a half-written state file from flashing on the LED."""
 import unittest
 
 from support import core, ledconfig, sandbox, cleanup
+import netswitch_switcher_state as sw  # noqa: E402
 import netswitch_led as led
 
 COLOURS = ["#ff8c00", "#0046ff", "#aa00ff", "#ff0000", "#00ff00", "#00c8ff", "#ffd000", "#ffffff"]
@@ -185,7 +186,7 @@ class SteadyTests(unittest.TestCase):
         try:
             a = led.watched_files()
             self.assertEqual(led.watched_files(), a)                               # nothing written: the same
-            open(core.FLAG, "w").close()
+            open(sw.FLAG, "w").close()
             b = led.watched_files()
             self.assertNotEqual(a, b)                                              # the flag appeared (DCNET selected)
             ledconfig.save_led_config(ledconfig.default_led_config())

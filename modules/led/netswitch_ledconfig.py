@@ -169,6 +169,12 @@ def order_by_priority(groups, priority):
     return sorted(groups, key=lambda g: min([rank.get(m, big) for m in g["messages"]] or [big]))
 
 
+def network_colour(net):
+    """The palette entry of the colour the user gave the network "dcnow" or "dcnet" (the network switcher's colour picks, in the
+    base's colours.json; orange and blue without them)."""
+    return core.colour(core.module_colours("switcher").get(net) or {"dcnow": "orange", "dcnet": "blue"}.get(net, core.DEFAULT_COLOUR))
+
+
 def _valid_colour(c):
     return isinstance(c, _TEXT) and (c in TOKEN_IDS or c in core.colour_ids() or c in core.LEGACY_COLOURS)
 
@@ -267,7 +273,7 @@ def resolve_colour(colour, selected="dcnow"):
     if colour == "network":
         colour = selected
     if colour in ("dcnow", "dcnet"):
-        return core.network_colour(colour)["led"]
+        return network_colour(colour)["led"]
     return core.colour(colour)["led"]
 
 

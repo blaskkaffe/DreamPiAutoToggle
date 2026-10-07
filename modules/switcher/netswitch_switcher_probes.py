@@ -11,6 +11,7 @@ import threading
 import time
 
 import base_core as core
+import netswitch_switcher_state as state
 
 INTERNET_EVERY = 30   # seconds between internet checks while it works
 INTERNET_RETRY = 5    # ... and while it doesn't
@@ -321,7 +322,7 @@ def force_hangup():
             end = time.time() + HANGUP_WAIT
             while time.time() < end:
                 time.sleep(1)
-                if core.dreampi_state()[0] == "ok":
+                if state.dreampi_state()[0] == "ok":
                     say("hung up, DreamPi is ready for calls")
                     return
             say("DreamPi didn't get ready, restarting it")
@@ -337,7 +338,7 @@ def force_hangup():
 
 def start_hangup():
     """Only while DreamPi is in a call (the button is hidden otherwise)."""
-    if not core.dreampi_state()[0].startswith("call"):
+    if not state.dreampi_state()[0].startswith("call"):
         return False
     with _hangup_lock:
         if _hangup["busy"]:
@@ -358,7 +359,7 @@ def start_hangup():
 # instead of completing, so it was removed. If that's revisited, it needs
 # testing against real hardware first, not just the simulated port this
 # was developed against.
-MODEM_PORT = "/tmp/dreampi-netswitch.port"   # written by the hook
+MODEM_PORT = core.TMP_PREFIX + ".port"   # written by the hook
 
 # Modems the DreamPi community has reported working, matched (case-
 # insensitive) against the USB descriptor's manufacturer + product strings
@@ -449,7 +450,7 @@ def modem_compat(usb):
 
 
 def new_checker_state():
-    return {"poke": core.poke_stamp("internet"), "health": 0.0, "pi": None, "sig": None, "written": 0.0}
+    return {"poke": core.poke_stamp("internet"), "health": 0.0, "pi": None, "dcnet": (None, "inactive"), "sig": None, "written": 0.0}
 
 
 def checker_step(seen, now=None):
@@ -465,6 +466,7 @@ def checker_step(seen, now=None):
         _net["recheck"].set()
     if seen["pi"] is None or now - seen["health"] >= HEALTH_EVERY:
         seen["pi"], seen["health"] = pi_health(), now
+        seen["dcnet"] = (state.dcnet_problem(), state.dcnet_code())
         core.trim_log()
     pi = seen["pi"]
     internet = _net["internet"]
@@ -489,6 +491,8 @@ def checker_step(seen, now=None):
             "wifi_weak": level is not None and level <= WIFI_WEAK_DBM,
             "slow": is_slow(avg, loss) if internet["state"] == "ok" else False,
             "modem": modem_plugged(),
+            "dcnet_problem": bool(seen["dcnet"][0]),            # DCNET is selected-able only when DreamPi's config has it on
+            "dcnet_code": seen["dcnet"][1],                      # "ok" / "noupdates" / "config" / "disabled" / "inactive" (openMenu's DCNET line)
             "undervoltage": bool(pi.get("undervoltage")),
             "throttled": bool(flags is not None and flags & 0x4),
             "hot": pi.get("temp") is not None and pi["temp"] >= 80,
@@ -496,7 +500,7 @@ def checker_step(seen, now=None):
     sig = json.dumps(data, sort_keys=True)
     if sig != seen["sig"] or now - seen["written"] >= STATE_BEAT:      # a change goes out at once; otherwise just a sign of life
         data["time"] = now
-        core._write_net_state(data)
+        state.write_net_state(data)
         seen["sig"], seen["written"] = sig, now
 
 

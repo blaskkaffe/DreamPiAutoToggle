@@ -10,6 +10,7 @@
 # button(s) assigned to Wi-Fi setup for 3 s starts or stops it. Pins and
 # functions are re-read every HEARTBEAT seconds, so page changes apply
 # without a restart.
+import json
 import os
 import signal
 import sys
@@ -19,7 +20,16 @@ import time
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (base_core, base_gpio ...)
 import base_core as core  # noqa: E402  (paths, settings, debug_log())
+import netswitch_switcher_state as state  # noqa: E402  (the selected network, the button settings)
 from base_gpio import peripheral_base, Block, GPIO_OFFSET, set_input_pullup, read_level  # noqa: E402
+
+# The Wi-Fi setup module's files (docs/buttons-wifi.md): a hold only touches the two flags, its own service does the setup
+WIFI_START = os.path.join(core.BASE_DIR, "wifi_start")        # touched to ask the Wi-Fi service to start
+WIFI_STOP = os.path.join(core.BASE_DIR, "wifi_stop")          # touched to ask it to stop / cancel
+WIFI_STATE = core.TMP_PREFIX + ".wifi"                        # its state: {"state": idle|scanning|hosting|connecting|ok|failed, "time"}
+WIFI_STALE = 30                                               # ignore WIFI_STATE when older than this (the service is down)
+WIFI_BUTTON_FILE = os.path.join(core.BASE_DIR, "wifi_button")   # "1", "2" or "12": which button(s) hold-to-start Wi-Fi setup
+WIFI_BUTTONS = ("1", "2", "12")
 
 HOLD_SECONDS = 3.0        # button hold before Wi-Fi setup starts/stops
 SHORT_PRESS_MIN = 0.03    # ignore a debounced press shorter than this
@@ -33,11 +43,11 @@ PULLUP_RETRY = 1.0           # re-apply the pull-up this often while a pin sits 
 def toggle_network():
     """Short press: switch the selected network, the same flag file the web
     page's DCNow!/DCNET buttons and the special phone numbers use."""
-    if os.path.exists(core.FLAG):
-        os.remove(core.FLAG)
+    if os.path.exists(state.FLAG):
+        os.remove(state.FLAG)
         net = "DCNow!"
     else:
-        open(core.FLAG, "w").close()
+        open(state.FLAG, "w").close()
         net = "DCNET"
     core.debug_log("button: short press, %s selected" % net)
 
@@ -46,12 +56,12 @@ def select_network(net):
     """Short press: select DCNow! or DCNET outright, unlike toggle_network()
     not relative to the current selection. Idempotent (does nothing, and
     logs nothing, if that network is already selected)."""
-    exists = os.path.exists(core.FLAG)
+    exists = os.path.exists(state.FLAG)
     if net == "dcnet" and not exists:
-        open(core.FLAG, "w").close()
+        open(state.FLAG, "w").close()
         core.debug_log("button: short press, DCNET selected")
     elif net == "dcnow" and exists:
-        os.remove(core.FLAG)
+        os.remove(state.FLAG)
         core.debug_log("button: short press, DCNow! selected")
 
 
@@ -60,14 +70,25 @@ _BUTTON_FUNCTIONS = {"off": lambda: None, "toggle": toggle_network,
 
 
 def _wifi_active():
-    return os.path.exists(core.WIFI_STATE) and core.wifi_state().get("state", "idle") != "idle"
+    """Wi-Fi setup is doing something (its service wrote a state that is not idle, and not too long ago)."""
+    try:
+        with open(WIFI_STATE) as f:
+            data = json.load(f)
+    except (IOError, OSError, ValueError):
+        return False
+    return data.get("state", "idle") != "idle" and time.time() - data.get("time", 0) <= WIFI_STALE
+
+
+def _wifi_button():
+    v = (core.read_file(WIFI_BUTTON_FILE) or "").strip()
+    return v if v in WIFI_BUTTONS else "1"
 
 
 def _start_wifi_toggle():
     if _wifi_active():
-        open(core.WIFI_STOP, "w").close()
+        open(WIFI_STOP, "w").close()
     else:
-        open(core.WIFI_START, "w").close()
+        open(WIFI_START, "w").close()
     core.debug_log("button: hold, Wi-Fi setup toggled")
 
 
@@ -78,10 +99,10 @@ def _wifi_request(start):
         return
     active = _wifi_active()
     if start and not active:
-        open(core.WIFI_START, "w").close()
+        open(WIFI_START, "w").close()
         core.debug_log("button: switch, Wi-Fi setup started")
     elif not start and active:
-        open(core.WIFI_STOP, "w").close()
+        open(WIFI_STOP, "w").close()
         core.debug_log("button: switch, Wi-Fi setup stopped")
 
 
@@ -263,13 +284,13 @@ def run_buttons(read, apply_pullups, gpio1, gpio2, function1, function2, wifi_as
 def wifi_enabled():
     """The Wi-Fi setup module is installed and switched on; without it the buttons
     only run their own short-press functions."""
-    return core.wifi_enabled()
+    return core.module_enabled("wifi")
 
 
 def _button_config():
     # "" = no button starts Wi-Fi setup (check_wifi_hold() matches none)
-    return (core.button_gpio(1), core.button_gpio(2), core.button_function(1), core.button_function(2),
-            core.wifi_button() if wifi_enabled() else "")
+    return (state.button_gpio(1), state.button_gpio(2), state.button_function(1), state.button_function(2),
+            _wifi_button() if wifi_enabled() else "")
 
 
 def _exit(*_):
@@ -279,7 +300,7 @@ def _exit(*_):
 def main():
     signal.signal(signal.SIGTERM, _exit)
     signal.signal(signal.SIGINT, _exit)
-    core.reset_network_after_boot()      # DCNow! after every reboot, before a switch position can set the network
+    state.reset_network_after_boot()      # DCNow! after every reboot, before a switch position can set the network
     cfg = _button_config()
     stop_event = threading.Event()
     thread = threading.Thread(target=button_watcher, args=cfg + (stop_event,))

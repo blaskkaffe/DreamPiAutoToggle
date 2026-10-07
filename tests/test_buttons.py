@@ -5,6 +5,8 @@ import threading
 import unittest
 
 from support import core, sandbox, cleanup
+import netswitch_wifi_setup as wf  # noqa: E402
+import netswitch_switcher_state as sw  # noqa: E402
 import netswitch_switcher_buttons as b
 
 
@@ -51,7 +53,7 @@ class LoopTests(unittest.TestCase):
 
     def selected(self):
         import os
-        return "dcnet" if os.path.exists(core.FLAG) else "dcnow"
+        return "dcnet" if os.path.exists(sw.FLAG) else "dcnow"
 
     def test_switch_position_is_applied_at_start_and_follows_changes(self):
         self.run_loop({17: [(0, False), (100, True), (200, False)]}, "sw_dcnet", "off")
@@ -59,7 +61,7 @@ class LoopTests(unittest.TestCase):
         self.assertEqual(self.selected(), "dcnet")
 
     def test_switch_open_at_start_selects_the_off_network(self):
-        open(core.FLAG, "w").close()
+        open(sw.FLAG, "w").close()
         self.run_loop({17: [(0, True)]}, "sw_dcnet", "off", ticks=20)
         self.assertEqual(self.selected(), "dcnow")
 
@@ -78,19 +80,19 @@ class LoopTests(unittest.TestCase):
         self.run_loop({17: [(0, True), (30, False), (45, True)], 4: [(0, True), (100, False)]},
                       "toggle", "sw_wifi", ticks=200)
         self.assertEqual(self.selected(), "dcnet")      # the push toggled once
-        self.assertTrue(os.path.exists(core.WIFI_START))
+        self.assertTrue(os.path.exists(wf.WIFI_START))
 
     def test_held_push_button_still_starts_wifi_next_to_a_switch(self):
         import os
         core.save_module_enabled("wifi", True)
         self.run_loop({17: [(0, True), (10, False)], 4: [(0, True)]}, "toggle", "sw_dcnet", wifi="1", ticks=500)
-        self.assertTrue(os.path.exists(core.WIFI_START))
+        self.assertTrue(os.path.exists(wf.WIFI_START))
 
     def test_wifi_hold_on_a_switch_button_is_ignored(self):
         import os
         core.save_module_enabled("wifi", True)
         self.run_loop({17: [(0, True), (10, False)]}, "sw_dcnet", "off", wifi="1", ticks=500)
-        self.assertFalse(os.path.exists(core.WIFI_START))
+        self.assertFalse(os.path.exists(wf.WIFI_START))
 
     def test_push_button_toggle_still_works(self):
         self.run_loop({17: [(0, True), (10, False), (40, True)]}, "toggle", "off", ticks=100)
@@ -173,57 +175,57 @@ class ButtonTests(unittest.TestCase):
 
     def test_toggle_and_select(self):
         import os
-        self.assertFalse(os.path.exists(core.FLAG))
+        self.assertFalse(os.path.exists(sw.FLAG))
         b.toggle_network()
-        self.assertTrue(os.path.exists(core.FLAG))
+        self.assertTrue(os.path.exists(sw.FLAG))
         b.toggle_network()
-        self.assertFalse(os.path.exists(core.FLAG))
+        self.assertFalse(os.path.exists(sw.FLAG))
         b.select_network("dcnet")
         b.select_network("dcnet")                     # idempotent
-        self.assertTrue(os.path.exists(core.FLAG))
+        self.assertTrue(os.path.exists(sw.FLAG))
         b.select_network("dcnow")
-        self.assertFalse(os.path.exists(core.FLAG))
+        self.assertFalse(os.path.exists(sw.FLAG))
 
     def test_network_switch_positions(self):
         import os
         b._SWITCH_FUNCTIONS["sw_dcnet"](True)             # on = DCNET
-        self.assertTrue(os.path.exists(core.FLAG))
+        self.assertTrue(os.path.exists(sw.FLAG))
         b._SWITCH_FUNCTIONS["sw_dcnet"](False)            # off = DCNow!
-        self.assertFalse(os.path.exists(core.FLAG))
+        self.assertFalse(os.path.exists(sw.FLAG))
         b._SWITCH_FUNCTIONS["sw_dcnow"](True)             # on = DCNow!
-        self.assertFalse(os.path.exists(core.FLAG))
+        self.assertFalse(os.path.exists(sw.FLAG))
         b._SWITCH_FUNCTIONS["sw_dcnow"](False)            # off = DCNET
-        self.assertTrue(os.path.exists(core.FLAG))
+        self.assertTrue(os.path.exists(sw.FLAG))
         b._SWITCH_FUNCTIONS["sw_dcnow"](False)            # same position again changes nothing
-        self.assertTrue(os.path.exists(core.FLAG))
+        self.assertTrue(os.path.exists(sw.FLAG))
 
     def test_wifi_switch_needs_wifi_installed(self):
         import os
         b._SWITCH_FUNCTIONS["sw_wifi"](True)
-        self.assertFalse(os.path.exists(core.WIFI_START))   # Wi-Fi setup not installed: nothing happens
+        self.assertFalse(os.path.exists(wf.WIFI_START))   # Wi-Fi setup not installed: nothing happens
         core.save_module_enabled("wifi", True)
         b._SWITCH_FUNCTIONS["sw_wifi"](True)
-        self.assertTrue(os.path.exists(core.WIFI_START))
+        self.assertTrue(os.path.exists(wf.WIFI_START))
 
     def test_wifi_switch_start_stop_follow_the_position(self):
         import os
         core.save_module_enabled("wifi", True)
         def set_state(state):
-            with open(core.WIFI_STATE, "w") as f:
+            with open(wf.WIFI_STATE, "w") as f:
                 json.dump({"state": state, "time": self.clock.t}, f)
         core_time, core.time.time = core.time.time, self.clock
         try:
             set_state("hosting")                                  # already running: "on" again does nothing
             b._SWITCH_FUNCTIONS["sw_wifi"](True)
-            self.assertFalse(os.path.exists(core.WIFI_START))
+            self.assertFalse(os.path.exists(wf.WIFI_START))
             b._SWITCH_FUNCTIONS["sw_wifi"](False)                 # off ends it
-            self.assertTrue(os.path.exists(core.WIFI_STOP))
-            os.remove(core.WIFI_STOP)
+            self.assertTrue(os.path.exists(wf.WIFI_STOP))
+            os.remove(wf.WIFI_STOP)
             set_state("idle")
             b._SWITCH_FUNCTIONS["sw_wifi"](False)                 # idle + off: nothing to stop
-            self.assertFalse(os.path.exists(core.WIFI_STOP))
+            self.assertFalse(os.path.exists(wf.WIFI_STOP))
             b._SWITCH_FUNCTIONS["sw_wifi_off"](False)             # the opposite switch: open = Wi-Fi setup
-            self.assertTrue(os.path.exists(core.WIFI_START))
+            self.assertTrue(os.path.exists(wf.WIFI_START))
         finally:
             core.time.time = core_time
 
@@ -237,7 +239,7 @@ class ButtonTests(unittest.TestCase):
         self.assertEqual(e("", "toggle", "off"), "")
 
     def test_every_function_is_known_to_the_service(self):
-        for f in core.BUTTON_FUNCTIONS:
+        for f in sw.BUTTON_FUNCTIONS:
             self.assertTrue(f[0] in b._BUTTON_FUNCTIONS or f[0] in b._SWITCH_FUNCTIONS, f[0])
 
     def test_pull_constants_differ_per_register(self):

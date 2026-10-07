@@ -297,11 +297,6 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api":
             query = dict(p.split("=", 1) for p in (self.path.split("?", 1)[1] if "?" in self.path else "").split("&") if "=" in p)
             self.send(json.dumps(api_state(query.get("pv", "")[:16])), "application/json")
-        elif path == "/tag":
-            # For openMenu over the PPP link: a tiny HTTP/1.0 answer, no markup, no caching.
-            code = core.tag()
-            text = dict(core.TAGS).get(code, "") if "text" in self.path else code
-            self.send(text + "\n", "text/plain; charset=utf-8")
         elif path.startswith("/static/"):
             name = path[len("/static/"):]
             body = _static(name)

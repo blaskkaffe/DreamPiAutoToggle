@@ -3,7 +3,7 @@
 # DreamPi Netswitch add-on - the Wi-Fi setup module's own service (dreampi-netswitch-wifi).
 #
 # Runs as root. Idle until something asks for Wi-Fi setup: the page's Settings > Network button (POST /wifitoggle)
-# or a button hold (netswitch_buttons.py, in the base) just touch wifi_start / wifi_stop in /opt/dreampi-netswitch,
+# or a button hold (the network switcher's buttons service) just touch wifi_start / wifi_stop in /opt/dreampi-netswitch,
 # and this service picks that up and runs netswitch_wifi_setup.setup_cycle(). So the buttons never load any Wi-Fi code;
 # this module sits on top of them. While the module is switched off in Settings > Modules the service only idles
 # (and stops a setup that is running), so it needs no restart when the module is toggled.
@@ -26,9 +26,9 @@ def _module_off_watcher():
     """Switching the module off mid-setup counts as pressing stop (setup_cycle() watches for that)."""
     while True:
         time.sleep(1)
-        if not core.wifi_enabled() and os.path.exists(core.WIFI_STATE) and core.wifi_state().get("state", "idle") != "idle":
+        if not core.module_enabled("wifi") and os.path.exists(wifi.WIFI_STATE) and wifi.wifi_state().get("state", "idle") != "idle":
             try:
-                open(core.WIFI_STOP, "w").close()
+                open(wifi.WIFI_STOP, "w").close()
             except OSError:
                 pass
 
@@ -67,7 +67,7 @@ def main():
     signal.signal(signal.SIGINT, wifi.graceful_exit)
     threading.Thread(target=_module_off_watcher, daemon=True).start()
     while True:
-        if core.wifi_enabled():
+        if core.module_enabled("wifi"):
             run_once()
         time.sleep(HEARTBEAT)
 

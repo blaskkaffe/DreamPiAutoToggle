@@ -4,6 +4,7 @@ import os
 import unittest
 
 from support import ledconfig, core, sandbox, cleanup
+import netswitch_switcher_state as sw  # noqa: E402
 import netswitch_update as up  # noqa: E402
 import netswitch_rebootupdate as reb  # noqa: E402
 import netswitch_led as led
@@ -260,17 +261,17 @@ class LookTests(Base):
     def test_idle_with_the_defaults_shows_the_selected_networks_colour(self):
         looks = self.looks(ctx(net=GOOD))
         self.assertEqual([m["messages"] for m in looks], [["ready-dcnow", "sel-dcnow"]])        # both apply and share the look
-        self.assertEqual(looks[-1]["color"], core.network_colour("dcnow")["led"])
-        open(core.FLAG, "w").close()
+        self.assertEqual(looks[-1]["color"], ledconfig.network_colour("dcnow")["led"])
+        open(sw.FLAG, "w").close()
         looks = self.looks(ctx(selected="dcnet", net=GOOD))
-        self.assertEqual(looks[-1]["color"], core.network_colour("dcnet")["led"])
+        self.assertEqual(looks[-1]["color"], ledconfig.network_colour("dcnet")["led"])
 
     def test_the_network_colours_follow_the_switchers_choice(self):
         core.set_module_colour("switcher", "dcnow", "bright-green")
         looks = self.looks(ctx(state="call-dcnow", net=GOOD))
         self.assertEqual(looks[-1]["color"], "#50ff70")
         self.assertEqual(ledconfig.resolve_colour("network", "dcnow"), "#50ff70")
-        self.assertEqual(ledconfig.resolve_colour("dcnet"), core.network_colour("dcnet")["led"])
+        self.assertEqual(ledconfig.resolve_colour("dcnet"), ledconfig.network_colour("dcnet")["led"])
 
     def test_a_palette_colour_is_its_led_value(self):
         self.assertEqual(ledconfig.resolve_colour("orange"), "#ff8c00")
@@ -335,19 +336,19 @@ class LookTests(Base):
         self.assertEqual([l["messages"] for l in self.looks(ctx(net=GOOD, players={"games": [], "friends": ["Ana"]}))], [["players-friend"]])
 
     def test_the_dot_previews_what_dreampi_is_doing(self):
-        with open(core.STATE, "w") as f:
+        with open(sw.STATE, "w") as f:
             f.write("call dcnow 123")
         look = ledconfig.dreampi_look()
-        self.assertEqual(look["color"], core.network_colour("dcnow")["led"])                  # the LED gets the calibrated value ...
+        self.assertEqual(look["color"], ledconfig.network_colour("dcnow")["led"])                  # the LED gets the calibrated value ...
         self.assertEqual(ledconfig.dreampi_dot(), {"colour": "network", "effect": "solid", "speed": "slow"})   # ... the dot the palette colour
-        os.remove(core.STATE)
+        os.remove(sw.STATE)
         self.groups(group("g1", "red", ["no-network"]))
         self.assertIsNone(ledconfig.dreampi_look())                               # no group for any DreamPi message: no look
 
     def test_gather_reads_the_files_the_other_services_write(self):
         up.write_update_info(True, False)
         reb.mark_reboot()
-        open(core.FLAG, "w").close()
+        open(sw.FLAG, "w").close()
         c = ledconfig.gather()
         self.assertEqual((c["selected"], c["reboot"], c["update_info"].get("addon")), ("dcnet", True, True))
         self.assertEqual(ledconfig.gather(live=False)["update_info"], {})
@@ -399,8 +400,8 @@ class ReadyFollowsTheNetworkTests(Base):
 
     def test_the_selection_decides_which_ready_look_shows_when_the_network_is_switched_later(self):
         self.groups(group("g1", "network", ["ready-dcnow", "ready-dcnet"]))
-        self.assertEqual(self.looks(ctx(net=GOOD))[0]["color"], core.network_colour("dcnow")["led"])
-        self.assertEqual(self.looks(ctx(selected="dcnet", net=GOOD))[0]["color"], core.network_colour("dcnet")["led"])
+        self.assertEqual(self.looks(ctx(net=GOOD))[0]["color"], ledconfig.network_colour("dcnow")["led"])
+        self.assertEqual(self.looks(ctx(selected="dcnet", net=GOOD))[0]["color"], ledconfig.network_colour("dcnet")["led"])
 
 
 class PaletteCalibrationTests(Base):

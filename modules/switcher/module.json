@@ -11,6 +11,7 @@
   "dcnet": "blue"
  },
  "colours_unique": true,
+ "colours_real": ["dcnow", "dcnet"],
  "colour_tokens": [
   {"id": "network", "name": "Selected network"}
  ],

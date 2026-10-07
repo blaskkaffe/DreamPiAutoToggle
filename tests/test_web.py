@@ -15,6 +15,8 @@ except ImportError:   # pragma: no cover
     raise
 
 from support import web, core, ledconfig, sandbox, cleanup
+import netswitch_wifi_setup as wf  # noqa: E402
+import netswitch_switcher_state as sw  # noqa: E402
 
 
 class ConfigTests(unittest.TestCase):
@@ -73,18 +75,18 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(ledconfig.led_count(), 0)
 
     def test_button_config_defaults_and_validation(self):
-        self.assertEqual((core.button_gpio(1), core.button_gpio(2)), (17, 4))
-        self.assertEqual((core.button_function(1), core.button_function(2)), ("toggle", "off"))
-        self.assertEqual(core.wifi_button(), "1")
-        core.save_button_gpio(1, 22)
-        core.save_button_function(2, "dcnet")
-        core.save_wifi_button("12")
-        core.save_button_gpio(2, 99)          # out of range: ignored
-        core.save_button_function(1, "explode")
-        core.save_wifi_button("3")
-        self.assertEqual((core.button_gpio(1), core.button_gpio(2)), (22, 4))
-        self.assertEqual((core.button_function(1), core.button_function(2)), ("toggle", "dcnet"))
-        self.assertEqual(core.wifi_button(), "12")
+        self.assertEqual((sw.button_gpio(1), sw.button_gpio(2)), (17, 4))
+        self.assertEqual((sw.button_function(1), sw.button_function(2)), ("toggle", "off"))
+        self.assertEqual(wf.wifi_button(), "1")
+        sw.save_button_gpio(1, 22)
+        sw.save_button_function(2, "dcnet")
+        wf.save_wifi_button("12")
+        sw.save_button_gpio(2, 99)          # out of range: ignored
+        sw.save_button_function(1, "explode")
+        wf.save_wifi_button("3")
+        self.assertEqual((sw.button_gpio(1), sw.button_gpio(2)), (22, 4))
+        self.assertEqual((sw.button_function(1), sw.button_function(2)), ("toggle", "dcnet"))
+        self.assertEqual(wf.wifi_button(), "12")
 
     def test_white_balance_test_flag(self):
         self.assertFalse(ledconfig.wb_test_active())
@@ -318,7 +320,7 @@ class HttpTests(unittest.TestCase):
     def test_buttonconfig_has_the_standard_form_shape(self):
         r = self.buttons()
         self.assertEqual(sorted(r["values"]), ["button1_function", "button1_gpio", "button2_function", "button2_gpio"])
-        self.assertEqual([o["value"] for o in r["options"]["gpios"]], list(core.BUTTON_GPIO_PINS))
+        self.assertEqual([o["value"] for o in r["options"]["gpios"]], list(sw.BUTTON_GPIO_PINS))
         functions = r["options"]["functions"]
         self.assertTrue(all(f["label"] and f["group"] for f in functions))
         self.assertNotIn("sw_wifi", [f["value"] for f in functions])         # the Wi-Fi switch functions wait for the Wi-Fi module
@@ -332,7 +334,7 @@ class HttpTests(unittest.TestCase):
         t = self.buttons()["texts"]
         self.assertEqual((t["button1"], t["button2"]), ("GPIO22 selects DCNow!", "GPIO4 is not used"))
         self.assertNotIn("{pin}", " ".join(t.values()))
-        for f in core.BUTTON_FUNCTIONS:                                   # every function has a line that starts with its pin
+        for f in sw.BUTTON_FUNCTIONS:                                   # every function has a line that starts with its pin
             self.assertTrue(f[4].startswith("{pin} "), f[0])
 
     def test_the_led_line_counts_the_leds_with_order_and_pin(self):
@@ -358,9 +360,9 @@ class HttpTests(unittest.TestCase):
             out = json.loads(self.post("/wifibutton", {"values": {"wifi_button": "2"}})[1].decode())
             self.assertEqual(out["values"]["wifi_button"], "2")
             self.assertEqual(out["texts"]["wifi_button"], "Hold button 2 for 3 s to start Wi-Fi setup")
-            self.assertEqual(core.wifi_button(), "2")
+            self.assertEqual(wf.wifi_button(), "2")
             self.post("/wifibutton", {"values": {"wifi_button": "nope"}})
-            self.assertEqual(core.wifi_button(), "2")
+            self.assertEqual(wf.wifi_button(), "2")
         finally:
             core.save_module_enabled("wifi", False)
 

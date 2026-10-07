@@ -6,6 +6,8 @@ import time
 import unittest
 
 from support import core, sandbox, cleanup
+import netswitch_wifi_setup as wf  # noqa: E402
+import netswitch_switcher_state as swstate  # noqa: E402
 import netswitch_players as pl
 import netswitch_wifi_web as wifi
 import netswitch_rebootupdate as ru
@@ -85,7 +87,7 @@ class WifiView(unittest.TestCase):
         cleanup(self.tmp)
 
     def state(self, state, **extra):
-        with open(core.WIFI_STATE, "w") as f:
+        with open(wf.WIFI_STATE, "w") as f:
             json.dump(dict(extra, state=state, time=time.time()), f)
         d = {}
         wifi.api(d, [])
@@ -115,7 +117,7 @@ class WifiView(unittest.TestCase):
         self.assertEqual(self.state("hosting", networks=nets)["list"][0]["info"], "Secured · Strong")
 
     def test_demo_mode_says_so(self):
-        open(core.WIFI_DEMO, "w").close()
+        open(wf.WIFI_DEMO, "w").close()
         w = self.state("hosting")
         self.assertIn("DEMO", w["sub"])
         self.assertTrue(w["sub"].startswith("Pick a network below"))
@@ -191,7 +193,7 @@ class SwitcherView(unittest.TestCase):
         d, _ = self.api()
         self.assertEqual((d["network"], d["selected"]), ("dcnow", {"id": "dcnow", "title": "DCNow!", "parts": [{"text": "DCNow!", "colour": "switcher.dcnow"}]}))     # parts: the name in its network's colour
         self.assertEqual(d["primary"]["switcher"], "orange")
-        open(core.FLAG, "w").close()
+        open(swstate.FLAG, "w").close()
         d, _ = self.api()
         self.assertEqual((d["network"], d["selected"]["title"], d["primary"]["switcher"]), ("dcnet", "DCNET", "blue"))
         core.set_module_colour("switcher", "dcnet", "bright-cyan")
@@ -199,10 +201,10 @@ class SwitcherView(unittest.TestCase):
 
     def test_hang_up_only_shows_in_a_call_or_while_hanging_up(self):
         self.assertFalse(self.api()[0]["hangup"]["visible"])
-        with open(core.STATE, "w") as f:
+        with open(swstate.STATE, "w") as f:
             f.write("call dcnow 123")
         self.assertTrue(self.api()[0]["hangup"]["visible"])
-        os.remove(core.STATE)
+        os.remove(swstate.STATE)
         probes._hangup.update(busy=True, text="")
         h = self.api()[0]["hangup"]
         self.assertTrue(h["visible"] and h["busy"])

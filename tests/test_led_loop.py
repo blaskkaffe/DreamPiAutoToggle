@@ -6,6 +6,7 @@ import time
 import unittest
 
 from support import core, ledconfig, sandbox, cleanup
+import netswitch_switcher_state as sw  # noqa: E402
 import netswitch_led as led
 
 
@@ -55,7 +56,7 @@ class LoopTests(unittest.TestCase):
     def test_a_selected_network_shows_within_a_fraction_of_a_second_and_is_sent_again_at_once(self):
         base = self.out.shows[-1][1]
         t0 = time.monotonic()
-        open(core.FLAG, "w").close()                              # DCNET selected (the page's button, a phone number or a physical button)
+        open(sw.FLAG, "w").close()                              # DCNET selected (the page's button, a phone number or a physical button)
         self.assertTrue(self.wait_for_change(base))
         self.assertLess(self.out.shows[-1][0] - t0, 0.3)
         time.sleep(0.3)

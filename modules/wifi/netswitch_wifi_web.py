@@ -9,14 +9,15 @@ import json
 import os
 
 import base_core as core
+import netswitch_wifi_setup as setup
 
 
 def _toggle(h):
-    if core.wifi_state().get("state", "idle") == "idle":
-        open(core.WIFI_START, "w").close()
+    if setup.wifi_state().get("state", "idle") == "idle":
+        open(setup.WIFI_START, "w").close()
         core.debug_log("web page: Wi-Fi setup started")
     else:
-        open(core.WIFI_STOP, "w").close()
+        open(setup.WIFI_STOP, "w").close()
         core.debug_log("web page: Wi-Fi setup stop requested")
 
 
@@ -31,18 +32,18 @@ def _connect(h):
     except (ValueError, IOError, OSError, AttributeError):
         pass
     if ssid:
-        tmp = core.WIFI_CONNECT + ".tmp"
+        tmp = setup.WIFI_CONNECT + ".tmp"
         with open(tmp, "w") as f:
             json.dump({"ssid": ssid, "password": password}, f)
-        os.rename(tmp, core.WIFI_CONNECT)
+        os.rename(tmp, setup.WIFI_CONNECT)
         core.debug_log("web page: Wi-Fi connect requested for %s" % ssid)
 
 
 def _wifi_button_reply():
-    choice = core.wifi_button()
+    choice = setup.wifi_button()
     return {"values": {"wifi_button": choice},
             "texts": {"wifi_button": "Hold button %s for 3 s to start Wi-Fi setup" % ("1 + 2" if choice == "12" else choice)},
-            "options": {"choices": [{"value": c[0], "label": c[1]} for c in core.WIFI_BUTTON_CHOICES]}}
+            "options": {"choices": [{"value": c[0], "label": c[1]} for c in setup.WIFI_BUTTON_CHOICES]}}
 
 
 def _get_button(h):
@@ -51,7 +52,7 @@ def _get_button(h):
 
 def _post_button(h):
     try:
-        core.save_wifi_button((json.loads(h._body(1024).decode("utf-8")).get("values") or {}).get("wifi_button"))
+        setup.save_wifi_button((json.loads(h._body(1024).decode("utf-8")).get("values") or {}).get("wifi_button"))
     except (ValueError, IOError, OSError, AttributeError) as e:
         return h.send(str(e), "text/plain; charset=utf-8", status=400)
     h.send(json.dumps(_wifi_button_reply()), "application/json")
@@ -88,16 +89,16 @@ def networks_list(nets):
 
 
 def api(d, warnings):
-    wf = core.wifi_state()
+    wf = setup.wifi_state()
     state = wf.get("state", "idle")
     if state in ("scanning", "hosting"):
         warnings.append("Wi-Fi setup: connect a phone or PC to the “%s” Wi-Fi network, then open "
-                        "http://192.168.4.1 to pick a network." % core.WIFI_AP_SSID)
+                        "http://192.168.4.1 to pick a network." % setup.AP_SSID)
     elif state == "connecting":
         warnings.append("Wi-Fi setup: trying to connect to “%s”..." % (wf.get("ssid") or ""))
     elif state == "failed":
         warnings.append("Wi-Fi setup: could not connect (%s)." % (wf.get("ssid") or "unknown reason"))
-    demo = os.path.exists(core.WIFI_DEMO)
+    demo = os.path.exists(setup.WIFI_DEMO)
     button, text = LABELS.get(state, LABELS["idle"])
     sub = "Pick a network below" if demo and state == "hosting" else text.replace("%s", wf.get("ssid") or "")
     d["wifi"] = {"state": state, "ssid": wf.get("ssid"), "networks": wf.get("networks"), "installed": True, "demo": demo,

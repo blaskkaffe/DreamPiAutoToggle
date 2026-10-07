@@ -8,6 +8,7 @@ import time
 import unittest
 
 from support import sandbox, cleanup, core, web
+import netswitch_switcher_state as sw  # noqa: E402
 import netswitch_rebootupdate as ru
 import base_security as sec
 import netswitch_update as up
@@ -135,11 +136,11 @@ class HttpSecurityTests(unittest.TestCase):
                 status, _b, _r = self.req("POST", path, dict(evil, **extra), b"{}")
                 self.assertEqual(status, 403, (path, extra))
         self.assertEqual(self.spawned, [])
-        self.assertFalse(os.path.exists(core.FLAG))
+        self.assertFalse(os.path.exists(sw.FLAG))
 
     def test_post_without_header_or_origin_is_refused(self):
         self.assertEqual(self.req("POST", "/dcnet")[0], 403)
-        self.assertFalse(os.path.exists(core.FLAG))
+        self.assertFalse(os.path.exists(sw.FLAG))
 
     def test_openmenu_selects_the_network_like_the_page(self):
         """openMenu's two buttons send POST /dcnow and /dcnet over the PPP link: X-Requested-With: openMenu, no Origin, often no Host."""
@@ -147,9 +148,9 @@ class HttpSecurityTests(unittest.TestCase):
         open(core.DEBUG_DTMF, "w").close()                       # the debug log is on
         core.save_module_enabled("debuglog", True)
         self.assertEqual(self.req("POST", "/dcnet", h)[0], 204)
-        self.assertTrue(os.path.exists(core.FLAG))
+        self.assertTrue(os.path.exists(sw.FLAG))
         self.assertEqual(self.req("POST", "/dcnow", h)[0], 204)
-        self.assertFalse(os.path.exists(core.FLAG))
+        self.assertFalse(os.path.exists(sw.FLAG))
         log = open(core.DTMF_LOG).read()
         self.assertIn("openMenu: DCNET selected", log)
         self.assertIn("openMenu: DCNow! selected", log)
@@ -158,8 +159,8 @@ class HttpSecurityTests(unittest.TestCase):
         status, _b, r = self.req("POST", "/dcnet", {"Origin": "http://127.0.0.1:%d" % self.port,
                                                     "Host": "127.0.0.1:%d" % self.port})
         self.assertEqual(status, 303)
-        self.assertTrue(os.path.exists(core.FLAG))
-        os.remove(core.FLAG)
+        self.assertTrue(os.path.exists(sw.FLAG))
+        os.remove(sw.FLAG)
 
     def test_reboot_form_post_is_never_enough(self):
         status, _b, _r = self.req("POST", "/reboot", {"Origin": "http://127.0.0.1:%d" % self.port,
@@ -182,7 +183,7 @@ class HttpSecurityTests(unittest.TestCase):
         # the check for updates and everyday switches need no PIN
         self.assertEqual(self.req("POST", "/update/check", h)[0], 200)
         self.assertEqual(self.req("POST", "/dcnet", h)[0], 204)
-        os.path.exists(core.FLAG) and os.remove(core.FLAG)
+        os.path.exists(sw.FLAG) and os.remove(sw.FLAG)
 
     def test_api_says_whether_a_pin_is_needed(self):
         self.assertFalse(json.loads(self.req("GET", "/api")[1].decode())["pin"])
@@ -221,7 +222,7 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertEqual(self.req("POST", "/pin/check", dict(h, **{"X-Netswitch-Pin": "0000"}), b"{}")[0], 401)
         self.assertEqual(self.req("POST", "/settings-pin", ok, b'{"value": false}')[0], 200)        # unlocked again: settings are open
         self.assertEqual(self.req("POST", "/screen/stretch", h, b'{"value": false}')[0], 200)
-        os.path.exists(core.FLAG) and os.remove(core.FLAG)
+        os.path.exists(sw.FLAG) and os.remove(sw.FLAG)
 
     def test_the_pin_can_be_set_changed_and_removed_from_the_page(self):
         h = {"X-Requested-With": "x"}
@@ -253,7 +254,8 @@ class HttpSecurityTests(unittest.TestCase):
         core.save_module_enabled("wifi", True)
         body = json.dumps({"ssid": "s" * 100, "password": "p" * 200}).encode()
         self.assertEqual(self.req("POST", "/wificonnect", {"X-Requested-With": "x"}, body)[0], 204)
-        got = json.load(open(core.WIFI_CONNECT))
+        import netswitch_wifi_setup as wifi
+        got = json.load(open(wifi.WIFI_CONNECT))
         self.assertEqual((len(got["ssid"]), len(got["password"])), (32, 63))
         core.save_module_enabled("wifi", False)
 

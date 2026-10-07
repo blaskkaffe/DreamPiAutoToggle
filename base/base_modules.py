@@ -365,6 +365,18 @@ def get(name):
     return None
 
 
+def service_finder(name):
+    """The function a module's SERVICES = {...} offers under this name, or None."""
+    for m in _state["loaded"]:
+        fn = (getattr(m["web"], "SERVICES", None) or {}).get(name) if m["web"] is not None else None
+        if callable(fn):
+            return fn
+    return None
+
+
+core.set_service_finder(service_finder)
+
+
 def collect(name):
     """What the enabled modules' web entries return from a function called `name` (a plain list of rows, joined in picker order):
     a way for several modules to fill one list without importing each other (the About table's rows: system's versions, the

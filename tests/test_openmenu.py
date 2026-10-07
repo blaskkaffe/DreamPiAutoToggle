@@ -160,13 +160,15 @@ class LiveInfo(Base):
         return self.call("GET", POLL)[1].splitlines()
 
     def test_the_selected_network_goes_back_to_the_dreamcast(self):
-        from unittest import mock
         self.upload2()
         self.assertIn("NET dcnow", self.poll_lines())
-        with mock.patch.object(core, "tag", return_value="DCNET"):               # DCNET is selected and DreamPi can use it
-            self.assertIn("NET dcnet", self.poll_lines())
-        with mock.patch.object(core, "tag", return_value="DCNET_OFF"):           # selected, but calls go to DCNow! anyway
-            self.assertIn("NET dcnow", self.poll_lines())
+        open(om.FLAG, "w").close()                                                  # DCNET is selected ...
+        with open(om.NET_STATE, "w") as f:
+            json.dump({"time": time.time(), "dcnet_code": "ok"}, f)                 # ... and DreamPi can use it
+        self.assertIn("NET dcnet", self.poll_lines())
+        with open(om.NET_STATE, "w") as f:
+            json.dump({"time": time.time(), "dcnet_code": "disabled"}, f)           # selected, but calls go to DCNow! anyway
+        self.assertIn("NET dcnow", self.poll_lines())
 
     def test_the_games_played_online_go_back_with_how_many_play_them(self):
         self.upload2()
@@ -184,13 +186,17 @@ class LiveInfo(Base):
         self.assertIn("PLY 2:1", self.poll_lines())
 
     def test_the_dcnet_line_says_why_dcnet_does_not_work(self):
-        from unittest import mock
+        """The network switcher's checker writes the code into its NET_STATE file; openMenu's line just passes it on."""
         self.upload2()
-        with mock.patch.object(core, "hook_problem", return_value=None):
-            for code, line in ((None, "DCNET ok"), ("config", "DCNET off config"), ("disabled", "DCNET off disabled"), ("noupdates", "DCNET off noupdates")):
-                with mock.patch.object(core, "_dcnet_check", return_value=(code, "why" if code else None)):
-                    self.assertIn(line, self.poll_lines())
-        self.assertIn("DCNET off inactive", self.poll_lines())             # DreamPi is not running the add-on
+        for code, line in (("ok", "DCNET ok"), ("config", "DCNET off config"), ("disabled", "DCNET off disabled"), ("noupdates", "DCNET off noupdates")):
+            with open(om.NET_STATE, "w") as f:
+                json.dump({"time": time.time(), "dcnet_code": code}, f)
+            self.assertIn(line, self.poll_lines())
+        with open(om.NET_STATE, "w") as f:
+            json.dump({"time": time.time() - 100, "dcnet_code": "ok"}, f)       # stale: the web service was down
+        self.assertIn("DCNET off inactive", self.poll_lines())
+        os.remove(om.NET_STATE)
+        self.assertIn("DCNET off inactive", self.poll_lines())             # nothing known: DreamPi is not running the add-on
 
     def test_the_event_line_is_the_one_due_else_the_soonest(self):
         self.upload2()

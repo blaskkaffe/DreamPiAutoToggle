@@ -38,7 +38,7 @@ if os.environ.get("OPENMENU"):
         threading.Thread(target=heartbeat, daemon=True).start()
 if os.environ.get("WIFI"): core.save_module_enabled("wifi", True)
 if os.environ.get("WIFIDEMO"):
-    core.save_module_enabled("wifi", True); open(core.WIFI_DEMO, "w").close()
+    core.save_module_enabled("wifi", True); open(wifi.WIFI_DEMO, "w").close()
     wifi.SCAN_WAIT = 3
     def loop():     # what netswitch_wifi_service.py does
         while True:

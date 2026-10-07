@@ -46,6 +46,24 @@ _state = {"seen": 0.0, "pending": None, "pending_time": 0.0, "launched": None, "
 
 
 # ------------------------------------------------------------------ game list
+FLAG = os.path.join(core.BASE_DIR, "dcnet_mode")   # exists = DCNET is the selected network (the network switcher's)
+NET_STATE = core.TMP_PREFIX + ".net"          # the network switcher's measurements (JSON, rewritten every few seconds)
+NET_STALE = 20                                 # ... ignored when older than this (the web service is down)
+
+
+def dcnet_code():
+    """"ok" when DreamPi's DCNET support is on, else a short code why not (noupdates / config / disabled), "inactive" when the network
+    switcher says DreamPi is not running the add-on or says nothing (read from its NET_STATE file)."""
+    try:
+        with open(NET_STATE) as f:
+            data = json.load(f)
+        if time.time() - data.get("time", 0) > NET_STALE:
+            return "inactive"
+        return str(data.get("dcnet_code") or "inactive")
+    except (IOError, OSError, ValueError, AttributeError):
+        return "inactive"
+
+
 def event_reminder(now=None):
     """The reminded DC99 event that is due now, or None: {"id", "title", "start"}. The events module writes EVENT_REMINDERS
     ({"lead": minutes before, "after": minutes after the start, "items": [{"id", "title", "start"}], "dismissed": [ids]}) whenever
@@ -217,7 +235,7 @@ def event_line(now):
 
 def network():
     """'dcnet' when DCNET is the selected network and DreamPi can use it, else 'dcnow'."""
-    return "dcnet" if core.tag() == "DCNET" else "dcnow"
+    return "dcnet" if os.path.exists(FLAG) and dcnet_code() == "ok" else "dcnow"
 
 
 # ------------------------------------------------------------------ the launch handshake
@@ -238,7 +256,7 @@ def poll_reply(headers_query):
     if q.get("h", "") != have.get("hash", "") or not have["games"]:
         lines.append("NEED games")
     lines.append("NET " + network())
-    code = core.dcnet_code()
+    code = dcnet_code()
     lines.append("DCNET ok" if code == "ok" else "DCNET off " + code)
     players, _table, age = players_file()
     playing = playing_now(players)

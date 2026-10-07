@@ -437,10 +437,10 @@ class Services(unittest.TestCase):
         wifi.setup_cycle = lambda iface: calls.append(iface)
         try:
             core.save_module_enabled("wifi", True)
-            open(core.WIFI_START, "w").close()
+            open(wifi.WIFI_START, "w").close()
             svc.run_once()
             self.assertEqual(calls, ["wlan0"])
-            self.assertFalse(os.path.exists(core.WIFI_START))       # the request was consumed
+            self.assertFalse(os.path.exists(wifi.WIFI_START))       # the request was consumed
             svc.run_once()                                          # nothing asked: nothing runs
             self.assertEqual(calls, ["wlan0"])
         finally:
