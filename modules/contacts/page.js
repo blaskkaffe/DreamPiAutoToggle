@@ -2,7 +2,8 @@
 custom("contacts-import",function(host){
  var ta=host.querySelector(".ctext"),file=host.querySelector(".cfile"),rep=host.querySelector(".crep"),go=host.querySelector(".cgo"),msg=host.querySelector(".cmsg");
  file.onchange=function(){var f=file.files&&file.files[0];if(!f)return;var r=new FileReader();
-  r.onload=function(){ta.value=String(r.result||"")};r.readAsText(f)};
+  // UTF-8 when the bytes are valid UTF-8; else Windows-1252 (what a plain "CSV" save in Excel on a Swedish PC gives: a, a, o are single bytes)
+  r.onload=function(){var buf=r.result,txt;try{txt=new TextDecoder("utf-8",{fatal:true}).decode(buf)}catch(e){txt=new TextDecoder("windows-1252").decode(buf)}ta.value=txt};r.readAsArrayBuffer(f)};
  go.onclick=function(){if(!ta.value.trim()){setText(msg,"Choose a file or paste some text first");return}
   go.disabled=true;setText(msg,"Importing...");
   post("/contacts/import",{csv:ta.value,replace:rep.checked},function(r,st,b){go.disabled=false;
