@@ -8,7 +8,7 @@ import types
 import unittest
 
 from support import ROOT, sandbox, cleanup
-import netswitch_hook as hook
+import netswitch_dreampi as hook
 import netswitch_hookdebug as hookdebug
 
 builtins.__import__ = hook._original_import     # importing the hook may arm its import hook; undo that here

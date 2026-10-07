@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# DreamPi Netswitch add-on - the GPIO buttons (base). While the Wi-Fi setup module is switched on, a hold only
+# DreamPi Netswitch add-on - the network switcher module's GPIO buttons service. While the Wi-Fi setup module is switched on, a hold only
 # touches wifi_start / wifi_stop; the module's own service (modules/wifi/netswitch_wifi_service.py) does the setup.
 #
 # Runs as root (service dreampi-netswitch-buttons). Watches up to two GPIO
@@ -16,7 +16,8 @@ import sys
 import threading
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (base_core, base_gpio ...)
 import base_core as core  # noqa: E402  (paths, settings, debug_log())
 from base_gpio import peripheral_base, Block, GPIO_OFFSET, set_input_pullup, read_level  # noqa: E402
 

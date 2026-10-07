@@ -52,7 +52,7 @@ if os.environ.get("WIFIDEMO"):
 if os.environ.get("FAKEUPDATE"):
     import subprocess
     import netswitch_update as up
-    import netswitch_probes
+    import netswitch_system
     src = os.path.join(tmp, "DreamPiAutoToggle"); os.mkdir(src)
     env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
     subprocess.check_call(["git", "init", "-q", "-b", "main"], cwd=src)
@@ -60,8 +60,8 @@ if os.environ.get("FAKEUPDATE"):
     open(os.path.join(src, "install.sh"), "w").write("#!/bin/sh\n")
     subprocess.check_call(["git", "add", "."], cwd=src); subprocess.check_call(["git", "commit", "-q", "-m", "x"], cwd=src, env=env)
     open(core.ADDON_SRC, "w").write(src); open(core.ADDON_COMMIT, "w").write("a"*40)
-    open(netswitch_probes.ADDON_VERSION, "w").write("2026-09-30 12:00 (aaaaaaa)")
-    dp = os.path.join(tmp, "dp"); os.mkdir(dp); netswitch_probes.DREAMPI_DIR = dp
+    open(core.VERSION_FILE, "w").write("2026-09-30 12:00 (aaaaaaa)")
+    dp = os.path.join(tmp, "dp"); os.mkdir(dp); netswitch_system.DREAMPI_DIR = up.DREAMPI_DIR = dp
     open(os.path.join(dp, "dreampi.py"), "w").write("#dreampi.py_version=202601010000\n")
     def fake(url):
         if "/commits/" in url: return json.dumps({"sha": "b"*40, "commit": {"committer": {"date": "2026-10-02T10:00:00Z"}}})

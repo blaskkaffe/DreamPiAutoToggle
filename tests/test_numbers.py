@@ -9,7 +9,8 @@ import builtins
 
 from support import ROOT, core, sandbox, cleanup
 import netswitch_numbers as nums
-import netswitch_hook as hook
+import netswitch_numbers_hook as nh
+import netswitch_dreampi as hook
 
 builtins.__import__ = hook._original_import     # importing the hook may arm its import hook; undo that here
 
@@ -19,6 +20,12 @@ def install_modules(*names):
     hook._parts.clear()
     for name in names:
         shutil.copytree(os.path.join(ROOT, "modules", name), os.path.join(hook.MODULES_DIR, name), ignore=shutil.ignore_patterns("__pycache__"))
+
+
+def load_rows():
+    """The rows the DreamPi integration works with: the numbers module's saved ones while it is on, else its own default row."""
+    part = hook._module_part("numbers")
+    return part.load_rows(hook.BASE_DIR) if part is not None else [dict(hook.DEFAULT_ROW)]
 
 
 def row(action, items, hangup=False, rid=""):
@@ -37,7 +44,7 @@ class SettingsTests(unittest.TestCase):
     def test_the_default_is_one_dcnow_row_with_11111(self):
         self.assertEqual(nums.default_rows(), [{"id": "1", "action": "switcher.dcnow", "items": ["11111"], "opts": {"hangup": False}}])
         self.assertEqual(nums.numbers(), nums.default_rows())              # nothing saved yet
-        self.assertEqual([r["items"] for r in hook._load_rows()], [["11111"]])
+        self.assertEqual([r["items"] for r in load_rows()], [["11111"]])
 
     def test_clean_number(self):
         self.assertEqual(nums.clean_number("555-0001"), "5550001")
@@ -61,11 +68,11 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(len(set(r["id"] for r in saved)), 3)
         self.assertEqual(saved[0]["opts"], {"hangup": True})
         self.assertEqual(nums.numbers(), saved)
-        self.assertEqual(hook._load_rows()[0]["items"], ["*61#", "5550009"])
+        self.assertEqual(load_rows()[0]["items"], ["*61#", "5550009"])
 
     def test_no_rows_means_no_numbers_do_anything(self):
         self.assertEqual(nums.save_numbers({"rows": []}), [])
-        self.assertEqual(hook._load_rows(), [])
+        self.assertEqual(load_rows(), [])
 
     def test_at_most_max_rows(self):
         self.assertEqual(len(nums.save_numbers({"rows": [row("switcher.dcnow", ["12345"]) for _ in range(50)]})), nums.MAX_ROWS)
@@ -77,24 +84,24 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual([(r["action"], r["opts"]["hangup"], r["items"]) for r in rows],
                          [("switcher.dcnow", True, ["5550001#"]), ("switcher.dcnet", True, []),
                           ("switcher.dcnow", False, ["11111", "1111111"]), ("switcher.dcnet", False, ["5550002"])])
-        self.assertEqual([r["items"] for r in hook._load_rows()], [r["items"] for r in rows])
+        self.assertEqual([r["items"] for r in load_rows()], [r["items"] for r in rows])
 
     def test_without_the_module_the_hook_uses_the_default_row(self):
         nums.save_numbers({"rows": [row("switcher.dcnet", ["*61#"])]})
-        self.assertEqual(hook._load_rows()[0]["items"], ["*61#"])
+        self.assertEqual(load_rows()[0]["items"], ["*61#"])
         with open(hook.MODULES_STATE, "w") as f:                       # switched off in the Modules menu
             json.dump({"numbers": False}, f)
-        self.assertEqual([r["items"] for r in hook._load_rows()], [["11111"]])
+        self.assertEqual([r["items"] for r in load_rows()], [["11111"]])
         os.remove(hook.MODULES_STATE)
-        self.assertEqual(hook._load_rows()[0]["items"], ["*61#"])
+        self.assertEqual(load_rows()[0]["items"], ["*61#"])
         os.remove(os.path.join(hook.MODULES_DIR, "numbers", "module.json"))   # folder deleted
-        self.assertEqual([r["items"] for r in hook._load_rows()], [["11111"]])
+        self.assertEqual([r["items"] for r in load_rows()], [["11111"]])
 
     def test_broken_file_falls_back(self):
         with open(core.NUMBERS, "w") as f:
             f.write("{not json")
         self.assertEqual(nums.numbers(), nums.default_rows())
-        self.assertEqual([r["items"] for r in hook._load_rows()], [["11111"]])
+        self.assertEqual([r["items"] for r in load_rows()], [["11111"]])
 
     def test_modules_announce_actions(self):
         """The switcher announces toggle / DCNow! / DCNET; a module that is off announces nothing."""
@@ -115,12 +122,28 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual((r["off"], r["title"]), (True, "gone.thing"))                    # a row of a module that is not there stays
 
 
+class WithoutTheNumbersModule(unittest.TestCase):
+    """The DreamPi integration has its own one row (DCNow! on 11111) while the numbers module is not there."""
+    def setUp(self):
+        self.tmp = sandbox(hook)
+        install_modules("switcher")
+
+    def tearDown(self):
+        hook._parts.clear()
+        cleanup(self.tmp)
+
+    def test_default_row_matches_what_openmenu_dials(self):
+        self.assertEqual([(r["action"], n) for r, n in hook._matches("1111111")], [("switcher.dcnow", "11111")])
+        self.assertEqual(hook._matches("5550001"), [])
+        self.assertEqual(hook._matches(""), [])
+
+
 class MatchTests(unittest.TestCase):
     def m(self, dialed, rows):
-        return [(r["action"], n) for r, n in hook._matching(dialed, rows)]
+        return [(r["action"], n) for r, n in nh.matching(dialed, rows)]
 
     def test_defaults_catch_openmenu(self):
-        rows = hook.rows_from_data(None)
+        rows = nh.rows_from_data(None)
         self.assertEqual(self.m("11111", rows), [("switcher.dcnow", "11111")])
         self.assertEqual(self.m("1111111", rows), [("switcher.dcnow", "11111")])       # openMenu's own number ends with 11111
         self.assertEqual(self.m("5550001", rows), [])

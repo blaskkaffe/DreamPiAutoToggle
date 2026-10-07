@@ -14,7 +14,7 @@ from support import ROOT
 
 
 def module_hook_files():
-    """Every module's "hook" file (module.json): it runs inside DreamPi like netswitch_hook.py."""
+    """Every module's "hook" file (module.json): it runs inside DreamPi like netswitch_dreampi.py."""
     out = {}
     for name in sorted(os.listdir(os.path.join(ROOT, "modules"))):
         path = os.path.join(ROOT, "modules", name, "module.json")
@@ -26,11 +26,11 @@ def module_hook_files():
     return out
 
 
-HOOK_FILES = [os.path.join(ROOT, "netswitch_hook.py")] + sorted(module_hook_files().values())
+HOOK_FILES = [os.path.join(ROOT, "modules", "switcher", "netswitch_dreampi.py")] + sorted(module_hook_files().values())
 
 
 class HookCompatTests(unittest.TestCase):
-    """netswitch_hook.py, and the debug log module's part that it loads, run inside DreamPi on Python 2.7."""
+    """netswitch_dreampi.py (the switcher's DreamPi integration), and the modules' hook files that it loads, run inside DreamPi on Python 2.7."""
     def test_no_python3_only_syntax(self):
         for path in HOOK_FILES:
             self.check_syntax(path)
@@ -87,13 +87,13 @@ class ActionTests(unittest.TestCase):
 class LayeringTests(unittest.TestCase):
     """The small services must not drag the web server in."""
     def test_led_and_buttons_do_not_import_the_web_module(self):
-        for mod in ("netswitch_led", "netswitch_led_drivers", "netswitch_buttons", "netswitch_wifi_setup", "base_core", "netswitch_ledconfig", "netswitch_probes"):
+        for mod in ("netswitch_led", "netswitch_led_drivers", "netswitch_switcher_buttons", "netswitch_wifi_setup", "base_core", "netswitch_ledconfig", "netswitch_switcher_probes"):
             code = ("import sys; sys.path[:0] = %r; import %s; sys.exit(1 if 'base_web' in sys.modules else 0)"
                     % ([ROOT, os.path.join(ROOT, "base")] + [os.path.join(ROOT, "modules", m) for m in os.listdir(os.path.join(ROOT, "modules"))], mod))
             self.assertEqual(subprocess.call(["python3", "-c", code]), 0, mod)
 
     def test_core_does_not_import_probes(self):
-        code = "import sys; sys.path[:0] = %r; import base_core; sys.exit(1 if 'netswitch_probes' in sys.modules else 0)" % [ROOT, os.path.join(ROOT, "base")]
+        code = "import sys; sys.path[:0] = %r; import base_core; sys.exit(1 if 'netswitch_switcher_probes' in sys.modules else 0)" % [ROOT, os.path.join(ROOT, "base")]
         self.assertEqual(subprocess.call(["python3", "-c", code]), 0)
 
 

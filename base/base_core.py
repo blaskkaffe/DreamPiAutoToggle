@@ -55,6 +55,7 @@ PLAYERS_CACHE = os.path.join(BASE_DIR, "players_cache.json")   # the last list t
 PLAYERS_FAVORITES = os.path.join(BASE_DIR, "players_favorites.json")   # {"games": [names], "players": [names]} the user watches
 OPENMENU_GAMES = os.path.join(BASE_DIR, "openmenu_games.json")   # {"hash", "time", "games": [...]}: the game list the Dreamcast's openMenu uploaded (openMenu link module)
 IMAGEBG_FILE = os.path.join(BASE_DIR, "background_image")     # the picture of the Background image module (any of PNG, JPEG, GIF, WebP; its type is in the config)
+VERSION_FILE = os.path.join(BASE_DIR, "version")        # written by install.sh: date and commit of the installed checkout
 IMAGEBG_CONFIG = os.path.join(BASE_DIR, "imagebg.json")  # {"fit", "dim", "type", "version"} of the Background image module
 NUMBERS = os.path.join(BASE_DIR, "numbers.json")     # phone numbers per action, edited on the page, read by the hook
 CLOCK_MODE = os.path.join(BASE_DIR, "clock_mode")    # older versions: "24h", "12h" or "beat" (read once to carry the choice over to clock.json)

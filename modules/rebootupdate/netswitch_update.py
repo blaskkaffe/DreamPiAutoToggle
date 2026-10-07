@@ -18,10 +18,10 @@ except ImportError:   # Python 2.7
     from urllib2 import urlopen, Request
 
 import base_core as core
-import netswitch_probes as probes
 
 DEFAULT_REPO = "blaskkaffe/DreamPiAutoToggle"
 DEFAULT_BRANCH = "main"
+DREAMPI_DIR = "/home/pi/dreampi"
 DREAMPI_RAW = "https://raw.githubusercontent.com/Kazade/dreampi/master/"   # what DreamPi's own updater follows
 DREAMPI_FILES = ("dreampi.py", "netlink.py", "dcnow.py")
 TIMEOUT = 10
@@ -72,7 +72,7 @@ def local_commit():
 def check_addon():
     repo, branch, _src = source()
     commit = local_commit()
-    out = {"current": (core.read_file(probes.ADDON_VERSION) or "unknown").strip(), "repo": repo, "branch": branch,
+    out = {"current": (core.read_file(core.VERSION_FILE) or "unknown").strip(), "repo": repo, "branch": branch,
            "available": None, "latest": None, "latest_date": None, "behind": None, "note": None}
     head = json.loads(fetch("https://api.github.com/repos/%s/commits/%s" % (repo, branch)))
     out["latest"] = head["sha"][:7]
@@ -110,7 +110,7 @@ def check_dreampi():
     for name in DREAMPI_FILES:
         local = None
         try:
-            with open(os.path.join(probes.DREAMPI_DIR, name), "rb") as f:
+            with open(os.path.join(DREAMPI_DIR, name), "rb") as f:
                 local = _raw_version(f.read(4096).decode("utf-8", "replace"))
         except (IOError, OSError):
             pass
@@ -218,7 +218,7 @@ def status():
         out = dict(_info)
     out.update({"state": update_state(), "log": _log_tail() if update_state() != "idle" else [],
                 "can_update": can_update(), "src": src, "repo": repo, "branch": branch,
-                "version_file": (core.read_file(probes.ADDON_VERSION) or "unknown").strip()})
+                "version_file": (core.read_file(core.VERSION_FILE) or "unknown").strip()})
     return out
 
 

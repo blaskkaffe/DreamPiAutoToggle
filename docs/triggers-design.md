@@ -8,7 +8,7 @@ numbers rows, `actions` in `module.json`, the `triggers` widget, the LED rows). 
 | Piece | Where | What it does |
 |---|---|---|
 | `actions` | `module.json` of the switcher | Announces `toggle`, `dcnow`, `dcnet` (id, label, sub-label). `core.module_actions()` lists the actions of the enabled modules as `<module>.<id>`. |
-| `hook` | the module's hook file, loaded by `netswitch_hook.py` | `ACTIONS = {"dcnow": fn}`; `fn(call)` runs **inside DreamPi** and gets `.raw`, `.number`, `.base_dir`, `.log`. Python 2/3, works through files. |
+| `hook` | the module's hook file, loaded by `netswitch_dreampi.py` | `ACTIONS = {"dcnow": fn}`; `fn(call)` runs **inside DreamPi** and gets `.raw`, `.number`, `.base_dir`, `.log`. Python 2/3, works through files. |
 | Rows | `numbers.json` `{"rows": [{id, action, items, opts: {hangup}}]}` | A row = one action + the numbers that trigger it + "hang up". Default row: `switcher.dcnow` with `11111`. A number may be in several rows. |
 | Widget | `triggers` in `page/widgets.js`, answered by `GET`/`POST /numbers` | Edit rows, number chips, Add row, Restore, (i) help. |
 | LED rows | `GET`/`POST /ledrows`, `led_messages` in `module.json` | A row = colour + the LED messages (announced by every module) that trigger it; row order is priority. |

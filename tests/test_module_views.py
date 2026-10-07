@@ -10,7 +10,7 @@ import netswitch_players as pl
 import netswitch_wifi_web as wifi
 import netswitch_rebootupdate as ru
 import netswitch_switcher as sw
-import netswitch_probes as probes
+import netswitch_switcher_probes as probes
 import netswitch_clock as clock
 import base_tz as tzmod
 
@@ -464,3 +464,26 @@ class ClockView(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ModemAboutRow(unittest.TestCase):
+    """The Modem row of Settings > System > About is the switcher's (it knows the modem): in its /api answer, shown in the shared box."""
+    def test_rows(self):
+        import netswitch_switcher as sw
+        self.assertEqual(sw._modem_about("Conexant USB Modem", True, True), [["Modem", "Conexant USB Modem"]])
+        self.assertIn("not known to work", sw._modem_about("Conceptronic C56U", False, True)[0][1])
+        self.assertIn("not a modem DreamPi is confirmed", sw._modem_about("Acme", None, True)[0][1])
+        self.assertEqual(sw._modem_about(None, None, False), [["Modem", "Not detected (check the USB connection)"]])
+        self.assertEqual(sw._modem_about(None, None, None), [])
+
+    def test_the_about_rows_are_collected_by_the_base_from_every_module(self):
+        from unittest import mock
+        import base_modules as modules
+        import netswitch_system as system
+        with mock.patch.object(modules, "collect", return_value=[["Modem", "Acme"]]):
+            captured = []
+            class H(object):
+                def send(self, body, ctype): captured.append(json.loads(body))
+            system._about(H())
+        self.assertIn(["Modem", "Acme"], captured[0])
+        self.assertEqual(captured[0][0][0], "Add-on")

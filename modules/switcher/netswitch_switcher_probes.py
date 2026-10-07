@@ -1,6 +1,6 @@
-# DreamPi Netswitch add-on - things the web service measures: internet and
-# link checks, Pi health, hang up, versions, modem identification, and the
-# checker() loop that publishes them. Works on Python 3 and 2.7.
+# DreamPi Netswitch add-on - network switcher module: the things its web side measures: internet and link checks, Pi health,
+# hang up, modem identification, and the checker() loop that publishes them (started from netswitch_switcher.start()).
+# Works on Python 3 and 2.7.
 import json
 import os
 import re
@@ -347,58 +347,6 @@ def start_hangup():
     t.daemon = True
     t.start()
     return True
-
-
-# --------------------------------------------------------------- versions
-
-DREAMPI_DIR = "/home/pi/dreampi"
-ADDON_VERSION = os.path.join(core.BASE_DIR, "version")   # written by install.sh
-
-
-def script_version(path):
-    """DreamPi's own version line in a script ("#dreampi.py_version=
-    202512152004", the timestamp its updater compares) as a readable date."""
-    try:
-        with open(path, "rb") as f:
-            for raw in f:
-                line = raw.decode("utf-8", "replace")
-                if "_version=" in line:
-                    v = line.split("version=")[1].strip()
-                    if len(v) == 12 and v.isdigit():
-                        return "%s-%s-%s %s:%s" % (v[:4], v[4:6], v[6:8], v[8:10], v[10:12])
-                    return v or None
-    except (IOError, OSError):
-        return None
-    return None
-
-
-def about():
-    model = core.read_file("/proc/device-tree/model")
-    osname = None
-    try:
-        with open("/etc/os-release") as f:
-            for line in f:
-                if line.startswith("PRETTY_NAME="):
-                    osname = line.split("=", 1)[1].strip().strip('"')
-    except (IOError, OSError):
-        pass
-    rows = [("Add-on", core.read_file(ADDON_VERSION) or "unknown")]
-    for name in ("dreampi.py", "netlink.py", "dcnow.py"):
-        rows.append((name, script_version(os.path.join(DREAMPI_DIR, name)) or "not found"))
-    rows.append(("Raspberry Pi", (model or "unknown").replace("\x00", "")))
-    rows.append(("System", osname or "unknown"))
-    usb = _usb_info(modem_port())
-    compat, label = modem_compat(usb)
-    if usb:
-        text = label
-        if compat is False:
-            text += " — not known to work with DreamPi"
-        elif compat is None:
-            text += " — not a modem DreamPi is confirmed to work with yet"
-        rows.append(("Modem", text))
-    elif modem_plugged() is False:
-        rows.append(("Modem", "Not detected (check the USB connection)"))
-    return rows
 
 
 # ----------------------------------------------------- modem identification

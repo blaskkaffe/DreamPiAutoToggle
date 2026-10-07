@@ -152,7 +152,7 @@ def _check_widget(w, where):
             for i, sub in enumerate(w[key]):
                 _check_widget(sub, "%s.%s[%d]" % (where, key, i))
     for key in ("fields", "rows"):          # entries that are not widgets themselves but hold some
-        if key in w:
+        if key in w and not (t == "info" and isinstance(w[key], str)):      # (an info table's rows may be a "@data" binding)
             if not isinstance(w[key], list):
                 raise ValueError("%s.%s must be a list" % (where, key))
             for i, sub in enumerate(w[key]):
@@ -363,6 +363,21 @@ def get(name):
         if m["name"] == name:
             return m["web"]
     return None
+
+
+def collect(name):
+    """What the enabled modules' web entries return from a function called `name` (a plain list of rows, joined in picker order):
+    a way for several modules to fill one list without importing each other (the About table's rows: system's versions, the
+    network switcher's modem)."""
+    out = []
+    for m in _state["loaded"]:
+        fn = getattr(m["web"], name, None) if m["web"] is not None else None
+        if callable(fn):
+            try:
+                out.extend(fn())
+            except Exception as e:
+                sys.stderr.write("module %s: %s() failed: %s\n" % (m["name"], name, e))
+    return out
 
 
 def route(method, path):

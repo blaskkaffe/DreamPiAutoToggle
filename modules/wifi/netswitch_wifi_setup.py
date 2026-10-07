@@ -39,6 +39,7 @@ import json
 import os
 import queue
 import re
+import socket
 import subprocess
 import sys
 import threading
@@ -54,7 +55,6 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)                                            # this module's other files
 sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (base_core ...)
 import base_core as core  # noqa: E402  (paths, settings, debug_log())
-import netswitch_probes as probes  # noqa: E402  (check_internet())
 
 BASE_DIR = core.BASE_DIR
 HOSTAPD_CONF = os.path.join(BASE_DIR, "wifi_hostapd.conf")
@@ -336,8 +336,19 @@ def try_connect(iface, ssid, password):
         if stop_requested():
             return False
         if has_ip(iface):
-            return probes.check_internet()["state"] in ("ok", "warn")
+            return internet_reachable()
         time.sleep(1)
+    return False
+
+
+def internet_reachable():
+    """Whether the new network gets to the internet: a public DNS server answers over TCP (the same idea as DreamPi's own check)."""
+    for host in ("1.1.1.1", "8.8.8.8", "208.67.222.222"):
+        try:
+            socket.create_connection((host, 53), 3).close()
+            return True
+        except Exception:
+            continue
     return False
 
 

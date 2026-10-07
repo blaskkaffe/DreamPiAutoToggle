@@ -21,7 +21,7 @@ for _name in sorted(os.listdir(_MODULES)):
 
 import base_core as core  # noqa: E402
 import netswitch_ledconfig as ledconfig  # noqa: E402
-import netswitch_probes as probes  # noqa: E402
+import netswitch_switcher_probes as probes  # noqa: E402
 import base_web as web  # noqa: E402
 
 __all__ = ['ROOT', 'core', 'ledconfig', 'probes', 'web', 'sandbox', 'cleanup']

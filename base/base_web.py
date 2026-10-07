@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
-# DreamPi Netswitch add-on - web page to choose DCNow! or DCNET.
-# Shows DreamPi's and the modem's live status and internet access, plus an
-# optional debug timeline. It only creates/removes the files that
-# netswitch_hook.py reads. This module is the HTTP side (page, API, HTTPS,
-# watchdog); settings and state are in base_core.py, the optional features in modules/ (base_modules.py loads them), measurements in
-# netswitch_probes.py. Works on Python 3 and 2.7.
+# Base - the web service: the HTTP side (page, API, HTTPS, watchdog). Settings and state are in base_core.py, the features
+# (and what they measure) are modules in modules/ that base_modules.py loads. Works on Python 3 and 2.7.
 import gzip
 import io
 import json
@@ -25,7 +21,6 @@ except ImportError:
 
 import base_core as core
 import base_modules as modules
-import netswitch_probes as probes
 import base_security as security
 
 STATIC_DIR = core.project_path("static")          # the project's pictures: served from /static/ (a plain file name with one of these endings)
@@ -646,8 +641,7 @@ if __name__ == "__main__":
         PORT = int(sys.argv[1])
     if len(sys.argv) > 2:
         HTTPS_PORT = int(sys.argv[2])
-    core.reset_network_after_boot()      # DCNow! after every reboot
-    for target in (probes.checker, watchdog):
+    for target in (watchdog,):
         t = threading.Thread(target=target)
         t.daemon = True
         t.start()

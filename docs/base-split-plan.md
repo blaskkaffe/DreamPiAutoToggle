@@ -30,7 +30,7 @@ install.sh uninstall.sh   the project's installer (copies base/ and modules/ to 
 | selected network (`dcnet_mode`), `tag()`, DCNET checks, `network_colour()`, boot reset, DreamPi / modem state readers, hook checks | `switcher` | files: `dcnet_mode`, the state files; openMenu asks the `switcher` service in the web process |
 | `netswitch_probes.py` (internet, link, Pi health, hang up, modem id, checker loop) | `switcher` (the About rows to `system`) | `net` state file (`/tmp/....net`) for the LED |
 | `netswitch_hook.py` (inside DreamPi) | `switcher` (the numbers matching to `numbers`) | `module.json` `hook` files, as now |
-| `netswitch_buttons.py`, `base_gpio.py`, the button settings | `switcher` (its own service) | `led` has its own GPIO driver copy-free: it imports nothing from here (the LED output uses its own small register code) |
+| `netswitch_buttons.py`, the button settings (`base_gpio.py` stays in the base: it is a generic hardware helper) | `switcher` (its own service) | `led` has its own GPIO driver copy-free: it imports nothing from here (the LED output uses its own small register code) |
 | update / reboot marks, `update_info()`, `ADDON_*` | `rebootupdate` | files `updateinfo`, `update`, `reboot` read by `led` |
 | `WIFI_*`, Wi-Fi button | `wifi` | files `wifi`, `wifi_start` ... |
 | events paths, `event_reminder()`, `next_event()` | `events` | file `event_reminders.json` read by `led` and `openmenu` |
@@ -40,8 +40,8 @@ install.sh uninstall.sh   the project's installer (copies base/ and modules/ to 
 | debug log paths and `debug_log()` | the base keeps a generic `log()` (a file and a flag from `project.json`); `debuglog` owns the switch | - |
 
 **Order of work (tests green and a push after each step).**
-1. Neutral names: `base/`, `base_*.py`, `project.json`, the installer copies `base/` and `modules/`; a test forbids project words in `base/`.
-2. The DreamPi integration files into `switcher` (probes, hook, buttons, gpio); numbers matching into `numbers`; About rows into `system`.
+1. **Done.** Neutral names: `base/`, `base_*.py`, `project.json`, the installer copies `base/` and `modules/`; a test forbids project words in `base/`.
+2. **Done.** The DreamPi integration files into `switcher` (`netswitch_switcher_probes.py`, `netswitch_dreampi.py` = the hook, `netswitch_switcher_buttons.py`; its `install.sh` writes the `.pth` and the buttons unit, its `start()` runs the checker and the boot reset); numbers matching into `numbers` (`netswitch_numbers_hook.py`); the About versions into `system` (the Modem row is the switcher's `about_rows()`, collected by the base's `modules.collect("about_rows")` so that modules fill one list without importing each other); the Wi-Fi setup has its own small internet check.
 3. The module-owned paths and readers out of `base_core.py`, owner by owner (wifi, rebootupdate, events, players, openmenu, imagebg, numbers, clock, led, switcher).
 4. LED colours into the `led` module; tokens resolved by the module that adds them (service); `realColour()` in the page without the word `switcher`.
 5. Documentation, and the forbidden-words test switched on for all of `base/`.

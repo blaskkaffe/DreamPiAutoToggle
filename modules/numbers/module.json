@@ -5,5 +5,6 @@
  "visible": true,
  "order": 20,
  "ui": 2,
- "web": "netswitch_numbers"
+ "web": "netswitch_numbers",
+ "hook": "netswitch_numbers_hook"
 }

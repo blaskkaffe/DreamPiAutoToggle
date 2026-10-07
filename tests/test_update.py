@@ -8,7 +8,7 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import urlopen, Request
 
-from support import core, probes, web, sandbox, cleanup
+from support import core, web, sandbox, cleanup
 import netswitch_update as up
 
 LOCAL = "a" * 40
@@ -35,7 +35,7 @@ class CheckTests(unittest.TestCase):
         self._fetch = up.fetch
         with open(core.ADDON_COMMIT, "w") as f:
             f.write(LOCAL)
-        with open(probes.ADDON_VERSION, "w") as f:
+        with open(core.VERSION_FILE, "w") as f:
             f.write("2026-09-30 12:00 (aaaaaaa)")
         up._info.update({"time": 0, "started": 0, "checking": False, "addon": None, "dreampi": None, "error": None})
 
@@ -120,7 +120,7 @@ class CheckTests(unittest.TestCase):
     def test_dreampi_versions(self):
         dp = os.path.join(self.tmp, "dreampi")
         os.mkdir(dp)
-        probes.DREAMPI_DIR = dp
+        up.DREAMPI_DIR = dp
         with open(os.path.join(dp, "dreampi.py"), "w") as f:
             f.write("#!/usr/bin/env python\n#dreampi.py_version=202601010000\n")
         with open(os.path.join(dp, "netlink.py"), "w") as f:

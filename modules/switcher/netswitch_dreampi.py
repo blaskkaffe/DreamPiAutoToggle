@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-DreamPi Netswitch add-on - routing hook.
+DreamPi Netswitch add-on - the network switcher module's integration with DreamPi (routing hook).
 
-Loaded automatically by Python (through a .pth file) but does nothing unless
+Loaded automatically by Python (through a .pth file written by modules/switcher/install.sh) but does nothing unless
 the running program imports DreamPi's netlink.py from /home/pi/dreampi.
 It then wraps Netlink.check_number() with these rules:
 
-  numbers  Rows of numbers set on the web page (numbers.json). A row = an action that a module announces (module.json "actions",
-           done by that module's "hook" file: the network switcher has toggle / DCNow! / DCNET) + the numbers that trigger it
-           + "hang up" (do not answer, busy tone). A dialed string only has to END with a number; the longest match decides and
-           every row holding that number runs. Default: one row, DCNow!, 11111 (openMenu dials 1111111, which ends with it).
+  numbers  Rows of numbers set on the web page (numbers.json, read by the numbers module's hook file). A row = an action that a
+           module announces (module.json "actions", done by that module's "hook" file: this module has toggle / DCNow! / DCNET) +
+           the numbers that trigger it + "hang up" (do not answer, busy tone). A dialed string only has to END with a number; the
+           longest match decides and every row holding that number runs. Without the numbers module there is one row, DCNow!,
+           11111 (openMenu dials 1111111, which ends with it).
   others   Go to whichever network is selected (website or the numbers above).
            Only calls DreamPi would send to its normal PPP are redirected;
            Netlink/XBAND codes and the built-in *69 prefix are untouched.
@@ -44,15 +45,8 @@ MODEM = "/tmp/dreampi-netswitch.modem"
 MODEM_PORT = "/tmp/dreampi-netswitch.port"   # the serial device DreamPi opened, e.g. /dev/ttyUSB0
 NETLINK_DIR = "/home/pi/dreampi"
 
-NUMBERS = os.path.join(BASE_DIR, "numbers.json")   # the four lists below, edited on the web page (phone numbers module)
-
-# The rows of numbers.json: {"rows": [{"action": "switcher.dcnow", "items": ["11111"], "opts": {"hangup": false}}]}. A row says which
-# action (a module's, announced in its module.json "actions" and done by its "hook" file) the numbers trigger; opts.hangup = do not
-# answer the call (busy tone) after the action. These are the rows used until the user has saved their own.
-DEFAULT_ROWS = [{"action": "switcher.dcnow", "items": ["11111"], "opts": {}}]
-# the four lists of an older numbers.json -> (action, hang up)
-LEGACY_LISTS = (("toggle_dcnow", "switcher.dcnow", True), ("toggle_dcnet", "switcher.dcnet", True),
-                ("call_dcnow", "switcher.dcnow", False), ("call_dcnet", "switcher.dcnet", False))
+# the one row used without the numbers module: DCNow! on 11111 (the numbers module's own default is the same)
+DEFAULT_ROW = {"action": "switcher.dcnow", "items": ["11111"], "opts": {}}
 
 # __builtin__ first: on Python 2 the "future" package can provide a fake
 # "builtins" module, and patching that would do nothing.
@@ -211,51 +205,14 @@ def _play_busy(modem):
         return False
 
 
-def rows_from_data(data):
-    """The rows of what numbers.json holds (the web page's numbers module uses this too). The older form with four lists becomes
-    rows; a missing, broken or empty file gives the default rows."""
-    rows = []
-    if isinstance(data, dict) and isinstance(data.get("rows"), list):
-        for r in data["rows"]:
-            if isinstance(r, dict) and r.get("action"):
-                opts = r.get("opts") if isinstance(r.get("opts"), dict) else {}
-                items = r.get("items") if isinstance(r.get("items"), list) else []
-                rows.append({"id": str(r.get("id") or ""), "action": str(r["action"]), "items": [str(n) for n in items if n], "opts": opts})
-        return rows
-    if isinstance(data, dict) and any(k[0] in data for k in LEGACY_LISTS):
-        for key, action, hangup in LEGACY_LISTS:
-            items = data.get(key)
-            if not isinstance(items, list):
-                items = ["11111"] if key == "call_dcnow" else []
-            rows.append({"id": "", "action": action, "items": [str(n) for n in items if n], "opts": {"hangup": True} if hangup else {}})
-        return rows
-    return [dict(r, id="") for r in DEFAULT_ROWS]
-
-
-def _load_rows():
-    """The rows from numbers.json, or the default rows without the numbers module (not installed or switched off)."""
-    if not _module_active("numbers"):
-        return rows_from_data(None)
-    try:
-        with open(NUMBERS) as f:
-            return rows_from_data(json.load(f))
-    except Exception:
-        return rows_from_data(None)
-
-
-def _matching(raw_string, rows):
-    """[(row, number)] for what was dialed. The dialed string only has to END with a configured number: DreamPi often hears an
-    extra leading digit (e.g. 15550002) and ISP settings add prefixes or area codes, so exact matching is unreliable. The longest
-    match decides, and every row that has that number runs (a number may be in several rows), in the order of the rows."""
-    if not raw_string:
-        return []
-    found = []
-    for row in rows:
-        lens = [len(n) for n in row.get("items", []) if n and raw_string.endswith(n)]
-        if lens:
-            found.append((row, max(lens)))
-    best = max([n for _r, n in found] or [0])
-    return [(row, raw_string[-best:]) for row, n in found if n == best]
+def _matches(raw_string):
+    """[(row, number)] for what was dialed: the numbers module's saved rows while it is on, else the one default row (the dialed
+    string only has to end with its number)."""
+    part = _module_part("numbers")
+    if part is not None:
+        return part.matches(raw_string, BASE_DIR)
+    row = DEFAULT_ROW
+    return [(row, raw_string[-len(n):]) for n in row["items"] if raw_string and raw_string.endswith(n)][:1]
 
 
 class _Call(object):
@@ -282,7 +239,7 @@ def _patch(module):
         return
 
     def check_number(self, raw_string):
-        matches = _matching(raw_string, _load_rows())
+        matches = _matches(raw_string)
         if raw_string:
             _dtmf_log("add-on: number heard %r (%s)" % (raw_string, "matches %s" % ", ".join(r["action"] for r, _n in matches) if matches else "no special number"))
         # run the actions of the rows this number is in; a row with "hang up" makes the call end here (no answer, busy tone, like *70)
@@ -357,7 +314,7 @@ _MODEM_EVENTS = [
 _speed = [""]
 
 
-POKE_INTERNET = "/tmp/dreampi-netswitch.poke.internet"     # core.poke("internet"): the web service measures the internet again now
+POKE_INTERNET = "/tmp/dreampi-netswitch.poke.internet"     # core.poke("internet"): the checker (netswitch_switcher_probes.py) measures the internet again now
 _poked = [0.0]
 
 

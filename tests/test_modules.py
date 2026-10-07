@@ -415,7 +415,7 @@ class Services(unittest.TestCase):
         self.assertEqual(led.wanted_count(), 5)
 
     def test_buttons_service_wifi_follows_the_module(self):
-        import netswitch_buttons as buttons
+        import netswitch_switcher_buttons as buttons
         self.assertFalse(buttons.wifi_enabled())                # the Wi-Fi module is off by default
         core.save_module_enabled("wifi", True)
         self.assertTrue(buttons.wifi_enabled())
@@ -424,8 +424,8 @@ class Services(unittest.TestCase):
 
     def test_buttons_service_loads_no_module_code(self):
         """Wi-Fi is layered on top: a button hold only touches wifi_start / wifi_stop; the module has its own service."""
-        code = ("import sys; sys.path[:0] = %r; import netswitch_buttons; "
-                "sys.exit(1 if 'netswitch_wifi_setup' in sys.modules else 0)" % [ROOT, os.path.join(ROOT, "base")])
+        code = ("import sys; sys.path[:0] = %r; import netswitch_switcher_buttons; "
+                "sys.exit(1 if 'netswitch_wifi_setup' in sys.modules else 0)" % [ROOT, os.path.join(ROOT, "base"), os.path.join(ROOT, "modules", "switcher")])
         self.assertEqual(subprocess.call(["python3", "-c", code]), 0)
 
     def test_wifi_service_idles_while_module_is_off_and_runs_a_requested_setup(self):
@@ -521,6 +521,22 @@ class InstallerTests(unittest.TestCase):
             self.assertIn(needle, led)
         self.assertIn("disable --now dreampi-netswitch-led.service", open(os.path.join(REAL_MODULES, "led", "remove.sh")).read())
 
+    def test_the_switcher_owns_its_dreampi_integration_and_buttons_service(self):
+        """The DreamPi hook (.pth) and the buttons service are installed by the module, not by install.sh."""
+        main = open(os.path.join(ROOT, "install.sh")).read()
+        for line in main.splitlines():
+            if not line.lstrip().startswith(("rm -f", "#", '"$DEST/')):          # (the old files are still removed, and mentioned in comments)
+                for gone in ("netswitch_hook", "netswitch_buttons", "dreampi_netswitch.pth", "dreampi-netswitch-buttons.service", "netswitch_dreampi"):
+                    self.assertNotIn(gone, line)
+        text = open(os.path.join(REAL_MODULES, "switcher", "install.sh")).read()
+        self.assertIn("$DEST/modules/switcher", text)
+        self.assertIn("import netswitch_dreampi", text)
+        self.assertIn("ExecStart=$(command -v python3) $DEST/modules/switcher/netswitch_switcher_buttons.py", text)
+        self.assertIn('NS_SERVICES="$NS_SERVICES dreampi-netswitch-buttons.service"', text)
+        remove = open(os.path.join(REAL_MODULES, "switcher", "remove.sh")).read()
+        self.assertIn("disable --now dreampi-netswitch-buttons.service", remove)
+        self.assertIn("pth_locations", remove)
+
     def test_installer_copies_the_loader_and_the_base_only(self):
         text = open(os.path.join(ROOT, "install.sh")).read()
         self.assertIn("base/base_*.py", text)
@@ -544,7 +560,7 @@ class Layering(unittest.TestCase):
                     m = re.match(r"\s*(?:import|from)\s+(\w+)", line)
                     if m and m.group(1) in module_files:
                         # one place loads a module's code on purpose, guarded: the hook inside DreamPi (the debug log's part)
-                        self.assertIn((name, m.group(1)), [("netswitch_hook.py", "netswitch_hookdebug")], (name, line))
+                        self.assertIn((name, m.group(1)), [("netswitch_dreampi.py", "netswitch_hookdebug")], (name, line))
 
     def test_modules_only_use_the_base_and_themselves(self):
         base = set(f[:-3] for d in (ROOT, os.path.join(ROOT, "base")) for f in os.listdir(d) if f.endswith(".py"))

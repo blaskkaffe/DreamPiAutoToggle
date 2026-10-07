@@ -5,7 +5,7 @@ import threading
 import unittest
 
 from support import core, sandbox, cleanup
-import netswitch_buttons as b
+import netswitch_switcher_buttons as b
 
 
 class Clock(object):

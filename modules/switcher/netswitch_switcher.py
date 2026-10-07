@@ -1,14 +1,45 @@
 # DreamPi Netswitch add-on - network switcher module, web side: the selected network, DreamPi's / the modem's / the internet's
 # / the Pi's status for the network box, the two network buttons' POSTs, hang up and the plain-text /status, and the module's
 # GPIO settings: which function and pin the two physical network buttons have (GET/POST /buttonconfig, the standard form answer
-# {values, options}; the always-running buttons service, netswitch_buttons.py, only follows the files written here).
+# {values, options}; the always-running buttons service, netswitch_switcher_buttons.py, only follows the files written here).
 # Everything it shows is in layout.json; the numbers and texts come from the /api answer built in api() below.
 import json
 import os
+import threading
 import time
 
 import base_core as core
-import netswitch_probes as probes
+import netswitch_switcher_probes as probes
+
+
+def start():
+    """Called once by the web service: DCNow! is selected again after every reboot, and the checker (cables, Wi-Fi, internet, the
+    modem, the Pi's health) starts measuring."""
+    core.reset_network_after_boot()
+    t = threading.Thread(target=probes.checker)
+    t.daemon = True
+    t.start()
+
+
+def about_rows():
+    """The Modem row of Settings > System > About (the system module collects these)."""
+    usb = probes._usb_info(probes.modem_port())
+    compat, label = probes.modem_compat(usb)
+    return _modem_about(label, compat, probes.modem_plugged())
+
+
+def _modem_about(label, compat, plugged):
+    """The Modem row of Settings > System > About: the make and model, or that none is found."""
+    if label:
+        text = label
+        if compat is False:
+            text += " \u2014 not known to work with DreamPi"
+        elif compat is None:
+            text += " \u2014 not a modem DreamPi is confirmed to work with yet"
+        return [["Modem", text]]
+    if plugged is False:
+        return [["Modem", "Not detected (check the USB connection)"]]
+    return []
 
 
 def _dot_look(dstate):

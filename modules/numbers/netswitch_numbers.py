@@ -1,14 +1,14 @@
 # DreamPi Netswitch add-on - the phone numbers module: rows of "an action + the numbers that trigger it", edited on the web page and
-# read by netswitch_hook.py from numbers.json. The module has no actions of its own: every module announces what it can do in its
+# read by its hook file (netswitch_numbers_hook.py, inside DreamPi) from numbers.json. The module has no actions of its own: every module announces what it can do in its
 # module.json "actions" (the network switcher: toggle / DCNow! / DCNET), and a row picks one of them. A row can also say "hang up":
 # the call is not answered (busy tone) after the action. A number may be in several rows (all of them run). Works on Python 3 and
-# 2.7 (the hook shares the parsing: netswitch_hook.rows_from_data).
+# 2.7 (the hook file shares the parsing: rows_from_data).
 import json
 import os
 import re
 
 import base_core as core
-import netswitch_hook as hook
+import netswitch_numbers_hook as hook
 
 MIN_LEN, MAX_LEN, MAX_PER_ROW, MAX_ROWS = 3, 12, 10, 30
 _JUNK = re.compile(r"[^0-9*#]")
@@ -92,7 +92,7 @@ def _reply():
         sub = (a["sub"] if a else "This module is off or gone: the row does nothing until it is back")
         out.append({"id": r["id"], "action": r["action"], "title": a["label"] if a else r["action"], "sub": sub,
                     "items": r["items"], "opts": r["opts"], "off": a is None})
-    caught = [row for row, _n in hook._matching(OPENMENU, rows) if row["action"] == "switcher.dcnow" and not row["opts"].get("hangup")]
+    caught = [row for row, _n in hook.matching(OPENMENU, rows) if row["action"] == "switcher.dcnow" and not row["opts"].get("hangup")]
     return {"rows": out, "actions": actions, "options": OPTIONS, "defaults": {"rows": default_rows()},
             "note": "" if caught else "No row selects DCNow! for %s, the number openMenu dials: openMenu will use the network that is "
                                        "selected, and on DCNET its login fails." % OPENMENU,

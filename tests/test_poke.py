@@ -10,7 +10,7 @@ from support import core, probes, sandbox, cleanup, ROOT
 import sys
 sys.path.insert(0, os.path.join(ROOT, "modules", "led"))
 import netswitch_led as led  # noqa: E402
-import netswitch_hook as hook  # noqa: E402
+import netswitch_dreampi as hook  # noqa: E402
 import builtins  # noqa: E402
 
 builtins.__import__ = hook._original_import     # importing the hook may arm its import hook; undo that here
