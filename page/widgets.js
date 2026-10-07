@@ -592,7 +592,7 @@ W.triggers=function(s,ctx){var el=h("div",{"class":"wtrig"}),cfg=null,timer=null
   cfg.rows.forEach(function(row){ids[row.id]=1;
    var e=editRow({title:row.title,button:R.edit_label||"Edit",aria:(R.edit_label||"Edit")+" "+row.title});rowEls.push(e);
    e.setSub(row.sub||"");e.setList(row.items.map(label));var lk=lookOf(row);if(lk)e.setLook(lk[0],lk[1],lk[2]);
-   if(R.sort){var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+row.title+": drag, or use the up and down arrow keys",html:"&#8942;&#8942;"});
+   if(R.sort){var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+row.title+": drag, or use the up and down arrow keys",html:GRIP_SVG});
     e.el.insertBefore(grip,e.el.firstChild);e.el.setAttribute("data-id",row.id)}
    e.btn.onclick=function(ev){ev.stopPropagation();var ed=editor(row);ed.row=row;if(ed.p.isOpen())ed.p.close();else{fillEditor(row);ed.p.open(e.btn)}};list.appendChild(e.el);
    var q=editors[row.id];if(q&&q.p.isOpen())q.p.open(e.btn);                       // an open editor follows its row (the row's height changes with its tags)
@@ -793,7 +793,7 @@ function buildPicker(cols){
    if(m.group!==shownGroup){shownGroup=m.group;list.appendChild(h("div",{"class":"sub grp",text:GROUPS[m.group]||""}))}      // a heading is not a row: a module moves inside its group
    if(m.visible===false)cb=h("span",{"class":"sub fixed",text:"Always on"});                     // can be moved, not switched off
    else{cb=h("input",{type:"checkbox","class":"cbox neutral","data-module":m.name,"aria-label":m.title});cb.checked=m.enabled;boxes[m.name]=cb}
-   var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+m.title+": drag, or use the up and down arrow keys",html:"&#8942;&#8942;"}),
+   var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+m.title+": drag, or use the up and down arrow keys",html:GRIP_SVG}),
     left=h("span",{},[document.createTextNode(m.title),h("span",{"class":"sub",html:esc(m.description)+(m.note?"<br>"+esc(m.note):"")+(m.error?'<br><b class="modbad">Could not load: '+esc(m.error)+"</b>":"")})]);
    list.appendChild(h("div",{"class":"srow","data-id":m.name},[grip,left,cb]))});
   sortable(list,function(){})}                                                                       // the order is read from the page when Done is pressed

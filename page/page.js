@@ -16,6 +16,8 @@ function fire(name,arg){var handled=false;(HOOKS[name]||[]).forEach(function(f){
 // =====
 var ui={version:2,_pops:[]};   // keep in step with UI_KIT in netswitch_modules.py
 ui.closePopups=function(except){ui._pops.forEach(function(p){if(p!==except)p.close()})};
+// the drag handle (list rows and main-screen tiles): two columns of three dots, drawn, so it looks the same in every font
+var GRIP_SVG='<svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>';
 ui.popup=function(el){
  var p={el:el,anchor:null,onclose:null};
  el.classList.add("pop");el.setAttribute("role","dialog");
@@ -129,7 +131,7 @@ function shownTiles(){return dashTiles().filter(function(b){return b.offsetHeigh
 var dragTile=null,dropBar=null;
 function tileTitle(b){var t=b.querySelector("b,h2,.nlabel");return t?t.textContent.trim():b.getAttribute("data-box")}
 function applyGrips(){var on=tilesMovable();$("dash").classList.toggle("movable",on);
- dashTiles().forEach(function(b){if(!b._grip){var g=h("button",{type:"button","class":"grip tilegrip keep",title:"Drag to move (or use the arrow keys)",html:"&#8942;&#8942;"});b._grip=g;b.insertBefore(g,b.firstChild);gripEvents(b,g)}
+ dashTiles().forEach(function(b){if(!b._grip){var g=h("button",{type:"button","class":"grip tilegrip keep",title:"Drag to move (or use the arrow keys)",html:GRIP_SVG});b._grip=g;b.insertBefore(g,b.firstChild);gripEvents(b,g)}
   sh(b._grip,on);b._grip.setAttribute("aria-label","Move "+tileTitle(b)+": drag, or use the arrow keys")})}
 // where a tile dropped at (x,y) goes: {tile, after} = next to the tile under or nearest to the point
 function dropSpot(x,y,moving){var best=null,bd=1e9;
