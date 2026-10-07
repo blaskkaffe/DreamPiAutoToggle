@@ -13,7 +13,7 @@ CSS = os.path.join(ROOT, "page", "page.css")
 JS = os.path.join(ROOT, "page", "page.js")
 WIDGETS_JS = os.path.join(ROOT, "page", "widgets.js")
 MODULES = os.path.join(ROOT, "modules")
-THEME_MODULES = ("background",)       # a theme restyles the base classes on purpose
+THEME_MODULES = ("background", "imagebg")       # a theme restyles the base classes on purpose
 
 
 def read(path):

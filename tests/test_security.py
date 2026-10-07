@@ -182,6 +182,44 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertEqual(codes[:sec.FAIL_LIMIT], [401] * sec.FAIL_LIMIT)
         self.assertEqual(codes[-1], 429)
 
+    def test_locked_settings_need_the_pin_but_the_dashboard_does_not(self):
+        h = {"X-Requested-With": "x"}
+        self.assertEqual(self.req("POST", "/settings-pin", h, b'{"value": true}')[0], 409)         # no PIN yet: nothing to lock with
+        sec.set_pin("4821")
+        self.assertEqual(self.req("POST", "/settings-pin", h, b'{"value": true}')[0], 200)
+        api = json.loads(self.req("GET", "/api")[1].decode())
+        self.assertEqual(api["settings_pin"], {"on": True, "pin": True})
+        for path in ("/colour", "/screen", "/screen/stretch", "/modules", "/clock/beat", "/highlight", "/settings-pin", "/contacts/import", "/checkin/all", "/checkin/config"):
+            sec.reset_for_tests()
+            self.assertEqual(self.req("POST", path, h, b"{}")[0], 401, path)
+        self.assertFalse(os.path.exists(core.SCREEN))
+        for path in ("/checkin/toggle", "/checkin/status", "/contacts/photo"):            # the board's own actions stay open (they answer 400 for a made-up person)
+            self.assertEqual(self.req("POST", path, h, b'{"id": "nobody"}')[0], 400, path)
+        ok = dict(h, **{"X-Netswitch-Pin": "4821"})
+        sec.reset_for_tests()
+        self.assertEqual(self.req("POST", "/screen/stretch", ok, b'{"value": true}')[0], 200)
+        self.assertTrue(core.screen_settings()["stretch"])
+        self.assertEqual(self.req("POST", "/pin/check", ok, b"{}")[0], 200)
+        self.assertEqual(self.req("POST", "/pin/check", dict(h, **{"X-Netswitch-Pin": "0000"}), b"{}")[0], 401)
+        self.assertEqual(self.req("POST", "/settings-pin", ok, b'{"value": false}')[0], 200)        # unlocked again: settings are open
+        self.assertEqual(self.req("POST", "/screen/stretch", h, b'{"value": false}')[0], 200)
+
+    def test_the_pin_can_be_set_changed_and_removed_from_the_page(self):
+        h = {"X-Requested-With": "x"}
+        self.assertEqual(self.req("POST", "/pin", h, b'{"pin": "ab"}')[0], 400)                    # too short
+        self.assertEqual(self.req("POST", "/pin", h, b'{"pin": "4821"}')[0], 200)
+        self.assertTrue(sec.pin_required())
+        self.assertEqual(self.req("POST", "/pin", h, b'{"pin": "9999"}')[0], 401)                  # changing it needs the old one
+        old = dict(h, **{"X-Netswitch-Pin": "4821"})
+        self.assertEqual(self.req("POST", "/pin", old, b'{"pin": "9999"}')[0], 200)
+        sec.reset_for_tests()
+        self.assertTrue(sec.check_pin("9999")[0])
+        core.save_settings_pin(True)
+        self.assertEqual(self.req("POST", "/pin", dict(h, **{"X-Netswitch-Pin": "9999"}), b'{"pin": ""}')[0], 200)
+        self.assertFalse(sec.pin_required())
+        self.assertFalse(core.settings_pin_on())                                                    # no PIN: the lock goes with it
+        self.assertFalse(sec.settings_locked())
+
     def test_page_cannot_be_framed(self):
         _s, _b, r = self.req("GET", "/")
         self.assertEqual(r.getheader("X-Frame-Options"), "DENY")

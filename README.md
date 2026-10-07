@@ -7,7 +7,7 @@ It is built on the module base of the DreamPi network switcher, and the board an
 <p align="center"><img src="docs/images/board.png" alt="The board: a box per department, a row per person, grey while out and coloured while in, a status shows on the row" width="420"> <img src="docs/images/status-menu.png" alt="The status menu" width="420"></p>
 
 What you get:
-- **A box per department with a row per person.** The whole row, edge to edge in its box, is grey while the person is out and turns the department's colour while they are in. The **INNE** (green) / **UTE** (red) button at its right checks the person in or out. A tap on the row opens the **status menu** in the middle of the screen: photo (tap it to choose a picture), name, department, building, role and phone at the top, a cross to close, and the statuses (CheckinChicken's) as same-size buttons, three in a row. A status turns the row the status' colour and the name and status scroll round like a carousel. One column, large text: 60 people fit a 1080p screen in two columns (portrait) or three (landscape) once the page has columns.
+- **A box per department with a row per person.** The whole row, edge to edge in its box, is grey while the person is out and turns the department's colour while they are in. The **INNE** (green) / **UTE** (red) button at its right checks the person in or out. A tap on the row opens the **status menu** in the middle of the screen: photo (tap it to choose a picture), name, department, building, role and phone at the top, a cross to close, and the statuses (CheckinChicken's) as same-size buttons, three in a row. A status turns the row the status' colour and the name and status scroll round like a carousel. Large text: 60 people fit a 1080p screen in two columns (portrait) or three (landscape) with Max columns set to 2 or 3.
 - **Colours by department and/or building**, picked from the page's palette (automatic, or your own pick for each department / building).
 - **Screens in step in real time.** The Pi (the host) keeps everything; every other screen is only a browser that opens the host's address, in kiosk mode if you like (`kiosk/kiosk-browser.sh`). A change on one screen is on the others within about a second.
 - **A screen per building:** with several buildings a row of chips picks what a screen shows (kept in that browser; `?location=Område A` in the address sets it).
@@ -64,7 +64,7 @@ Settings, people and who is in are kept. An install over the old DreamPi network
 
 The web page runs on the Pi as root, because it has to reboot the Pi, join Wi-Fi networks and run the updater. There are no user accounts: **anybody who can reach the page on your network can use it**, so only put the Pi on a network you trust, and don't forward its ports from the internet. What the add-on does to limit the risk:
 
-- **PIN (optional).** `sudo ./install.sh --pin` sets a PIN that the page asks for (once per page load) before **Update now**, **Reboot**, **Wi-Fi connect** and a **contacts import**. It is stored only as a salted hash, can only be set or removed from the Pi itself (`--pin` / `--no-pin`, never from the page), and five wrong tries lock those actions for a minute. Use the `https://` address when you use a PIN: over plain `http://` the PIN travels unencrypted. Forgot it? `sudo ./install.sh --no-pin`. Without a PIN, anybody on your network can update or reboot the Pi.
+- **PIN (optional).** `sudo ./install.sh --pin` sets a PIN that the page asks for (once per page load) before **Update now**, **Reboot**, **Wi-Fi connect** and a **contacts import**. It is stored only as a salted hash, and five wrong tries lock those actions for a minute. The PIN can also be set, changed or removed in **Settings > Appearance > PIN** (changing or removing it asks for the old one; while no PIN is set anybody on your network can set one there, which is why `sudo ./install.sh --no-pin` stays as the way back). **Ask for the PIN to open Settings** (same box) locks Settings: the cogwheel asks for the PIN and every change needs it, while tapping people in and out keeps working. Use the `https://` address when you use a PIN: over plain `http://` the PIN travels unencrypted. Forgot it? `sudo ./install.sh --no-pin`. Without a PIN, anybody on your network can update or reboot the Pi.
 - **Other websites can't use it.** Every change (all `POST`s) must come from the page itself: a request from another site (a form or script on a web page you have open in your browser) is refused, and so is a request that reaches the Pi under a name that isn't the Pi's (the trick used to attack devices on a home network from a web page). The page answers to IP addresses, `.local`-style names and the Pi's own host name; if your router gives it another domain name and the page says "Unknown host name", list that name in `/opt/dreampi-netswitch/allowed_hosts` (one per line). The page can't be shown inside another site's frame.
 - **Update now is limited to GitHub.** It only pulls from the git address the checkout had when the add-on was installed (it must be a GitHub address, and a changed one is refused), fetches from exactly that address, and only fast-forwards, so it can't pull in changes that don't continue your copy.
 - **The web service is fenced in** (systemd: no new privileges, read-only `/usr`, `/boot` and `/etc`, no kernel-module or cgroup changes) and the add-on's files in `/opt/dreampi-netswitch` are root-owned.
@@ -81,6 +81,7 @@ Everything the page shows is a module, one folder in `modules/`. **Settings > Sy
 | Clock | The time on the board page: 12 / 24-hour, `.beat`, world times, time zone map | on |
 | About | Versions, the time zone, the global colours, a link to the project (always on) | on |
 | Wi-Fi setup | Join a Wi-Fi network with no keyboard (a temporary access point) | **off** |
+| Background image | A picture of your own as the page's background: choose it in Settings > Background image (big pictures are shrunk in the browser first), fit and darken it | **off** |
 | Reboot and Update | Update the add-on from GitHub, reboot the Pi | on |
 
 Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), [docs/checkin.md](docs/checkin.md) (the board and the contacts), [docs/web.md](docs/web.md), [docs/wifi.md](docs/wifi.md). `CLAUDE.md` is the short guide for working on the code.
@@ -100,11 +101,11 @@ Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), 
 The main page is the board (and the clock box above it when that module is on). The cogwheel opens **Settings**:
 
 - **Check-in board:** what to group by and what to colour by (department or building), a colour for every department and building (Automatic or your pick), **All out** (the start of the day) and **All in**.
-- **Appearance / Global colours:** the module's colour, the global main colour, the highlight look.
+- **Appearance / Global colours:** the module's colour, the global main colour, the highlight look, **Max columns** for the dashboard and for Settings (1 to 6; as many as fit at about 430 px each), **Stretch boxes** (the columns share the whole screen width) with **Scale content**, **Rearrange the main screen** (drag the tiles; the department boxes move too), and the **PIN** with **Ask for the PIN to open Settings** (the board itself keeps working without it).
 - **Contacts:** how many people, import (a file or pasted text), Export.
 - **About:** versions, the address, the time zone, GitHub. **System:** Modules, Wi-Fi setup (when on), Updates, Reboot.
 
-The page works on a phone as well as a wall display: the board is one column (several columns are planned).
+The page works on a phone as well as a wall display: the dashboard is one column by default and uses as many columns as you allow in Appearance, each department box being a tile of its own.
 
 ## Checking it works
 

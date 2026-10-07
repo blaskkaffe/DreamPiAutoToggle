@@ -1,0 +1,11 @@
+/* Background image module: the picture, a black layer that darkens it, and the boxes a little translucent on top of it */
+#imgbg,#imgbg-dim{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:-1;pointer-events:none}
+#imgbg{background-position:center;background-repeat:no-repeat}
+#imgbg-dim{background:#000}
+body.imgbg-on #imgbg,body.imgbg-on #imgbg-dim{display:block}
+body.imgbg-on{background:transparent;--card:rgba(20,20,20,.78)} html.imgbg-on{background:#000}
+body.imgbg-on #settings{background:rgba(17,17,17,.84)}
+body.imgbg-on h1{text-shadow:0 1px 4px rgba(0,0,0,.6)}
+body.imgbg-on .note,body.imgbg-on h2{color:#eee;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+.imgbg-file{display:none}
+.imgbg-thumb{height:90px;border-radius:var(--r-ctl);border:var(--bw) solid var(--ctl-line);background-size:cover;background-position:center;margin:8px 0 4px}

@@ -37,7 +37,9 @@ def api_state():
          "warnings": warnings, "now": int(time.time()),
          "highlight": {},       # {dashboard box id: why}: a module asks for one of its boxes to stand out for a while (an event soon, say)
          "notices": [],         # banners over the boxes that are not warnings: {"id", "text", "post" (dismiss: POST {"id"} there)}
-         "theme": {"highlight": core.highlight_style()}}
+         "theme": {"highlight": core.highlight_style()},
+         "screen": core.screen_settings(),
+         "settings_pin": {"on": security.settings_locked(), "pin": security.pin_required()}}
     modules.apply_api(d, warnings)          # what the enabled modules add: the board, wifi, the clock ...
     return d
 
@@ -56,6 +58,15 @@ def _highlight_reply():
     label = "Rainbow edge, animated" if style == "rainbow" else "Glow in %s" % core.colour(style)["name"].lower()
     return {"values": {"style": style}, "options": {"styles": opts},
             "texts": {"highlight": label}}
+
+
+def _screen_reply():
+    """The form widget's answer for Appearance > Max columns (the two toggles under it read S.screen from /api)."""
+    cur = core.screen_settings()
+    opts = [{"value": n, "label": str(n)} for n in range(1, core.MAX_COLUMNS + 1)]
+    return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"]}, "options": {"cols": opts},
+            "texts": {"dash_cols": "Up to %d" % cur["dash_cols"] + (" column" if cur["dash_cols"] == 1 else " columns"),
+                      "set_cols": "Up to %d" % cur["set_cols"] + (" column" if cur["set_cols"] == 1 else " columns")}}
 
 
 def _timezone_reply():
@@ -147,7 +158,7 @@ class Handler(BaseHTTPRequestHandler):
         form is kept in memory instead of compressed for every request."""
         if not isinstance(body, bytes):
             body = body.encode("utf-8")
-        gz = len(body) > 2000 and "gzip" in (self.headers.get("Accept-Encoding") or "")
+        gz = len(body) > 2000 and "gzip" in (self.headers.get("Accept-Encoding") or "") and not ctype.startswith("image/")      # pictures are packed already
         if gz:
             key = (id(body), len(body)) if fixed else None
             if key and key in _gz_cache:
@@ -245,6 +256,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(json.dumps(_highlight_reply()), "application/json")
         elif path == "/timezone":
             self.send(json.dumps(_timezone_reply()), "application/json")
+        elif path == "/screen":
+            self.send(json.dumps(_screen_reply()), "application/json")
         elif modules.route("GET", path):
             modules.route("GET", path)(self)         # an enabled module's own endpoint
         elif path == "/":
@@ -258,25 +271,37 @@ class Handler(BaseHTTPRequestHandler):
         # Everything here changes something, and some of it runs as root: only the page itself may ask
         # (not another site's form or script), and the paths a module marks PROTECTED (reboot, update, Wi-Fi
         # connect) also need the PIN when one is set.
-        if not security.post_allowed(self.headers, strict=modules.protected(path)):
+        # With Settings locked (Appearance > Ask for the PIN) every POST that is not a dashboard action (a module's OPEN list) needs it too.
+        need_pin = modules.protected(path) or path in ("/pin", "/pin/check") or (security.settings_locked() and not modules.open_post(path))
+        if not security.post_allowed(self.headers, strict=need_pin):
             return self._refuse(403, "Refused: this request did not come from the page")
-        if modules.protected(path):
+        if need_pin:
             ok, message = security.check_pin(self.headers.get("X-Netswitch-Pin") or "")
             if not ok:
                 core.log("web page: %s refused (%s)" % (path, message))
                 self.send(json.dumps({"started": False, "message": message}), "application/json",
                           status=429 if message.startswith("Too many") else 401)
                 return
+        if path == "/pin/check":
+            return self.send(json.dumps({"ok": True}), "application/json")        # got here: the PIN was right (or none is set)
+        if path == "/pin":
+            return self._post_pin()
+        if path == "/settings-pin":
+            return self._post_settings_pin()
         if path == "/modules":
             return self._post_modules()
         if path == "/modules/order":
             return self._post_module_order()
+        if path == "/modules/dashboard-order":
+            return self._post_dashboard_order()
         if path == "/colour":
             return self._post_colour()
         if path == "/highlight":
             return self._post_highlight()
         if path == "/timezone":
             return self._post_timezone()
+        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/drag"):
+            return self._post_screen(path)
         if path == "/palette":
             return self._post_palette()
         if modules.route("POST", path):
@@ -306,6 +331,18 @@ class Handler(BaseHTTPRequestHandler):
         if not core.save_module_enabled(name, on):
             return self.send("No such module: %s" % name, "text/plain; charset=utf-8", status=404)
         core.log("web page: module %s switched %s" % (name, "on" if on else "off"))
+        refresh_page(force=True)
+        self.send(json.dumps({"modules": modules.listing()}), "application/json")
+
+    def _post_dashboard_order(self):
+        """The tiles of the main screen were moved: {"order": [module names, in the order of their tiles]}."""
+        try:
+            order = core.save_dashboard_order(json.loads(self._body(4096).decode("utf-8")).get("order"))
+        except (ValueError, AttributeError, IOError, OSError) as e:
+            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
+        if order is None:
+            return self.send("Bad request: order must be a list of module names", "text/plain; charset=utf-8", status=400)
+        core.log("web page: main screen tiles moved, modules now %s" % ", ".join(order))
         refresh_page(force=True)
         self.send(json.dumps({"modules": modules.listing()}), "application/json")
 
@@ -359,6 +396,49 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, AttributeError, IOError, OSError) as e:
             return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
         self.send(json.dumps(_highlight_reply()), "application/json")
+
+    def _post_pin(self):
+        """Set, change or remove the PIN: {"pin": "1234"} (4 to 64 characters) or {"pin": ""} (remove it, and with it the lock on Settings).
+        The PIN in use (when there is one) was checked before this: the page sends it in X-Netswitch-Pin."""
+        try:
+            pin = json.loads(self._body(1024).decode("utf-8")).get("pin")
+            if not isinstance(pin, type(u"")):
+                raise ValueError("pin needed")
+            if pin:
+                security.set_pin(pin)
+            else:
+                security.clear_pin()
+                core.save_settings_pin(False)
+        except (ValueError, AttributeError, IOError, OSError) as e:
+            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
+        core.log("web page: the PIN was %s" % ("set" if pin else "removed"))
+        self.send(json.dumps({"pin": security.pin_required()}), "application/json")
+
+    def _post_settings_pin(self):
+        """Appearance > Ask for the PIN: {"value": true | false}. Needs a PIN to exist."""
+        try:
+            want = json.loads(self._body(1024).decode("utf-8")).get("value")
+            if not isinstance(want, bool):
+                raise ValueError("value must be true or false")
+        except (ValueError, AttributeError, IOError, OSError) as e:
+            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
+        if want and not security.pin_required():
+            return self.send("Set a PIN first", "text/plain; charset=utf-8", status=409)
+        core.save_settings_pin(want)
+        self.send(json.dumps({"on": security.settings_locked()}), "application/json")
+
+    def _post_screen(self, path):
+        """Settings > Appearance: /screen = {"values": {"dash_cols", "set_cols"}} (the form widget); /screen/stretch and /screen/scale =
+        {"value": true | false} (the toggles)."""
+        try:
+            data = json.loads(self._body(1024).decode("utf-8"))
+            if path == "/screen":
+                core.save_screen_settings(dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols")))
+            else:
+                core.save_screen_settings({path.rsplit("/", 1)[1]: data.get("value")})
+        except (ValueError, AttributeError, IOError, OSError) as e:
+            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
+        self.send(json.dumps(_screen_reply()), "application/json")
 
     def _post_timezone(self):
         """Settings > About > Time zone: {"values": {"zone": "" | IANA name}} (the form widget's format)."""

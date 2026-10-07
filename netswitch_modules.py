@@ -11,6 +11,8 @@
 #                                                                    POST function returns True once it has answered
 #   api(d, warnings)                add to the /api answer (d is its dict) and to the warning boxes
 #   PROTECTED = ("/path", ...)      POST paths that need the PIN when one is set (they run as root)
+#   OPEN = ("/path", ...)           POST paths of the dashboard (tapping a person in or out) that stay open when Settings is locked with the PIN; every
+#                                   other POST of the module is a setting and needs the PIN then
 #   GET_PREFIX / POST_PREFIX        {"/api/events/": fn}: a path that starts with it (and goes on) and no exact path matched
 #   start()                         called once, when the web service itself starts (start_background()) or when the module is
 #                                   switched on later: for background work that should run without anyone viewing the page
@@ -20,7 +22,7 @@
 #   BOX = {"box": "check-in", "title": "Check-in board", "items": [WIDGET, ...]}
 # Modules that name the same box (case-insensitive) share it: their items come one after the other in picker order and
 # the first module (in that order) that gives a title names it. A WIDGET is {"type": ..., ...} from WIDGETS below.
-# A background module (type "fullscreen" or "part") has a background and nothing else; the top one in picker order is
+# A background module (type "fullscreen" or "part") has a background and, if it needs them, settings boxes (no dashboard boxes); the top one in picker order is
 # drawn and, if it is fullscreen, nothing below it is.
 # Nothing outside this file and the web service knows which modules exist. A module whose folder is missing,
 # that is switched off, or whose Python fails to import is simply absent. Works on Python 3 and 2.7.
@@ -38,14 +40,14 @@ UI_KIT = 2       # the version of the page kit (ui in page/page.js, the kit bloc
 _PAGE_FILES = ("page.css", "page.js")
 # the standard widgets the page can draw from a layout (docs/modules.md, "Layout"); "custom" hands a box to the module's own page.js
 WIDGETS = ("text", "row", "button", "toggle", "swatches", "colourpick", "link", "form", "infobox", "status", "bar", "carousel", "worldmap", "triggers",
-           "picker", "list", "links", "console", "info", "roster", "custom")
+           "picker", "list", "links", "console", "info", "pinset", "roster", "custom")
 CONTROLS = ("select", "choice", "number", "text", "toggle", "colour", "slider", "range")      # what a form field may hold (W.form, control() in page/widgets.js)
 SECTIONS = ("dashboard", "settings")
 BACKGROUND_TYPES = ("fullscreen", "part")
 _LAYOUT_KEYS = SECTIONS + ("background", "data")
 _NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _lock = threading.Lock()
-_state = {"sig": None, "loaded": [], "errors": {}, "get": {}, "post": {}, "api": [], "protected": set(), "background": False, "started": set()}
+_state = {"sig": None, "loaded": [], "errors": {}, "get": {}, "post": {}, "api": [], "protected": set(), "open": set(), "background": False, "started": set()}
 
 
 def _read(path):
@@ -92,7 +94,7 @@ def refresh(force=False):
         sig = signature()
         if sig == _state["sig"] and not force:
             return False
-        loaded, errors, get, post, api, protected = [], {}, {}, {}, [], set()
+        loaded, errors, get, post, api, protected, open_ = [], {}, {}, {}, [], set(), set()
         state = core.modules_state()
         for name in core.module_names():
             if not core.module_enabled(name, state):
@@ -122,9 +124,10 @@ def refresh(force=False):
                 for k, fn in (getattr(web, "POST_PREFIX", None) or {}).items():
                     post["prefix:" + k] = fn
                 protected.update(getattr(web, "PROTECTED", None) or ())
+                open_.update(getattr(web, "OPEN", None) or ())
                 if callable(getattr(web, "api", None)):
                     api.append(web.api)
-        _state.update(sig=sig, loaded=loaded, errors=errors, get=get, post=post, api=api, protected=protected)
+        _state.update(sig=sig, loaded=loaded, errors=errors, get=get, post=post, api=api, protected=protected, open=open_)
         if _state["background"]:
             _start_new()
         return True
@@ -173,12 +176,11 @@ def _check_layout(layout):
         if key not in _LAYOUT_KEYS:
             raise ValueError("unknown key %r (use %s)" % (key, ", ".join(_LAYOUT_KEYS)))
     if "background" in layout:
-        if any(k in layout for k in SECTIONS + ("data",)):
-            raise ValueError("a background module can only have a background, no dashboard or settings boxes")
+        if "dashboard" in layout or "data" in layout:
+            raise ValueError("a background module can have a background and settings boxes, no dashboard boxes or data")
         bg = layout["background"]
         if not isinstance(bg, dict) or bg.get("type") not in BACKGROUND_TYPES:
             raise ValueError("background.type must be one of %s" % ", ".join(BACKGROUND_TYPES))
-        return
     for sec in SECTIONS:
         if sec not in layout:
             continue
@@ -282,7 +284,6 @@ def layout():
             if not covered:
                 out["backgrounds"].append(dict(lay["background"], mod=name))
                 covered = lay["background"]["type"] == "fullscreen"
-            continue
         for sec in SECTIONS:
             for box in lay.get(sec, []):
                 b = _add_box(out, boxes, sec, box["box"].strip().lower(), box.get("title"), name)
@@ -357,6 +358,11 @@ def route(method, path):
     return fn
 
 
+def open_post(path):
+    """True for a POST path that an enabled module marked OPEN: it still works without the PIN while Settings is locked."""
+    return path in _state["open"]
+
+
 def protected(path):
     """True for a POST path that an enabled module marked PROTECTED: it needs the page's own header and, when one is
     set, the PIN (rebooting, updating, joining a Wi-Fi network)."""
@@ -391,7 +397,7 @@ def listing():
         m = core.module_manifest(name)
         if not core.module_visible(name, m) and not shows_something(name):
             continue                       # a module with no box and no background (a plain service) has nothing to move
-        out.append({"name": name, "visible": core.module_visible(name, m), "title": core.module_title(name, m), "description": m.get("description", ""),
+        out.append({"name": name, "group": core.module_group(name), "visible": core.module_visible(name, m), "title": core.module_title(name, m), "description": m.get("description", ""),
                     "note": m.get("note", ""), "enabled": core.module_enabled(name, state),
                     "default": core.module_default_enabled(m), "error": _state["errors"].get(name)})
     return out

@@ -62,7 +62,8 @@ class ManifestTests(PickerBase):
         self.assertIs(got["contacts"]["visible"], True)
         self.assertTrue(got["fixed"]["enabled"])
         core.save_module_order(["fixed", "contacts"])
-        self.assertEqual([m["name"] for m in mods.listing()][:2], ["fixed", "contacts"])     # and it can be placed anywhere in the order
+        settings_only = [m["name"] for m in mods.listing() if m["group"] == 1]
+        self.assertEqual(settings_only[:2], ["fixed", "contacts"])     # and it can be placed anywhere in the order of its group
 
 
 class ShownInThePickerTests(PickerBase):
@@ -92,17 +93,18 @@ class OrderTests(PickerBase):
         self.add("zzz", {"name": "Z", "description": "d", "enabled": True})
         self.add("aaa", {"name": "A", "description": "d", "enabled": True})
         names = core.module_names()
-        self.assertEqual(names[-2:], ["aaa", "zzz"])                     # no hint = 100: after the hinted ones, by name
+        plain = [n for n in names if core.module_group(n) == 1]            # modules with no layout.json are settings-only: group 1
+        self.assertEqual(plain[-2:], ["aaa", "zzz"])                     # no hint = 100: after the hinted ones of the group, by name
         self.assertLess(names.index("checkin"), names.index("contacts"))
 
     def test_the_saved_order_wins_and_new_modules_go_last(self):
         core.save_module_order(["wifi", "contacts", "nosuchmodule"])
-        names = core.module_names()
-        self.assertEqual(names[:2], ["wifi", "contacts"])
-        self.assertNotIn("nosuchmodule", names)
+        settings_only = lambda: [n for n in core.module_names() if core.module_group(n) == 1]          # the order is kept inside each group
+        self.assertEqual(settings_only()[:2], ["wifi", "contacts"])
+        self.assertNotIn("nosuchmodule", core.module_names())
         self.add("later", {"name": "Later", "description": "d", "enabled": True, "order": 1})
-        self.assertEqual(core.module_names()[:2], ["wifi", "contacts"])
-        self.assertEqual(core.module_names()[-1], "later")                # not in the saved list yet: after it
+        self.assertEqual(settings_only()[:2], ["wifi", "contacts"])
+        self.assertEqual(settings_only()[-1], "later")                # not in the saved list yet: after it
 
     def test_a_bad_order_is_refused_and_a_broken_file_is_ignored(self):
         self.assertIsNone(core.save_module_order("contacts"))
@@ -137,7 +139,8 @@ class HttpOrderTests(PickerBase):
 
     def test_post_order_moves_modules_and_the_menu_follows(self):
         got = json.loads(self.post("/modules/order", {"order": ["rebootupdate", "checkin"]}).read())["modules"]
-        self.assertEqual([m["name"] for m in got][:2], ["rebootupdate", "checkin"])
+        names = [m["name"] for m in got]
+        self.assertLess(names.index("checkin"), names.index("rebootupdate"))               # a dashboard module stays above the settings-only ones
         again = json.loads(urlopen(self.base + "/modules", timeout=10).read())["modules"]
         self.assertEqual([m["name"] for m in again], [m["name"] for m in got])
 

@@ -2,7 +2,7 @@
 in a temp dir), with the 25 people of tests/ui/people.csv imported. Switches via environment:
 IN=n (the first n people start checked in, one of them with a status),
 WIFIDEMO=1 (dummy Wi-Fi networks + the setup loop), FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log),
-CLOCK=1 (the clock module on; off by default so the box counts are stable), EMPTY=1 (no people imported), PEOPLE=file.csv (another roster),
+IMGBG=1 (the Background image module on), CLOCK=1 (the clock module on; off by default so the box counts are stable), EMPTY=1 (no people imported), PEOPLE=file.csv (another roster),
 OFF=wifi,... (modules switched off in the module picker; OFF=all = every module the picker can switch, only the always-on ones stay),
 PIN=1234 (a PIN for update / restart / Wi-Fi / import; restart is faked), PORT=n (default 8734)."""
 import sys, os, threading, time, json
@@ -21,6 +21,7 @@ if not os.environ.get("EMPTY"):
         people = [p for g in checkin.snapshot()["groups"] for p in g["people"]]
         for p in people[:n]: checkin.toggle(p["id"])
         if n > 2: checkin.set_status(people[1]["id"], "LATE", "08:15"); checkin.set_status(people[2]["id"], "SICK")
+if os.environ.get("IMGBG"): core.save_module_enabled("imagebg", True)
 if os.environ.get("WIFI"): core.save_module_enabled("wifi", True)
 if os.environ.get("WIFIDEMO"):
     core.save_module_enabled("wifi", True); open(core.WIFI_DEMO, "w").close()

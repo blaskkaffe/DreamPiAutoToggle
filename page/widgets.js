@@ -68,7 +68,7 @@ function renderLayout(){
  (LAY.settings||[]).forEach(function(b){cols.appendChild(box("settings",b))});
  buildPicker(cols);
  AFTER.forEach(function(f){f()});AFTER=[]}
-function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});applyTheme();applyHighlight();hideEmptyBoxes()}
+function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});applyTheme();applyHighlight();hideEmptyBoxes();applyScreen()}
 // ---- highlight (/api "highlight": {box id: why}): those dashboard boxes get the class "hl" (page.css draws it) and the reason as a
 // tooltip; the look is global (/api theme.highlight: "rainbow" or a palette id)
 var hlKey="";
@@ -153,6 +153,15 @@ W.button=function(s,ctx){var pill=s.style==="pill",
  return el};
 // a switch: bound to a value on the server and POSTed ({value: true/false}) on change, or kept only in this page with "local": "name" (S._local.name)
 S._local={};
+// "pinset": the buttons that set, change or remove the PIN (the page asks for the old one first when there is one)
+W.pinset=function(s,ctx){var set=h("button",{type:"button","class":"pill-s",text:"Set PIN"}),rem=h("button",{type:"button","class":"pill-s",text:"Remove"}),
+ el=h("span",{"class":"optrow"},[set,rem]);
+ function send(pin,okText){withPin(function(){post("/pin",{pin:pin},function(r,st){if(r){pinValue=pin;alert(okText);refresh();ctx.saved()}
+  else alert(st===400?"The PIN must be 4 to 64 characters.":"The PIN was not changed.")})})}
+ set.onclick=function(e){e.stopPropagation();var a=prompt("New PIN (4 to 64 characters)");if(a===null)return;if(prompt("Enter the new PIN again")!==a){alert("The two PINs are not the same.");return}send(a,"The PIN is set.")};
+ rem.onclick=function(e){e.stopPropagation();if(confirm("Remove the PIN?"))send("","The PIN is removed.")};
+ function paint(){var has=!!(S.settings_pin&&S.settings_pin.pin);set.textContent=has?"Change PIN":"Set PIN";sh(rem,has)}
+ UPD.push(paint);paint();return el};
 W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.look||"neutral"),"aria-label":s.label||""}),el=box;
  if(s.text){el=h("label",{"class":"sub tgl"},[box,document.createTextNode(s.text)])}
  if(s.colour)colourClass(box,s.colour,s.mod);
@@ -629,10 +638,10 @@ function rosterAvatar(p,cls){var h0=0,i,n=String(p.name||"");for(i=0;i<n.length;
  return '<span class="rp-av '+cls+' c-'+ROSTER_TONES[h0%ROSTER_TONES.length]+'" aria-hidden="true">'+esc(ini.toUpperCase())+'</span>'}
 W.roster=function(s,ctx){
  if(s.mode==="colours")return rosterColours(s,ctx);
- var el=h("div",{"class":"roster"}),chips=h("div",{"class":"rp-chips"}),list=h("div",{"class":"rp-list"}),
+ var el=h("div",{"class":"roster"}),chips=h("div",{"class":"rp-chips"}),msg=h("div"),
   modal=h("div",{"class":"rp-modal",style:"display:none"}),
   sel=rosterLocations(),last="",D=null,cur=null;
- el.appendChild(chips);el.appendChild(list);document.body.appendChild(modal);
+ el.appendChild(chips);el.appendChild(msg);document.body.appendChild(modal);
  function visible(p){if(!sel.length)return !p.restrict;return sel.indexOf(p.building)>=0||(!p.building&&!p.restrict)}
  function person(id){var r=null;((D&&D.groups)||[]).forEach(function(g){g.people.forEach(function(p){if(p.id===id)r=p})});return r}
  function colourCls(p){return p.colour?" c-"+p.colour:""}
@@ -644,18 +653,29 @@ W.roster=function(s,ctx){
    :'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-s">'+esc(p.role||"")+'</span>';
   return '<div class="rp-r '+(p.colour?"pri"+colourCls(p):"out")+'" data-id="'+esc(p.id)+'"><button type="button" class="rp-t" data-act="menu" aria-label="'+esc(p.name)+': '+esc(state)+', open the status menu">'+inner+'</button>'+
    '<button type="button" class="pill-s pri rp-io c-'+(p.in?"green":"red")+'" data-act="toggle" aria-label="'+esc(p.name)+': '+(p.in?"checked in, tap to check out":"checked out, tap to check in")+'">'+(p.in?"INNE":"UTE")+'</button></div>'}
- function paint(){if(!D)return;paintChips();var html="";
-  if(!D.total){setHtml(list,'<div class="sub rp-empty">'+esc(D.text)+'</div>');return}
-  D.groups.forEach(function(g){var ps=g.people.filter(visible);if(!ps.length)return;
-   var n=ps.filter(function(p){return p.in}).length;
-   html+='<div class="rp-box"><div class="rp-gh"><span class="rp-gt">'+esc(g.title)+'</span><span class="sub">'+n+'/'+ps.length+'</span></div>'+ps.map(row).join("")+'</div>'});
-  setHtml(list,html||'<div class="sub rp-empty">Nobody to show for the chosen buildings.</div>')}
+ // Each group is a tile of the main screen (a .dbox beside the board's own), so the page's columns, stretch, scale and rearranging apply to them
+ // like to every other tile. They are made and removed here as the groups change; the board's own tile holds the filter chips.
+ var tiles={},anchor=null,order=[];
+ function slug(t){return String(t).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"x"}
+ function tileFor(g,idx){var id="checkin-"+slug(g.id),t=tiles[id];
+  if(!t){t=h("div",{"class":"dbox rp-tile","data-box":id,"data-mod":s.mod||"checkin"});t._body=h("div");t.appendChild(t._body);tiles[id]=t;
+   t.addEventListener("click",tap);anchor=anchor||el.closest(".dbox");$("dash").insertBefore(t,anchor?anchor.nextSibling:null);
+   dashTiles();var base=anchor&&anchor._ord!==undefined?anchor._ord:0;t._ord=base+(idx+1)/1000}
+  return t}
+ function paint(){if(!D)return;paintChips();var live={},n=0,changed=false;
+  if(D.total)D.groups.forEach(function(g){var ps=g.people.filter(visible);if(!ps.length)return;
+   var k=ps.filter(function(p){return p.in}).length,t=tiles["checkin-"+slug(g.id)],fresh=!t;t=tileFor(g,n);t._ord=(anchor&&anchor._ord!==undefined?anchor._ord:0)+(n+1)/1000;
+   live[t.getAttribute("data-box")]=1;n++;if(fresh)changed=true;
+   setHtml(t._body,'<div class="rp-box"><div class="rp-gh"><span class="rp-gt">'+esc(g.title)+'</span><span class="sub">'+k+'/'+ps.length+'</span></div>'+ps.map(row).join("")+'</div>')});
+  Object.keys(tiles).forEach(function(id){if(!live[id]){var t=tiles[id];if(t.parentNode)t.parentNode.removeChild(t);delete tiles[id];changed=true}});
+  setHtml(msg,!D.total?'<div class="sub rp-empty">'+esc(D.text)+'</div>':(n?'':'<div class="sub rp-empty">Nobody to show for the chosen buildings.</div>'));
+  if(changed&&window.applyScreen)applyScreen(true)}
  chips.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-loc]");if(!b)return;var n=b.getAttribute("data-loc");
   if(!n)sel=[];else{var i=sel.indexOf(n);if(i>=0)sel.splice(i,1);else sel.push(n)}rosterSaveLocations(sel);paint()});
  function take(r){if(r&&r.checkin){S.checkin=D=r.checkin;last="";paint()}}
- list.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-act]");if(!b)return;var r=b.closest(".rp-r"),id=r&&r.getAttribute("data-id");if(!id)return;
+ function tap(e){var b=e.target.closest&&e.target.closest("[data-act]");if(!b)return;var r=b.closest(".rp-r"),id=r&&r.getAttribute("data-id");if(!id)return;
   if(b.getAttribute("data-act")==="menu"){openMenu(id);return}
-  b.disabled=true;post(s.toggle,{id:id},function(r2){b.disabled=false;take(r2)})});
+  b.disabled=true;post(s.toggle,{id:id},function(r2){b.disabled=false;take(r2)})}
  // ---- the status menu: a pop-up in the middle of the screen (about 60 % of its width): who it is, the statuses three in a row, a cross in the corner
  function menuHtml(p){var st=D.statuses||[],who=[p.department,p.building].filter(Boolean).join(" · ");
   return '<div class="rp-sheet" role="dialog" aria-modal="true" aria-label="Status for '+esc(p.name)+'"><button type="button" class="rp-x" data-close="1" title="Close" aria-label="Close">&#10005;</button>'+
@@ -802,8 +822,8 @@ function sortable(box,onDone){
    // The grabbed row itself is never taken out of the document and put back (iOS Safari ends a touch whose element is re-inserted):
    // when it passes a neighbour, the NEIGHBOUR moves to the other side of it.
    function place(){for(var guard=0;guard<30;guard++){
-     var r=row.getBoundingClientRect(),nat=r.top-tx,want=y-grab;
-     tx=want-nat;row.style.transform="translateY("+tx+"px)";
+     var r=row.getBoundingClientRect(),nat=r.top-tx,want=y-grab,f=row.offsetHeight?r.height/row.offsetHeight:1;      // f: the row is drawn f times bigger (Scale content)
+     tx=want-nat;row.style.transform="translateY("+(tx/f)+"px)";
      var c=want+r.height/2,prev=row.previousElementSibling,next=row.nextElementSibling;
      if(hasId(prev)&&c<mid(prev))box.insertBefore(prev,row.nextSibling);
      else if(hasId(next)&&c>mid(next))box.insertBefore(next,row);
@@ -836,20 +856,21 @@ function buildPicker(cols){
  var card=cols.querySelector('[data-box="system"] .card'),
   btn=h("button",{type:"button","class":"pill-s",text:"Edit","aria-haspopup":"dialog"}),list=h("div",{"class":"mlist"}),
   done=h("button",{type:"button","class":"pill-s",text:"Done"}),
-  pop=h("div",{},[h("div",{"class":"t",text:"Modules: tick to switch on or off, drag the handle to move. The top one has priority."}),list,h("div",{"class":"bar end"},[done])]),
+  pop=h("div",{},[h("div",{"class":"t",text:"Modules: tick to switch on or off, drag the handle to move inside its group. The top one has priority."}),list,h("div",{"class":"bar end"},[done])]),
   row=h("div",{"class":"srow edit","data-picker":"modules"},[h("span",{},[document.createTextNode("Modules"),h("span",{"class":"sub",text:"Switch modules on or off and set their priority"})]),btn]);
  if(!card){card=h("div",{"class":"card"});cols.appendChild(h("section",{"class":"sec","data-box":"system"},[h("h2",{text:"System"}),card]))}
  card.insertBefore(row,card.firstChild);card.appendChild(pop);
  var p=ui.popup(pop),mods=[],boxes={};
- function paint(list2){mods=list2;boxes={};list.innerHTML="";
+ function paint(list2){mods=list2;boxes={};list.innerHTML="";var GROUPS=["On the main screen","In Settings only","Backgrounds"],shownGroup=-1;
   mods.forEach(function(m){var cb;
+   if(m.group!==shownGroup){shownGroup=m.group;list.appendChild(h("div",{"class":"sub grp",text:GROUPS[m.group]||""}))}      // a heading is not a row: a module moves inside its group
    if(m.visible===false)cb=h("span",{"class":"sub fixed",text:"Always on"});                     // can be moved, not switched off
    else{cb=h("input",{type:"checkbox","class":"cbox neutral","data-module":m.name,"aria-label":m.title});cb.checked=m.enabled;boxes[m.name]=cb}
    var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+m.title+": drag, or use the up and down arrow keys",html:"&#8942;&#8942;"}),
     left=h("span",{},[document.createTextNode(m.title),h("span",{"class":"sub",html:esc(m.description)+(m.note?"<br>"+esc(m.note):"")+(m.error?'<br><b class="modbad">Could not load: '+esc(m.error)+"</b>":"")})]);
    list.appendChild(h("div",{"class":"srow","data-id":m.name},[grip,left,cb]))});
   sortable(list,function(){})}                                                                       // the order is read from the page when Done is pressed
- function apply(){var order=Array.prototype.map.call(list.children,function(r){return r.getAttribute("data-id")}),
+ function apply(){var order=Array.prototype.map.call(list.children,function(r){return r.getAttribute("data-id")}).filter(Boolean),
    was=mods.map(function(m){return m.name}),changes=[];
   mods.forEach(function(m){var cb=boxes[m.name];if(cb&&cb.checked!==m.enabled)changes.push({name:m.name,enabled:cb.checked})});
   var reorder=order.length&&order.join()!==was.join();

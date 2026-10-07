@@ -114,6 +114,11 @@ def pin_required():
     return bool(core.read_file(core.ADMIN_PIN))
 
 
+def settings_locked():
+    """True when Settings is locked with the PIN: the user turned it on and a PIN is set (without a PIN nothing can be locked)."""
+    return pin_required() and core.settings_pin_on()
+
+
 def set_pin(pin):
     """Store a PIN (called by install.sh --pin). Raises ValueError for a bad one."""
     if not (PIN_MIN <= len(pin) <= PIN_MAX):
@@ -127,10 +132,11 @@ def set_pin(pin):
 
 
 def clear_pin():
-    try:
-        os.remove(core.ADMIN_PIN)
-    except OSError:
-        pass
+    for path in (core.ADMIN_PIN, core.SETTINGS_PIN):         # no PIN, nothing left to lock Settings with
+        try:
+            os.remove(path)
+        except OSError:
+            pass
 
 
 def _hex(raw):

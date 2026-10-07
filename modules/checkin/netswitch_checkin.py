@@ -360,6 +360,7 @@ def api(d, warnings):
     d["checkin"] = snapshot()
 
 
+OPEN = ("/checkin/toggle", "/checkin/status")       # tapping people in and out works while Settings is locked with the PIN
 GET = {"/checkin": _get_board, "/checkin/config": _get_config}
 POST = {"/checkin/toggle": _post_toggle, "/checkin/status": _post_status, "/checkin/all": _post_all,
         "/checkin/config": _post_config, "/checkin/colour": _post_colour}

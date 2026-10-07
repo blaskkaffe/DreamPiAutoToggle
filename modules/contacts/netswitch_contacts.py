@@ -264,6 +264,7 @@ GET = {"/contacts": _get_view, "/contacts.csv": _get_csv}
 GET_PREFIX = {"/contacts/photo/": _get_photo}
 POST = {"/contacts/import": _post_import, "/contacts/active": _post_active, "/contacts/photo": _post_photo}
 PROTECTED = ("/contacts/import", "/contacts/active")
+OPEN = ("/contacts/photo",)          # a photo is set from the status menu on the board
 
 
 if __name__ == "__main__":      # python3 netswitch_contacts.py people.csv [--replace]: the same import from a shell
