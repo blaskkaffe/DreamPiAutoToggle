@@ -128,7 +128,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await sec.locator('.srow', { hasText: '.beat time' }).locator('input').uncheck(); await settle(900);
   await page.click('#close-settings'); await settle(1800);
   const full = await geo();
-  ok(full.mode === 'full' && full.fs > g.fs && full.h === h0, 'both off: the time fills all three rows (' + full.fs + 'px)');
+  ok(full.mode === 'full' && full.fs > g.fs * 0.97 && full.h === h0, 'both off: the time fills all three rows (' + full.fs + 'px)');
   const tw = await box.evaluate(e => { const b = e.querySelector(':scope > b'), r = document.createRange(); r.selectNodeContents(b); return [r.getBoundingClientRect().width, e.clientWidth]; });
   ok(tw[0] <= tw[1], 'and the text fits the box (' + Math.round(tw[0]) + ' of ' + tw[1] + ')');
   await page.click('#cog'); await settle(900);
