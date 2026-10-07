@@ -410,7 +410,7 @@ def colours():
     for t in colour_tokens():
         pick = service("colour:" + t["id"])
         base = ([c for c in out if c["id"] == pick] or [c for c in out if c["id"] == DEFAULT_COLOUR] or out)[0]
-        out.append(dict(base, id=t["id"], name=t["name"], group="token", ui_default=base["ui"], token=True))
+        out.append(dict(base, id=t["id"], name=t["name"], group="token", ui_default=base["ui"], token=True, follows=base["id"]))
     return out
 
 
@@ -579,7 +579,7 @@ def palette_reset(ident=None):
 def palette_version():
     """A short tag of the palette as the page draws it (ids, names, colours): the page asks for the palette again only when it changes."""
     import hashlib
-    text = json.dumps([[c["id"], c["name"], c["ui"], c["ui_l"]] for c in colours()], sort_keys=True)
+    text = json.dumps([[c["id"], c["name"], c["ui"], c["ui_l"], c.get("follows", "")] for c in colours()], sort_keys=True)
     return hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
 

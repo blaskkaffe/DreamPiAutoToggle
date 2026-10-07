@@ -257,10 +257,13 @@ def colour_table():
     return out
 
 
+COLOUR_OWNER = "switcher"      # the module whose colour keys "dcnow" / "dcnet" a group colour may name (the network switcher: the colours the user gave the networks)
+
+
 def network_colour(net):
     """The palette entry of the colour the user gave the network "dcnow" or "dcnet" (the network switcher's colour picks, in the
     base's colours.json; orange and blue without them)."""
-    return core.colour(core.module_colours("switcher").get(net) or {"dcnow": "orange", "dcnet": "blue"}.get(net, core.DEFAULT_COLOUR))
+    return core.colour(core.module_colours(COLOUR_OWNER).get(net) or {"dcnow": "orange", "dcnet": "blue"}.get(net, core.DEFAULT_COLOUR))
 
 
 def _valid_colour(c):
@@ -507,4 +510,4 @@ def dreampi_dot():
     """What the status dot on the page previews: that look as the page draws it, the group's palette colour (not the LED's calibrated
     value) with its effect and speed, or None."""
     look = dreampi_look()
-    return {"colour": look["colour"], "effect": look["effect"], "speed": look["speed"]} if look else None
+    return {"colour": look["colour"], "effect": look["effect"], "speed": look["speed"], "module": COLOUR_OWNER} if look else None

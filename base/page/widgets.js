@@ -23,8 +23,8 @@ function sh(el,show){setStyle(el,"display",show?"":"none")}
 function colourId(ref,mod){if(!ref)return"";var c=S.colours||LAY.colours||{};
  if(ref.indexOf(".")>0){var p=ref.split(".");return realColour((c[p[0]]||{})[p[1]]||"")}
  return realColour((c[mod]||{})[ref]||ref)}
-// "Selected network" is not a colour of its own: it is the colour DCNow! or DCNET has right now, so it follows the switch
-function realColour(id){if(id!=="network")return id;var sw=(S.colours||LAY.colours||{}).switcher||{};return sw[S.network||"dcnow"]||"orange"}
+// A colour token (a colour a module adds, like "Selected network") is not a colour of its own: the palette says which colour it is right now ("follows")
+function realColour(id){var p=colourOfId(id);return p&&p.follows||id}
 // Whether the background of a colour is coloured (the default) or neutral: the "Coloured background" box next to a colour pick
 function tintOf(ref,mod){if(!ref)return true;var p=ref.indexOf(".")>0?ref.split("."):[mod,ref],t=(S.tints||LAY.tints||{})[p[0]]||{};return t[p[1]]!==false}
 // An element with its own colour (a button of the module's colour key): it follows S.colours live and is not repainted with the
@@ -94,7 +94,7 @@ function hideEmptyBoxes(){var bs=document.querySelectorAll("[data-box]"),i,j;
 var themeKey="";
 function applyTheme(){var p={},pk={},k;for(k in (LAY.primary||{}))p[k]=LAY.primary[k];for(k in (S.primary||{}))p[k]=S.primary[k];
  for(k in (LAY.primary_key||{}))pk[k]=LAY.primary_key[k];for(k in (S.primary_key||{}))pk[k]=S.primary_key[k];
- var key=JSON.stringify([p,pk,S.tints||LAY.tints||{},S.network||"",(S.colours||{}).switcher||""]);if(key===themeKey)return;themeKey=key;
+ var key=JSON.stringify([p,pk,S.tints||LAY.tints||{},S.colours||LAY.colours||{},S.palette_v||""]);if(key===themeKey)return;themeKey=key;
  var els=document.querySelectorAll("[data-mod]"),i,root="";
  for(i=0;i<(LAY.modules||[]).length&&!root;i++)root=realColour(p[LAY.modules[i]]||"");
  function paint(el,id){var old=el._pc;if(old===id)return;if(old)el.classList.remove("c-"+old);if(id)el.classList.add("c-"+id);el._pc=id}
@@ -216,7 +216,7 @@ W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.l
 W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx))};
 // ---- the module's own colour choice: a "Colour" button in the chosen colour that opens a pop-up with the palette's colours;
 // the pick is kept for the module (core.set_module_colour)
-// the palette in the server's order, without the ids a pick leaves out ("exclude": the network colours cannot be "Selected network", that would be a circle)
+// the palette in the server's order, without the ids a pick leaves out ("exclude": a key that may only hold real colours cannot be a colour token, that would be a circle)
 function paletteOrder(s){return PAL().filter(function(c){return (s.exclude||[]).indexOf(c.id)<0})}
 function colourOfId(id){var r=null;PAL().forEach(function(p){if(p.id===id)r=p});return r}
 function mixWhite(hex){var n=[1,3,5].map(function(i){var v=parseInt(hex.substr(i,2),16);return Math.round(v+(255-v)*0.45)});return "#"+n.map(function(v){return (v<16?"0":"")+v.toString(16)}).join("")}
@@ -252,7 +252,7 @@ W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri
  function paint(){if(builtPV!==PV)buildGrid();var cur=(((S.colours||{})[s.mod])||{})[s.key]||"",real=realColour(cur);
   if(btn._cc!==real){if(btn._cc)btn.classList.remove("c-"+btn._cc);if(real)btn.classList.add("c-"+real);btn._cc=real;
    btn.setAttribute("aria-label",(s.label||"Colour")+": "+(names[cur]||cur||"not set"))}
-  if(btns.network){var nw=colourOfId(realColour("network"));if(nw)btns.network.style.cssText="--c:"+nw.ui+";--cl:"+nw.ui_l}      // the ball shows the network's colour now
+  for(var tid in btns){var tp=colourOfId(tid);if(tp&&tp.follows){var nw=colourOfId(tp.follows);if(nw)btns[tid].style.cssText="--c:"+nw.ui+";--cl:"+nw.ui_l}}      // a token's ball shows the colour it follows now
   for(var id in btns){var on=id===cur;btns[id].classList.toggle("sel",on);btns[id].setAttribute("aria-pressed",on?"true":"false")}}
  function paintTint(){if(tint)tint.checked=tintOf(s.key,s.mod)}
  UPD.push(paint);UPD.push(paintTint);paint();paintTint();hook("settingsClose",function(){p.close()});return el};
@@ -624,7 +624,7 @@ W.triggers=function(s,ctx){var el=h("div",{"class":"wtrig"}),cfg=null,timer=null
    box.appendChild(h("div",{"class":"fld"},[inp,addI]));box.appendChild(msg)}
   del.onclick=function(){var i=cfg.rows.indexOf(row);ed.p.close();if(i>=0)cfg.rows.splice(i,1);paint();save()};done.onclick=function(){ed.p.close()};
   box.appendChild(h("div",{"class":"bar end"},[del,done]))}
- function lookOf(row){var l=row.look;if(!l)return;var id=colourId(l.colour,"switcher");return id?[id,l.effect,l.speed]:null}
+ function lookOf(row){var l=row.look;if(!l)return;var id=colourId(l.colour,l.module);return id?[id,l.effect,l.speed]:null}
  // an option changed: the row's own look follows at once (the server writes its title and grey line when it has saved)
  function soft(row){var re=rowEls[cfg.rows.indexOf(row)];if(!re)return;var o=row.opts||{};
   if(row.look&&o.colour){row.look={colour:o.colour,effect:o.effect,speed:o.speed};var lk=lookOf(row);if(lk)re.setLook(lk[0],lk[1],lk[2])}}
@@ -715,7 +715,7 @@ function control(spec,F,change){var key=spec.key,el,paint;
  // "colour": the options ([{value,label}], palette ids or the network colours) as balls in the colour they have now; a tap picks
  if(spec.type==="colour"){el=h("span",{"class":"swatches grid",role:"group","aria-label":spec.aria||spec.label||key});var lastk="",bs=[];
   paint=function(){var opts=optionList(spec,F),k=JSON.stringify(opts),name="";
-   if(k!==lastk){lastk=k;el.innerHTML="";bs=opts.map(function(o){var id=colourId(o.value,"switcher"),b=h("button",{type:"button","class":"swatch",title:o.label,"aria-label":o.label,style:"--c:var(--c-"+id+");--cl:var(--c-"+id+"-l)"});
+   if(k!==lastk){lastk=k;el.innerHTML="";bs=opts.map(function(o){var id=colourId(o.value,spec.module),b=h("button",{type:"button","class":"swatch",title:o.label,"aria-label":o.label,style:"--c:var(--c-"+id+");--cl:var(--c-"+id+"-l)"});
     b.onclick=function(e){e.stopPropagation();F.values[key]=o.value;change()};el.appendChild(b);return b})}
    opts.forEach(function(o,i){var on=String(o.value)===String(F.values[key]);bs[i].classList.toggle("sel",on);if(on)name=o.label});
    if(el._labelEl)setText(el._labelEl,(spec.label||"")+": "+name)};

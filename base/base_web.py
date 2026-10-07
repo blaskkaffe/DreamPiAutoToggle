@@ -39,6 +39,13 @@ CERT = os.path.join(core.BASE_DIR, "https.crt")   # self-signed, made by install
 KEY = os.path.join(core.BASE_DIR, "https.key")
 
 
+def palette_json():
+    """The palette as the page needs it: id, name, group, ui, ui_l; a colour token (a colour a module adds, like "Selected network") also says which
+    palette colour it is right now ("follows")."""
+    return [dict({"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"], "ui_l": c["ui_l"]}, **({"follows": c["follows"]} if c.get("follows") else {}))
+            for c in core.colours()]
+
+
 def api_state(have_palette=""):
     """The /api answer. The base only has the page-wide parts (PIN flag, warnings, time, the modules' colours); everything
     else is added by the enabled modules' api() hooks (the network switcher adds the network and the status rows)."""
@@ -55,7 +62,7 @@ def api_state(have_palette=""):
     version = core.palette_version()
     d["palette_v"] = version
     if have_palette != version:             # the palette (and its CSS) only when the page does not have this version: it changes when the user edits it
-        d["palette"] = [{"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"], "ui_l": c["ui_l"]} for c in core.colours()]
+        d["palette"] = palette_json()
         d["palette_css"] = core.colours_css()
     return d
 
@@ -114,7 +121,7 @@ def _layout_script():
     """window.LAYOUT: the boxes, data sources, colours and backgrounds of the enabled modules (base_modules.layout()),
     plus the palette. Put in a <script> tag, so a "</" inside a text is escaped."""
     lay = modules.layout()
-    lay["palette"] = [{"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"], "ui_l": c["ui_l"]} for c in core.colours()]
+    lay["palette"] = palette_json()
     return "window.LAYOUT=" + json.dumps(lay).replace("</", "<\\/") + ";"
 
 

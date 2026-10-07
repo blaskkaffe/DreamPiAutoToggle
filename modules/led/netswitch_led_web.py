@@ -71,10 +71,10 @@ def _rows_reply():
         if count > 1 and g["leds"]:
             sub.append("LED %d" % g["leds"][0] if g["leds"][0] == g["leds"][1] else "LEDs %d-%d" % tuple(g["leds"]))
         rows.append({"id": g["id"], "title": "%s, %s" % (names.get(g["colour"], g["colour"]), _effect_text(g)), "sub": u" \u00b7 ".join(sub),
-                     "look": {"colour": g["colour"], "effect": g["effect"], "speed": g["speed"]},
+                     "look": {"colour": g["colour"], "effect": g["effect"], "speed": g["speed"], "module": ledconfig.COLOUR_OWNER},
                      "items": [{"value": k, "label": known.get(k) or k} for k in g["messages"]],
                      "opts": {"colour": g["colour"], "effect": g["effect"], "speed": g["speed"], "brightness": g["brightness"], "leds": g["leds"]}})
-    options = [{"key": "colour", "type": "colour", "label": "Colour", "options": "colours"},
+    options = [{"key": "colour", "type": "colour", "label": "Colour", "options": "colours", "module": ledconfig.COLOUR_OWNER},
                {"key": "effect", "type": "choice", "label": "Animation", "options": "effects"},
                {"key": "speed", "type": "choice", "label": "Speed", "options": "speeds", "disabled_if": {"key": "effect", "value": "solid"}},
                {"key": "brightness", "type": "slider", "label": "Level", "scale": "log100", "default": cfg["max_brightness"],
