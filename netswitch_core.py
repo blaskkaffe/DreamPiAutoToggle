@@ -8,8 +8,8 @@ import sys
 import time
 
 BASE_DIR = "/opt/dreampi-netswitch"
-PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the Colour palette module's list: {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui", "led"}]}
-PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb", "led": "#rrggbb"}}: palette colours the user changed (on screen, on the LED)
+PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the Colour palette module's list: {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui"}]}
+PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb"}}: palette colours the user changed
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
 MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"checkin": {"checkin": "green", ...}}: the global-palette colours each module uses
 MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["switcher", "numbers", ...]: the order set in the module picker (top = first, wins)
@@ -204,26 +204,25 @@ def save_module_enabled(name, on):
 # defined only here. A module never writes a colour of its own; it names one from the palette by its id ("orange",
 # "bright-blue" ...), either in module.json  "colours": {"checkin": "green", ...}  (the user can change these in the
 # module's own settings, see module_colour()) or as its  "primary"  colour, the one used on its borders and buttons.
-# id, name, hue group, page colour, its lighter variant (borders, text), LED colour (the LED's own tuning: a screen
-# colour looks different lit on a strip of LEDs; no module uses it at the moment).
+# id, name, hue group, page colour, its lighter variant (borders, text).
 # "global" is not a fixed colour: Global main, one colour the user picks in Appearance, for boxes that should share it.
 PALETTE = (
-    ("global", "Global main", "global", "#6f7d99", "#b0b7c7", "#8090ff"),
-    ("red", "Red", "red", "#d9363e", "#ef8a8f", "#ff0000"),
-    ("orange", "Orange", "orange", "#e8761c", "#f6b27a", "#ff8c00"),
-    ("yellow", "Yellow", "yellow", "#d9a900", "#f0d36a", "#ffd000"),
-    ("green", "Green", "green", "#2fa84f", "#8ed9a4", "#00ff00"),
-    ("cyan", "Cyan", "cyan", "#1fb5c9", "#7fdbe6", "#00c8ff"),
-    ("blue", "Blue", "blue", "#1c6fe8", "#80b1f6", "#0046ff"),
-    ("purple", "Purple", "purple", "#8a4fd6", "#bf9ae8", "#aa00ff"),
-    ("teal", "Teal", "cyan", "#17a398", "#7fd9d0", "#00d0a0"),
-    ("white", "White", "white", "#b8bec9", "#e6e9ee", "#ffffff"),
-    ("bright-red", "Bright red", "red", "#ff5a5f", "#ffa6a9", "#ff5050"),
-    ("bright-green", "Bright green", "green", "#4cd964", "#a6efb6", "#50ff70"),
-    ("bright-cyan", "Bright cyan", "cyan", "#3de0f5", "#9aeefa", "#70e0ff"),
-    ("bright-blue", "Bright blue", "blue", "#4a90ff", "#9fc4ff", "#5080ff"),
-    ("bright-purple", "Bright purple", "purple", "#b070ff", "#d3b0ff", "#cc66ff"),
-    ("bright-pink", "Bright pink", "pink", "#ff6ab8", "#ffaad6", "#ff70b0"),
+    ("global", "Global main", "global", "#6f7d99", "#b0b7c7"),
+    ("red", "Red", "red", "#d9363e", "#ef8a8f"),
+    ("orange", "Orange", "orange", "#e8761c", "#f6b27a"),
+    ("yellow", "Yellow", "yellow", "#d9a900", "#f0d36a"),
+    ("green", "Green", "green", "#2fa84f", "#8ed9a4"),
+    ("cyan", "Cyan", "cyan", "#1fb5c9", "#7fdbe6"),
+    ("blue", "Blue", "blue", "#1c6fe8", "#80b1f6"),
+    ("purple", "Purple", "purple", "#8a4fd6", "#bf9ae8"),
+    ("teal", "Teal", "cyan", "#17a398", "#7fd9d0"),
+    ("white", "White", "white", "#b8bec9", "#e6e9ee"),
+    ("bright-red", "Bright red", "red", "#ff5a5f", "#ffa6a9"),
+    ("bright-green", "Bright green", "green", "#4cd964", "#a6efb6"),
+    ("bright-cyan", "Bright cyan", "cyan", "#3de0f5", "#9aeefa"),
+    ("bright-blue", "Bright blue", "blue", "#4a90ff", "#9fc4ff"),
+    ("bright-purple", "Bright purple", "purple", "#b070ff", "#d3b0ff"),
+    ("bright-pink", "Bright pink", "pink", "#ff6ab8", "#ffaad6"),
 )
 PALETTE_IDS = tuple(c[0] for c in PALETTE)       # the ones the add-on ships; palette_ids() is the list in use (the Colour palette module can delete and add colours)
 FIXED_COLOURS = ("global", "orange")   # never deleted: "Global main" is not a colour of its own, orange is the one everything falls back to
@@ -250,7 +249,7 @@ MAX_CUSTOM_COLOURS = 40
 
 def palette_layout():
     """The Colour palette module's list over the shipped palette, made safe: {"order", "deleted", "names", "custom"}. Empty while that module is
-    off (the shipped palette is then in use, with the changes of the LED colour editor in palette.json)."""
+    off (the shipped palette is then in use, with the changes of the Global main colour picker in palette.json)."""
     out = {"order": [], "deleted": [], "names": {}, "custom": []}
     if not module_enabled("palette"):
         return out
@@ -266,8 +265,7 @@ def palette_layout():
         if (isinstance(c, dict) and isinstance(c.get("id"), _STR) and _CUSTOM_ID.match(c["id"]) and c["id"] not in seen and isinstance(c.get("ui"), _STR)
                 and _HEX.match(c["ui"]) and len(out["custom"]) < MAX_CUSTOM_COLOURS):
             seen.add(c["id"])
-            led = c.get("led") if isinstance(c.get("led"), _STR) and _HEX.match(c.get("led")) else c["ui"]
-            out["custom"].append({"id": c["id"], "name": str(c.get("name") or c["id"])[:24], "ui": c["ui"].lower(), "led": led.lower()})
+            out["custom"].append({"id": c["id"], "name": str(c.get("name") or c["id"])[:24], "ui": c["ui"].lower()})
     if isinstance(data.get("deleted"), list):
         out["deleted"] = [i for i in data["deleted"] if i in PALETTE_IDS and i not in FIXED_COLOURS]
     if isinstance(data.get("names"), dict):
@@ -281,7 +279,7 @@ def _palette_entries():
     """The palette in use as tuples like PALETTE: the shipped colours that were not deleted and the custom ones, renamed and in the user's order."""
     lay = palette_layout()
     entries = [c for c in PALETTE if c[0] not in lay["deleted"]]
-    entries += [(c["id"], c["name"], "custom", c["ui"], lighter(c["ui"]), c["led"]) for c in lay["custom"]]
+    entries += [(c["id"], c["name"], "custom", c["ui"], lighter(c["ui"])) for c in lay["custom"]]
     entries = [(c[0], lay["names"].get(c[0], c[1])) + tuple(c[2:]) for c in entries]
     rank = dict((i, n) for n, i in enumerate(lay["order"]))
     return sorted(entries, key=lambda c: rank.get(c[0], len(rank)))          # a stable sort: what the order does not name keeps its place at the end
@@ -293,7 +291,7 @@ def palette_ids():
 
 
 def palette_overrides():
-    """{id: {"ui": "#rrggbb", "led": "#rrggbb"}}: what the user changed in the palette editor (only valid entries)."""
+    """{id: {"ui": "#rrggbb"}}: what the user changed in the palette editor (only valid entries)."""
     try:
         with open(PALETTE_FILE) as f:
             data = json.load(f)
@@ -302,32 +300,32 @@ def palette_overrides():
     out = {}
     for ident, v in (data.items() if isinstance(data, dict) else []):
         if ident in palette_ids() and isinstance(v, dict):
-            keep = dict((k, str(v[k]).lower()) for k in ("ui", "led") if isinstance(v.get(k), _STR) and _HEX.match(v[k]))
+            keep = dict((k, str(v[k]).lower()) for k in ("ui",) if isinstance(v.get(k), _STR) and _HEX.match(v[k]))
             if keep:
                 out[ident] = keep
     return out
 
 
 def colours():
-    """The palette as dicts: id, name, group, ui, ui_l, led, and the defaults (ui_default, led_default) as the add-on ships them."""
+    """The palette as dicts: id, name, group, ui, ui_l, and the default colour (ui_default) as the add-on ships it."""
     over, out = palette_overrides(), []
     for c in _palette_entries():
         o = over.get(c[0], {})
         ui = o.get("ui", c[3])
         out.append({"id": c[0], "name": c[1], "group": c[2], "ui": ui, "ui_l": lighter(ui) if "ui" in o else c[4],
-                    "led": o.get("led", c[5]), "ui_default": c[3], "led_default": c[5]})
+                    "ui_default": c[3]})
     return out
 
 
-def set_palette_colour(ident, ui=None, led=None):
-    """Change a palette colour on screen (ui) and / or on the LED (led), "#rrggbb". A value equal to the default is not kept.
+def set_palette_colour(ident, ui=None):
+    """Change a palette colour (ui), "#rrggbb". A value equal to the default is not kept.
     Returns False for an unknown id or a value that is not a colour."""
-    if ident not in palette_ids() or any(v is not None and not (isinstance(v, _STR) and _HEX.match(v)) for v in (ui, led)):
+    if ident not in palette_ids() or any(v is not None and not (isinstance(v, _STR) and _HEX.match(v)) for v in (ui,)):
         return False
     base = [c for c in _palette_entries() if c[0] == ident][0]
     over = palette_overrides()
     entry = over.get(ident, {})
-    for key, value, default in (("ui", ui, base[3]), ("led", led, base[5])):
+    for key, value, default in (("ui", ui, base[3]),):
         if value is None:
             continue
         if value.lower() == default.lower():
@@ -380,9 +378,9 @@ def _write_layout(data):
     os.rename(tmp, PALETTE_CUSTOM)
 
 
-def palette_add(name, ui, led=None):
+def palette_add(name, ui):
     """A new colour at the end of the palette. Returns its id, or None for a bad colour or when there are too many."""
-    if not (isinstance(ui, _STR) and _HEX.match(ui)) or (led is not None and not (isinstance(led, _STR) and _HEX.match(led))):
+    if not (isinstance(ui, _STR) and _HEX.match(ui)):
         return None
     data = _raw_layout()
     if len(data["custom"]) >= MAX_CUSTOM_COLOURS:
@@ -395,13 +393,13 @@ def palette_add(name, ui, led=None):
     while ident in taken or not _CUSTOM_ID.match(ident):
         n += 1
         ident = "%s-%d" % (base, n)
-    data["custom"].append({"id": ident, "name": name, "ui": ui.lower(), "led": (led or ui).lower()})
+    data["custom"].append({"id": ident, "name": name, "ui": ui.lower()})
     _write_layout(data)
     return ident
 
 
-def palette_edit(ident, name=None, ui=None, led=None):
-    """Rename a colour and / or change its screen / LED colour. "Selected network" cannot change colour, only be renamed. False when it does not exist."""
+def palette_edit(ident, name=None, ui=None):
+    """Rename a colour and / or change its colour. False when it does not exist."""
     if ident not in palette_ids():
         return False
     data = _raw_layout()
@@ -414,22 +412,21 @@ def palette_edit(ident, name=None, ui=None, led=None):
             else:
                 data["names"][ident] = name
             _write_layout(data)
-    if ui is not None or led is not None:
+    if ui is not None:
         if custom:
-            for key, value in (("ui", ui), ("led", led)):
+            for key, value in (("ui", ui),):
                 if value is not None:
                     if not (isinstance(value, _STR) and _HEX.match(value)):
                         return False
                     custom[0][key] = value.lower()
             _write_layout(data)
-        elif not set_palette_colour(ident, ui, led):
+        elif not set_palette_colour(ident, ui):
             return False
     return True
 
 
 def palette_delete(ident):
-    """Take a colour out of the palette. What used it falls back (a module's pick to its default, a highlight to the rainbow, an LED row to
-    orange). False for one that cannot be deleted (FIXED_COLOURS) or does not exist."""
+    """Take a colour out of the palette. What used it falls back (a module's pick to its default, a highlight to the rainbow). False for one that cannot be deleted (FIXED_COLOURS) or does not exist."""
     if ident in FIXED_COLOURS or ident not in palette_ids():
         return False
     data = _raw_layout()
@@ -492,7 +489,7 @@ def palette_reset(ident=None):
 def palette_version():
     """A short tag of the palette as the page draws it (ids, names, colours): the page asks for the palette again only when it changes."""
     import hashlib
-    text = json.dumps([[c["id"], c["name"], c["ui"], c["ui_l"], c["led"]] for c in colours()], sort_keys=True)
+    text = json.dumps([[c["id"], c["name"], c["ui"], c["ui_l"]] for c in colours()], sort_keys=True)
     return hashlib.md5(text.encode("utf-8")).hexdigest()[:10]
 
 

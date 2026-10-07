@@ -220,7 +220,7 @@ W.swatches=function(s,ctx){var btn=h("button",{type:"button","class":"pill-s pri
    b.onclick=function(e){e.stopPropagation();post("/colour",{module:s.mod,key:s.key,colour:c.id},function(r){if(r){p.close();refresh();ctx.saved()}})};grid.appendChild(b)})}
  buildGrid();
  btn.onclick=function(e){p.toggle(btn,e)};
- function paint(){if(builtPV!==PV)buildGrid();var cur=(((S.colours||{})[s.mod])||{})[s.key]||"",real=realColour(cur);
+ function paint(){if(builtPV!==PV)buildGrid();var cur=(((S.colours||{})[s.mod])||{})[s.key]||"",real=cur;
   if(btn._cc!==real){if(btn._cc)btn.classList.remove("c-"+btn._cc);if(real)btn.classList.add("c-"+real);btn._cc=real;
    btn.setAttribute("aria-label",(s.label||"Colour")+": "+(names[cur]||cur||"not set"))}
   for(var id in btns){var on=id===cur;btns[id].classList.toggle("sel",on);btns[id].setAttribute("aria-pressed",on?"true":"false")}}

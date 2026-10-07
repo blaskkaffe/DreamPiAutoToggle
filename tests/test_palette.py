@@ -25,10 +25,10 @@ class PaletteCore(unittest.TestCase):
         self.assertEqual(core.palette_ids(), core.PALETTE_IDS)
 
     def test_add_edit_and_use_a_custom_colour(self):
-        ident = core.palette_add("Hot  Pink!", "#FF00AA", "#ff0099")
+        ident = core.palette_add("Hot  Pink!", "#FF00AA")
         self.assertEqual(ident, "hot-pink")
         c = core.colour("hot-pink")
-        self.assertEqual((c["name"], c["ui"], c["led"], c["group"]), ("Hot Pink!", "#ff00aa", "#ff0099", "custom"))
+        self.assertEqual((c["name"], c["ui"], c["group"]), ("Hot Pink!", "#ff00aa", "custom"))
         self.assertEqual(self.ids()[-1], "hot-pink")
         self.assertEqual(core.palette_add("Hot Pink", "#112233"), "hot-pink-2")                 # the same name again: another id
         self.assertEqual(core.palette_add("1 2 3", "#112233"), "colour-1-2-3")                  # an id starts with a letter
@@ -40,9 +40,9 @@ class PaletteCore(unittest.TestCase):
         self.assertIn("--c-hot-pink:#aa0000", core.colours_css())
 
     def test_edit_a_shipped_colour(self):
-        self.assertTrue(core.palette_edit("red", name="Cherry", ui="#c00000", led="#ff1010"))
+        self.assertTrue(core.palette_edit("red", name="Cherry", ui="#c00000"))
         c = core.colour("red")
-        self.assertEqual((c["name"], c["ui"], c["led"]), ("Cherry", "#c00000", "#ff1010"))
+        self.assertEqual((c["name"], c["ui"]), ("Cherry", "#c00000"))
         self.assertTrue(core.palette_edit("global", name="Main"))                               # Global main can be renamed and recoloured
         self.assertFalse(core.palette_edit("nope", name="x"))
         self.assertFalse(core.palette_edit("red", ui="not a colour"))
@@ -135,7 +135,7 @@ class PaletteHttp(unittest.TestCase):
         st, got = self.call("POST", "/palette/add", {"name": "Lime", "ui": "#99ff00"})
         self.assertEqual((st, got["id"]), (200, "lime"))
         self.assertEqual(got["colours"][-1]["custom"], True)
-        self.call("POST", "/palette/edit", {"id": "lime", "name": "Lime time", "led": "#88ff00"})
+        self.call("POST", "/palette/edit", {"id": "lime", "name": "Lime time", "ui": "#88ff00"})
         self.call("POST", "/palette/edit", {"id": "red", "ui": "#c00000"})
         st, got = self.call("POST", "/palette/order", {"order": ["lime", "red"]})
         self.assertEqual([c["id"] for c in got["colours"]][:2], ["lime", "red"])

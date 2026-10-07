@@ -1,8 +1,8 @@
-# DreamPi Netswitch add-on - OPTIONAL "Colour palette" module, web side: the editor of the palette every colour pick, box and LED row draws from.
-#   GET  /palette/list     {"colours": [{"id", "name", "ui", "ui_l", "led", "ui_default", "led_default", "fixed", "custom", "changed"}, ...]} in the palette's order
-#   POST /palette/edit     {"id", "name"?, "ui"?, "led"?}   rename a colour and / or change its colour on screen / on the LED ("#rrggbb")
-#   POST /palette/add      {"name", "ui", "led"?}           a new colour at the end (answers with its id too)
-#   POST /palette/delete   {"id"}                           (not Global main, Selected network or orange; what used it falls back to its default)
+# OPTIONAL "Colour palette" module, web side: the editor of the palette every colour pick and box draws from.
+#   GET  /palette/list     {"colours": [{"id", "name", "ui", "ui_l", "ui_default", "fixed", "custom", "changed"}, ...]} in the palette's order
+#   POST /palette/edit     {"id", "name"?, "ui"?}           rename a colour and / or change its colour ("#rrggbb")
+#   POST /palette/add      {"name", "ui"}                   a new colour at the end (answers with its id too)
+#   POST /palette/delete   {"id"}                           (not Global main or orange; what used it falls back to its default)
 #   POST /palette/order    {"order": [ids]}
 #   POST /palette/reset    {} = the palette the add-on ships (all colours, names, order and changes), or {"id"} = one shipped colour
 # The logic is the base's (core.palette_*); the list is kept in palette_custom.json (core.PALETTE_CUSTOM) and only counts while this module is on. Every answer is the
@@ -17,9 +17,9 @@ def _list():
     for c in core.colours():
         shipped = [s for s in core.PALETTE if s[0] == c["id"]]
         name_default = shipped[0][1] if shipped else c["name"]
-        out.append({"id": c["id"], "name": c["name"], "ui": c["ui"], "ui_l": c["ui_l"], "led": c["led"], "ui_default": c["ui_default"], "led_default": c["led_default"],
+        out.append({"id": c["id"], "name": c["name"], "ui": c["ui"], "ui_l": c["ui_l"], "ui_default": c["ui_default"],
                     "fixed": c["id"] in core.FIXED_COLOURS, "custom": not shipped,
-                    "changed": bool(shipped) and (c["ui"] != c["ui_default"] or c["led"] != c["led_default"] or c["name"] != name_default)})
+                    "changed": bool(shipped) and (c["ui"] != c["ui_default"] or c["name"] != name_default)})
     return out
 
 
@@ -49,14 +49,14 @@ def _bad(h, text):
 
 def _post_edit(h):
     d = _body(h)
-    if not core.palette_edit(d.get("id"), d.get("name"), d.get("ui"), d.get("led")):
+    if not core.palette_edit(d.get("id"), d.get("name"), d.get("ui")):
         return _bad(h, "Not a colour of the palette, or not #rrggbb")
     return _reply(h)
 
 
 def _post_add(h):
     d = _body(h)
-    ident = core.palette_add(d.get("name"), d.get("ui"), d.get("led"))
+    ident = core.palette_add(d.get("name"), d.get("ui"))
     if ident is None:
         return _bad(h, "Not a colour (#rrggbb), or the palette is full")
     return _reply(h, {"id": ident})
