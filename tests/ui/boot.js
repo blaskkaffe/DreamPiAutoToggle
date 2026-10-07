@@ -33,7 +33,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(order.join() === c0.flat().join(), 'read down the columns the boxes are in the modules\' order');
   const hs = await page.evaluate(() => Array.from(document.querySelectorAll('#set-boxes > .col')).map(c => Math.round(c.getBoundingClientRect().height)));
   ok(Math.max(...hs) < Math.min(...hs) * 2.2, 'the columns are about as tall as each other (' + hs.join(', ') + ')');
-  await page.locator('[data-box="check-in"] .srow', { hasText: 'Group people by' }).locator('button').click(); await settle(500);   // content changes
+  await page.locator('[data-box="check-in"] .srow', { hasText: 'Display roles' }).locator('button', { hasText: 'Edit' }).click(); await settle(500);   // content changes
   await page.keyboard.press('Escape'); await settle(300);
   ok(JSON.stringify(await cols()) === JSON.stringify(c0), 'a box that grows stays in its column');
   await page.click('#close-settings'); await settle(300); await page.click('#cog'); await settle(1200);

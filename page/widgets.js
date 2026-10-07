@@ -733,7 +733,9 @@ W.roster=function(s,ctx){
   fillCarousels();
   var c=capacity();if(c!==usedCap&&!again){usedCap=c;again=true;try{paint()}finally{again=false}}}
  // a carousel needs enough copies of its text to fill a wide row (stretched boxes): half of the track is at least as wide as the row, the track moves by half
- function fillCarousels(){Array.prototype.forEach.call(document.querySelectorAll("#dash .rp-mq"),function(mq){var trk=mq.querySelector(".rp-trk");if(!trk||!trk.firstChild)return;
+ var ro=null,raf=0;
+ function fillCarousels(){Array.prototype.forEach.call(document.querySelectorAll("#dash .rp-mq"),function(mq){if(window.ResizeObserver){if(!ro)ro=new ResizeObserver(function(){if(!raf)raf=requestAnimationFrame(function(){raf=0;fillCarousels()})});ro.observe(mq)}
+  var trk=mq.querySelector(".rp-trk");if(!trk||!trk.firstChild)return;
   var one=trk.firstChild.getBoundingClientRect().width,w=mq.getBoundingClientRect().width;if(!one||!w)return;
   var zoom=one/(trk.firstChild.offsetWidth||one);var k=Math.max(1,Math.ceil(w/one)),have=trk.children.length/2;
   if(have!==k){var t=trk.firstChild.textContent;trk.innerHTML="";for(var i=0;i<2*k;i++){var sp=document.createElement("span");sp.textContent=t;trk.appendChild(sp)}}
