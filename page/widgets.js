@@ -668,12 +668,15 @@ W.roster=function(s,ctx){
   var rh=r.getBoundingClientRect().height,avail=window.innerHeight-(dash.getBoundingClientRect().top+(window.pageYOffset||0))-24;
   return rh>0?Math.max(3,Math.floor((avail-gh.getBoundingClientRect().height-14)/rh)):0}
  function parts(ps){if(!usedCap||ps.length<=usedCap)return [ps];var n=Math.ceil(ps.length/usedCap),per=Math.ceil(ps.length/n),out=[];for(var i=0;i<ps.length;i+=per)out.push(ps.slice(i,i+per));return out}
- function paint(){if(!D)return;paintChips();var live={},n=0,changed=false,base=function(){return anchor&&anchor._ord!==undefined?anchor._ord:0};
+ function paint(){if(!D)return;paintChips();var live={},n=0,changed=false,seq=[],base=function(){return anchor&&anchor._ord!==undefined?anchor._ord:0};
   if(D.total)D.groups.forEach(function(g){var ps=g.people.filter(visible);if(!ps.length)return;
    var chunks=parts(ps);chunks.forEach(function(cp,pi){var id="checkin-"+slug(g.id)+(pi?"-p"+(pi+1):""),fresh=!tiles[id],t=tileFor(id,g.id),k=cp.filter(function(p){return p.in}).length;
-    t._ord=base()+(n+1)/1000;live[id]=1;n++;if(fresh)changed=true;
+    t._want=base()+(n+1)/1000;live[id]=1;n++;if(fresh)changed=true;seq.push(t);
     setHtml(t._body,'<div class="rp-box"><div class="rp-gh"><span class="rp-gt">'+esc(g.title)+(chunks.length>1?' ('+(pi+1)+'/'+chunks.length+')':'')+'</span><span class="sub">'+k+'/'+cp.length+'</span></div>'+cp.map(row).join("")+'</div>')})});
   Object.keys(tiles).forEach(function(id){if(!live[id]){var t=tiles[id];if(t.parentNode)t.parentNode.removeChild(t);delete tiles[id];changed=true}});
+  // the tiles keep the places they have on this screen (the places are only swapped about to follow the host's order); new ones go after the board's own tile
+  if(changed){seq.forEach(function(t){t._ord=t._want})}
+  else{var ords=seq.map(function(t){return t._ord}).sort(function(x,y){return x-y});seq.forEach(function(t,i){t._ord=ords[i]})}
   setHtml(msg,!D.total?'<div class="sub rp-empty">'+esc(D.text)+'</div>':(n?'':'<div class="sub rp-empty">Nobody to show for the chosen buildings.</div>'));
   if(changed&&window.applyScreen)applyScreen(true);
   var c=capacity();if(c!==usedCap&&!again){usedCap=c;again=true;try{paint()}finally{again=false}}}
