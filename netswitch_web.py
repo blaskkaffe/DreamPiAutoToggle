@@ -342,7 +342,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_highlight()
         if path == "/timezone":
             return self._post_timezone()
-        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/drag"):
+        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/fit", "/screen/drag"):
             return self._post_screen(path)
         if path == "/palette":
             return self._post_palette()

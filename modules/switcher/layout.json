@@ -127,6 +127,12 @@
     },
     {
      "type": "row",
+     "title": "Fit to screen",
+     "sub": "The main screen is made as big as it can be without scrolling, so there is no empty space under it (the columns fill the width; neither Stretch nor scaling is needed)",
+     "control": {"type": "toggle", "bind": "@screen.fit", "post": "/screen/fit", "label": "Fit to screen"}
+    },
+    {
+     "type": "row",
      "title": "Rearrange the main screen",
      "sub": "A handle on each tile lets you drag it to another place; the modules take that order (the same as dragging them in Modules)",
      "control": {"type": "toggle", "bind": "@screen.drag", "post": "/screen/drag", "label": "Rearrange the main screen"}

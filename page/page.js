@@ -107,7 +107,7 @@ window.addEventListener("resize",function(){applyScreen();if($("settings").class
 // ---- the screen layout (Settings > Appearance; S.screen from /api): how many columns the dashboard and Settings use on a wide screen and
 // whether they stretch. A column is about COLW px wide; there are as many as fit, up to the setting. Stretch: the columns share the whole width
 // (the boxes are wider). Scale content: a stretched box is drawn bigger (CSS zoom) in step with its width, so it is taller too.
-var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,theme:"dark"},COLW=428,SGAP=20,scrKey="";
+var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,fit:false,theme:"dark"},COLW=428,SGAP=20,scrKey="";
 function colsFor(max,W){return Math.max(1,Math.min(max,Math.floor((W+SGAP)/(COLW+SGAP))))}
 function scrZoom(n,W){return SCR.stretch&&SCR.scale?Math.max(1,((W-SGAP*(n-1))/n)/COLW):1}
 // The dashboard's boxes in dn columns: each box goes to the column that is shortest so far, in the order of the layout (so the first boxes are at
@@ -177,12 +177,24 @@ function applyLook(){var pref=SCR.theme||"dark",d=document.documentElement,want=
  if(d.getAttribute("data-pref")!==pref)d.setAttribute("data-pref",pref);if(d.getAttribute("data-theme")!==want)d.setAttribute("data-theme",want);
  var m=document.querySelector('meta[name=theme-color]'),c=getComputedStyle(document.body).backgroundColor;if(m&&c&&c.indexOf("rgba(0, 0, 0, 0)")!==0)m.setAttribute("content",c)}
 if(themeMedia&&themeMedia.addEventListener)themeMedia.addEventListener("change",function(){applyLook()});
+// Fit to screen: the main screen is drawn as big as it can be without scrolling, so there is no empty space under it. The columns fill the width
+// (as with Stretch boxes) and the zoom is the biggest one (found by trying, ten steps) at which the bottom of the page is still on the screen; never
+// smaller than 1 (a screen that is too small for it scrolls as usual) and never so big that a column is narrower than 280 px of content.
+var fitState={key:"",z:1};
+function pageBottom(){return $("dash").getBoundingClientRect().bottom+window.scrollY+(parseFloat(getComputedStyle(document.body).marginBottom)||0)}
+function fitZoom(dn,W){var dash=$("dash"),vh=window.innerHeight,key=[W,vh,dn,Math.round(pageBottom())].join("/");
+ if(key===fitState.key)return fitState.z;
+ function put(z){dash.style.setProperty("--z",z)}
+ var lo=1,hi=Math.min(3.5,Math.max(1,((W-SGAP*(dn-1))/dn)/280)),i;put(1);
+ if(pageBottom()<=vh)for(i=0;i<10;i++){var mid=(lo+hi)/2;put(mid);if(pageBottom()<=vh)lo=mid;else hi=mid}
+ put(lo);fitState={key:[W,vh,dn,Math.round(pageBottom())].join("/"),z:lo};return lo}
 function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;applyLook();
- var vw=document.documentElement.clientWidth,pad=SCR.stretch&&vw>=900?24:16,W=vw-2*pad,dn=colsFor(SCR.dash_cols,W),dz=scrZoom(dn,W),
+ var vw=document.documentElement.clientWidth,wide=(SCR.stretch||SCR.fit),pad=wide&&vw>=900?24:16,W=vw-2*pad,dn=colsFor(SCR.dash_cols,W),dz=scrZoom(dn,W),
   sn=colsFor(SCR.set_cols,W),key=[dn,dz,sn,pad,SCR.stretch,SCR.set_cols].join("/");
  var dash=$("dash"),b=document.body,inn=document.querySelector("#settings .in");
- b.style.maxWidth=SCR.stretch?"none":(dn*COLW+(dn-1)*SGAP+2*pad)+"px";b.style.paddingLeft=b.style.paddingRight=pad+"px";
- dash.style.setProperty("--z",dz);dash.classList.toggle("multi",dn>1);layoutDash(dn);applyGrips();
+ b.style.maxWidth=wide?"none":(dn*COLW+(dn-1)*SGAP+2*pad)+"px";b.style.paddingLeft=b.style.paddingRight=pad+"px";
+ dash.style.setProperty("--z",SCR.fit?fitState.z:dz);dash.classList.toggle("multi",dn>1);layoutDash(dn);applyGrips();
+ if(SCR.fit)dash.style.setProperty("--z",fitZoom(dn,W));else fitState={key:"",z:1};
  if(inn){inn.style.maxWidth=SCR.stretch?"none":(sn*COLW+(sn-1)*SGAP+2*pad)+"px";inn.style.paddingLeft=inn.style.paddingRight=pad+"px"}
  if(key!==scrKey){scrKey=key;if(!fromSettings&&$("settings").classList.contains("open"))layoutColumns(true)}}
 // The PIN (when one is set with install.sh --pin) is asked for once per page load, before update / restart / Wi-Fi connect.
