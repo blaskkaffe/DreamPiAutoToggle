@@ -708,7 +708,7 @@ W.roster=function(s,ctx){
  function shownIn(list,v){return !!v&&(list==null||list.indexOf(v)>=0)}
  function sideText(p){var out=[];if(D.show_roles!==false&&shownIn(D.roles_shown,p.role))out.push(p.role);if(D.show_buildings&&shownIn(D.buildings_shown,p.building))out.push(p.building);return out.join(" \u00b7 ")}
  function row(p){var text=p.name+(p.text?"  ·  "+p.text:""),state=p.text?p.text:(p.in?"in":"out"),
-  inner=p.status?'<span class="rp-mq" style="--d:'+Math.max(8,Math.round(text.length*.45))+'s"><span class="rp-trk"><span>'+esc(text)+'</span><span>'+esc(text)+'</span></span></span>'
+  inner=p.status?'<span class="rp-mq" style="--d:'+Math.max(8,Math.round(text.length*.45))+'s"><span class="rp-trk"><span>'+esc(text)+'</span><span>'+esc(text)+'</span></span></span>'+(p.dots?'<span class="rp-dots" aria-label="'+p.dots+(p.dots>1?' dots':' dot')+'">'+"\u25cf".repeat(p.dots)+'</span>':'')
    :'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-s">'+esc(sideText(p))+'</span>';
   return '<div class="rp-r '+(p.colour?"pri"+colourCls(p):"out")+'" data-id="'+esc(p.id)+'"><button type="button" class="rp-t" data-act="menu" aria-label="'+esc(p.name)+': '+esc(state)+', open the status menu">'+inner+'</button>'+
    '<button type="button" class="pill-s pri rp-io c-'+(p.in?"green":"red")+'" data-act="toggle" aria-label="'+esc(p.name)+': '+(p.in?"checked in, tap to check out":"checked out, tap to check in")+'">'+(p.in?"INNE":"UTE")+'</button></div>'}

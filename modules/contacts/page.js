@@ -20,14 +20,14 @@ custom("contacts-people",function(host){var key="",box=host.querySelector(".cpeo
  function edit(p){modal.innerHTML='<div class="rp-sheet rp-need2" role="dialog" aria-modal="true" aria-label="Edit '+esc(p.title)+'"><button type="button" class="rp-x" data-close="1" title="Close" aria-label="Close">&#10005;</button>'+
   '<div class="rp-wn">'+esc(p.title)+'</div>'+FIELDS.map(function(f){return '<label class="rp-nl">'+f[1]+'<input class="rp-big" type="'+f[2]+'" data-f="'+f[0]+'" value="'+esc(p[f[0]]||"")+'" maxlength="80"></label>'}).join("")+
   '<label class="rp-nl rp-chk"><input type="checkbox" class="cbox neutral" data-f="restrictToLocation"'+(p.restrict?" checked":"")+'> Only show on the board when this building is chosen</label>'+
-  '<div class="rp-clear"><button type="button" class="pill-s danger rp-so" data-del="1">Delete person</button></div>'+
-  '<div class="rp-cmsg sub" aria-live="polite"></div><div class="rp-nb"><button type="button" class="pill-s rp-so" data-close="1">Cancel</button><button type="button" class="pill-s pri rp-so c-green" data-save="1">Save</button></div></div>';
+  '<div class="rp-cmsg sub" aria-live="polite"></div><div class="rp-nb rp-nb3"><button type="button" class="pill-s danger rp-so" data-del="1">Delete</button><button type="button" class="pill-s rp-so" data-close="1">Cancel</button><button type="button" class="pill-s pri rp-so c-green" data-save="1">Save</button></div></div>';
   modal.style.display="";var f0=modal.querySelector("input");if(f0&&f0.focus)f0.focus();
   modal._id=p.id}
- // Delete person: the first tap asks, the second one removes the person (and their photo) for good
- function del(b){if(!b._armed){b._armed=true;b.textContent="Tap again to delete";setTimeout(function(){if(b.isConnected){b._armed=false;b.textContent="Delete person"}},4000);return}
-  b.disabled=true;post("/contacts/delete",{id:modal._id},function(r,st,x){b.disabled=false;
-   if(r&&r.ok){close();reloadData("contacts");refresh();return}setText(modal.querySelector(".rp-cmsg"),(x&&x.message)||"That did not work")})}
+ // Delete: asks first in a pop-up, then removes the person (and their photo) for good
+ function del(b){var name=modal.querySelector(".rp-wn").textContent;
+  askConfirm("Delete "+name+"? This can't be undone.","Delete",function(){
+   b.disabled=true;post("/contacts/delete",{id:modal._id},function(r,st,x){b.disabled=false;
+    if(r&&r.ok){close();reloadData("contacts");refresh();return}setText(modal.querySelector(".rp-cmsg"),(x&&x.message)||"That did not work")})})}
  function save(){var body={id:modal._id},msg=modal.querySelector(".rp-cmsg"),btn=modal.querySelector("[data-save]");
   Array.prototype.forEach.call(modal.querySelectorAll("[data-f]"),function(i){body[i.getAttribute("data-f")]=i.type==="checkbox"?i.checked:i.value});
   btn.disabled=true;post("/contacts/person",body,function(r,st,b){btn.disabled=false;

@@ -150,6 +150,22 @@
    ]
   },
   {
+   "box": "statuses",
+   "title": "Statuses",
+   "items": [
+    {
+     "type": "text",
+     "muted": true,
+     "text": "What can be picked in the status menu on the board. Tap a status to change it. A sticky status stays when INNE / UTE is pressed; the others are cleared."
+    },
+    {
+     "type": "custom",
+     "name": "checkin-statuses",
+     "html": "<div class=\"cstatuses\"></div>"
+    }
+   ]
+  },
+  {
    "box": "appearance",
    "title": "Appearance",
    "items": [

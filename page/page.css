@@ -230,8 +230,10 @@
 .pinsheet input.pininp{display:block;box-sizing:border-box;width:100%;height:auto;min-height:60px;margin:0 0 16px;text-align:center;font-size:2em;letter-spacing:.3em}
  .pinpad{display:grid;grid-template-columns:repeat(3,72px);gap:14px;justify-content:center;margin-bottom:16px} .pinkey{width:72px;height:72px;min-height:72px;padding:0;border-radius:50%;font-size:1.8em} .pinok{width:100%;min-height:56px;font-size:1.2em}
  .rp-modal2{z-index:31} .rp-need2{width:clamp(300px,42vw,620px)} .rp-nl{display:block;margin:18px 0 0;font-size:1.1em;color:var(--text-2)}
- input.rp-big{display:block;box-sizing:border-box;width:100%;height:auto;min-height:64px;margin:8px 0 0;padding:8px 14px;font:inherit;font-size:1.6em;color:var(--text-1);background:var(--ctl);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl)}
+ .rp-sheet input.rp-big,.rp-sheet select.rp-big{display:block;box-sizing:border-box;width:100%;height:auto;min-height:50px;margin:6px 0 0;padding:6px 12px;font:inherit;font-size:1.25em;color:var(--text-1);background:var(--ctl);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl)}
  .rp-nb{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:20px}
+ .rp-nb.rp-nb3{grid-template-columns:repeat(3,minmax(0,1fr))} .rp-need2 select.rp-big{appearance:auto}
+ .rp-dots{margin-left:.5em;font-size:.6em;letter-spacing:.15em;vertical-align:middle;color:var(--c-red-l)}
  body.no-title header h1{display:none} body.no-title header{height:34px;margin:0 0 6px}   /* no title: only a strip for the cogwheel is left */
  .rp-empty{padding:12px 4px}
  textarea{display:block;box-sizing:border-box;width:100%;min-height:96px;margin:8px 0;padding:10px 12px;background:var(--ctl);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm);resize:vertical} input[type=file],.rp-need input{min-height:var(--h-ctl);max-width:100%;font-size:var(--fs-sm);color:var(--text-2)} .rp-need input{color:var(--text-1);background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);padding:0 8px}

@@ -84,8 +84,44 @@ def statuses(data=None):
         seen.add(s["code"])
         out.append({"code": s["code"], "label": str(s.get("label") or s["code"])[:30], "colour": _palette_id(s.get("colour"), "white"),
                     "needs": s.get("needs") if s.get("needs") in ("time", "date", "note") else "", "default": str(s.get("default") or "")[:5],
-                    "prefix": str(s.get("prefix") or "")[:20], "out": bool(s.get("out"))})
+                    "prefix": str(s.get("prefix") or "")[:20], "out": bool(s.get("out")), "sticky": bool(s.get("sticky")),
+                    "dots": s.get("dots") if s.get("dots") in (1, 2, 3) else 0})
     return out[:16]
+
+
+def save_statuses(items):
+    """Replace the status menu (Settings > Statuses): a list of {code?, label, colour, needs, default, prefix, out, sticky, dots}. A status without a
+    code (a new one) gets a fresh one. Returns the cleaned list, None when it is not a list or a label is missing. People who have a status that is
+    no longer in the list simply show none."""
+    if not isinstance(items, list) or len(items) > 16 or not all(isinstance(x, dict) for x in items):
+        return None
+    with _lock:
+        data = _load()
+        used = set(str(x.get("code")) for x in items if x.get("code"))
+        out = []
+        for x in items:
+            label = re.sub(r"\s+", " ", str(x.get("label") or "")).strip()[:30]
+            if not label:
+                return None
+            code = str(x.get("code") or "")
+            if not re.match(r"^[A-Z0-9_]{1,24}$", code) or code in (IN, OUT):
+                code = ""
+                while not code or code in used:
+                    code = "S" + os.urandom(4).hex().upper()
+                used.add(code)
+            d = str(x.get("default") or "").strip()
+            out.append({"code": code, "label": label, "colour": _palette_id(x.get("colour"), "white"),
+                        "needs": x.get("needs") if x.get("needs") in ("time", "date", "note") else "",
+                        "default": d if re.match(r"^([01]?\d|2[0-3]):[0-5]\d$", d) else "", "prefix": str(x.get("prefix") or "").strip()[:20],
+                        "out": bool(x.get("out")), "sticky": bool(x.get("sticky")), "dots": x.get("dots") if x.get("dots") in (1, 2, 3) else 0})
+        seen = set()
+        for x in out:
+            if x["code"] in seen:
+                return None
+            seen.add(x["code"])
+        data["statuses"] = out
+        _save(data)
+        return statuses(data)
 
 
 def _names(v):
@@ -187,7 +223,7 @@ def snapshot(data=None):
                 "building": p.get("location", ""), "photo": photos.get(p["id"], ""), "restrict": bool(p.get("restrictToLocation")), "in": is_in,
                 "colour": status["colour"] if status else (base if is_in else ""),
                 "status": status["code"] if status else "", "text": _status_text(status, detail) if status else "", "detail": detail,
-                "state": "Status" if status else ("In" if is_in else "Out"), "at": st.get("at", 0)}
+                "state": "Status" if status else ("In" if is_in else "Out"), "at": st.get("at", 0), "dots": status["dots"] if status else 0}
         g = index.get(gname)
         if g is None:
             g = index[gname] = {"id": gname, "title": gname, "colour": colour_of.get(gname, "blue") if cfg["colour_by"] == cfg["group_by"] else "", "people": []}
@@ -211,13 +247,14 @@ def _person_known(pid):
 
 
 def toggle(pid):
-    """A tap on a person: in <-> out, and any status is cleared. Returns the new snapshot, or None for an unknown person."""
+    """A tap on the INNE / UTE button: in <-> out, and the status is cleared unless it is a sticky one. Returns the new snapshot, or None for an unknown person."""
     with _lock:
         data = _load()
         if not _person_known(pid):
             return None
         cur = data["people"].get(pid) or {}
-        data["people"][pid] = {"in": not cur.get("in"), "status": "", "detail": "", "at": int(time.time())}
+        keep = next((x for x in statuses(data) if x["code"] == cur.get("status") and x["sticky"]), None)      # a sticky status stays when the person is switched
+        data["people"][pid] = {"in": not cur.get("in"), "status": keep["code"] if keep else "", "detail": cur.get("detail", "") if keep else "", "at": int(time.time())}
         _save(data)
         return snapshot(data)
 
@@ -358,6 +395,15 @@ def _post_order(h):
     return True
 
 
+def _post_statuses(h):
+    got = save_statuses(_body(h, 65536).get("statuses"))
+    if got is None:
+        h.send(json.dumps({"ok": False, "message": "Every status needs a name (at most 16 statuses)"}), "application/json", status=400)
+    else:
+        h.send(json.dumps({"ok": True, "statuses": got, "checkin": snapshot()}), "application/json")
+    return True
+
+
 def _post_all(h):
     b = _body(h)
     return _answer(h, set_all(bool(b.get("in")), b.get("ids") if isinstance(b.get("ids"), list) else None))
@@ -409,4 +455,4 @@ def api(d, warnings):
 OPEN = ("/checkin/toggle", "/checkin/status")       # tapping people in and out works while Settings is locked with the PIN
 GET = {"/checkin": _get_board, "/checkin/config": _get_config}
 POST = {"/checkin/toggle": _post_toggle, "/checkin/status": _post_status, "/checkin/all": _post_all,
-        "/checkin/config": _post_config, "/checkin/colour": _post_colour, "/checkin/order": _post_order}
+        "/checkin/config": _post_config, "/checkin/colour": _post_colour, "/checkin/order": _post_order, "/checkin/statuses": _post_statuses}

@@ -203,10 +203,35 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   const nBefore = (await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length;
   ok(await page.locator('[data-box="contacts"] .cpick').count() === 1 && await page.locator('[data-box="contacts"] input[type=file]').isHidden(), 'the CSV box has a styled Choose file button instead of the browser one');
   await page.locator('[data-box="contacts"] .cpeople .srow').last().locator('span').first().click(); await settle(400);
-  await page.locator('.rp-need2 [data-del]').click(); await settle(200);
-  ok(/again/.test(await page.locator('.rp-need2 [data-del]').textContent()) && (await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length === nBefore, 'the first tap on Delete person only asks');
-  await page.locator('.rp-need2 [data-del]').click(); await settle(1200);
-  ok((await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length === nBefore - 1 && await page.locator('.rp-modal:visible').count() === 0, 'the second tap deletes the person');
+  await page.locator('.rp-need2 [data-del]').click(); await settle(300);
+  ok(/Delete/.test(await page.locator('.rp-need2 [data-del]').textContent()) && await page.locator('.pinm .rp-sheet').count() === 1 && (await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length === nBefore, 'Delete asks in a pop-up first');
+  await page.locator('.pinm button', { hasText: 'Cancel' }).click(); await settle(300);
+  ok((await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length === nBefore && await page.locator('.rp-need2 [data-del]').count() === 1, 'Cancel keeps the person');
+  const order = await page.locator('.rp-need2 .rp-nb button').allTextContents();
+  ok(order.join() === 'Delete,Cancel,Save', 'Delete is to the left of Cancel (' + order.join() + ')');
+  await page.locator('.rp-need2 [data-del]').click(); await settle(300);
+  await page.locator('.pinm button', { hasText: /^Delete$/ }).click(); await settle(1200);
+  ok((await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length === nBefore - 1 && await page.locator('.rp-modal:visible').count() === 0, 'confirming deletes the person');
+  await closeSettings();
+
+  // ---- the status editor (Settings > Statuses)
+  await openSettings();
+  const nSt = await page.locator('[data-box="statuses"] .cstatuses .srow').count();
+  ok(nSt >= 12, 'Settings > Statuses lists the statuses (' + nSt + ')');
+  await page.locator('[data-box="statuses"] button', { hasText: 'Add status' }).click(); await settle(300);
+  ok(parseFloat(await page.locator('.rp-need2 input[data-f=label]').evaluate(e => getComputedStyle(e).fontSize)) >= 18, 'the editor fields have a readable font size');
+  await page.locator('.rp-need2 input[data-f=label]').fill('Testst\u00e4ll'); await page.selectOption('.rp-need2 select[data-f=needs]', 'time');
+  ok(await page.locator('.rp-need2 [data-row=default]').isVisible() && !(await page.locator('.rp-need2 [data-row=prefix]').isVisible()), 'a time status asks for a start time, not a date prefix');
+  await page.selectOption('.rp-need2 select[data-f=dots]', '2'); await page.locator('.rp-need2 input[data-f=sticky]').check(); await page.locator('.rp-need2 [data-save]').click(); await settle(1200);
+  const made = (await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.statuses.find(x => x.label === 'Testst\u00e4ll');
+  ok(made && made.sticky && made.dots === 2 && made.needs === 'time', 'the new status is saved with its settings (' + JSON.stringify(made) + ')');
+  await page.locator('[data-box="statuses"] .cstatuses .srow', { hasText: 'Testst\u00e4ll' }).locator('button[aria-label$="up"]').click(); await settle(1000);
+  const labels = (await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.statuses.map(x => x.label);
+  ok(labels.indexOf('Testst\u00e4ll') === labels.length - 2, 'the arrows move a status');
+  await page.locator('[data-box="statuses"] .cstatuses .srow', { hasText: 'Testst\u00e4ll' }).locator('span').first().click(); await settle(300);
+  await page.locator('.rp-need2 [data-del]').click(); await settle(300);
+  await page.locator('.pinm button', { hasText: /^Delete$/ }).click(); await settle(1200);
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.statuses.length === nSt, 'a status is deleted after a question');
   await closeSettings();
 
   ok(errors.length === 0, 'no JavaScript errors (' + errors.slice(0, 3).join(' | ') + ')');

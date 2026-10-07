@@ -155,7 +155,7 @@ class WithEverything(Base):
         about = [b for b in lay["settings"] if b["id"] == "about"][0]
         self.assertEqual((about["mods"], about["title"]), (["system"], "About"))               # the versions are their own box, not part of System
         self.assertEqual([b["id"] for b in lay["dashboard"]], ["checkin", "clock"])
-        self.assertEqual([b["id"] for b in lay["settings"]], ["check-in", "appearance", "clock", "contacts", "colours", "about", "background-image", "system"])
+        self.assertEqual([b["id"] for b in lay["settings"]], ["check-in", "statuses", "appearance", "clock", "contacts", "colours", "about", "background-image", "system"])
 
     def test_the_picker_lists_dashboard_modules_then_settings_only_then_backgrounds(self):
         core.save_module_order(["imagebg", "rebootupdate", "contacts", "clock", "system", "checkin"])      # the user's own mix

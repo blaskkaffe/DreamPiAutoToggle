@@ -220,6 +220,31 @@ class BoardTests(Base):
         self.assertFalse(contacts.delete_person(anna["id"]))
         self.assertFalse(contacts.delete_person(""))
 
+    def test_statuses_can_be_edited_and_a_sticky_one_survives_in_out(self):
+        anna = self.people()["Anna Svensson"]["id"]
+        menu = checkin.statuses()
+        self.assertTrue(all(not s["sticky"] and s["dots"] == 0 for s in menu))
+        menu[0]["sticky"] = True                                                    # FYS
+        menu.append({"label": "Plupp", "colour": "red", "dots": 2, "needs": "note"})
+        got = checkin.save_statuses(menu)
+        new = [s for s in got if s["label"] == "Plupp"][0]
+        self.assertTrue(new["code"].startswith("S") and new["dots"] == 2 and new["needs"] == "note")
+        checkin.set_status(anna, "FYS")
+        checkin.toggle(anna)
+        p = self.people()["Anna Svensson"]
+        self.assertEqual((p["status"], p["in"]), ("FYS", True))                     # sticky: still there
+        checkin.set_status(anna, new["code"], "x")
+        self.assertEqual(self.people()["Anna Svensson"]["dots"], 2)
+        checkin.toggle(anna)
+        self.assertEqual(self.people()["Anna Svensson"]["status"], "")              # not sticky: cleared
+        self.assertIsNone(checkin.save_statuses([{"label": " "}]))
+        self.assertIsNone(checkin.save_statuses("x"))
+        self.assertIsNone(checkin.save_statuses([{"label": "a"}] * 17))
+        self.assertEqual(len(checkin.save_statuses([])), 0)                        # an empty menu is allowed
+        checkin.save_statuses([{"code": "FYS", "label": "FYS", "default": "9:99", "needs": "time", "colour": "nonsense"}])
+        s = checkin.statuses()[0]
+        self.assertEqual((s["default"], s["colour"], s["code"]), ("", "white", "FYS"))
+
     def test_the_order_of_the_boxes_is_kept(self):
         self.assertEqual([g["title"] for g in checkin.snapshot()["groups"]], ["Kök", "No department", "Servering"])
         checkin.set_group_order(["Servering", "Kök"])
@@ -282,6 +307,15 @@ class HttpTests(Base):
         self.assertEqual(self.get("/api")["checkin"]["total"], 3)
         with self.assertRaises(HTTPError) as e:
             self.post("/contacts/delete", {"id": anna})
+        self.assertEqual(e.exception.code, 400)
+
+    def test_statuses_are_posted(self):
+        menu = self.get("/api")["checkin"]["statuses"]
+        r = self.post("/checkin/statuses", {"statuses": menu[:2] + [{"label": "Ny", "colour": "blue"}]})
+        self.assertEqual([s["label"] for s in r["statuses"]], [menu[0]["label"], menu[1]["label"], "Ny"])
+        self.assertEqual(len(self.get("/api")["checkin"]["statuses"]), 3)
+        with self.assertRaises(HTTPError) as e:
+            self.post("/checkin/statuses", {"statuses": [{"label": ""}]})
         self.assertEqual(e.exception.code, 400)
 
     def test_the_order_of_the_boxes_is_posted_and_seen_by_the_other_screen(self):

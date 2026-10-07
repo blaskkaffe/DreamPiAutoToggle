@@ -181,6 +181,13 @@ function askPin(title,cb){closePin();var m=h("div",{"class":"rp-modal keep-visib
  document.body.appendChild(m);pinDlg=m;inp.focus()}
 function closePin(){if(pinDlg&&pinDlg.parentNode)pinDlg.parentNode.removeChild(pinDlg);pinDlg=null}
 hook("escape",function(){if(pinDlg){closePin();return true}});
+// askConfirm(text, okLabel, cb): a small question pop-up (Cancel / okLabel); cb() when the answer is yes. Esc, the cross or a tap outside is no.
+function askConfirm(text,okLabel,cb){closePin();var m=h("div",{"class":"rp-modal keep-visible pinm",role:"alertdialog","aria-modal":"true","aria-label":text}),
+ no=h("button",{type:"button","class":"pill-s rp-so",text:"Cancel"}),yes=h("button",{type:"button","class":"pill-s danger rp-so",text:okLabel||"OK"});
+ m.appendChild(h("div",{"class":"rp-sheet pinsheet"},[h("div",{"class":"rp-wn",text:text}),h("div",{"class":"rp-nb"},[no,yes])]));
+ function done(ok){closePin();if(ok)cb()}
+ m.addEventListener("click",function(e){if(e.target===m)done(false)});no.onclick=function(){done(false)};yes.onclick=function(){done(true)};
+ document.body.appendChild(m);pinDlg=m;no.focus()}
 function withPin(go){if(!pinNeeded||pinValue)return go();askPin("Enter the PIN",function(p){pinValue=p;go()})}
 function xhrJson(method,url,cb,body){var x=new XMLHttpRequest(),counted=method!=="POST";if(counted)inflight++;x.open(method,url,true);
  if(method=="POST"){x.setRequestHeader("X-Requested-With","netswitch");if(pinValue)x.setRequestHeader("X-Netswitch-Pin",pinValue);
