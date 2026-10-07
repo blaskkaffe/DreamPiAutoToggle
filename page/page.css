@@ -204,6 +204,8 @@
  .rp-t{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:4px 16px;background:none;text-align:left;font-size:1.75em;line-height:1.2;color:inherit;text-shadow:inherit}
  .rp-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600} .rp-s{flex:none;max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.6em;opacity:.85}
  .rp-r.out .rp-n{font-weight:500}
+ .rp-s.rp-stt{max-width:60%;font-size:.8em;font-weight:600;opacity:1}
+ .rp-mq.still .rp-trk{animation:none} .rp-mq.still .rp-trk > span + span{display:none} .rp-mq.still .rp-trk > span{padding-right:0}
  .rp-mq{flex:1;min-width:0;overflow:hidden;white-space:nowrap;font-weight:600} .rp-trk{display:inline-block;animation:marquee var(--d,12s) linear infinite} .rp-trk > span{display:inline-block;padding-right:3em}   /* name and status scroll round like the carousel */
  @media(prefers-reduced-motion:reduce){.rp-trk{animation:none}.rp-trk > span + span{display:none}}
  .rp-io{flex:none;min-width:5.2em;min-height:34px;padding:0 14px;font-weight:700;font-size:var(--fs-md);letter-spacing:.04em}   /* INNE (green) / UTE (red) */

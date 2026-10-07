@@ -714,7 +714,8 @@ W.roster=function(s,ctx){
  function shownIn(list,v){return !!v&&(list==null||list.indexOf(v)>=0)}
  function sideText(p){var out=[];if(D.show_roles!==false&&shownIn(D.roles_shown,p.role))out.push(p.role);if(D.show_buildings&&shownIn(D.buildings_shown,p.building))out.push(p.building);return out.join(" \u00b7 ")}
  function row(p){var text=p.name+(p.text?"  ·  "+p.text:""),state=p.text?p.text:(p.in?"in":"out"),
-  inner=p.status?'<span class="rp-mq" style="--d:'+Math.max(8,Math.round(text.length*.45))+'s"><span class="rp-trk"><span>'+esc(text)+'</span><span>'+esc(text)+'</span></span></span>'+(p.dots?'<span class="rp-dots" aria-label="'+p.dots+(p.dots>1?' dots':' dot')+'">'+"\u25cf".repeat(p.dots)+'</span>':'')
+  inner=p.status&&D.scroll==="off"?'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-s rp-stt">'+esc(p.text)+'</span>'+(p.dots?'<span class="rp-dots" aria-label="'+p.dots+(p.dots>1?' dots':' dot')+'">'+"\u25cf".repeat(p.dots)+'</span>':'')
+   :p.status?'<span class="rp-mq" data-scroll="'+(D.scroll==="auto"?"auto":"on")+'" style="--d:'+Math.max(8,Math.round(text.length*.45))+'s"><span class="rp-trk"><span>'+esc(text)+'</span><span>'+esc(text)+'</span></span></span>'+(p.dots?'<span class="rp-dots" aria-label="'+p.dots+(p.dots>1?' dots':' dot')+'">'+"\u25cf".repeat(p.dots)+'</span>':'')
    :'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-s">'+esc(sideText(p))+'</span>';
   return '<div class="rp-r '+(p.colour?"pri"+colourCls(p):"out")+'" data-id="'+esc(p.id)+'"><button type="button" class="rp-t" data-act="menu" aria-label="'+esc(p.name)+': '+esc(state)+', open the status menu">'+inner+'</button>'+
    '<button type="button" class="pill-s pri rp-io c-'+(p.in?"green":"red")+'" data-act="toggle" aria-label="'+esc(p.name)+': '+(p.in?"checked in, tap to check out":"checked out, tap to check in")+'">'+(p.in?"INNE":"UTE")+'</button></div>'}
@@ -750,7 +751,10 @@ W.roster=function(s,ctx){
  var ro=null,raf=0;
  function fillCarousels(){Array.prototype.forEach.call(document.querySelectorAll("#dash .rp-mq"),function(mq){if(window.ResizeObserver){if(!ro)ro=new ResizeObserver(function(){if(!raf)raf=requestAnimationFrame(function(){raf=0;fillCarousels()})});ro.observe(mq)}
   var trk=mq.querySelector(".rp-trk");if(!trk||!trk.firstChild)return;
+  if(mq.classList.contains("still"))mq.classList.remove("still");        // measured as if it scrolled
   var one=trk.firstChild.getBoundingClientRect().width,w=mq.getBoundingClientRect().width;if(!one||!w)return;
+  // "auto": a status that fits the row stays still (one copy, no movement); one that does not scrolls
+  if(mq.getAttribute("data-scroll")==="auto"&&one-(parseFloat(getComputedStyle(trk.firstChild).paddingRight)||0)<=w){mq.classList.add("still");return}
   var zoom=one/(trk.firstChild.offsetWidth||one);var k=Math.max(1,Math.ceil(w/one)),have=trk.children.length/2;
   if(have!==k){var t=trk.firstChild.textContent;trk.innerHTML="";for(var i=0;i<2*k;i++){var sp=document.createElement("span");sp.textContent=t;trk.appendChild(sp)}}
   mq.style.setProperty("--d",Math.max(8,Math.round(k*one/(70*(zoom||1))))+"s")})}

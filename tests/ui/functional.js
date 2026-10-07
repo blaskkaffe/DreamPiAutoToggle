@@ -214,6 +214,21 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok((await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length === nBefore - 1 && await page.locator('.rp-modal:visible').count() === 0, 'confirming deletes the person');
   await closeSettings();
 
+  // ---- scrolling text: off / auto / on
+  const scrollIs = async mode => { await cfg({ scroll: mode }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500); return page.evaluate(() => ({ trk: document.querySelectorAll('#dash .rp-trk').length, still: document.querySelectorAll('#dash .rp-mq.still').length, stt: document.querySelectorAll('#dash .rp-stt').length })); };
+  let sc = await scrollIs('off');
+  ok(sc.trk === 0 && sc.stt > 0, 'scrolling off: the status is plain text on the row (' + JSON.stringify(sc) + ')');
+  await page.setViewportSize({ width: 1500, height: 900 });
+  await page.evaluate(() => fetch('/screen/stretch', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ value: true }) }));
+  sc = await scrollIs('auto');
+  ok(sc.trk > 0 && sc.still > 0, 'auto: a status that fits the row stands still (' + JSON.stringify(sc) + ')');
+  await page.setViewportSize({ width: 360, height: 900 }); await settle(1000);
+  ok(await page.evaluate(() => document.querySelectorAll('#dash .rp-mq:not(.still)').length) > 0, 'auto: a status that does not fit scrolls (narrow window)');
+  await page.setViewportSize({ width: 1500, height: 900 });
+  await page.evaluate(() => fetch('/screen/stretch', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ value: false }) }));
+  sc = await scrollIs('on');
+  ok(sc.trk > 0 && sc.still === 0, 'on: always scrolls (' + JSON.stringify(sc) + ')');
+
   // ---- the status editor (Settings > Statuses)
   await openSettings();
   const nSt = await page.locator('[data-box="statuses"] .cstatuses .srow').count();

@@ -338,7 +338,7 @@ class HttpTests(Base):
 
     def test_settings_and_colour_endpoints(self):
         r = self.get("/checkin/config")
-        self.assertEqual(r["values"], {"show_title": True, "group_by": "department", "colour_by": "department", "show_roles": True, "show_buildings": False,
+        self.assertEqual(r["values"], {"show_title": True, "group_by": "department", "colour_by": "department", "scroll": "on", "show_roles": True, "show_buildings": False,
                                        "keyboard": False, "roles_shown": None, "buildings_shown": None})
         self.assertEqual([x["key"] for x in r["colours"]["department"]], ["Kök", "No department", "Servering"])
         r = self.post("/checkin/config", {"values": {"colour_by": "building", "group_by": "nonsense", "show_title": False}})
@@ -346,6 +346,13 @@ class HttpTests(Base):
         r = self.post("/checkin/config", {"values": {"show_buildings": True, "keyboard": True, "roles_shown": ["Chef", 3], "buildings_shown": "x", "show_roles": "no"}})
         v = r["values"]
         self.assertEqual((v["show_buildings"], v["keyboard"], v["roles_shown"], v["buildings_shown"], v["show_roles"]), (True, True, ["Chef"], None, True))     # bad values are ignored
+        self.assertEqual(r["values"]["scroll"], "on")
+        r = self.post("/checkin/config", {"values": {"scroll": "auto"}})
+        self.assertEqual(self.get("/api")["checkin"]["scroll"], "auto")
+        self.post("/checkin/config", {"values": {"scroll": "sideways"}})                                              # not one of off / auto / on: kept
+        self.assertEqual(self.get("/api")["checkin"]["scroll"], "auto")
+        self.assertEqual([o["value"] for o in r["options"]["scrolls"]], ["off", "auto", "on"])
+        self.post("/checkin/config", {"values": {"scroll": "on"}})
         self.assertIn("Kökschef", [o["value"] for o in r["options"]["roles"]])
         self.assertEqual([o["value"] for o in r["options"]["buildings"]], ["Område A", "Område B"])
         board = self.get("/api")["checkin"]

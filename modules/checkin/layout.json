@@ -65,6 +65,18 @@
        "inline": true
       },
       {
+       "title": "Scrolling text",
+       "inline": true,
+       "controls": [
+        {
+         "type": "select",
+         "key": "scroll",
+         "options": "scrolls",
+         "label": "Scrolling name and status"
+        }
+       ]
+      },
+      {
        "title": "Display roles",
        "inline": true,
        "controls": [
