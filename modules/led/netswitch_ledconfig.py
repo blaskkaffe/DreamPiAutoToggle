@@ -2,7 +2,7 @@
 # led.json keeps colour calibration (white balance, brightness, wire order) and the colour GROUPS: each group is one look
 # (colour, effect, speed, level, which LEDs) plus the list of messages (triggers) that use it. A message is something the add-on can
 # tell happened ("Starting up", "No internet", "Update available" ...): the modules announce theirs in module.json
-# ("led_messages", see core.module_led_messages()); active_messages() works out which are true right now, finds their groups and
+# ("led_messages", see core.module_announcements()); active_messages() works out which are true right now, finds their groups and
 # gives the looks the LED service draws. The order of the groups is the priority: the top group wins where looks overlap.
 # Also: LED count / output pin and the white-balance test flag. Shared by the web page and the LED service. Works on Python 3 and 2.7.
 import json
@@ -43,8 +43,15 @@ _KEY = re.compile(r"^[a-z][a-z0-9-]*$")
 
 
 def messages():
-    """[{"key", "label", "group", "description", "module"}] of the enabled modules, in picker order (core.module_led_messages())."""
-    return core.module_led_messages()
+    """[{"key", "label", "group", "description", "module"}] of the enabled modules, in picker order (core.module_announcements())."""
+    out, seen = [], set()
+    for name, title, m in core.module_announcements("led_messages"):
+        key = str(m.get("id") or "")
+        if _KEY.match(key) and key not in seen:
+            seen.add(key)
+            out.append({"key": key, "label": str(m.get("label") or key), "group": str(m.get("group") or title),
+                        "description": str(m.get("description") or ""), "module": name})
+    return out
 
 
 ERRORS = ("notrunning", "no-network", "no-internet", "undervoltage", "hot", "modem-missing")

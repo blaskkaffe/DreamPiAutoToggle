@@ -260,7 +260,7 @@ class LiveInfo(Base):
     def test_the_module_announces_a_launcher_and_the_page_gets_it(self):
         import base_modules as mods
         lay = mods.layout()
-        self.assertEqual(lay["launcher"], {"mod": "openmenu", "title": "openMenu", "state": "openmenu", "games": "om_games", "start": "/openmenu/launch"})
+        self.assertEqual(lay["launcher"], {"mod": "openmenu", "title": "openMenu", "state": "openmenu", "games": "om_games", "start": "/openmenu/launch", "target": "the Dreamcast"})
         self.assertIn("om_games", lay["data"])
         core.save_module_enabled("openmenu", False)
         web.refresh_page(force=True)

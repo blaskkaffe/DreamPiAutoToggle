@@ -1,4 +1,4 @@
-# DreamPi Netswitch add-on - loads the optional modules for the web service.
+# Base - loads the modules for the web service.
 #
 # A module is a folder in modules/ with a module.json (see base_core.module_manifest()). The web
 # service runs the Python part of every *enabled* module (the "web" entry in its manifest) and builds the
@@ -11,7 +11,7 @@
 #                                                                    POST function returns True once it has answered
 #   api(d, warnings)                add to the /api answer (d is its dict) and to the warning boxes
 #   PROTECTED = ("/path", ...)      POST paths that need the PIN when one is set (they run as root)
-#   OPEN = ("/path", ...)           POST paths of the dashboard (and of the Dreamcast) that stay open when Settings is locked with the PIN; every
+#   OPEN = ("/path", ...)           POST paths of the dashboard (and of devices that cannot send the page's header) that stay open when Settings is locked with the PIN; every
 #                                   other POST of the module is a setting and needs the PIN then
 #   GET_PREFIX / POST_PREFIX        {"/api/events/": fn}: a path that starts with it (and goes on) and no exact path matched
 #   start()                         called once, when the web service itself starts (start_background()) or when the module is
@@ -203,6 +203,23 @@ def _check_layout(layout):
             raise ValueError('data %r needs a name like "players" and a "url" starting with /' % ns)
 
 
+BASE = "base"          # the name the base's own widgets carry in the boxes' "mods" and as their "mod"
+_base = {}
+
+
+def _base_layout():
+    """base/layout.json: boxes of the base itself (the same format as a module's layout.json, settings only), or {}."""
+    if "layout" not in _base:
+        path = os.path.join(os.path.dirname(os.path.abspath(core.__file__)), "layout.json")
+        try:
+            _base["layout"] = json.loads(_read(path)) if os.path.exists(path) else {}
+            _check_layout(_base["layout"])
+        except ValueError as e:
+            sys.stderr.write("base layout.json: %s\n" % e)
+            _base["layout"] = {}
+    return _base["layout"]
+
+
 def read_layout(name):
     """The parsed, checked layout.json of a module, or None when it has none. ValueError says what is wrong."""
     path = os.path.join(core.MODULES_DIR, name, "layout.json")
@@ -249,7 +266,7 @@ def _add_box(out, boxes, sec, key, title, name):
 
 
 def _launcher_of(name, manifest, lay):
-    """The module's "launcher" announcement made safe, or None: {"state": data source, "games": data source, "start": "/path", "title"};
+    """The module's "launcher" announcement made safe, or None: {"state": data source, "games": data source, "start": "/path", "title", "target": what it starts games on};
     both data sources must be ones of its own layout and the path must be an absolute one."""
     spec = manifest.get("launcher")
     data = lay.get("data") or {}
@@ -258,7 +275,8 @@ def _launcher_of(name, manifest, lay):
     start = spec.get("start")
     if not (isinstance(start, str) and start.startswith("/")):
         return None
-    return {"mod": name, "title": str(spec.get("title") or core.module_title(name, manifest)), "state": spec["state"], "games": spec["games"], "start": start}
+    return {"mod": name, "title": str(spec.get("title") or core.module_title(name, manifest)), "state": spec["state"], "games": spec["games"], "start": start,
+            "target": str(spec.get("target") or "the device")}
 
 
 def layout():
@@ -266,16 +284,20 @@ def layout():
     {"modules": [names], "dashboard": [box], "settings": [box], "backgrounds": [{"mod", "type", ...}],
      "data": {namespace: {"url", "every", "mod"}}, "primary": {name: palette id}, "colours": {name: {key: id}},
      "launcher": {"mod", "title", "state", "games", "start"} or absent}
-    "launcher" is a module that can start games on the Dreamcast (the openMenu link): its module.json says so, with the data sources that
+    "launcher" is a module that can start games on a device (a game console, say): its module.json says so, with the data sources that
     hold its state and the games it announces and the path that starts one. Lists in other modules show a Start button for the games
     it announces (row "start", page/widgets.js); with no such module enabled they show nothing.
     box = {"id": lower-case name, "title", "mods": [names], "items": [widget + "mod"]}.
     A module whose module.json has "toggle_box": "appearance" also gets a row with its on/off switch in that Settings box,
-    even while it is off (a switched-off module has no layout of its own to put one in): the Dreamcast background does."""
+    even while it is off (a switched-off module has no layout of its own to put one in): a background module's does."""
     out = {"modules": [], "dashboard": [], "settings": [], "backgrounds": [], "data": {}, "primary": {}, "primary_key": {}, "colours": {}, "tints": {}}
     boxes = dict((sec, {}) for sec in SECTIONS)
     covered = False                       # a fullscreen background above hides every one below it
     loaded = dict((m["name"], m) for m in _state["loaded"])
+    for sec in SECTIONS:                  # the base's own settings (base/layout.json: the palette, the screen layout, the PIN ...) come first
+        for box in _base_layout().get(sec, []):
+            b = _add_box(out, boxes, sec, box["box"].strip().lower(), box.get("title"), BASE)
+            b["items"].extend(dict(w, mod=BASE) for w in box.get("items", []))
     for name in core.module_names():
         manifest = core.module_manifest(name) or {}
         toggle_box = manifest.get("toggle_box")
@@ -314,7 +336,7 @@ def layout():
         launcher = _launcher_of(name, m["manifest"], lay)
         if launcher and "launcher" not in out:                    # the first module in the picker order that announces one
             out["launcher"] = launcher
-    out["settings"].sort(key=lambda b: b["id"] == "system")   # System (the module picker, Wi-Fi, update, reboot) is always the last box of Settings, whatever the picker order (a stable sort: the others keep theirs)
+    out["settings"].sort(key=lambda b: b["id"] == "system")   # System (the module picker and the modules' system controls) is always the last box of Settings, whatever the picker order (a stable sort: the others keep theirs)
     return out
 
 
@@ -380,7 +402,7 @@ core.set_service_finder(service_finder)
 def collect(name):
     """What the enabled modules' web entries return from a function called `name` (a plain list of rows, joined in picker order):
     a way for several modules to fill one list without importing each other (the About table's rows: system's versions, the
-    network switcher's modem)."""
+    About table's rows: one module's versions, another's device)."""
     out = []
     for m in _state["loaded"]:
         fn = getattr(m["web"], name, None) if m["web"] is not None else None
@@ -412,7 +434,7 @@ def open_post(path):
 
 def protected(path):
     """True for a POST path that an enabled module marked PROTECTED: it needs the page's own header and, when one is
-    set, the PIN (rebooting, updating, joining a Wi-Fi network)."""
+    set, the PIN (the actions a module marks PROTECTED)."""
     return path in _state["protected"]
 
 
@@ -436,7 +458,7 @@ def shows_something(name):
 
 def listing():
     """What the module picker shows: every installed module in priority order, on or off. One that can't be switched
-    (visible false in its module.json, like the network switcher) is listed too, with "visible": false and no switch on the
+    (visible false in its module.json, like a module that is always there) is listed too, with "visible": false and no switch on the
     page, so it can still be moved."""
     state = core.modules_state()
     out = []

@@ -13,10 +13,18 @@ NUMBERS = os.path.join(core.BASE_DIR, "numbers.json")     # phone numbers per ac
 
 MIN_LEN, MAX_LEN, MAX_PER_ROW, MAX_ROWS = 3, 12, 10, 30
 _JUNK = re.compile(r"[^0-9*#]")
+_ACTION_ID = re.compile(r"^[a-z][a-z0-9_]*$")
 _ACTION = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
 OPENMENU = "1111111"     # what openMenu dials; it ends with the default row's 11111
 OPTIONS = [{"key": "hangup", "type": "toggle", "label": "Hang up after the action",
             "sub": "Don't answer the call: the Dreamcast gets a busy tone, like *70"}]
+
+
+def module_actions():
+    """The actions the enabled modules announce (module.json "actions": [{"id", "label", "sub"}]), in picker order, as
+    [{"value": "<module>.<id>", "label", "sub", "group": <the module's title>}]. A module's hook file does them inside DreamPi."""
+    return [{"value": "%s.%s" % (name, a["id"]), "label": str(a.get("label") or a["id"]), "sub": str(a.get("sub") or ""), "group": title}
+            for name, title, a in core.module_announcements("actions") if _ACTION_ID.match(str(a.get("id") or ""))]
 
 
 def default_rows():
@@ -85,7 +93,7 @@ def _reply():
     """The standard "rows" answer (page/widgets.js W.rows): the rows with their ready texts, the actions a row can pick, the options
     a row has and the rules for adding a number."""
     rows = numbers()
-    actions = core.module_actions()
+    actions = module_actions()
     known = dict((a["value"], a) for a in actions)
     out = []
     for r in rows:

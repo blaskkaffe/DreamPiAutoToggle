@@ -145,13 +145,13 @@ class HttpSecurityTests(unittest.TestCase):
     def test_openmenu_selects_the_network_like_the_page(self):
         """openMenu's two buttons send POST /dcnow and /dcnet over the PPP link: X-Requested-With: openMenu, no Origin, often no Host."""
         h = {"X-Requested-With": "openMenu"}
-        open(core.DEBUG_DTMF, "w").close()                       # the debug log is on
+        open(core.DEBUG_FLAG, "w").close()                       # the debug log is on
         core.save_module_enabled("debuglog", True)
         self.assertEqual(self.req("POST", "/dcnet", h)[0], 204)
         self.assertTrue(os.path.exists(sw.FLAG))
         self.assertEqual(self.req("POST", "/dcnow", h)[0], 204)
         self.assertFalse(os.path.exists(sw.FLAG))
-        log = open(core.DTMF_LOG).read()
+        log = open(core.DEBUG_LOG).read()
         self.assertIn("openMenu: DCNET selected", log)
         self.assertIn("openMenu: DCNow! selected", log)
 
@@ -174,10 +174,10 @@ class HttpSecurityTests(unittest.TestCase):
         for path in ("/reboot", "/update/start", "/wificonnect"):
             sec.reset_for_tests()
             self.assertEqual(self.req("POST", path, h, b"{}")[0], 401, path)
-            self.assertEqual(self.req("POST", path, dict(h, **{"X-Netswitch-Pin": "1111"}), b"{}")[0], 401, path)
+            self.assertEqual(self.req("POST", path, dict(h, **{"X-Pin": "1111"}), b"{}")[0], 401, path)
         self.assertEqual(self.spawned, [])
         sec.reset_for_tests()
-        status, body, _r = self.req("POST", "/reboot", dict(h, **{"X-Netswitch-Pin": "4821"}))
+        status, body, _r = self.req("POST", "/reboot", dict(h, **{"X-Pin": "4821"}))
         self.assertEqual((status, json.loads(body.decode())["started"]), (200, True))
         self.assertEqual(self.spawned, [1])
         # the check for updates and everyday switches need no PIN
@@ -192,7 +192,7 @@ class HttpSecurityTests(unittest.TestCase):
 
     def test_lockout_answers_429(self):
         sec.set_pin("4821")
-        h = {"X-Requested-With": "x", "X-Netswitch-Pin": "0000"}
+        h = {"X-Requested-With": "x", "X-Pin": "0000"}
         codes = [self.req("POST", "/reboot", h)[0] for _ in range(sec.FAIL_LIMIT + 1)]
         self.assertEqual(codes[:sec.FAIL_LIMIT], [401] * sec.FAIL_LIMIT)
         self.assertEqual(codes[-1], 429)
@@ -214,12 +214,12 @@ class HttpSecurityTests(unittest.TestCase):
             if want:
                 self.assertEqual(got, want, path)
         self.assertEqual(self.req("POST", "/openmenu/games", {"X-Requested-With": "openMenu"}, b"#openmenu-games 1 abc 0\n")[0], 200)
-        ok = dict(h, **{"X-Netswitch-Pin": "4821"})
+        ok = dict(h, **{"X-Pin": "4821"})
         sec.reset_for_tests()
         self.assertEqual(self.req("POST", "/screen/stretch", ok, b'{"value": true}')[0], 200)
         self.assertTrue(core.screen_settings()["stretch"])
         self.assertEqual(self.req("POST", "/pin/check", ok, b"{}")[0], 200)
-        self.assertEqual(self.req("POST", "/pin/check", dict(h, **{"X-Netswitch-Pin": "0000"}), b"{}")[0], 401)
+        self.assertEqual(self.req("POST", "/pin/check", dict(h, **{"X-Pin": "0000"}), b"{}")[0], 401)
         self.assertEqual(self.req("POST", "/settings-pin", ok, b'{"value": false}')[0], 200)        # unlocked again: settings are open
         self.assertEqual(self.req("POST", "/screen/stretch", h, b'{"value": false}')[0], 200)
         os.path.exists(sw.FLAG) and os.remove(sw.FLAG)
@@ -230,12 +230,12 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertEqual(self.req("POST", "/pin", h, b'{"pin": "4821"}')[0], 200)
         self.assertTrue(sec.pin_required())
         self.assertEqual(self.req("POST", "/pin", h, b'{"pin": "9999"}')[0], 401)                  # changing it needs the old one
-        old = dict(h, **{"X-Netswitch-Pin": "4821"})
+        old = dict(h, **{"X-Pin": "4821"})
         self.assertEqual(self.req("POST", "/pin", old, b'{"pin": "9999"}')[0], 200)
         sec.reset_for_tests()
         self.assertTrue(sec.check_pin("9999")[0])
         core.save_settings_pin(True)
-        self.assertEqual(self.req("POST", "/pin", dict(h, **{"X-Netswitch-Pin": "9999"}), b'{"pin": ""}')[0], 200)
+        self.assertEqual(self.req("POST", "/pin", dict(h, **{"X-Pin": "9999"}), b'{"pin": ""}')[0], 200)
         self.assertFalse(sec.pin_required())
         self.assertFalse(core.settings_pin_on())                                                    # no PIN: the lock goes with it
         self.assertFalse(sec.settings_locked())

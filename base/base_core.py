@@ -28,26 +28,21 @@ def _read_project():
 
 
 PROJECT = _read_project()      # project.json: {"name", "title" (the page's), "data_dir", "tmp_prefix", "service", "icon", "touch_icon"}
-BASE_DIR = PROJECT.get("data_dir", "/opt/dreampi-netswitch")           # where the project keeps its settings and state
-TMP_PREFIX = PROJECT.get("tmp_prefix", "/tmp/dreampi-netswitch")       # the start of the names of its short-lived state files
-PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the user's changes to the list of the palette (Appearance > Colour palette): {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui", "led"}]}
-PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb"}}: palette colours the user changed on screen (Appearance > Colour palette; the LED colours are in led_colours.json)
+BASE_DIR = PROJECT.get("data_dir", "/opt/" + PROJECT.get("name", "app"))           # where the project keeps its settings and state
+TMP_PREFIX = PROJECT.get("tmp_prefix", "/tmp/" + PROJECT.get("name", "app"))       # the start of the names of its short-lived state files
+PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the user's changes to the list of the palette (Appearance > Colour palette): {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui"}]}
+PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb"}}: palette colours the user changed on screen (Appearance > Colour palette)
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
-MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"switcher": {"dcnow": "orange", ...}}: the global-palette colours each module uses
-MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["switcher", "numbers", ...]: the order set in the module picker (top = first, wins)
-DEBUG_DTMF = os.path.join(BASE_DIR, "debug_dtmf")
-ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for update/restart/Wi-Fi (install.sh --pin)
+MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"clock": {"clock": "orange", ...}}: the global-palette colours each module uses
+MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["clock", "players", ...]: the order set in the module picker (top = first, wins)
+DEBUG_FLAG = os.path.join(BASE_DIR, PROJECT.get("debug_flag", "debug"))     # exists = the debug timeline is recorded (a debug module switches it)
+ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for the actions a module marks PROTECTED (install.sh --pin)
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
 HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id: how a highlighted box looks (Settings > Appearance)
 SETTINGS_PIN = os.path.join(BASE_DIR, "settings_pin")   # exists = Settings asks for the PIN (when one is set) before it opens and changes anything
 SCREEN = os.path.join(BASE_DIR, "screen.json")         # how the page is laid out on a wide screen: max columns, stretch, scale (Settings > Appearance)
 TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the Pi's own (Settings > About)
-DTMF_LOG = TMP_PREFIX + "-dtmf.log"
-# Wi-Fi setup (netswitch_buttons.py, install.sh --wifi); the buttons themselves are always installed
-                                                         # to the setup access point's own /connect -
-                                                         # lets the regular page pick a network too,
-                                                         # useful when it's reachable some other way
-                                                         # (e.g. Ethernet) while Wi-Fi is being set up
+DEBUG_LOG = TMP_PREFIX + PROJECT.get("debug_log", "-debug.log")           # the debug timeline
 POKE_PREFIX = TMP_PREFIX + ".poke."   # poke(name): "measure it again now", see poke()
 
 
@@ -58,14 +53,14 @@ POKE_PREFIX = TMP_PREFIX + ".poke."   # poke(name): "measure it again now", see 
 #   "description"  the text under it in the picker
 #   "enabled"      on by default when it is first loaded           (older files: "default"); the picker's own choice
 #                  (modules.json) overrides it
-#   "visible"      false = not in the picker and always on (the network switcher, say)   (default true)
+#   "visible"      false = not in the picker and always on (a module that is always there, say)   (default true)
 #   optional: "web" (Python entry for the web service), "ui" (page kit version), "order" (where it starts out in the
 #   list), "colours" / "primary" (see the colour section below)
 # A module is *installed* when its folder is there and *enabled* when it is on in the picker. Its place in the picker
 # (module_order.json) is its priority: the first one shows first and wins where two modules want the same thing.
-# Everything that has to know - the web page, the LED service, the buttons service - asks here.
+# Everything that has to know - the web page, a module's own service - asks here.
 MODULES_DIR = project_path("modules")
-MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"led": true, "wifi": false, ...} set from the module picker
+MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"clock": true, "players": false, ...} set from the module picker
 
 
 _manifests = {}     # path -> (mtime, parsed): module.json is asked for many times a second, it changes almost never
@@ -105,37 +100,17 @@ def module_default_enabled(manifest):
     return bool(manifest.get("enabled", manifest.get("default", True)))
 
 
-def module_actions():
-    """The actions the enabled modules announce (module.json "actions": [{"id", "label", "sub"}]), in picker order, as
-    [{"value": "<module>.<id>", "label", "sub", "group": <the module's title>}]. A module's hook file does them inside DreamPi
-    (see netswitch_hook.py); the phone numbers module offers them in its rows."""
+def module_announcements(key):
+    """What the enabled modules announce under `key` in their module.json (a list of objects, e.g. "actions" or "led_messages"), in picker
+    order, as [(module name, the module's title, one announcement)]. How an announcement is used is for the module that asked."""
     out, state = [], modules_state()
     for name in module_names():
         manifest = module_manifest(name) or {}
         if not module_enabled(name, state):
             continue
-        for a in manifest.get("actions") or []:
-            if isinstance(a, dict) and re.match(r"^[a-z][a-z0-9_]*$", str(a.get("id") or "")):
-                out.append({"value": "%s.%s" % (name, a["id"]), "label": str(a.get("label") or a["id"]),
-                            "sub": str(a.get("sub") or ""), "group": module_title(name, manifest)})
-    return out
-
-
-def module_led_messages():
-    """The messages the enabled modules announce for the LEDs (module.json "led_messages": [{"id", "label", "group", "description"}]),
-    in picker order, as [{"key", "label", "group", "description", "module"}]. The LED module lists them as the triggers a row can
-    have; a message of a module that is off is not offered and never lights. The first module to announce a key owns it."""
-    out, seen, state = [], set(), modules_state()
-    for name in module_names():
-        manifest = module_manifest(name) or {}
-        if not module_enabled(name, state):
-            continue
-        for m in manifest.get("led_messages") or []:
-            key = str((m or {}).get("id") or "") if isinstance(m, dict) else ""
-            if re.match(r"^[a-z][a-z0-9-]*$", key) and key not in seen:
-                seen.add(key)
-                out.append({"key": key, "label": str(m.get("label") or key), "group": str(m.get("group") or module_title(name, manifest)),
-                            "description": str(m.get("description") or ""), "module": name})
+        for item in manifest.get(key) or []:
+            if isinstance(item, dict):
+                out.append((name, module_title(name, manifest), item))
     return out
 
 
@@ -370,7 +345,7 @@ def service(name, *args):
 
 def colour_tokens():
     """[{"id", "name", "module"}]: colours that the enabled modules add to what a colour pick offers (module.json "colour_tokens": [{"id", "name"}]), after
-    the palette. Not part of the palette: it cannot be edited or deleted. The switcher's "network" (Selected network) follows the selected network."""
+    the palette. Not part of the palette: it cannot be edited or deleted. A token's colour is named by a service of the module that added it (see service())."""
     out, seen = [], set(PALETTE_IDS)
     state = modules_state()
     for name in module_names():
@@ -399,7 +374,7 @@ def palette_overrides():
 
 def colours():
     """The palette as dicts: id, name, group, ui, ui_l and ui_default (as the add-on ships it). A module that shows a colour some other way
-    (the LED module) keeps its own table for that."""
+    (another module) keeps its own table for that."""
     over, out = palette_overrides(), []
     for c in _palette_entries():
         o = over.get(c[0], {})
@@ -488,7 +463,7 @@ def palette_add(name, ui):
 
 
 def palette_edit(ident, name=None, ui=None):
-    """Rename a colour and / or change its colour on screen (what the LED shows is the LED module's). "Selected network" cannot change colour, only be
+    """Rename a colour and / or change its colour on screen (what another module shows is that module's). A colour token cannot change colour, only be
     renamed. False when it does not exist."""
     if ident not in palette_ids():
         return False
@@ -514,7 +489,7 @@ def palette_edit(ident, name=None, ui=None):
 
 
 def palette_delete(ident):
-    """Take a colour out of the palette. What used it falls back (a module's pick to its default, a highlight to the rainbow, an LED row to
+    """Take a colour out of the palette. What used it falls back (a module's pick to its default, a highlight to the rainbow, another module's row to
     orange). False for one that cannot be deleted (FIXED_COLOURS) or does not exist."""
     if ident in FIXED_COLOURS or ident not in palette_ids():
         return False
@@ -559,7 +534,7 @@ def palette_order(ids):
 
 def palette_reset(ident=None):
     """Back to the colours the add-on ships: the whole palette (all colours, names, order, screen colours) or one shipped colour (its name and screen
-    colour). What the LED shows for a colour is the LED module's and stays."""
+    colour). What another module shows for a colour is that module's and stays."""
     if ident is None:
         reset_palette()
         try:
@@ -651,7 +626,7 @@ def module_colours(name):
 
 
 # ---- highlight: a module can ask for one of its dashboard boxes to stand out for a while (an event starts soon, say): /api
-# "highlight" {box id: why}. A grey box (the Dreamcast background) turns its own colour; a coloured box takes the highlight look
+# "highlight" {box id: why}. A grey box (a background module's) turns its own colour; a coloured box takes the highlight look
 # set here, the same for every module: an animated rainbow edge or one palette colour that glows.
 HIGHLIGHT_STYLES = ("rainbow",) + PALETTE_IDS        # as shipped; highlight_styles() is the list in use
 DEFAULT_HIGHLIGHT = "rainbow"
@@ -836,11 +811,11 @@ def read_file(path):
 
 def debug_log(text):
     """Add a line to the debug timeline (same format as the hook)."""
-    if not os.path.exists(DEBUG_DTMF) or not module_enabled("debuglog"):
+    if not os.path.exists(DEBUG_FLAG) or not module_enabled(PROJECT.get("debug_module", "debug")):
         return
     try:
         now = time.time()
-        with open(DTMF_LOG, "a") as f:
+        with open(DEBUG_LOG, "a") as f:
             f.write("%s.%03d %9s  %s\n" % (time.strftime("%H:%M:%S", time.localtime(now)),
                                           int(now * 1000) % 1000, "", text))
     except IOError:
@@ -855,16 +830,16 @@ def trim_log():
     """Keep the debug log from growing without limit while recording.
     The hook opens the file for every line, so replacing it is safe."""
     try:
-        if os.path.getsize(DTMF_LOG) <= LOG_MAX:
+        if os.path.getsize(DEBUG_LOG) <= LOG_MAX:
             return
-        with open(DTMF_LOG, "rb") as f:
+        with open(DEBUG_LOG, "rb") as f:
             f.seek(-LOG_KEEP, 2)
             data = f.read()
         data = data[data.find(b"\n") + 1:]      # start at a whole line
-        tmp = DTMF_LOG + ".tmp"
+        tmp = DEBUG_LOG + ".tmp"
         with open(tmp, "wb") as f:
             f.write(data)
-        os.rename(tmp, DTMF_LOG)
+        os.rename(tmp, DEBUG_LOG)
     except (IOError, OSError):
         pass
 
@@ -890,11 +865,5 @@ def poke_stamp(name):
     except OSError:
         return None
 
-
-
-# What a button does. Push buttons act on a short press. A toggle switch is wired
-# between the pin and GND and acts on its position: closed (pin low) = "on",
-# open = "off"; the position is also applied once at start.
-# (name, label, group, needs Wi-Fi setup installed, the line under the button's row on the page; "{pin}" becomes "GPIO17" for its pin)
 
 

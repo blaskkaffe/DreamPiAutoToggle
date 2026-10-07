@@ -7,12 +7,12 @@ numbers rows, `actions` in `module.json`, the `triggers` widget, the LED rows). 
 
 | Piece | Where | What it does |
 |---|---|---|
-| `actions` | `module.json` of the switcher | Announces `toggle`, `dcnow`, `dcnet` (id, label, sub-label). `core.module_actions()` lists the actions of the enabled modules as `<module>.<id>`. |
+| `actions` | `module.json` of the switcher | Announces `toggle`, `dcnow`, `dcnet` (id, label, sub-label). `netswitch_numbers.module_actions()` lists the actions of the enabled modules as `<module>.<id>`. |
 | `hook` | the module's hook file, loaded by `netswitch_dreampi.py` | `ACTIONS = {"dcnow": fn}`; `fn(call)` runs **inside DreamPi** and gets `.raw`, `.number`, `.base_dir`, `.log`. Python 2/3, works through files. |
 | Rows | `numbers.json` `{"rows": [{id, action, items, opts: {hangup}}]}` | A row = one action + the numbers that trigger it + "hang up". Default row: `switcher.dcnow` with `11111`. A number may be in several rows. |
 | Widget | `triggers` in `page/widgets.js`, answered by `GET`/`POST /numbers` | Edit rows, number chips, Add row, Restore, (i) help. |
 | LED rows | `GET`/`POST /ledrows`, `led_messages` in `module.json` | A row = colour + the LED messages (announced by every module) that trigger it; row order is priority. |
-| Buttons | `button1_function`, `button2_function`, `wifi_button`; `core.BUTTON_FUNCTIONS` | **Still a fixed list**, run by the buttons service. Not part of the rows. |
+| Buttons | `button1_function`, `button2_function`, `wifi_button`; `netswitch_switcher_state.BUTTON_FUNCTIONS` | **Still a fixed list**, run by the buttons service. Not part of the rows. |
 | Events, players, updates | each module's own code | Banner, highlight and LED messages are hard-wired. |
 
 What is missing for the whole idea: variables for actions, actions that run outside DreamPi, triggers other than a dialed
@@ -177,7 +177,7 @@ The old `button*_function` and `wifi_button` settings are converted once, on upd
 
 | Step | Change | Files |
 |---|---|---|
-| 1 | `netswitch_actions.py` (run from any process); the hook uses it; `call` gets `.args`, `.source`, `.value`; the action announcement gets `params` and `required`, checked by `core.module_actions()` | base, `netswitch_hook.py`, tests |
+| 1 | `netswitch_actions.py` (run from any process); the hook uses it; `call` gets `.args`, `.source`, `.value`; the action announcement gets `params` and `required`, checked by `netswitch_numbers.module_actions()` | base, `netswitch_hook.py`, tests |
 | 2 | Source announcement (`triggers` in `module.json`), `GET`/`POST /triggers`, the `triggered_by` widget with the source mark; numbers answers the source interface | base, `page/widgets.js`, numbers, switcher `layout.json` |
 | 3 | Variables in the row editor; placeholders | `page/widgets.js`, numbers |
 | 4 | Actions for Wi-Fi, LED alert, notice, highlight, colour, check for updates | those modules, base |

@@ -15,6 +15,7 @@
  },
  "launcher": {
   "title": "openMenu",
+  "target": "the Dreamcast",
   "state": "openmenu",
   "games": "om_games",
   "start": "/openmenu/launch"

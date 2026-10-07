@@ -1,11 +1,11 @@
-# DreamPi Netswitch add-on - who may talk to the web service, and the optional PIN.
-# The web service runs as root (it restarts DreamPi, reboots the Pi and runs the updater), so
+# Base - who may talk to the web service, and the optional PIN.
+# The web service runs as root (a module can restart services, reboot the machine or run an updater), so
 # a request is checked before anything is done:
 #   - Host header: refuse names that are not this Pi's (DNS rebinding: a web page on the
 #     internet that points its own name at the Pi's address and then talks to it from the browser);
 #   - Origin / Referer: a browser's POST from another site is refused (CSRF);
 #   - the custom X-Requested-With header (a page of another site can't add it) for the actions
-#     that reboot, update or change Wi-Fi;
+#     a module marks PROTECTED;
 #   - an optional PIN (set with install.sh --pin, never from the page) for those same actions,
 #     with a lock-out after repeated wrong tries.
 # Python 3 (imports only core).
@@ -38,7 +38,7 @@ _fails = {"count": 0, "until": 0.0}
 # ------------------------------------------------------------------ host / origin
 
 def _host_only(value):
-    """'Host: dreampi.local:80' -> 'dreampi.local'; '[::1]:80' -> '::1'."""
+    """'Host: box.local:80' -> 'box.local'; '[::1]:80' -> '::1'."""
     value = (value or "").strip().lower()
     if value.startswith("["):
         return value[1:].split("]")[0]
@@ -62,9 +62,9 @@ def extra_hosts():
 
 
 def host_allowed(header):
-    """True when the Host header names this Pi: an IP address, a plain or local name, its own
+    """True when the Host header names this machine: an IP address, a plain or local name, its own
     host name, or something listed in allowed_hosts. No Host header (old HTTP/1.0 clients such
-    as the Dreamcast) is fine: a browser always sends one."""
+    as old game consoles) is fine: a browser always sends one."""
     host = _host_only(header)
     if not host:
         return not (header or "").strip()

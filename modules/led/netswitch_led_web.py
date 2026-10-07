@@ -80,7 +80,7 @@ def _rows_reply():
                {"key": "brightness", "type": "slider", "label": "Level", "scale": "log100", "default": cfg["max_brightness"],
                 "null_text": "Uses the global level from Calibration", "own_text": "Its own level", "null_button": "Use global"}]
     if count > 1:
-        options.append({"key": "leds", "type": "range", "label": "LEDs", "max": count})
+        options.append({"key": "leds", "type": "range", "label": "LEDs", "max": count, "unit": "LED"})
     used = set(g["colour"] for g in cfg["groups"])
     first = [c["id"] for c in core.colours() if c["id"] not in used and not c["id"].startswith("bright-")] or [core.colours()[0]["id"]]
     default = ledconfig.default_led_config()

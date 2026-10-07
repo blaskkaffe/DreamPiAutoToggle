@@ -14,7 +14,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   let prompts = [], alerts = [];
   page.on('dialog', d => { if (d.type() === 'prompt') { prompts.push(d.message()); return d.accept(answers.shift() || ''); } alerts.push(d.message()); return d.accept(); });
   const answers = [];
-  const post = (path, body, pin) => page.evaluate(([p, b, pn]) => fetch(p, { method: 'POST', headers: Object.assign({ 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, pn ? { 'X-Netswitch-Pin': pn } : {}), body: JSON.stringify(b || {}) }).then(r => r.status), [path, body, pin]);
+  const post = (path, body, pin) => page.evaluate(([p, b, pn]) => fetch(p, { method: 'POST', headers: Object.assign({ 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, pn ? { 'X-Pin': pn } : {}), body: JSON.stringify(b || {}) }).then(r => r.status), [path, body, pin]);
   const load = async () => { await page.goto(URL, { waitUntil: 'networkidle' }); await settle(1200); };
   const info = () => page.evaluate(() => {
     const d = document.getElementById('dash'), cols = d.querySelectorAll(':scope > .dcol'), b = document.body;

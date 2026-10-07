@@ -162,7 +162,7 @@ class WithEverything(Base):
         self.assertEqual(ids[-1], "system")                                                                # System is the very last box
         self.assertLess(ids.index("about"), ids.index("background-image"))                                  # settings-only modules come before the backgrounds
         appearance = [b for b in lay["settings"] if b["id"] == "appearance"][0]
-        self.assertEqual((appearance["mods"], appearance["title"]), (["switcher", "clock", "players", "events", "openmenu", "debuglog", "imagebg", "background"], "Appearance"))      # the colours (network, clock, players, events, openMenu link, debug log), the notification highlight look and the background's switch
+        self.assertEqual((appearance["mods"], appearance["title"]), (["base", "switcher", "clock", "players", "events", "openmenu", "debuglog", "imagebg", "background"], "Appearance"))      # the base's own settings (base/layout.json) first, then the colours (network, clock, players, events, openMenu link, debug log) and the background's switch
         self.assertEqual([w["control"]["module"] for w in appearance["items"] if w["type"] == "row" and w["control"]["type"] == "toggle" and "module" in w["control"]], ["imagebg", "background"])
         about = [b for b in lay["settings"] if b["id"] == "about"][0]
         self.assertEqual((about["mods"], about["title"]), (["system"], "About"))               # the versions are their own box, not part of System

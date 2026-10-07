@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
-# DreamPi Netswitch add-on - shared low-level GPIO register access.
-#
-# Used by netswitch_led.py (NeoPixel output, GPIO10/12/18/21) and
-# netswitch_buttons.py (the Wi-Fi setup button input). Registers are mapped straight from
+# Base - shared low-level GPIO register access for the modules' services (a strip of lights' output, a button's input).
+# Registers are mapped straight from
 # /dev/mem, 32-bit accesses only, so no driver or Python package is needed;
 # each caller opens its own mapping since these run in separate processes.
 # Python 3 only (both services run under python3).
@@ -55,7 +53,7 @@ class Block(object):
 
 
 # ------------------------------------------------------------------- input
-# Only what the Wi-Fi setup button needs: one pin, as input with an internal
+# Only what a button needs: one pin, as input with an internal
 # pull-up (idle high; the button pulls it to GND when pressed).
 
 def set_input_pullup(gpio, pin, base):

@@ -105,9 +105,9 @@ class SettingsTests(unittest.TestCase):
 
     def test_modules_announce_actions(self):
         """The switcher announces toggle / DCNow! / DCNET; a module that is off announces nothing."""
-        got = [a["value"] for a in core.module_actions()]
+        got = [a["value"] for a in nums.module_actions()]
         self.assertEqual([a for a in got if a.startswith("switcher.")], ["switcher.toggle", "switcher.dcnow", "switcher.dcnet"])
-        self.assertTrue(all(a["label"] and a["group"] for a in core.module_actions()))
+        self.assertTrue(all(a["label"] and a["group"] for a in nums.module_actions()))
 
     def test_the_reply_has_ready_texts_and_warns_when_openmenu_is_not_caught(self):
         r = nums._reply()

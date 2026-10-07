@@ -71,7 +71,7 @@ changed, n removed)` or `events: sync failed, the stored events are kept: ...`.
   (10) minutes after, unless dismissed.
 - While one is due: the module's `api()` adds a **notice** (the banner; its ✕ is `POST /events/dismiss`) and **highlights** the
   `clock` box and its own `events` box (the base's highlight, see [modules.md](modules.md)); the LED service's `gather()` asks
-  `core.event_reminder()` too and lights **Event starting soon** (`event-soon`), so the LED works without the page open.
+  `netswitch_led_inputs.event_reminder()` too and lights **Event starting soon** (`event-soon`), so the LED works without the page open.
 - Picks of events that are gone, and dismissals of past events, are dropped by `write_reminders()`.
 
 ## The JSON API

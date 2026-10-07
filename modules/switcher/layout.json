@@ -85,70 +85,11 @@
      "title": "Network Selector colour",
      "sub": "Module",
      "control": {
-      "type": "swatches", "tint": true,
+      "type": "swatches",
+      "tint": true,
       "key": "selector",
       "title": "Colour of the DreamPi Network Selector"
      }
-    },
-    {"type": "palette"},
-    {
-     "type": "form",
-     "get": "/screen",
-     "post": "/screen",
-     "fields": [
-      {
-       "title": "Theme",
-       "sub_text": "theme",
-       "controls": [{"type": "choice", "key": "theme", "options": "themes", "label": "Theme"}]
-      },
-      {
-       "title": "Max columns: dashboard",
-       "sub_text": "dash_cols",
-       "controls": [{"type": "choice", "key": "dash_cols", "options": "cols", "label": "Columns"}]
-      },
-      {
-       "title": "Max columns: settings",
-       "sub_text": "set_cols",
-       "controls": [{"type": "choice", "key": "set_cols", "options": "cols", "label": "Columns"}]
-      }
-     ]
-    },
-    {
-     "type": "row",
-     "title": "Stretch boxes",
-     "sub": "On a wide screen the columns fill the width, so the boxes are wider",
-     "control": {"type": "toggle", "bind": "@screen.stretch", "post": "/screen/stretch", "label": "Stretch boxes"}
-    },
-    {
-     "type": "row",
-     "title": "Scale content",
-     "sub": "The content of a stretched box grows with it, so the box is taller too (off: the content keeps its size)",
-     "show": "@screen.stretch",
-     "control": {"type": "toggle", "bind": "@screen.scale", "post": "/screen/scale", "label": "Scale content"}
-    },
-    {
-     "type": "row",
-     "title": "Fit to screen",
-     "sub": "The main screen is made as big as it can be without scrolling, so there is no empty space under it (the columns fill the width; neither Stretch nor scaling is needed)",
-     "control": {"type": "toggle", "bind": "@screen.fit", "post": "/screen/fit", "label": "Fit to screen"}
-    },
-    {
-     "type": "row",
-     "title": "Rearrange the main screen",
-     "sub": "A handle on each tile lets you drag it to another place; the modules take that order (the same as dragging them in Modules)",
-     "control": {"type": "toggle", "bind": "@screen.drag", "post": "/screen/drag", "label": "Rearrange the main screen"}
-    },
-    {
-     "type": "row",
-     "title": "Ask for the PIN to open Settings",
-     "sub": "The dashboard keeps working without it; opening Settings and changing anything in it needs the PIN. Set a PIN below first.",
-     "control": {"type": "toggle", "bind": "@settings_pin.on", "post": "/settings-pin", "label": "Ask for the PIN to open Settings"}
-    },
-    {
-     "type": "row",
-     "title": "PIN",
-     "sub": "4 to 64 characters. It is also asked for before updating, restarting the Pi and joining Wi-Fi.",
-     "control": {"type": "pinset"}
     }
    ]
   },
@@ -163,7 +104,9 @@
      "control": {
       "type": "swatches",
       "key": "dcnow",
-      "exclude": ["network"],
+      "exclude": [
+       "network"
+      ],
       "title": "Colour for DCNow!"
      }
     },
@@ -174,34 +117,11 @@
      "control": {
       "type": "swatches",
       "key": "dcnet",
-      "exclude": ["network"],
+      "exclude": [
+       "network"
+      ],
       "title": "Colour for DCNET"
      }
-    },
-    {
-     "type": "row",
-     "title": "Global main colour",
-     "sub": "Pick Global main for a box or a row of the LEDs to give them this colour",
-     "control": {"type": "colourpick", "id": "global", "label": "Global main colour"}
-    },
-    {
-     "type": "form",
-     "get": "/highlight",
-     "post": "/highlight",
-     "fields": [
-      {
-       "title": "Notification highlight",
-       "sub_text": "highlight",
-       "controls": [
-        {
-         "type": "select",
-         "key": "style",
-         "options": "styles",
-         "label": "Look"
-        }
-       ]
-      }
-     ]
     }
    ]
   },

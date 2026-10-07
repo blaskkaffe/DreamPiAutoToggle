@@ -42,9 +42,9 @@ install.sh uninstall.sh   the project's installer (copies base/ and modules/ to 
 **Order of work (tests green and a push after each step).**
 1. **Done.** Neutral names: `base/`, `base_*.py`, `project.json`, the installer copies `base/` and `modules/`; a test forbids project words in `base/`.
 2. **Done.** The DreamPi integration files into `switcher` (`netswitch_switcher_probes.py`, `netswitch_dreampi.py` = the hook, `netswitch_switcher_buttons.py`; its `install.sh` writes the `.pth` and the buttons unit, its `start()` runs the checker and the boot reset); numbers matching into `numbers` (`netswitch_numbers_hook.py`); the About versions into `system` (the Modem row is the switcher's `about_rows()`, collected by the base's `modules.collect("about_rows")` so that modules fill one list without importing each other); the Wi-Fi setup has its own small internet check.
-3. The module-owned paths and readers out of `base_core.py`, owner by owner (wifi, rebootupdate, events, players, openmenu, imagebg, numbers, clock, led, switcher).
-4. LED colours into the `led` module; tokens resolved by the module that adds them (service); `realColour()` in the page without the word `switcher`.
-5. Documentation, and the forbidden-words test switched on for all of `base/`.
+3. **Done.** The module-owned paths and readers out of `base_core.py`, owner by owner (wifi, rebootupdate, events, players, openmenu, imagebg, numbers, clock, led, switcher).
+4. **Done.** LED colours into the `led` module; tokens resolved by the module that adds them (service); `realColour()` in the page without the word `switcher`.
+5. **Done.** Documentation, and the forbidden-words test switched on for all of `base/`.
 
 Not verified on a Pi: the installer and the hook inside DreamPi are only tested off-hardware, as before; every step keeps that boundary and says so in
 `docs/hardware-status.md`.
