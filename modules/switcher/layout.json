@@ -90,6 +90,7 @@
       "title": "Colour of the DreamPi Network Selector"
      }
     },
+    {"type": "palette"},
     {
      "type": "form",
      "get": "/screen",

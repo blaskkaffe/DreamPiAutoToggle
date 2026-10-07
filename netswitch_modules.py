@@ -40,7 +40,7 @@ UI_KIT = 2       # the version of the page kit (ui in page/page.js, the kit bloc
 _PAGE_FILES = ("page.css", "page.js")
 # the standard widgets the page can draw from a layout (docs/modules.md, "Layout"); "custom" hands a box to the module's own page.js
 WIDGETS = ("text", "row", "button", "toggle", "swatches", "colourpick", "link", "form", "infobox", "status", "bar", "carousel", "worldmap", "triggers",
-           "picker", "list", "links", "console", "info", "pinset", "custom")
+           "picker", "list", "links", "console", "info", "pinset", "palette", "custom")
 CONTROLS = ("select", "choice", "number", "text", "toggle", "colour", "slider", "range")      # what a form field may hold (W.form, control() in page/widgets.js)
 SECTIONS = ("dashboard", "settings")
 BACKGROUND_TYPES = ("fullscreen", "part")
@@ -223,7 +223,7 @@ def _primary_of(name, manifest):
     cols = core.module_colours(name)
     if want in cols:
         return cols[want]
-    return want if want in core.palette_ids() else None
+    return want if want in core.colour_ids() else None
 
 
 def _module_file(name, filename):

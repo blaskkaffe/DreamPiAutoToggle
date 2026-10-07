@@ -1,9 +1,0 @@
-{
- "name": "Colour palette",
- "description": "Edit, add, rearrange and delete the colours the page and the LEDs offer.",
- "enabled": true,
- "visible": true,
- "order": 45,
- "ui": 2,
- "web": "netswitch_palette"
-}

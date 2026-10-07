@@ -10,9 +10,9 @@ import time
 
 BASE_DIR = "/opt/dreampi-netswitch"
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
-PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the Colour palette module's list: {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui", "led"}]}
+PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the user's changes to the list of the palette (Appearance > Colour palette): {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui", "led"}]}
 LED_COLOURS = os.path.join(BASE_DIR, "led_colours.json")   # {"red": "#rrggbb"}: how the LED shows a palette colour when that is not the default (Status LED > Colours, the LED module's)
-PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb"}}: palette colours the user changed on screen (the Colour palette module; the LED colours are in led_colours.json)
+PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb"}}: palette colours the user changed on screen (Appearance > Colour palette; the LED colours are in led_colours.json)
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
 MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"switcher": {"dcnow": "orange", ...}}: the global-palette colours each module uses
 MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["switcher", "numbers", ...]: the order set in the module picker (top = first, wins)
@@ -303,14 +303,15 @@ def reset_network_after_boot():
 
 
 # ---------------------------------------------------------------- colours
-# The page's colours: one global palette of 16 named colours (8 hues, each normal and bright, like a terminal's 16),
-# defined only here. A module never writes a colour of its own; it names one from the palette by its id ("orange",
+# The page's colours: one global palette of 15 named colours (8 hues, each normal and bright, like a terminal's 16, and "Global main"),
+# defined only here (the user can edit it in Settings > Appearance > Colour palette). A module never writes a colour of its own; it names one from the palette by its id ("orange",
 # "bright-blue" ...), either in module.json  "colours": {"dcnow": "orange", ...}  (the user can change these in the
 # module's own settings, see module_colour()) or as its  "primary"  colour, the one used on its borders and buttons.
 # id, name, hue group, page colour, its lighter variant (borders, text), LED colour (the LED's own tuning: a screen
 # colour looks different lit on a NeoPixel).
-# Two of the 16 are not fixed colours: "global" (Global main, one colour the user picks in Appearance, for boxes that should
-# share it) and "network" (Selected network: whichever colour DCNow! or DCNET has right now, it follows the switch).
+# "global" (Global main) is not a fixed colour: one colour the user picks, for boxes that should share it. A module can add a colour
+# of its own to what a colour pick offers (module.json "colour_tokens"; see colour_tokens()): the network switcher adds "network"
+# (Selected network: whichever colour DCNow! or DCNET has right now, it follows the switch). Those are not part of the palette.
 PALETTE = (
     ("global", "Global main", "global", "#6f7d99", "#b0b7c7", "#8090ff"),
     ("red", "Red", "red", "#d9363e", "#ef8a8f", "#ff0000"),
@@ -320,7 +321,6 @@ PALETTE = (
     ("cyan", "Cyan", "cyan", "#1fb5c9", "#7fdbe6", "#00c8ff"),
     ("blue", "Blue", "blue", "#1c6fe8", "#80b1f6", "#0046ff"),
     ("purple", "Purple", "purple", "#8a4fd6", "#bf9ae8", "#aa00ff"),
-    ("network", "Selected network", "network", "#e8761c", "#f6b27a", "#ff8c00"),
     ("white", "White", "white", "#b8bec9", "#e6e9ee", "#ffffff"),
     ("bright-red", "Bright red", "red", "#ff5a5f", "#ffa6a9", "#ff5050"),
     ("bright-green", "Bright green", "green", "#4cd964", "#a6efb6", "#50ff70"),
@@ -329,8 +329,8 @@ PALETTE = (
     ("bright-purple", "Bright purple", "purple", "#b070ff", "#d3b0ff", "#cc66ff"),
     ("bright-pink", "Bright pink", "pink", "#ff6ab8", "#ffaad6", "#ff70b0"),
 )
-PALETTE_IDS = tuple(c[0] for c in PALETTE)       # the ones the add-on ships; palette_ids() is the list in use (the Colour palette module can delete and add colours)
-FIXED_COLOURS = ("global", "network", "orange")   # never deleted: "Global main" and "Selected network" are not colours of their own, orange is the one everything falls back to
+PALETTE_IDS = tuple(c[0] for c in PALETTE)       # the ones the add-on ships; palette_ids() is the list in use (the colour palette editor can delete and add colours)
+FIXED_COLOURS = ("global", "orange")   # never deleted: "Global main" is not a colour of its own, orange is the one everything falls back to
 # colours that were in the palette once: what a saved choice of them becomes
 LEGACY_COLOURS = {"bright-orange": "orange", "bright-yellow": "yellow", "pink": "bright-pink"}
 DEFAULT_COLOUR = "orange"
@@ -360,11 +360,9 @@ MAX_CUSTOM_COLOURS = 40
 
 
 def palette_layout():
-    """The Colour palette module's list over the shipped palette, made safe: {"order", "deleted", "names", "custom"}. Empty while that module is
-    off (the shipped palette is then in use, with the screen colours the user changed in palette.json and the LED colours in led_colours.json)."""
+    """The user's changes to the list of the palette (Settings > Appearance > Colour palette) over the shipped palette, made safe:
+    {"order", "deleted", "names", "custom"}. The screen colours the user changed are in palette.json, the LED colours in led_colours.json."""
     out = {"order": [], "deleted": [], "names": {}, "custom": []}
-    if not module_enabled("palette"):
-        return out
     try:
         with open(PALETTE_CUSTOM) as f:
             data = json.load(f)
@@ -412,17 +410,37 @@ def _read_dict(path):
     return data if isinstance(data, dict) else {}
 
 
+def colour_tokens():
+    """[{"id", "name", "module"}]: colours that the enabled modules add to what a colour pick offers (module.json "colour_tokens": [{"id", "name"}]), after
+    the palette. Not part of the palette: it cannot be edited or deleted. The switcher's "network" (Selected network) follows the selected network."""
+    out, seen = [], set(PALETTE_IDS)
+    state = modules_state()
+    for name in module_names():
+        if not module_enabled(name, state):
+            continue
+        for t in (module_manifest(name) or {}).get("colour_tokens") or []:
+            if isinstance(t, dict) and isinstance(t.get("id"), _STR) and _CUSTOM_ID.match(t["id"]) and t["id"] not in seen:
+                seen.add(t["id"])
+                out.append({"id": t["id"], "name": str(t.get("name") or t["id"])[:24], "module": name})
+    return out
+
+
+def colour_ids():
+    """Every id a colour pick may hold: the palette's and the modules' colours (colour_tokens())."""
+    return palette_ids() + tuple(t["id"] for t in colour_tokens())
+
+
 def palette_overrides():
-    """{id: {"ui": "#rrggbb", "led": "#rrggbb"}}: what the user changed in a palette colour, on screen (palette.json: the Colour palette module) and on the
+    """{id: {"ui": "#rrggbb", "led": "#rrggbb"}}: what the user changed in a palette colour, on screen (palette.json: the colour palette editor) and on the
     LED (led_colours.json: the LED module); only valid entries. An older palette.json that also holds "led" values still counts for them."""
     ids, out = palette_ids(), {}
     for ident, v in _read_dict(PALETTE_FILE).items():
-        if ident in ids and ident != "network" and isinstance(v, dict):
+        if ident in ids and isinstance(v, dict):
             keep = dict((k, str(v[k]).lower()) for k in ("ui", "led") if isinstance(v.get(k), _STR) and _HEX.match(v[k]))
             if keep:
                 out[ident] = keep
     for ident, v in _read_dict(LED_COLOURS).items():
-        if ident in ids and ident != "network" and isinstance(v, _STR) and _HEX.match(v):
+        if ident in ids and isinstance(v, _STR) and _HEX.match(v):
             out.setdefault(ident, {})["led"] = v.lower()
     return out
 
@@ -435,20 +453,19 @@ def colours():
         ui = o.get("ui", c[3])
         out.append({"id": c[0], "name": c[1], "group": c[2], "ui": ui, "ui_l": lighter(ui) if "ui" in o else c[4],
                     "led": o.get("led", c[5]), "ui_default": c[3], "led_default": c[5]})
-    # "Selected network" is the colour of the selected network, as it is now (the network switcher's pick for it)
+    # the modules' own colours (colour_tokens()); "network" (Selected network) is the colour of the selected network, as it is now (the switcher's pick for it)
     sel = "dcnet" if os.path.exists(FLAG) else "dcnow"
     pick = module_colours("switcher").get(sel) or {"dcnow": "orange", "dcnet": "blue"}[sel]
-    base = [c for c in out if c["id"] == (pick if pick != "network" else DEFAULT_COLOUR)][0]
-    for i, c in enumerate(out):
-        if c["id"] == "network":
-            out[i] = dict(base, id="network", name=c["name"], group="network", ui_default=base["ui"], led_default=base["led"])
+    base = ([c for c in out if c["id"] == pick] or [c for c in out if c["id"] == DEFAULT_COLOUR] or out)[0]
+    for t in colour_tokens():
+        out.append(dict(base, id=t["id"], name=t["name"], group="token", ui_default=base["ui"], led_default=base["led"], token=True))
     return out
 
 
 def set_palette_colour(ident, ui=None, led=None):
     """Change a palette colour on screen (ui) and / or on the LED (led), "#rrggbb". A value equal to the default is not kept.
     Returns False for an unknown id or a value that is not a colour."""
-    if ident not in palette_ids() or ident == "network" or any(v is not None and not (isinstance(v, _STR) and _HEX.match(v)) for v in (ui, led)):
+    if ident not in palette_ids() or any(v is not None and not (isinstance(v, _STR) and _HEX.match(v)) for v in (ui, led)):
         return False
     base = [c for c in _palette_entries() if c[0] == ident][0]
     over = palette_overrides()
@@ -479,7 +496,7 @@ def reset_palette(ident=None):
 
 
 def reset_palette_ui(ident=None):
-    """The same for how the colour looks on screen only (the Colour palette module); what the LED shows is left alone."""
+    """The same for how the colour looks on screen only (the colour palette editor); what the LED shows is left alone."""
     over = palette_overrides()
     for i in ([ident] if ident else list(over)):
         if i in over:
@@ -517,7 +534,7 @@ def _write_palette(over):
         os.rename(tmp, path)
 
 
-# ---- the Colour palette module's changes (they only count while that module is on; see palette_layout())
+# ---- the changes the colour palette editor makes (see palette_layout())
 def _raw_layout():
     try:
         with open(PALETTE_CUSTOM) as f:
@@ -697,7 +714,7 @@ def module_colours(name):
     wanted = manifest.get("colours")
     if not isinstance(wanted, dict):
         return {}
-    ids = palette_ids()
+    ids = colour_ids()
 
     def ok(k, v):       # the network colours cannot be "the selected network's" (that would be a circle)
         v = LEGACY_COLOURS.get(v, v)
@@ -729,7 +746,7 @@ DEFAULT_HIGHLIGHT = "rainbow"
 
 
 def highlight_styles():
-    return ("rainbow",) + palette_ids()
+    return ("rainbow",) + colour_ids()
 
 
 def highlight_style():
@@ -817,7 +834,7 @@ def set_module_colour(name, key, ident):
     module, key or colour is unknown."""
     cur = module_colours(name)
     ident = LEGACY_COLOURS.get(ident, ident)
-    if key not in cur or ident not in palette_ids() or (_network_key(name, key) and ident == "network"):
+    if key not in cur or ident not in colour_ids() or (_network_key(name, key) and ident == "network"):
         return None
     if (module_manifest(name) or {}).get("colours_unique"):
         uniq = [k for k in cur if _network_key(name, k)] or list(cur)

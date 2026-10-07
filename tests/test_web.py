@@ -143,7 +143,7 @@ class HttpTests(unittest.TestCase):
     def test_the_highlight_look_is_a_global_setting(self):
         r = json.loads(self.get("/highlight")[2].decode())
         self.assertEqual(r["values"], {"style": "rainbow"})
-        self.assertEqual(len(r["options"]["styles"]), 1 + len(core.PALETTE_IDS))
+        self.assertEqual(len(r["options"]["styles"]), 1 + len(core.colour_ids()))
         st, body = self.post("/highlight", {"values": {"style": "bright-green"}})
         self.assertEqual(json.loads(body.decode())["values"], {"style": "bright-green"})
         self.assertEqual(json.loads(self.get("/api")[2].decode())["theme"]["highlight"], "bright-green")

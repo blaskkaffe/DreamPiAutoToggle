@@ -35,7 +35,7 @@ function setWb(on){if(on){startHold("#ffffff");$("wb-preview").classList.add("on
 $("wb-preview").onclick=function(){setWb(!wbOn)};
 $("wb-reset").onclick=function(){cfg.white_balance={r:1,g:1,b:1};showCal();save()};
 $("led-bright").oninput=function(){cfg.max_brightness=Math.round(sliderToBright(this.value)*1000)/1000;$("led-bright-v").textContent=pct(cfg.max_brightness);save()};
-// ---- Colours: how the LED shows each palette colour (the LED's red need not be the page's red). How a colour looks on screen is set in the Colour palette module.
+// ---- Colours: how the LED shows each palette colour (the LED's red need not be the page's red). How a colour looks on screen is set in Appearance > Colour palette.
 var colRow=editRow({title:"Colours",button:"Adjust",aria:"Adjust the colours"}),colPop=h("div",{"class":"gpop"}),pCol=ui.popup(colPop),colSel=null,colPreview=null,colChanged=false,colTimer=null,pal=[];
 colRow.setSub("How the LED shows each colour");
 host.appendChild(colRow.el);host.appendChild(colPop);

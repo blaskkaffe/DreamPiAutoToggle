@@ -19,7 +19,7 @@ class PaletteCore(unittest.TestCase):
         cleanup(self.tmp)
 
     def ids(self):
-        return [c["id"] for c in core.colours()]
+        return [c["id"] for c in core.colours() if not c.get("token")]            # the palette (the switcher's Selected network is not in it)
 
     def test_the_shipped_palette_is_what_is_used_to_begin_with(self):
         self.assertEqual(tuple(self.ids()), core.PALETTE_IDS)
@@ -44,8 +44,8 @@ class PaletteCore(unittest.TestCase):
         self.assertTrue(core.palette_edit("red", name="Cherry", ui="#c00000"))
         c = core.colour("red")
         self.assertEqual((c["name"], c["ui"], c["led"]), ("Cherry", "#c00000", "#ff0000"))                 # the LED colour is not touched
-        self.assertTrue(core.palette_edit("network", name="Whatever is selected"))             # a rename is fine ...
-        self.assertFalse(core.palette_edit("network", ui="#000000"))                           # ... a colour is not
+        self.assertFalse(core.palette_edit("network", name="Whatever is selected"))            # Selected network is the switcher's, not a colour of the palette
+        self.assertFalse(core.palette_edit("network", ui="#000000"))
         self.assertFalse(core.palette_edit("nope", name="x"))
         self.assertFalse(core.palette_edit("red", ui="not a colour"))
 
@@ -56,7 +56,7 @@ class PaletteCore(unittest.TestCase):
         self.assertFalse(core.palette_order("blue"))
 
     def test_delete_and_what_used_it(self):
-        for fixed in core.FIXED_COLOURS:
+        for fixed in core.FIXED_COLOURS + ("network",):
             self.assertFalse(core.palette_delete(fixed), fixed)
         self.assertEqual(core.module_colours("switcher")["dcnet"], "blue")
         self.assertTrue(core.palette_delete("blue"))
@@ -121,14 +121,19 @@ class PaletteCore(unittest.TestCase):
         self.assertEqual(json.load(open(core.PALETTE_FILE)), {"red": {"ui": "#c00000"}})
         self.assertEqual(json.load(open(core.LED_COLOURS)), {"blue": "#0000aa", "green": "#00aa00", "red": "#00ffff"})
 
-    def test_the_list_only_counts_while_the_module_is_on(self):
-        core.palette_add("Mine", "#123456")
-        core.palette_delete("cyan")
-        self.assertIn("mine", self.ids())
-        core.save_module_enabled("palette", False)
-        self.assertEqual(tuple(self.ids()), core.PALETTE_IDS)                                   # the file is still there, but the shipped palette is in use
-        core.save_module_enabled("palette", True)
-        self.assertIn("mine", self.ids())
+    def test_selected_network_is_a_colour_of_the_switcher_module(self):
+        self.assertEqual([t["id"] for t in core.colour_tokens()], ["network"])
+        self.assertIn("network", core.colour_ids())
+        self.assertNotIn("network", core.palette_ids())
+        self.assertNotIn("network", self.ids())
+        self.assertTrue(core.colour("network")["token"])
+        self.assertIsNotNone(core.set_module_colour("clock", "clock", "network"))               # a module can still pick it
+        self.assertEqual(core.module_colours("clock")["clock"], "network")
+        self.assertIsNone(core.set_module_colour("switcher", "dcnow", "network"))               # the network colours themselves cannot (a circle)
+        core.set_module_colour("switcher", "dcnow", "green")
+        self.assertEqual(core.colour("network")["ui"], core.colour("green")["ui"])              # it is the colour of the selected network
+        core.save_module_enabled("switcher", False)                                              # always on: a request to turn it off changes nothing
+        self.assertTrue(core.module_enabled("switcher"))
 
     def test_the_version_follows_the_palette(self):
         v = core.palette_version()

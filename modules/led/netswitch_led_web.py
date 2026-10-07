@@ -178,9 +178,9 @@ def _post_wbtest_done(h):
 
 
 def _colours_reply():
-    """Every palette colour with how it looks on screen (set in the Colour palette module; shown here for reference) and how the LED shows it (set here)."""
+    """Every palette colour with how it looks on screen (set in Appearance > Colour palette; shown here for reference) and how the LED shows it (set here)."""
     return {"colours": [{"id": c["id"], "name": c["name"], "ui": c["ui"], "led": c["led"], "led_default": c["led_default"],
-                         "fixed": c["id"] == "network"} for c in core.colours()]}
+                         "fixed": bool(c.get("token"))} for c in core.colours()]}
 
 
 def _get_colours(h):
@@ -189,7 +189,7 @@ def _get_colours(h):
 
 def _post_colours(h):
     """The LED colours: {"id", "led"} changes how the LED shows a palette colour; {"reset": id | "all"} puts it back. How a colour looks on screen is the
-    Colour palette module's."""
+    colour palette editor (Appearance)."""
     try:
         body = json.loads(h._body(1024).decode("utf-8"))
         if not isinstance(body, dict):

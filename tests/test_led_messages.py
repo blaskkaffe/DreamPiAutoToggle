@@ -89,7 +89,7 @@ class CatalogueTests(Base):
                          [("red", "blink"), ("yellow", "blink"), ("network", "solid"), ("purple", "solid"), ("bright-pink", "blink"), ("network", "solid")])
         self.assertEqual(by["g6"]["messages"], ["ready-dcnow", "ready-dcnet", "sel-dcnow", "sel-dcnet"])
         for g in by.values():
-            self.assertIn(g["colour"], ledconfig.TOKEN_IDS + core.PALETTE_IDS)
+            self.assertIn(g["colour"], ledconfig.TOKEN_IDS + core.colour_ids())
 
     def test_the_default_order_puts_what_matters_most_on_top(self):
         order = [g["messages"][0] for g in ledconfig.default_groups()]

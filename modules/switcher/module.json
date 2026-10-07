@@ -11,6 +11,9 @@
   "dcnet": "blue"
  },
  "colours_unique": true,
+ "colour_tokens": [
+  {"id": "network", "name": "Selected network"}
+ ],
  "tints": {
   "selector": false
  },

@@ -31,7 +31,7 @@ OLD_KEYS = {"ready": ["ready-dcnow", "ready-dcnet"]}
 # -------------------------------------------------------------------- the looks (groups)
 # A group's colour is a palette id (core.PALETTE, the LED value of it), or a token that follows the networks' global colours:
 # "dcnow", "dcnet" (what the network switcher gave them) or "network" (the colour of whichever network is selected).
-COLOUR_TOKENS = [("dcnow", "DCNow!"), ("dcnet", "DCNET")]      # ("network" and "global" are palette entries now)
+COLOUR_TOKENS = [("dcnow", "DCNow!"), ("dcnet", "DCNET")]      # ("network" comes from the switcher module, "global" is in the palette)
 TOKEN_IDS = tuple(t[0] for t in COLOUR_TOKENS)
 # LED effects (the engine, with the timings, is in netswitch_led.py): name, label, whether it takes a speed.
 EFFECTS = [
@@ -164,7 +164,7 @@ def order_by_priority(groups, priority):
 
 
 def _valid_colour(c):
-    return isinstance(c, _TEXT) and (c in TOKEN_IDS or c in core.palette_ids() or c in core.LEGACY_COLOURS)
+    return isinstance(c, _TEXT) and (c in TOKEN_IDS or c in core.colour_ids() or c in core.LEGACY_COLOURS)
 
 
 def clean_groups(data):

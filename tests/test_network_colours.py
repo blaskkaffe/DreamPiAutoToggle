@@ -15,11 +15,15 @@ class PaletteTests(unittest.TestCase):
     def tearDown(self):
         cleanup(self.tmp)
 
-    def test_sixteen_colours_in_the_order_of_the_grid(self):
+    def test_fifteen_palette_colours_in_the_order_of_the_grid_and_the_switchers_own(self):
         pal = core.colours()
-        self.assertEqual([c["id"] for c in pal], ["global", "red", "orange", "yellow", "green", "cyan", "blue", "purple",
-                                                  "network", "white", "bright-red", "bright-green", "bright-cyan", "bright-blue",
-                                                  "bright-purple", "bright-pink"])       # Global main and Selected network start the two rows
+        self.assertEqual([c["id"] for c in pal if not c.get("token")], ["global", "red", "orange", "yellow", "green", "cyan", "blue", "purple",
+                                                                       "white", "bright-red", "bright-green", "bright-cyan", "bright-blue",
+                                                                       "bright-purple", "bright-pink"])
+        self.assertEqual([c["id"] for c in pal if c.get("token")], ["network"])           # Selected network is not in the palette: the network switcher module adds it
+        self.assertEqual([t["module"] for t in core.colour_tokens()], ["switcher"])
+        self.assertNotIn("network", core.PALETTE_IDS)
+        self.assertEqual(core.colour_ids(), core.palette_ids() + ("network",))
         self.assertEqual(len(set(c["id"] for c in pal)), 16)
         self.assertNotIn("pink", core.PALETTE_IDS)                                       # the dark pink, bright orange and bright yellow are gone
         self.assertNotIn("bright-orange", core.PALETTE_IDS)

@@ -97,7 +97,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await page.click('#cog'); await settle(800);
   await page.locator('[data-box="appearance"] .srow', { hasText: 'Clock colour' }).locator('button').first().click(); await settle(300);
   const ids = await page.locator('.pop.open .swatch').evaluateAll(els => els.map(e => e.getAttribute('data-id')));
-  ok(ids.length === 16 && ids[0] === 'global' && ids[8] === 'network' && ids[9] === 'white' && !ids.includes('pink') && !ids.includes('bright-orange'), 'the palette starts its rows with Global main and Selected network (' + ids.join(' ') + ')');
+  ok(ids.length === 16 && ids[0] === 'global' && ids[8] === 'white' && ids[15] === 'network' && !ids.includes('pink') && !ids.includes('bright-orange'), 'the palette starts with Global main, and Selected network (the network switcher\'s own colour) comes last (' + ids.join(' ') + ')');
   await page.keyboard.press('Escape'); await page.click('#close-settings'); await settle(400);
   await clockPick('Selected network');
   const clockBox = page.locator('.dbox[data-box="clock"]');
