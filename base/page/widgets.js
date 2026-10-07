@@ -210,8 +210,9 @@ W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.l
  if(s.module){bind("@enabled."+s.module,function(v){box.checked=!!v});         // switches a whole module on or off (POST /modules), then the page is built again
   box.onchange=function(){box.disabled=true;post("/modules",{name:s.module,enabled:box.checked},function(r){
    if(!r){box.disabled=false;box.checked=!box.checked;return}reloadInSettings()})};return el}
- bind(s.bind,function(v){box.checked=!!v});
- box.onchange=function(){var want=box.checked;post(s.post,s.body?Object.assign({value:want},s.body):{value:want},function(){refresh();ctx.saved()})};return el};
+ var hold=0;       // after a tap the tick stays as tapped until the server has had time to answer (a /api answer that was already on its way would put the old one back)
+ bind(s.bind,function(v){if(Date.now()>hold)box.checked=!!v});
+ box.onchange=function(){var want=box.checked;hold=Date.now()+4000;post(s.post,s.body?Object.assign({value:want},s.body):{value:want},function(){hold=Date.now()+600;refresh();ctx.saved()})};return el};
 // a row of widgets side by side (wraps)
 W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx))};
 // ---- the module's own colour choice: a "Colour" button in the chosen colour that opens a pop-up with the palette's colours;

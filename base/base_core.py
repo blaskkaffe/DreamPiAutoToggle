@@ -63,6 +63,44 @@ MODULES_DIR = project_path("modules")
 MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"clock": true, "players": false, ...} set from the module picker
 
 
+CACHE_SECONDS = 0.5      # how long what is read from the settings files is kept (0 = not at all: the tests); every write in here clears it
+_cache = {}
+
+
+def invalidate():
+    """Forget what cached() kept: a setting was written (in this process; another process's write is seen within CACHE_SECONDS)."""
+    _cache.clear()
+
+
+def _clone(v):
+    """A copy of plain data (dicts, lists, tuples, strings, numbers), much faster than copy.deepcopy."""
+    if isinstance(v, dict):
+        return dict((k, _clone(x)) for k, x in v.items())
+    if isinstance(v, list):
+        return [_clone(x) for x in v]
+    if isinstance(v, tuple):
+        return tuple(_clone(x) for x in v)
+    return v
+
+
+def cached(fn):
+    """Keep fn's answer for CACHE_SECONDS, per arguments (a copy is returned, so the caller may change it). The page asks for the same
+    handful of settings hundreds of times per request (each colour looks the palette and all the modules up again): on a Pi that is
+    most of the time a request takes."""
+    name = fn.__name__
+
+    def wrapper(*args):
+        if CACHE_SECONDS <= 0:
+            return fn(*args)
+        key, now = (name, args), time.monotonic()
+        hit = _cache.get(key)
+        if hit is None or now - hit[0] >= CACHE_SECONDS:
+            hit = _cache[key] = (now, fn(*args))
+        return _clone(hit[1])
+    wrapper.__name__, wrapper.__doc__ = name, fn.__doc__
+    return wrapper
+
+
 _manifests = {}     # path -> (mtime, parsed): module.json is asked for many times a second, it changes almost never
 
 
@@ -114,6 +152,7 @@ def module_announcements(key):
     return out
 
 
+@cached
 def saved_module_order():
     try:
         with open(MODULE_ORDER) as f:
@@ -148,6 +187,7 @@ def module_group(name):
     return group
 
 
+@cached
 def module_names():
     """Names of the installed modules (folders with a readable module.json), in picker order: the order the user set
     (module_order.json) first, then any module not in it by its manifest's "order" hint and name; then grouped: the modules with a
@@ -173,6 +213,7 @@ def save_module_order(order):
     with open(tmp, "w") as f:
         json.dump(new, f)
     os.rename(tmp, MODULE_ORDER)
+    invalidate()
     return new
 
 
@@ -191,6 +232,7 @@ def save_dashboard_order(names):
     return save_module_order(new)
 
 
+@cached
 def modules_state():
     try:
         with open(MODULES_STATE) as f:
@@ -223,6 +265,7 @@ def save_module_enabled(name, on):
     with open(tmp, "w") as f:
         json.dump(state, f, indent=1, sort_keys=True)
     os.rename(tmp, MODULES_STATE)
+    invalidate()
     return True
 
 
@@ -272,6 +315,7 @@ _CUSTOM_ID = re.compile(r"^[a-z][a-z0-9-]{0,23}$")
 MAX_CUSTOM_COLOURS = 40
 
 
+@cached
 def palette_layout():
     """The user's changes to the list of the palette (Settings > Appearance > Colour palette) over the shipped palette, made safe:
     {"order", "deleted", "names", "custom"}. The screen colours the user changed are in palette.json."""
@@ -298,6 +342,7 @@ def palette_layout():
     return out
 
 
+@cached
 def _palette_entries():
     """The palette in use as tuples like PALETTE: the shipped colours that were not deleted and the custom ones, renamed and in the user's order."""
     lay = palette_layout()
@@ -308,6 +353,7 @@ def _palette_entries():
     return sorted(entries, key=lambda c: rank.get(c[0], len(rank)))          # a stable sort: what the order does not name keeps its place at the end
 
 
+@cached
 def palette_ids():
     """The ids of the palette in use (see palette_layout())."""
     return tuple(c[0] for c in _palette_entries())
@@ -343,6 +389,7 @@ def service(name, *args):
         return None
 
 
+@cached
 def colour_tokens():
     """[{"id", "name", "module"}]: colours that the enabled modules add to what a colour pick offers (module.json "colour_tokens": [{"id", "name"}]), after
     the palette. Not part of the palette: it cannot be edited or deleted. A token's colour is named by a service of the module that added it (see service())."""
@@ -358,11 +405,13 @@ def colour_tokens():
     return out
 
 
+@cached
 def colour_ids():
     """Every id a colour pick may hold: the palette's and the modules' colours (colour_tokens())."""
     return palette_ids() + tuple(t["id"] for t in colour_tokens())
 
 
+@cached
 def palette_overrides():
     """{id: {"ui": "#rrggbb"}}: what the user changed in a palette colour on screen (palette.json: the colour palette editor); only valid entries."""
     ids, out = palette_ids(), {}
@@ -372,14 +421,21 @@ def palette_overrides():
     return out
 
 
-def colours():
-    """The palette as dicts: id, name, group, ui, ui_l and ui_default (as the add-on ships it). A module that shows a colour some other way
-    (another module) keeps its own table for that."""
+@cached
+def _palette_colours():
+    """The palette as dicts, without the colour tokens (they follow other settings, so colours() adds them fresh)."""
     over, out = palette_overrides(), []
     for c in _palette_entries():
         o = over.get(c[0], {})
         ui = o.get("ui", c[3])
         out.append({"id": c[0], "name": c[1], "group": c[2], "ui": ui, "ui_l": lighter(ui) if "ui" in o else c[4], "ui_default": c[3]})
+    return out
+
+
+def colours():
+    """The palette as dicts: id, name, group, ui, ui_l and ui_default (as the add-on ships it). A module that shows a colour some other way
+    (another module) keeps its own table for that."""
+    out = _palette_colours()
     # the modules' own colours (colour_tokens()): each is a palette colour that the module that added it names right now (its service
     # "colour:<id>", see service()), e.g. "Selected network" is the colour of the network that is selected
     for t in colour_tokens():
@@ -419,6 +475,7 @@ def _write_palette(over):
     with open(tmp, "w") as f:
         json.dump(dict((i, {"ui": v["ui"]}) for i, v in over.items() if "ui" in v), f)
     os.rename(tmp, PALETTE_FILE)
+    invalidate()
 
 
 # ---- the changes the colour palette editor makes (see palette_layout())
@@ -440,6 +497,7 @@ def _write_layout(data):
     with open(tmp, "w") as f:
         json.dump(data, f)
     os.rename(tmp, PALETTE_CUSTOM)
+    invalidate()
 
 
 def palette_add(name, ui):
@@ -517,6 +575,7 @@ def palette_delete(ident):
         with open(tmp, "w") as f:
             json.dump(picks, f, sort_keys=True)
         os.rename(tmp, MODULE_COLOURS)
+        invalidate()
     if (read_file(HIGHLIGHT) or "").strip() == ident:
         save_highlight_style("rainbow")
     return True
@@ -539,6 +598,7 @@ def palette_reset(ident=None):
         reset_palette()
         try:
             os.remove(PALETTE_CUSTOM)
+            invalidate()
         except OSError:
             pass
         return True
@@ -585,6 +645,7 @@ def colours_css():
     return root + "}\nhtml[data-theme=light]:not(.dark-only){" + light + "}\n" + classes
 
 
+@cached
 def _saved_module_colours():
     try:
         with open(MODULE_COLOURS) as f:
@@ -594,6 +655,7 @@ def _saved_module_colours():
         return {}
 
 
+@cached
 def module_colours(name):
     """{key: palette id} for a module: the defaults from its manifest "colours", with the user's picks over them.
     A module that asks for unique colours (manifest "colours_unique": true) never gets two keys with one colour."""
@@ -735,9 +797,11 @@ def set_module_colour(name, key, ident):
     with open(tmp, "w") as f:
         json.dump(data, f, sort_keys=True)
     os.rename(tmp, MODULE_COLOURS)
+    invalidate()
     return cur
 
 
+@cached
 def module_tints(name):
     """{colour key: True | False} for a module: whether the background of what has that colour is highlighted, i.e. coloured (True) or
     neutral (False). The default is the module's manifest "tints" ({"clock": false}); anything it does not name is highlighted
@@ -775,6 +839,7 @@ def set_module_tint(name, key, coloured):
     with open(tmp, "w") as f:
         json.dump(data, f, sort_keys=True)
     os.rename(tmp, MODULE_TINTS)
+    invalidate()
     return module_tints(name)
 
 

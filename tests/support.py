@@ -20,6 +20,7 @@ for _name in sorted(os.listdir(_MODULES)):
         sys.path.insert(0, os.path.join(_MODULES, _name))
 
 import base_core as core  # noqa: E402
+core.CACHE_SECONDS = 0        # the tests write settings files by hand and read them at once: nothing is kept (tests/test_cache.py turns it on)
 import netswitch_ledconfig as ledconfig  # noqa: E402
 import netswitch_switcher_probes as probes  # noqa: E402
 import base_web as web  # noqa: E402
