@@ -129,8 +129,8 @@ function shownTiles(){return dashTiles().filter(function(b){return b.offsetHeigh
 var dragTile=null,dropBar=null;
 function tileTitle(b){var t=b.querySelector("b,h2,.nlabel");return t?t.textContent.trim():b.getAttribute("data-box")}
 function applyGrips(){var on=tilesMovable();$("dash").classList.toggle("movable",on);
- dashTiles().forEach(function(b){if(!b._grip){var g=h("button",{type:"button","class":"tilegrip keep",title:"Drag to move this tile (or use the arrow keys)",html:"&#8942;&#8942;"});b._grip=g;b.insertBefore(g,b.firstChild);gripEvents(b,g)}
-  sh(b._grip,on);b._grip.setAttribute("aria-label","Move the "+tileTitle(b)+" tile: drag, or use the arrow keys")})}
+ dashTiles().forEach(function(b){if(!b._grip){var g=h("button",{type:"button","class":"grip tilegrip keep",title:"Drag to move (or use the arrow keys)",html:"&#8942;&#8942;"});b._grip=g;b.insertBefore(g,b.firstChild);gripEvents(b,g)}
+  sh(b._grip,on);b._grip.setAttribute("aria-label","Move "+tileTitle(b)+": drag, or use the arrow keys")})}
 // where a tile dropped at (x,y) goes: {tile, after} = next to the tile under or nearest to the point
 function dropSpot(x,y,moving){var best=null,bd=1e9;
  shownTiles().forEach(function(t){if(t===moving)return;var r=t.getBoundingClientRect(),dx=x<r.left?r.left-x:(x>r.right?x-r.right:0),dy=y<r.top?r.top-y:(y>r.bottom?y-r.bottom:0),d=dx*dx+dy*dy;
@@ -147,14 +147,22 @@ function gripEvents(tile,grip){
  grip.addEventListener("keydown",function(e){var back=e.key==="ArrowUp"||e.key==="ArrowLeft",fwd=e.key==="ArrowDown"||e.key==="ArrowRight";if(!back&&!fwd)return;e.preventDefault();
   var seq=shownTiles(),i=seq.indexOf(tile),j=i+(back?-1:1);if(j<0||j>=seq.length)return;seq.splice(i,1);seq.splice(j,0,tile);commitTiles(seq);grip.focus()});
  grip.addEventListener("pointerdown",function(e){if(e.pointerType==="mouse"&&e.button!==0)return;e.preventDefault();
-  var pid=e.pointerId,spot=null;dragTile=tile;try{grip.setPointerCapture(pid)}catch(x){}
+  var pid=e.pointerId,spot=null,last=e,r0=tile.getBoundingClientRect(),z=tile.offsetWidth?r0.width/tile.offsetWidth:1,offX=e.clientX-r0.left,offY=e.clientY-r0.top;
+  dragTile=tile;try{grip.setPointerCapture(pid)}catch(x){}
+  // the dragged tile is lifted like a row of a list: a copy with a shadow follows the pointer, the tile itself stays as a dimmed gap
+  var inner=tile.cloneNode(true),ghost=h("div",{"class":"tile-ghost"},[inner]);
+  Array.prototype.forEach.call(inner.querySelectorAll("[id]"),function(n){n.removeAttribute("id")});inner.removeAttribute("data-box");
+  inner.style.zoom=z;inner.style.width=tile.offsetWidth+"px";ghost.style.width=r0.width+"px";ghost.style.height=r0.height+"px";document.body.appendChild(ghost);
+  function lift(ev){ghost.style.left=(ev.clientX-offX)+"px";ghost.style.top=(ev.clientY-offY)+"px"}lift(e);
+  var edge=setInterval(function(){var y=last.clientY,hh=window.innerHeight;if(y<70)window.scrollBy(0,-14);else if(y>hh-70)window.scrollBy(0,14);else return;show(last)},16);      // near the top / bottom edge the page scrolls along, as Settings does
   tile.classList.add("tile-drag");document.body.classList.add("dragging");
   if(!dropBar){dropBar=h("div",{"class":"dropbar"});document.body.appendChild(dropBar)}
   function show(ev){spot=dropSpot(ev.clientX,ev.clientY,tile);if(!spot){dropBar.style.display="none";return}
    dropBar.style.display="block";dropBar.style.left=spot.r.left+"px";dropBar.style.width=spot.r.width+"px";dropBar.style.top=((spot.after?spot.r.bottom:spot.r.top)-3)+"px"}
-  function move(ev){if(ev.pointerId===pid)show(ev)}
+  function move(ev){if(ev.pointerId===pid){last=ev;lift(ev);show(ev)}}
   function end(cancel){grip.removeEventListener("pointermove",move);grip.removeEventListener("pointerup",up);grip.removeEventListener("pointercancel",lost);document.removeEventListener("keydown",esc,true);
    try{grip.releasePointerCapture(pid)}catch(x){}
+   clearInterval(edge);document.body.removeChild(ghost);
    tile.classList.remove("tile-drag");document.body.classList.remove("dragging");dropBar.style.display="none";dragTile=null;
    if(!cancel&&spot)moveTile(tile,spot)}
   function up(ev){if(ev.pointerId===pid)end(false)}
