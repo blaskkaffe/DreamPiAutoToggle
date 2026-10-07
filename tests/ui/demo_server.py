@@ -8,8 +8,8 @@ PIN=1234 (a PIN for update / restart / import; restart is faked), PORT=n (defaul
 import sys, os, threading, time, json
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from support import web, core, sandbox
-import netswitch_contacts as contacts
-import netswitch_checkin as checkin
+import contacts_web as contacts
+import checkin_web as checkin
 tmp = sandbox(contacts, checkin)
 if not os.environ.get("CLOCK"): core.save_module_enabled("clock", False)      # the checks count the dashboard boxes: the clock box is only there with CLOCK=1
 if not os.environ.get("EMPTY"):
@@ -23,8 +23,8 @@ if not os.environ.get("EMPTY"):
 if os.environ.get("IMGBG"): core.save_module_enabled("imagebg", True)
 if os.environ.get("FAKEUPDATE"):
     import subprocess
-    import netswitch_update as up
-    import netswitch_probes
+    import rebootupdate_update as up
+    import base_probes
     src = os.path.join(tmp, "checkout"); os.mkdir(src)
     env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
     subprocess.check_call(["git", "init", "-q", "-b", "main"], cwd=src)
@@ -32,7 +32,7 @@ if os.environ.get("FAKEUPDATE"):
     open(os.path.join(src, "install.sh"), "w").write("#!/bin/sh\n")
     subprocess.check_call(["git", "add", "."], cwd=src); subprocess.check_call(["git", "commit", "-q", "-m", "x"], cwd=src, env=env)
     open(core.ADDON_SRC, "w").write(src); open(core.ADDON_COMMIT, "w").write("a"*40)
-    open(netswitch_probes.ADDON_VERSION, "w").write("2026-09-30 12:00 (aaaaaaa)")
+    open(base_probes.ADDON_VERSION, "w").write("2026-09-30 12:00 (aaaaaaa)")
     def fake(url):
         if "/commits/" in url: return json.dumps({"sha": "b"*40, "commit": {"committer": {"date": "2026-10-02T10:00:00Z"}}})
         if "/compare/" in url: return json.dumps({"status": "ahead", "ahead_by": 4})
@@ -44,8 +44,8 @@ if os.environ.get("FAKEUPDATE"):
         open(core.UPDATE_LOG, "w").write("Updating /home/pi/checkout from origin/main\nFrom https://github.com/blaskkaffe/DreamPiAutoToggle\n"
             " * branch            main       -> FETCH_HEAD\nReceiving objects:  10%\rReceiving objects: 100% (42/42), done.\n"
             "Updating 3baa024..21d1ad8\nFast-forward\n page/widgets.js | 84 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-            " 4 files changed, 64 insertions(+), 37 deletions(-)\n\x1b[31mERROR\x1b[0m: could not write /etc/systemd/system/dreampi-netswitch.service (Read-only file system)\n"
-            "A_very_long_unbroken_path_/opt/dreampi-netswitch/page/widgets_and_more_and_more_and_more_and_more.js\nfailed\n")
+            " 4 files changed, 64 insertions(+), 37 deletions(-)\n\x1b[31mERROR\x1b[0m: could not write /etc/systemd/system/checkin-board.service (Read-only file system)\n"
+            "A_very_long_unbroken_path_/opt/checkin-board/page/widgets_and_more_and_more_and_more_and_more.js\nfailed\n")
 if os.environ.get("OFF"):         # modules switched off, as from the module picker (the always-on ones can't be)
     for name in (core.module_names() if os.environ["OFF"] == "all" else os.environ["OFF"].split(",")):
         core.save_module_enabled(name, False)
@@ -53,7 +53,7 @@ if os.environ.get("OFF"):         # modules switched off, as from the module pic
 if os.environ.get("PIN"):
     import base_security
     base_security.set_pin(os.environ["PIN"])
-    __import__("netswitch_rebootupdate")._spawn_reboot = lambda: None
+    __import__("rebootupdate_web")._spawn_reboot = lambda: None
 print("state dir", tmp, flush=True)
 srv = web.Server(('127.0.0.1', int(os.environ.get('PORT', '8734'))), web.Handler)
 srv.serve_forever()

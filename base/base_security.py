@@ -1,5 +1,5 @@
 # Check-in add-on - who may talk to the web service, and the optional PIN.
-# The web service runs as root (it restarts DreamPi, reboots the Pi and runs the updater), so
+# The web service runs as root (it reboots the machine and runs the updater), so
 # a request is checked before anything is done:
 #   - Host header: refuse names that are not this Pi's (DNS rebinding: a web page on the
 #     internet that points its own name at the Pi's address and then talks to it from the browser);
@@ -38,7 +38,7 @@ _fails = {"count": 0, "until": 0.0}
 # ------------------------------------------------------------------ host / origin
 
 def _host_only(value):
-    """'Host: dreampi.local:80' -> 'dreampi.local'; '[::1]:80' -> '::1'."""
+    """'Host: checkin.local:80' -> 'checkin.local'; '[::1]:80' -> '::1'."""
     value = (value or "").strip().lower()
     if value.startswith("["):
         return value[1:].split("]")[0]

@@ -8,17 +8,17 @@ import time
 import unittest
 
 from support import sandbox, cleanup, core, web
-import netswitch_rebootupdate as ru
+import rebootupdate_web as ru
 import base_security as sec
-import netswitch_update as up
+import rebootupdate_update as up
 
 
 class HostAndOriginTests(unittest.TestCase):
     def test_hosts(self):
-        for ok in (None, "192.168.1.5", "192.168.1.5:80", "[::1]:8080", "localhost", "dreampi", "dreampi.local:80",
-                   "router.lan", "dreampi.home.arpa", "10.0.0.2:443"):
+        for ok in (None, "192.168.1.5", "192.168.1.5:80", "[::1]:8080", "localhost", "checkin", "checkin.local:80",
+                   "router.lan", "checkin.home.arpa", "10.0.0.2:443"):
             self.assertTrue(sec.host_allowed(ok), ok)
-        for bad in ("evil.example.com", "evil.com:80", "a.b.c.d.example.org", "dreampi.local.evil.com", ":80"):
+        for bad in ("evil.example.com", "evil.com:80", "a.b.c.d.example.org", "checkin.local.evil.com", ":80"):
             self.assertFalse(sec.host_allowed(bad), bad)
 
     def test_hosts_from_the_allowed_file(self):
@@ -32,15 +32,15 @@ class HostAndOriginTests(unittest.TestCase):
             cleanup(tmp)
 
     def test_post_rules(self):
-        h = {"Host": "dreampi.local"}
+        h = {"Host": "checkin.local"}
         self.assertTrue(sec.post_allowed(dict(h, **{"X-Requested-With": "x"}), True))
-        self.assertTrue(sec.post_allowed(dict(h, **{"X-Requested-With": "x", "Origin": "http://dreampi.local"}), True))
+        self.assertTrue(sec.post_allowed(dict(h, **{"X-Requested-With": "x", "Origin": "http://checkin.local"}), True))
         self.assertFalse(sec.post_allowed(dict(h, **{"X-Requested-With": "x", "Origin": "http://evil.com"}), True))
         self.assertFalse(sec.post_allowed(dict(h, **{"Origin": "null"}), False))
-        self.assertTrue(sec.post_allowed(dict(h, **{"Origin": "http://dreampi.local"}), False))     # form post, JavaScript off
-        self.assertFalse(sec.post_allowed(dict(h, **{"Origin": "http://dreampi.local"}), True))     # but not for strict actions
+        self.assertTrue(sec.post_allowed(dict(h, **{"Origin": "http://checkin.local"}), False))     # form post, JavaScript off
+        self.assertFalse(sec.post_allowed(dict(h, **{"Origin": "http://checkin.local"}), True))     # but not for strict actions
         self.assertFalse(sec.post_allowed(h, False))                                               # neither header nor origin
-        self.assertTrue(sec.post_allowed(dict(h, **{"Referer": "http://dreampi.local/x"}), False))
+        self.assertTrue(sec.post_allowed(dict(h, **{"Referer": "http://checkin.local/x"}), False))
         self.assertFalse(sec.post_allowed(dict(h, **{"Referer": "http://evil.com/x"}), False))
 
 
@@ -158,10 +158,10 @@ class HttpSecurityTests(unittest.TestCase):
         for path in ("/reboot", "/update/start"):
             sec.reset_for_tests()
             self.assertEqual(self.req("POST", path, h, b"{}")[0], 401, path)
-            self.assertEqual(self.req("POST", path, dict(h, **{"X-Netswitch-Pin": "1111"}), b"{}")[0], 401, path)
+            self.assertEqual(self.req("POST", path, dict(h, **{"X-Checkin-Pin": "1111"}), b"{}")[0], 401, path)
         self.assertEqual(self.spawned, [])
         sec.reset_for_tests()
-        status, body, _r = self.req("POST", "/reboot", dict(h, **{"X-Netswitch-Pin": "4821"}))
+        status, body, _r = self.req("POST", "/reboot", dict(h, **{"X-Checkin-Pin": "4821"}))
         self.assertEqual((status, json.loads(body.decode())["started"]), (200, True))
         self.assertEqual(self.spawned, [1])
         # the check for updates and everyday check-ins need no PIN
@@ -175,7 +175,7 @@ class HttpSecurityTests(unittest.TestCase):
 
     def test_lockout_answers_429(self):
         sec.set_pin("4821")
-        h = {"X-Requested-With": "x", "X-Netswitch-Pin": "0000"}
+        h = {"X-Requested-With": "x", "X-Checkin-Pin": "0000"}
         codes = [self.req("POST", "/reboot", h)[0] for _ in range(sec.FAIL_LIMIT + 1)]
         self.assertEqual(codes[:sec.FAIL_LIMIT], [401] * sec.FAIL_LIMIT)
         self.assertEqual(codes[-1], 429)
@@ -193,12 +193,12 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertFalse(os.path.exists(core.SCREEN))
         for path in ("/checkin/toggle", "/checkin/status", "/contacts/photo"):            # the board's own actions stay open (they answer 400 for a made-up person)
             self.assertEqual(self.req("POST", path, h, b'{"id": "nobody"}')[0], 400, path)
-        ok = dict(h, **{"X-Netswitch-Pin": "4821"})
+        ok = dict(h, **{"X-Checkin-Pin": "4821"})
         sec.reset_for_tests()
         self.assertEqual(self.req("POST", "/screen/stretch", ok, b'{"value": true}')[0], 200)
         self.assertTrue(core.screen_settings()["stretch"])
         self.assertEqual(self.req("POST", "/pin/check", ok, b"{}")[0], 200)
-        self.assertEqual(self.req("POST", "/pin/check", dict(h, **{"X-Netswitch-Pin": "0000"}), b"{}")[0], 401)
+        self.assertEqual(self.req("POST", "/pin/check", dict(h, **{"X-Checkin-Pin": "0000"}), b"{}")[0], 401)
         self.assertEqual(self.req("POST", "/settings-pin", ok, b'{"value": false}')[0], 200)        # unlocked again: settings are open
         self.assertEqual(self.req("POST", "/screen/stretch", h, b'{"value": false}')[0], 200)
 
@@ -208,12 +208,12 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertEqual(self.req("POST", "/pin", h, b'{"pin": "4821"}')[0], 200)
         self.assertTrue(sec.pin_required())
         self.assertEqual(self.req("POST", "/pin", h, b'{"pin": "9999"}')[0], 401)                  # changing it needs the old one
-        old = dict(h, **{"X-Netswitch-Pin": "4821"})
+        old = dict(h, **{"X-Checkin-Pin": "4821"})
         self.assertEqual(self.req("POST", "/pin", old, b'{"pin": "9999"}')[0], 200)
         sec.reset_for_tests()
         self.assertTrue(sec.check_pin("9999")[0])
         core.save_settings_pin(True)
-        self.assertEqual(self.req("POST", "/pin", dict(h, **{"X-Netswitch-Pin": "9999"}), b'{"pin": ""}')[0], 200)
+        self.assertEqual(self.req("POST", "/pin", dict(h, **{"X-Checkin-Pin": "9999"}), b'{"pin": ""}')[0], 200)
         self.assertFalse(sec.pin_required())
         self.assertFalse(core.settings_pin_on())                                                    # no PIN: the lock goes with it
         self.assertFalse(sec.settings_locked())

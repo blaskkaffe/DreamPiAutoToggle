@@ -38,7 +38,7 @@ class HttpTests(unittest.TestCase):
     def post(self, path, body=None):
         data = None if body is None else json.dumps(body).encode()
         req = Request(self.base + path, data=data or b"", method="POST",
-                      headers={"X-Requested-With": "netswitch", "Content-Type": "application/json"})
+                      headers={"X-Requested-With": "checkin", "Content-Type": "application/json"})
         r = urlopen(req, timeout=10)
         return r.status, r.read()
 
@@ -155,7 +155,7 @@ class HttpTests(unittest.TestCase):
                 self.assertNotEqual((r.getheader("Connection") or "").lower(), "close")
                 r.read()
             # a POST that is refused without its body being read must not poison the next request on the connection
-            c.request("POST", "/nothing-here", body=b'{"x": 1}', headers={"X-Requested-With": "netswitch", "Content-Type": "application/json"})
+            c.request("POST", "/nothing-here", body=b'{"x": 1}', headers={"X-Requested-With": "checkin", "Content-Type": "application/json"})
             r = c.getresponse()
             self.assertEqual(r.status, 404)
             r.read()
@@ -163,7 +163,7 @@ class HttpTests(unittest.TestCase):
             r = c.getresponse()
             self.assertEqual(r.status, 200)
             r.read()
-            c.request("POST", "/checkin/all", headers={"X-Requested-With": "netswitch"})       # no body at all
+            c.request("POST", "/checkin/all", headers={"X-Requested-With": "checkin"})       # no body at all
             r = c.getresponse()
             self.assertEqual(r.status, 200)
             r.read()

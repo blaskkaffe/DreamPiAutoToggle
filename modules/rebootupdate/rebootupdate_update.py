@@ -13,7 +13,7 @@ import time
 from urllib.request import urlopen, Request
 
 import base_core as core
-import netswitch_probes as probes
+import base_probes as probes
 
 DEFAULT_REPO = "blaskkaffe/DreamPiAutoToggle"
 DEFAULT_BRANCH = "main"
@@ -25,7 +25,7 @@ _info = {"time": 0, "started": 0, "checking": False, "addon": None, "error": Non
 
 def fetch(url):
     """Body of a URL as text. Replaced by the tests."""
-    req = Request(url, headers={"User-Agent": "dreampi-netswitch", "Accept": "application/vnd.github+json"})
+    req = Request(url, headers={"User-Agent": "checkin-board", "Accept": "application/vnd.github+json"})
     return urlopen(req, timeout=TIMEOUT).read().decode("utf-8", "replace")
 
 
@@ -253,7 +253,7 @@ def _spawn(cmd):
     """Run cmd detached from this service (it is restarted by the installer).
     Replaced by the tests."""
     if os.path.exists("/run/systemd/system"):   # outside this service's cgroup: survives its restart
-        subprocess.Popen(["systemd-run", "--unit=dreampi-netswitch-update-%d" % int(time.time()), "--no-block",
+        subprocess.Popen(["systemd-run", "--unit=checkin-board-update-%d" % int(time.time()), "--no-block",
                           "--collect"] + cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     else:
         subprocess.Popen(["setsid"] + cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

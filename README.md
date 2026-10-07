@@ -36,7 +36,7 @@ name,department,role,phone,location,restrictToLocation
 Anna Svensson,Kök,Kökschef,070-123 45 67,Område A,
 Maja Berg,Servering,,,Område B,x
 ```
-`name` is required; a person without a `department` goes under "No department". **`location` is the building** (CheckinChicken's "Område"). `restrictToLocation` (`1`, `true`, `yes`, `ja` or `x`) shows the person only on a screen that has their own building picked, never under "All". Lines starting with `#` are ignored; comma, semicolon or tab work; Swedish headers (`namn`, `avdelning`, `telefon`) are understood. Importing again updates people in place and **never deletes** anyone (tick "Switch off people that are not in the file" to take others off the board); who is in is kept. From a shell: `python3 modules/contacts/netswitch_contacts.py people.csv`.
+`name` is required; a person without a `department` goes under "No department". **`location` is the building** (CheckinChicken's "Område"). `restrictToLocation` (`1`, `true`, `yes`, `ja` or `x`) shows the person only on a screen that has their own building picked, never under "All". Lines starting with `#` are ignored; comma, semicolon or tab work; Swedish headers (`namn`, `avdelning`, `telefon`) are understood. Importing again updates people in place and **never deletes** anyone (tick "Switch off people that are not in the file" to take others off the board); who is in is kept. From a shell: `python3 modules/contacts/contacts_web.py people.csv`.
 
 ### HTTPS
 
@@ -57,16 +57,16 @@ The page can do it for you while the **Reboot and Update** module is on: **Setti
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
 ```
-Settings, people and who is in are kept. An install over the old DreamPi network switcher removes its hook, buttons and LED service; the DreamPi itself was never changed.
+Settings, people and who is in are kept. An install made under the old names (`/opt/dreampi-netswitch`, the service `dreampi-netswitch`) is moved to `/opt/checkin-board` and the service `checkin-board`; the data comes along. An install over the old DreamPi network switcher removes its hook, buttons and LED service; the DreamPi itself was never changed.
 
 ### Safety
 
 The web page runs on the host as root, because it has to reboot the machine and run the updater. There are no user accounts: **anybody who can reach the page on your network can use it**, so only put the host on a network you trust, and don't forward its ports from the internet. What the add-on does to limit the risk:
 
 - **PIN (optional).** `sudo ./install.sh --pin` sets a PIN that the page asks for (once per page load) before **Update now**, **Reboot** and a **contacts import**. It is stored only as a salted hash, and five wrong tries lock those actions for a minute. The PIN can also be set, changed or removed in **Settings > Appearance > PIN** (changing or removing it asks for the old one; while no PIN is set anybody on your network can set one there, which is why `sudo ./install.sh --no-pin` stays as the way back). **Ask for the PIN to open Settings** (same box) locks Settings: the cogwheel asks for the PIN and every change needs it, while tapping people in and out keeps working. Use the `https://` address when you use a PIN: over plain `http://` the PIN travels unencrypted. Forgot it? `sudo ./install.sh --no-pin`. Without a PIN, anybody on your network can update or reboot the Pi.
-- **Other websites can't use it.** Every change (all `POST`s) must come from the page itself: a request from another site (a form or script on a web page you have open in your browser) is refused, and so is a request that reaches the host under a name that isn't the host's (the trick used to attack devices on a home network from a web page). The page answers to IP addresses, `.local`-style names and the host's own name; if your router gives it another domain name and the page says "Unknown host name", list that name in `/opt/dreampi-netswitch/allowed_hosts` (one per line). The page can't be shown inside another site's frame.
+- **Other websites can't use it.** Every change (all `POST`s) must come from the page itself: a request from another site (a form or script on a web page you have open in your browser) is refused, and so is a request that reaches the host under a name that isn't the host's (the trick used to attack devices on a home network from a web page). The page answers to IP addresses, `.local`-style names and the host's own name; if your router gives it another domain name and the page says "Unknown host name", list that name in `/opt/checkin-board/allowed_hosts` (one per line). The page can't be shown inside another site's frame.
 - **Update now is limited to GitHub.** It only pulls from the git address the checkout had when the add-on was installed (it must be a GitHub address, and a changed one is refused), fetches from exactly that address, and only fast-forwards, so it can't pull in changes that don't continue your copy.
-- **The web service is fenced in** (systemd: no new privileges, read-only `/usr`, `/boot` and `/etc`, no kernel-module or cgroup changes) and the add-on's files in `/opt/dreampi-netswitch` are root-owned.
+- **The web service is fenced in** (systemd: no new privileges, read-only `/usr`, `/boot` and `/etc`, no kernel-module or cgroup changes) and the add-on's files in `/opt/checkin-board` are root-owned.
 - **Not covered:** anybody who can open the page can also tap people in and out and change the board: there is no per-person login (the PIN only guards the actions above); someone who is already logged in on the host (or can run code on it) can do more than this add-on ever could, and the status files in `/tmp` are guessable names (the update's status file is not written through a planted link).
 
 ### Modules
@@ -86,7 +86,7 @@ Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), 
 
 ### Uninstall
 
-`sudo /opt/dreampi-netswitch/uninstall.sh` removes the services and everything under `/opt/dreampi-netswitch`, **people and who is in included**. Export the contacts first (Settings > Contacts > Download).
+`sudo /opt/checkin-board/uninstall.sh` removes the services and everything under `/opt/checkin-board`, **people and who is in included**. Export the contacts first (Settings > Contacts > Download).
 
 ## Requirements
 
@@ -108,9 +108,9 @@ The page works on a phone as well as a wall display: the dashboard is one column
 
 - The page shows red warning boxes at the top when something is wrong (a module that could not load).
 - If the page doesn't open at all, the host may have no network connection. If it is unreachable now and then, or slow to open the first time: try the host's IP address instead of the `.local` name (looking up `.local` names can take a few seconds on some phones and PCs); Wi-Fi power saving is a common cause of a small computer dropping off the network (the service switches it off each time it starts; it resets on reboot).
-- `journalctl -u dreampi-netswitch -n 50` shows whether the page service restarted or logged an error. It restarts itself within seconds if it ever stops answering.
+- `journalctl -u checkin-board -n 50` shows whether the page service restarted or logged an error. It restarts itself within seconds if it ever stops answering.
 - `curl http://localhost/api` shows what every screen is told (the `checkin` key is the whole board).
 
 ## Credits
 
-The board, the statuses and the CSV format follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken). The module base, the clock and the update / reboot controls come from the DreamPi network switcher this add-on grew out of; the names of the service and of `/opt/dreampi-netswitch` are still its.
+The board, the statuses and the CSV format follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken). The module base, the clock and the update / reboot controls come from the DreamPi network switcher this add-on grew out of; the names of the service and of `/opt/checkin-board` are still its.

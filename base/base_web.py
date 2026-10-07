@@ -232,7 +232,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _safely(self, handler):
         """Run a request handler; an unexpected error answers 500 and is
-        logged (journalctl -u dreampi-netswitch) instead of dropping the
+        logged (journalctl -u checkin-board) instead of dropping the
         connection."""
         try:
             handler()
@@ -242,7 +242,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             sys.stderr.write("request %s failed:\n%s" % (self.path, traceback.format_exc()))
             try:
-                self.send("Internal error, see journalctl -u dreampi-netswitch\n",
+                self.send("Internal error, see journalctl -u checkin-board\n",
                           "text/plain; charset=utf-8", status=500)
             except Exception:
                 pass
@@ -255,7 +255,7 @@ class Handler(BaseHTTPRequestHandler):
             self.close_connection = True      # a GET with a body: don't try to parse the body as the next request
         if not security.host_allowed(self.headers.get("Host")):
             return self._refuse(421, "Unknown host name: use the Pi's IP address or its .local name "
-                                     "(or list the name in /opt/dreampi-netswitch/allowed_hosts)")
+                                     "(or list the name in /opt/checkin-board/allowed_hosts)")
         self._safely(self._get)
 
     def do_POST(self):
@@ -335,7 +335,7 @@ class Handler(BaseHTTPRequestHandler):
         if not security.post_allowed(self.headers, strict=need_pin):
             return self._refuse(403, "Refused: this request did not come from the page")
         if need_pin:
-            ok, message = security.check_pin(self.headers.get("X-Netswitch-Pin") or "")
+            ok, message = security.check_pin(self.headers.get("X-Checkin-Pin") or "")
             if not ok:
                 core.log("web page: %s refused (%s)" % (path, message))
                 self.send(json.dumps({"started": False, "message": message}), "application/json",
@@ -484,7 +484,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _post_pin(self):
         """Set, change or remove the PIN: {"pin": "1234"} (4 to 64 characters) or {"pin": ""} (remove it, and with it the lock on Settings).
-        The PIN in use (when there is one) was checked before this: the page sends it in X-Netswitch-Pin."""
+        The PIN in use (when there is one) was checked before this: the page sends it in X-Checkin-Pin."""
         try:
             pin = json.loads(self._body(1024).decode("utf-8")).get("pin")
             if not isinstance(pin, type(u"")):

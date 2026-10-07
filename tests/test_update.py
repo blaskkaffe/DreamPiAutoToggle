@@ -9,7 +9,7 @@ from urllib.error import HTTPError
 from urllib.request import urlopen, Request
 
 from support import core, probes, web, sandbox, cleanup
-import netswitch_update as up
+import rebootupdate_update as up
 
 LOCAL = "a" * 40
 REMOTE = "b" * 40
@@ -287,7 +287,7 @@ class HttpUpdateTests(unittest.TestCase):
                 with self.assertRaises(HTTPError) as cm:
                     urlopen(Request(base + path, data=b"", method="POST"), timeout=10)
                 self.assertEqual(cm.exception.code, 403)
-            req = Request(base + "/update/start", data=b"", method="POST", headers={"X-Requested-With": "netswitch"})
+            req = Request(base + "/update/start", data=b"", method="POST", headers={"X-Requested-With": "checkin"})
             out = json.loads(urlopen(req, timeout=10).read().decode())
             self.assertIn("can't update itself", out["message"])    # no checkout recorded in the sandbox
         finally:

@@ -218,7 +218,7 @@ function askConfirm(text,okLabel,cb){closePin();var m=h("div",{"class":"rp-modal
  document.body.appendChild(m);pinDlg=m;no.focus()}
 function withPin(go){if(!pinNeeded||pinValue)return go();askPin("Enter the PIN",function(p){pinValue=p;go()})}
 function xhrJson(method,url,cb,body){var x=new XMLHttpRequest(),counted=method!=="POST";if(counted)inflight++;x.open(method,url,true);
- if(method=="POST"){x.setRequestHeader("X-Requested-With","netswitch");if(pinValue)x.setRequestHeader("X-Netswitch-Pin",pinValue);
+ if(method=="POST"){x.setRequestHeader("X-Requested-With","checkin");if(pinValue)x.setRequestHeader("X-Checkin-Pin",pinValue);
   if(body!==undefined)x.setRequestHeader("Content-Type","application/json")}
  x.onload=function(){if(counted)inflight--;var r=null;try{r=JSON.parse(x.responseText)}catch(e){}
   if(x.status==401||x.status==429)pinValue="";   // asked again next time

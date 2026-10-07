@@ -5,5 +5,5 @@
  "visible": true,
  "order": 30,
  "ui": 2,
- "web": "netswitch_contacts"
+ "web": "contacts_web"
 }

@@ -9,7 +9,7 @@
   "checkin": "green"
  },
  "primary": "checkin",
- "web": "netswitch_checkin",
+ "web": "checkin_web",
  "tints": {
   "checkin": false
  }

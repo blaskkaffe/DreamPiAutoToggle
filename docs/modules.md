@@ -24,7 +24,7 @@ There is no service besides the web service; a module that needs one writes its 
 | `rebootupdate` (Reboot and Update) | yes | Settings: the Updates rows (check, Update now, log) and the Reboot row, all in System; `GET /update`, `POST /update/check`, `/update/start`, `/reboot` | on |
 
 A module is **installed** when its folder (with a `module.json`) is there, and **enabled** when the picker has it on (`modules.json` in
-`/opt/dreampi-netswitch`: `{"led": true, ...}`; a module without an entry uses `enabled` from its manifest; a module that is not
+`/opt/checkin-board`: `{"led": true, ...}`; a module without an entry uses `enabled` from its manifest; a module that is not
 visible in the picker is always on). Not installed or not enabled = absent: no layout, no endpoints (404), no service work.
 `core.module_manifest()`, `module_names()`, `module_enabled()`, `module_visible()`, `save_module_enabled()` are the one place that knows.
 
@@ -34,7 +34,7 @@ visible in the picker is always on). Not installed or not enabled = absent: no l
 modules/<name>/
   module.json      {"name", "description", "enabled", "visible"}  + optional "web", "ui", "order", "colours", "colours_unique", "primary", "note"
   layout.json      what it shows (below); a module with only a web entry or only a background may differ
-  netswitch_*.py   its Python: the web entry named in "web", plus anything its services use
+  <name>_web.py     its Python: the web entry named in "web", plus anything its services use
   page.js          optional: custom widgets, hooks, a background (runs in the page's script after the base scripts)
   page.css         optional: only for what the page kit has nothing for (see the kit rules below)
   *.html           optional: markup of a custom widget (layout.json: "html_file")
@@ -196,7 +196,7 @@ The page itself (`page/`): `index.html` is only the frame (`#bg`, header, `#warn
 
 ## Services and the installer
 
-- `install.sh` `sync_modules`: copies every `modules/*/` that has a `module.json` to `$DEST/modules/` (replacing the old copy as a whole); a folder that was installed before but is gone from the repo gets its `remove.sh` run and is deleted. Then every installed module's `install.sh` is sourced. Before that, `install.sh` removes what the old Wi-Fi setup module left on a machine that had it (service `dreampi-netswitch-wifi`, `modules/wifi`, the `wifi_*` state files, `/tmp/dreampi-netswitch.wifi`). The installer also copies the base page files (`index.html`, `page.css`, `page.js`, `widgets.js`, `boot.js`).
+- `install.sh` `sync_modules`: copies every `modules/*/` that has a `module.json` to `$DEST/modules/` (replacing the old copy as a whole); a folder that was installed before but is gone from the repo gets its `remove.sh` run and is deleted. Then every installed module's `install.sh` is sourced. Before that, `install.sh` removes what the old Wi-Fi setup module left on a machine that had it (service `checkin-board-wifi`, `modules/wifi`, the `wifi_*` state files, `/tmp/checkin-board.wifi`). The installer also copies the base page files (`index.html`, `page.css`, `page.js`, `widgets.js`, `boot.js`).
 - To **remove a module for good**: delete its folder in the folder you installed from and run `sudo ./install.sh` (its service and files go; its settings files like `contacts.json` and `checkin.json` stay for when it comes back). To **add one**: put the folder in and run the installer. To only hide it: switch it off in Settings > System > Modules.
 
 ## Adding a new module

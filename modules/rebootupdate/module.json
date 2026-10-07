@@ -5,5 +5,5 @@
  "visible": true,
  "order": 65,
  "ui": 2,
- "web": "netswitch_rebootupdate"
+ "web": "rebootupdate_web"
 }

@@ -23,8 +23,8 @@ custom("imagebg-pick",function(host,ctx){
    c.width=Math.max(1,Math.round(img.naturalWidth*sc));c.height=Math.max(1,Math.round(img.naturalHeight*sc));
    c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);c.toBlob(done,"image/jpeg",.85)};
   img.onerror=function(){URL.revokeObjectURL(url);done(null)};img.src=url}
- function send(blob){var x=new XMLHttpRequest();x.open("POST","/imagebg/upload",true);x.setRequestHeader("X-Requested-With","netswitch");
-  if(pinValue)x.setRequestHeader("X-Netswitch-Pin",pinValue);
+ function send(blob){var x=new XMLHttpRequest();x.open("POST","/imagebg/upload",true);x.setRequestHeader("X-Requested-With","checkin");
+  if(pinValue)x.setRequestHeader("X-Checkin-Pin",pinValue);
   x.onload=function(){r.btn.disabled=false;if(x.status===200){refresh();ctx.saved()}else alert(x.status===401?"Wrong PIN":(x.responseText||"The picture was not saved."))};
   x.onerror=function(){r.btn.disabled=false;alert("The picture was not saved.")};x.send(blob)}
  r.btn.onclick=function(e){e.stopPropagation();file.click()};

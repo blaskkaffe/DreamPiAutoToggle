@@ -8,7 +8,7 @@ from urllib.request import Request, urlopen
 
 from support import web, core, sandbox, cleanup
 
-import netswitch_imagebg as ib
+import imagebg_web as ib
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 3000
 JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 3000
@@ -30,7 +30,7 @@ class ImageBg(unittest.TestCase):
         cleanup(self.tmp)
 
     def call(self, method, path, body=None, headers=None):
-        h = {"X-Requested-With": "netswitch"} if method == "POST" else {}
+        h = {"X-Requested-With": "checkin"} if method == "POST" else {}
         h.update(headers or {})
         try:
             r = urlopen(Request(self.base + path, data=body, method=method, headers=h), timeout=10)

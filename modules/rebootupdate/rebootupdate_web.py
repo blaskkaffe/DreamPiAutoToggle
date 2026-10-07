@@ -1,16 +1,16 @@
 # Check-in add-on - Reboot and Update module, web side:
-#   GET  /update          the cached update check (netswitch_update.status())
+#   GET  /update          the cached update check (rebootupdate_update.status())
 #   POST /update/check    run a check now
 #   POST /update/start    fetch and install the new version (needs the PIN when one is set)
 #   POST /reboot          reboot the Pi (needs the PIN when one is set)
 # GET /update also carries the texts the page's widgets show (view() below), so the page needs no code of its own to draw them.
-# The update logic is in netswitch_update.py next to this file. Without the module the page has no update or
+# The update logic is in rebootupdate_update.py next to this file. Without the module the page has no update or
 # reboot controls and these paths answer 404.
 import json
 import subprocess
 
 import base_core as core
-import netswitch_update as updater
+import rebootupdate_update as updater
 
 PROTECTED = ("/reboot", "/update/start")      # run as root: the PIN is asked for when one is set
 

@@ -112,7 +112,7 @@ class PaletteHttp(unittest.TestCase):
         cleanup(self.tmp)
 
     def call(self, method, path, body=None):
-        req = Request(self.base + path, data=None if body is None else json.dumps(body).encode(), method=method, headers={"X-Requested-With": "netswitch"} if method == "POST" else {})
+        req = Request(self.base + path, data=None if body is None else json.dumps(body).encode(), method=method, headers={"X-Requested-With": "checkin"} if method == "POST" else {})
         try:
             r = urlopen(req, timeout=10)
             return r.status, json.loads(r.read().decode() or "null")

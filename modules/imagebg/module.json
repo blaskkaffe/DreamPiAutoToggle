@@ -5,6 +5,6 @@
  "visible": true,
  "order": 18,
  "ui": 2,
- "web": "netswitch_imagebg",
+ "web": "imagebg_web",
  "toggle_box": "appearance"
 }

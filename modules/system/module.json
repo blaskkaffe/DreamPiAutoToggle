@@ -5,5 +5,5 @@
  "visible": false,
  "order": 55,
  "ui": 2,
- "web": "netswitch_system"
+ "web": "system_web"
 }

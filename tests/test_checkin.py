@@ -7,8 +7,8 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from support import web, core, sandbox, cleanup
-import netswitch_contacts as contacts
-import netswitch_checkin as checkin
+import contacts_web as contacts
+import checkin_web as checkin
 
 CSV = u"""# a comment line
 name,department,role,phone,location,restrictToLocation

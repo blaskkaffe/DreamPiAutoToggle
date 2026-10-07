@@ -40,10 +40,10 @@ function post(url,body,done){xhrJson("POST",url,function(r,st,b){if(r&&!/^\/wbte
 // after a button's POST: "reload" the page, "wait" until the Pi is back (a reboot), or just look at the new state
 function afterPost(s,r,el){
  if(r&&r.started===false){alert(r.message||"That did not start");return}
- if(s.then==="reload"){try{sessionStorage.setItem("netswitch-reopen",s.reopen?"1":"")}catch(e){}location.reload();return}
+ if(s.then==="reload"){try{sessionStorage.setItem("checkin-reopen",s.reopen?"1":"")}catch(e){}location.reload();return}
  if(s.then==="wait"){if(el){el.disabled=true;setText(el,"Restarting...")}waitForPi();return}
  refresh();if(s.reload)reloadData(s.reload);fire("posted")}   // only /api is asked for at once: a data source is read again only when the button says so ("reload": its name)
-function reloadInSettings(){try{sessionStorage.setItem("netswitch-reopen","1")}catch(e){}location.reload()}   // modules come and go: the page is built again, Settings stays open
+function reloadInSettings(){try{sessionStorage.setItem("checkin-reopen","1")}catch(e){}location.reload()}   // modules come and go: the page is built again, Settings stays open
 function waitForPi(){var down=false,tries=0;
  (function poll(){tries++;var x=new XMLHttpRequest();x.open("GET","/ping?"+Date.now(),true);x.timeout=3000;
   x.onload=function(){if(down||tries>60)location.reload();else setTimeout(poll,2000)};
@@ -106,9 +106,9 @@ var DATA={};
 function reloadData(name){for(var ns in DATA)if(!name||ns===name)DATA[ns]()}
 // The last answer of every data source is kept in this browser and shown at once when the page opens again (with "busy": true until the
 // new answer is there), so a page never starts with empty lists: what it knew stays until something newer replaces it.
-function restoreData(){var ns;for(ns in (LAY.data||{})){try{var r=JSON.parse(localStorage.getItem("netswitch-data-"+ns));if(r&&typeof r==="object"){r.busy=true;S[ns]=r}}catch(e){}
+function restoreData(){var ns;for(ns in (LAY.data||{})){try{var r=JSON.parse(localStorage.getItem("checkin-data-"+ns));if(r&&typeof r==="object"){r.busy=true;S[ns]=r}}catch(e){}
  if(!S[ns]&&(LAY.data[ns].when!=="settings"))bootPending["data-"+ns]=1}}      // no kept answer: the first draw waits for it (page.js bootDone)
-function keepData(ns,r){try{localStorage.setItem("netswitch-data-"+ns,JSON.stringify(r))}catch(e){}}
+function keepData(ns,r){try{localStorage.setItem("checkin-data-"+ns,JSON.stringify(r))}catch(e){}}
 function startData(){var ns;for(ns in (LAY.data||{}))(function(ns,spec){
  var timer=null,seq=0,every=(spec.every||60)*1000,retry=(spec.retry||2)*1000,onlyInSettings=spec.when==="settings";
  function wanted(){return !document.hidden&&(!onlyInSettings||$("settings").classList.contains("open"))}

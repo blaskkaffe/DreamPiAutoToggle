@@ -1,6 +1,6 @@
 """Shared helpers for the tests: import the add-on modules from the repo root
 and point every file path they use at a throw-away directory, so tests never
-touch /opt/dreampi-netswitch or /tmp/dreampi-netswitch.*."""
+touch /opt/checkin-board or /tmp/checkin-board.*."""
 import os
 import shutil
 import sys
@@ -20,7 +20,7 @@ for _name in sorted(os.listdir(_MODULES)):
         sys.path.insert(0, os.path.join(_MODULES, _name))
 
 import base_core as core  # noqa: E402
-import netswitch_probes as probes  # noqa: E402
+import base_probes as probes  # noqa: E402
 import base_web as web  # noqa: E402
 
 __all__ = ['ROOT', 'core', 'probes', 'web', 'sandbox', 'cleanup']
@@ -45,7 +45,7 @@ def sandbox(*modules):
         for name, val in _ORIGINAL[mod].items():
             if val.startswith(base + "/") or val == base:
                 setattr(mod, name, tmp + val[len(base):])
-            elif val.startswith("/tmp/dreampi-netswitch"):
+            elif val.startswith("/tmp/checkin-board"):
                 setattr(mod, name, os.path.join(tmp, os.path.basename(val)))
     return tmp
 

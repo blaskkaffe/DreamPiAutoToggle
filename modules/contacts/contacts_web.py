@@ -336,9 +336,9 @@ PROTECTED = ("/contacts/import", "/contacts/active", "/contacts/person", "/conta
 OPEN = ("/contacts/photo",)          # a photo is set from the status menu on the board
 
 
-if __name__ == "__main__":      # python3 netswitch_contacts.py people.csv [--replace]: the same import from a shell
+if __name__ == "__main__":      # python3 contacts_web.py people.csv [--replace]: the same import from a shell
     import sys
     if len(sys.argv) < 2:
-        sys.exit("usage: netswitch_contacts.py people.csv [--replace]")
+        sys.exit("usage: contacts_web.py people.csv [--replace]")
     with io.open(sys.argv[1], encoding="utf-8") as f:
         print(import_csv(f.read(), replace="--replace" in sys.argv[2:]))

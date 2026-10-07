@@ -1,7 +1,7 @@
 # Check-in add-on - system module, web side: GET /about, the name / value rows under Settings > System.
 import json
 
-import netswitch_probes as probes
+import base_probes as probes
 import base_security as security
 
 

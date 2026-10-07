@@ -16,8 +16,21 @@
 # One computer runs this (the host); every other screen opens its address in a browser, in kiosk mode if you like
 # (kiosk/kiosk-browser.sh). Everything the screens show is kept by the host, so they are all in step.
 set -e
-DEST=/opt/dreampi-netswitch
+DEST=/opt/checkin-board
 SRC="$(cd "$(dirname "$0")" && pwd)"
+# >>> migrate_old
+# An install made under the old names (service and folder "dreampi-netswitch") moves to the new ones: the settings, the people and who is in are kept
+OLD_DEST=${OLD_DEST:-/opt/dreampi-netswitch}
+if [ "$(id -u)" = "0" ] && [ -d "$OLD_DEST" ] && [ ! -e "$DEST" ]; then
+    for ns_old in dreampi-netswitch dreampi-netswitch-led dreampi-netswitch-buttons dreampi-netswitch-wifi; do
+        systemctl disable --now "$ns_old.service" 2>/dev/null || true
+        rm -f "/etc/systemd/system/$ns_old.service"
+    done
+    mv "$OLD_DEST" "$DEST"
+    rm -f /tmp/dreampi-netswitch.*
+    echo "Moved the old install from $OLD_DEST to $DEST"
+fi
+# <<< migrate_old
 PORT=80
 HTTPS_PORT=443
 # an update keeps the ports used last time unless they are given again
@@ -44,23 +57,23 @@ if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
-cp "$SRC"/base/base_*.py "$SRC/project.json" "$SRC/netswitch_probes.py" "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
+cp "$SRC"/base/base_*.py "$SRC/project.json" "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/kiosk"
 cp "$SRC"/base/page/index.html "$SRC"/base/page/page.css "$SRC"/base/page/page.js "$SRC"/base/page/widgets.js "$SRC"/base/page/boot.js "$DEST/page/"
 cp "$SRC"/kiosk/* "$DEST/kiosk/"
 chmod +x "$DEST/kiosk/kiosk-browser.sh"
 # Files of the DreamPi add-on this one grew out of (an install over it is cleaned up: the hook, the buttons and the LED service are gone)
-for ns_old in dreampi-netswitch-led dreampi-netswitch-buttons dreampi-netswitch-wifi; do
+for ns_old in dreampi-netswitch-led dreampi-netswitch-buttons dreampi-netswitch-wifi checkin-board-wifi; do
     if [ -f "/etc/systemd/system/$ns_old.service" ]; then
         systemctl disable --now "$ns_old.service" 2>/dev/null || true
         rm -f "/etc/systemd/system/$ns_old.service"
     fi
 done
-rm -f "$DEST/netswitch_core.py" "$DEST/netswitch_modules.py" "$DEST/netswitch_web.py" "$DEST/netswitch_security.py" "$DEST/netswitch_tz.py" "$DEST/netswitch_hook.py" "$DEST/netswitch_gpio.py" "$DEST/netswitch_buttons.py" "$DEST/netswitch_update.py" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" \
+rm -f "$DEST/netswitch_probes.py" "$DEST/netswitch_core.py" "$DEST/netswitch_modules.py" "$DEST/netswitch_web.py" "$DEST/netswitch_security.py" "$DEST/netswitch_tz.py" "$DEST/netswitch_hook.py" "$DEST/netswitch_gpio.py" "$DEST/netswitch_buttons.py" "$DEST/netswitch_update.py" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" \
       "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" "$DEST/netswitch_players.py" "$DEST/netswitch_wifi_setup.py" "$DEST/wifi_button" "$DEST/wifi_button_enabled"
 # The Wi-Fi setup module is gone: its service (removed above), module folder, state files and /tmp state
 rm -rf "$DEST/modules/wifi"
-rm -f "$DEST"/wifi_* /tmp/dreampi-netswitch.wifi
+rm -f "$DEST"/wifi_* /tmp/dreampi-netswitch.wifi /tmp/checkin-board.wifi
 rm -rf "$DEST/static"
 if [ -f "$DEST/pth_locations" ]; then       # the hook was loaded into every Python through .pth files
     while read -r ns_pth; do rm -f "$ns_pth"; done < "$DEST/pth_locations"
@@ -159,7 +172,7 @@ if [ "$HTTPS_PORT" != 0 ] && [ ! -f "$DEST/https.crt" ]; then
 fi
 
 WEBPY=$(command -v python3 || command -v python)
-cat > /etc/systemd/system/dreampi-netswitch.service <<EOF
+cat > /etc/systemd/system/checkin-board.service <<EOF
 [Unit]
 Description=Check-in web page
 After=network.target
@@ -193,8 +206,8 @@ for ns_dir in "$DEST"/modules/*/; do
 done
 
 systemctl daemon-reload
-systemctl enable dreampi-netswitch.service >/dev/null 2>&1
-systemctl restart dreampi-netswitch.service
+systemctl enable checkin-board.service >/dev/null 2>&1
+systemctl restart checkin-board.service
 for ns_service in $NS_SERVICES; do      # the services of the installed modules
     systemctl enable "$ns_service" >/dev/null 2>&1
     systemctl restart "$ns_service"

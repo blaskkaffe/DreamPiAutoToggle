@@ -29,8 +29,8 @@ def _read_project():
 
 
 PROJECT = _read_project()      # project.json: {"name", "title" (the page's), "data_dir", "tmp_prefix", "service", "icon", "touch_icon"}
-BASE_DIR = PROJECT.get("data_dir", "/opt/dreampi-netswitch")           # where the project keeps its settings and state
-TMP_PREFIX = PROJECT.get("tmp_prefix", "/tmp/dreampi-netswitch")       # the start of the names of its short-lived state files
+BASE_DIR = PROJECT.get("data_dir", "/opt/dashboard")           # where the project keeps its settings and state
+TMP_PREFIX = PROJECT.get("tmp_prefix", "/tmp/dashboard")       # the start of the names of its short-lived state files
 PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the user's changes to the list of the palette (Appearance > Colour palette): {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui"}]}
 PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb"}}: palette colours the user changed
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
@@ -759,7 +759,7 @@ def save_time_zone(value):
 # ---------------------------------------------------------------- file state
 
 def log(text):
-    """A line in the service's log (journalctl -u dreampi-netswitch)."""
+    """A line in the service's log (journalctl -u checkin-board)."""
     sys.stderr.write(text.rstrip("\n") + "\n")
 
 

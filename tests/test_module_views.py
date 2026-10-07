@@ -6,8 +6,8 @@ import time
 import unittest
 
 from support import core, sandbox, cleanup
-import netswitch_rebootupdate as ru
-import netswitch_clock as clock
+import rebootupdate_web as ru
+import clock_web as clock
 import base_tz as tzmod
 
 
