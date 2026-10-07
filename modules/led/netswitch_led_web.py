@@ -179,8 +179,7 @@ def _post_wbtest_done(h):
 
 def _colours_reply():
     """Every palette colour with how it looks on screen (set in Appearance > Colour palette; shown here for reference) and how the LED shows it (set here)."""
-    return {"colours": [{"id": c["id"], "name": c["name"], "ui": c["ui"], "led": c["led"], "led_default": c["led_default"],
-                         "fixed": bool(c.get("token"))} for c in core.colours()]}
+    return {"colours": ledconfig.colour_table()}
 
 
 def _get_colours(h):
@@ -195,8 +194,8 @@ def _post_colours(h):
         if not isinstance(body, dict):
             raise ValueError("not an object")
         if "reset" in body:
-            core.reset_led_colours(None if body["reset"] == "all" else body["reset"])
-        elif not core.set_led_colour(body.get("id"), body.get("led")):
+            ledconfig.reset_led_colours(None if body["reset"] == "all" else body["reset"])
+        elif not ledconfig.set_led_colour(body.get("id"), body.get("led")):
             raise ValueError("not a palette colour")
     except (ValueError, IOError, OSError) as e:
         h.send(str(e), "text/plain; charset=utf-8", status=400)

@@ -261,17 +261,17 @@ class LookTests(Base):
     def test_idle_with_the_defaults_shows_the_selected_networks_colour(self):
         looks = self.looks(ctx(net=GOOD))
         self.assertEqual([m["messages"] for m in looks], [["ready-dcnow", "sel-dcnow"]])        # both apply and share the look
-        self.assertEqual(looks[-1]["color"], ledconfig.network_colour("dcnow")["led"])
+        self.assertEqual(looks[-1]["color"], ledconfig.led_colour(ledconfig.network_colour("dcnow")["id"]))
         open(sw.FLAG, "w").close()
         looks = self.looks(ctx(selected="dcnet", net=GOOD))
-        self.assertEqual(looks[-1]["color"], ledconfig.network_colour("dcnet")["led"])
+        self.assertEqual(looks[-1]["color"], ledconfig.led_colour(ledconfig.network_colour("dcnet")["id"]))
 
     def test_the_network_colours_follow_the_switchers_choice(self):
         core.set_module_colour("switcher", "dcnow", "bright-green")
         looks = self.looks(ctx(state="call-dcnow", net=GOOD))
         self.assertEqual(looks[-1]["color"], "#50ff70")
         self.assertEqual(ledconfig.resolve_colour("network", "dcnow"), "#50ff70")
-        self.assertEqual(ledconfig.resolve_colour("dcnet"), ledconfig.network_colour("dcnet")["led"])
+        self.assertEqual(ledconfig.resolve_colour("dcnet"), ledconfig.led_colour(ledconfig.network_colour("dcnet")["id"]))
 
     def test_a_palette_colour_is_its_led_value(self):
         self.assertEqual(ledconfig.resolve_colour("orange"), "#ff8c00")
@@ -279,10 +279,10 @@ class LookTests(Base):
 
     def test_defaults_for_the_states(self):
         self.assertEqual(self.looks(ctx(state="busy"))[-1]["effect"], "blink")
-        self.assertEqual(self.looks(ctx(state="busy"))[-1]["color"], core.colour("yellow")["led"])
+        self.assertEqual(self.looks(ctx(state="busy"))[-1]["color"], ledconfig.led_colour("yellow"))
         m = self.looks(ctx(state="off"))[-1]
         self.assertEqual((m["color"], m["effect"]), ("#ff0000", "blink"))
-        self.assertEqual(self.looks(ctx(state="call"))[-1]["color"], core.colour("purple")["led"])
+        self.assertEqual(self.looks(ctx(state="call"))[-1]["color"], ledconfig.led_colour("purple"))
         unknown = self.looks(ctx(state="unknown"))                                                   # unknown is optional: only the selection lights
         self.assertEqual(len(unknown), 1)
         self.assertEqual(unknown[0]["messages"], ["sel-dcnow"])
@@ -339,7 +339,7 @@ class LookTests(Base):
         with open(sw.STATE, "w") as f:
             f.write("call dcnow 123")
         look = ledconfig.dreampi_look()
-        self.assertEqual(look["color"], ledconfig.network_colour("dcnow")["led"])                  # the LED gets the calibrated value ...
+        self.assertEqual(look["color"], ledconfig.led_colour(ledconfig.network_colour("dcnow")["id"]))                  # the LED gets the calibrated value ...
         self.assertEqual(ledconfig.dreampi_dot(), {"colour": "network", "effect": "solid", "speed": "slow"})   # ... the dot the palette colour
         os.remove(sw.STATE)
         self.groups(group("g1", "red", ["no-network"]))
@@ -395,46 +395,45 @@ class TargetingTests(Base):
 class ReadyFollowsTheNetworkTests(Base):
     def test_each_network_has_its_own_ready_look(self):
         self.groups(group("g1", "green", ["ready-dcnow"]), group("g2", "blue", ["ready-dcnet"]))
-        self.assertEqual([m["color"] for m in self.looks(ctx(net=GOOD))], [core.colour("green")["led"]])
-        self.assertEqual([m["color"] for m in self.looks(ctx(selected="dcnet", net=GOOD))], [core.colour("blue")["led"]])
+        self.assertEqual([m["color"] for m in self.looks(ctx(net=GOOD))], [ledconfig.led_colour("green")])
+        self.assertEqual([m["color"] for m in self.looks(ctx(selected="dcnet", net=GOOD))], [ledconfig.led_colour("blue")])
 
     def test_the_selection_decides_which_ready_look_shows_when_the_network_is_switched_later(self):
         self.groups(group("g1", "network", ["ready-dcnow", "ready-dcnet"]))
-        self.assertEqual(self.looks(ctx(net=GOOD))[0]["color"], ledconfig.network_colour("dcnow")["led"])
-        self.assertEqual(self.looks(ctx(selected="dcnet", net=GOOD))[0]["color"], ledconfig.network_colour("dcnet")["led"])
+        self.assertEqual(self.looks(ctx(net=GOOD))[0]["color"], ledconfig.led_colour(ledconfig.network_colour("dcnow")["id"]))
+        self.assertEqual(self.looks(ctx(selected="dcnet", net=GOOD))[0]["color"], ledconfig.led_colour(ledconfig.network_colour("dcnet")["id"]))
 
 
 class PaletteCalibrationTests(Base):
     def test_a_colour_can_look_different_on_the_led(self):
         self.groups(group("g1", "red", ["ready-dcnow"]))
         self.assertEqual(self.looks(ctx(net=GOOD))[0]["color"], "#ff0000")
-        self.assertTrue(core.set_palette_colour("red", led="#e01000"))
+        self.assertTrue(ledconfig.set_led_colour("red", "#e01000"))
         self.assertEqual(self.looks(ctx(net=GOOD))[0]["color"], "#e01000")              # the LED follows
         self.assertEqual(core.colour("red")["ui"], core.colour("red")["ui_default"])    # the page's red is untouched
 
     def test_a_colour_can_be_changed_on_screen_and_gets_its_lighter_border(self):
-        self.assertTrue(core.set_palette_colour("blue", ui="#0000ff"))
+        self.assertTrue(core.set_palette_colour("blue", "#0000ff"))
         c = core.colour("blue")
         self.assertEqual((c["ui"], c["ui_l"]), ("#0000ff", core.lighter("#0000ff")))
         self.assertIn("--c-blue:#0000ff", core.colours_css())
 
     def test_the_default_value_is_not_kept_and_a_reset_puts_it_back(self):
-        core.set_palette_colour("green", led="#00aa00")
+        core.set_palette_colour("green", "#123456")
+        ledconfig.set_led_colour("white", "#ffe0e0")
         self.assertIn("green", core.palette_overrides())
-        core.set_palette_colour("green", led=core.colour("green")["led_default"])
-        self.assertNotIn("green", core.palette_overrides())
-        core.set_palette_colour("green", ui="#123456", led="#00aa00")
-        core.set_palette_colour("white", led="#ffe0e0")
         core.reset_palette("green")
-        self.assertEqual(list(core.palette_overrides()), ["white"])
-        core.reset_palette()
-        self.assertEqual(core.palette_overrides(), {})
+        self.assertEqual(list(core.palette_overrides()), [])
+        self.assertEqual(list(ledconfig.led_overrides()), ["white"])             # the palette's reset leaves the LED values alone
+        ledconfig.set_led_colour("white", ledconfig.led_default("white"))
+        self.assertEqual(ledconfig.led_overrides(), {})
 
     def test_bad_values_are_refused(self):
-        self.assertFalse(core.set_palette_colour("nonsense", led="#ff0000"))
-        self.assertFalse(core.set_palette_colour("red", led="red"))
+        self.assertFalse(core.set_palette_colour("nonsense", "#ff0000"))
+        self.assertFalse(core.set_palette_colour("red", "red"))
+        self.assertFalse(ledconfig.set_led_colour("nonsense", "#ff0000"))
         with open(core.PALETTE_FILE, "w") as f:
-            f.write('{"red": {"led": "oops", "ui": "#112233"}, "nonsense": {"led": "#ffffff"}}')
+            f.write('{"red": {"led": "oops", "ui": "#112233"}, "nonsense": {"ui": "#ffffff"}}')
         self.assertEqual(core.palette_overrides(), {"red": {"ui": "#112233"}})
 
     def test_the_colour_test_holds_a_colour_for_a_few_seconds(self):

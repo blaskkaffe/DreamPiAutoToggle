@@ -13,6 +13,24 @@ import time
 import base_core as core
 import netswitch_led_inputs as inputs
 
+LED_COLOURS = os.path.join(core.BASE_DIR, "led_colours.json")   # {"red": "#rrggbb"}: how the LED shows a palette colour when that is not the default
+LED_DEFAULTS = {
+ "global": "#8090ff",
+ "red": "#ff0000",
+ "orange": "#ff8c00",
+ "yellow": "#ffd000",
+ "green": "#00ff00",
+ "cyan": "#00c8ff",
+ "blue": "#0046ff",
+ "purple": "#aa00ff",
+ "white": "#ffffff",
+ "bright-red": "#ff5050",
+ "bright-green": "#50ff70",
+ "bright-cyan": "#70e0ff",
+ "bright-blue": "#5080ff",
+ "bright-purple": "#cc66ff",
+ "bright-pink": "#ff70b0"
+}    # how the LED shows each colour the add-on ships (the palette itself is the base's, and only knows the screen colours)
 LED_CONFIG = os.path.join(core.BASE_DIR, "led.json")     # brightness, colours, wire order, white balance, the groups
 LED_COUNT = os.path.join(core.BASE_DIR, "led_count")      # number of LEDs, editable from the page
 LED_GPIO = os.path.join(core.BASE_DIR, "led_gpio")        # output pin (10, 12, 18 or 21), likewise
@@ -169,6 +187,76 @@ def order_by_priority(groups, priority):
     return sorted(groups, key=lambda g: min([rank.get(m, big) for m in g["messages"]] or [big]))
 
 
+_HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def led_overrides():
+    """{palette id: "#rrggbb"} the user gave the LED (only for colours that are still in the palette)."""
+    try:
+        with open(LED_COLOURS) as f:
+            data = json.load(f)
+    except (IOError, OSError, ValueError):
+        return {}
+    ids = core.palette_ids()
+    return dict((i, v.lower()) for i, v in data.items() if isinstance(data, dict) and i in ids and isinstance(v, _TEXT) and _HEX.match(v)) if isinstance(data, dict) else {}
+
+
+def led_default(ident):
+    """How the LED shows a palette colour as shipped: the add-on's own table, else (a colour the user added) its screen colour."""
+    return LED_DEFAULTS.get(ident) or core.colour(ident)["ui"]
+
+
+def led_colour(ident):
+    """"#rrggbb" for what the LED is asked to show for a palette colour or a colour token (before the white balance and the brightness).
+    A token follows the colour it stands for: "Selected network" is the LED value of the selected network's colour."""
+    ident = core.LEGACY_COLOURS.get(ident, ident)
+    if ident in LED_DEFAULTS or ident in core.palette_ids():
+        return led_overrides().get(ident) or led_default(ident)
+    if ident == "network":
+        return led_colour(network_colour(inputs.selected())["id"])
+    return led_colour(core.DEFAULT_COLOUR)
+
+
+def save_led_colours(over):
+    tmp = LED_COLOURS + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(over, f)
+    os.rename(tmp, LED_COLOURS)
+
+
+def set_led_colour(ident, led):
+    """The user changes how the LED shows a palette colour, "#rrggbb". A value equal to the default is not kept. False for an unknown colour or a bad value."""
+    if ident not in core.palette_ids() or not (isinstance(led, _TEXT) and _HEX.match(led)):
+        return False
+    over = led_overrides()
+    if led.lower() == led_default(ident).lower():
+        over.pop(ident, None)
+    else:
+        over[ident] = led.lower()
+    save_led_colours(over)
+    return True
+
+
+def reset_led_colours(ident=None):
+    """Put one colour (or all) back to what the LED showed as shipped."""
+    over = {} if ident is None else dict((i, v) for i, v in led_overrides().items() if i != ident)
+    save_led_colours(over)
+
+
+def colour_table():
+    """[{"id", "name", "ui", "led", "led_default", "fixed"}] of the palette, for the page's LED colour editor; a colour token ("Selected network")
+    follows another colour, so its LED value is that one's and it is fixed."""
+    over = led_overrides()
+    out = []
+    for c in core.colours():
+        if c.get("token"):
+            out.append({"id": c["id"], "name": c["name"], "ui": c["ui"], "led": led_colour(c["id"]), "led_default": led_colour(c["id"]), "fixed": True})
+        else:
+            out.append({"id": c["id"], "name": c["name"], "ui": c["ui"], "led": over.get(c["id"]) or led_default(c["id"]),
+                        "led_default": led_default(c["id"]), "fixed": False})
+    return out
+
+
 def network_colour(net):
     """The palette entry of the colour the user gave the network "dcnow" or "dcnet" (the network switcher's colour picks, in the
     base's colours.json; orange and blue without them)."""
@@ -273,8 +361,8 @@ def resolve_colour(colour, selected="dcnow"):
     if colour == "network":
         colour = selected
     if colour in ("dcnow", "dcnet"):
-        return network_colour(colour)["led"]
-    return core.colour(colour)["led"]
+        return led_colour(network_colour(colour)["id"])
+    return led_colour(colour)
 
 
 WB_TEST_STALE = 3   # seconds; a closed/crashed tab stops driving the LED after this

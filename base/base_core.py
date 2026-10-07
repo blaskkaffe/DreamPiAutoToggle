@@ -31,7 +31,6 @@ PROJECT = _read_project()      # project.json: {"name", "title" (the page's), "d
 BASE_DIR = PROJECT.get("data_dir", "/opt/dreampi-netswitch")           # where the project keeps its settings and state
 TMP_PREFIX = PROJECT.get("tmp_prefix", "/tmp/dreampi-netswitch")       # the start of the names of its short-lived state files
 PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the user's changes to the list of the palette (Appearance > Colour palette): {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui", "led"}]}
-LED_COLOURS = os.path.join(BASE_DIR, "led_colours.json")   # {"red": "#rrggbb"}: how the LED shows a palette colour when that is not the default (Status LED > Colours, the LED module's)
 PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb"}}: palette colours the user changed on screen (Appearance > Colour palette; the LED colours are in led_colours.json)
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
 MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"switcher": {"dcnow": "orange", ...}}: the global-palette colours each module uses
@@ -253,21 +252,21 @@ def save_module_enabled(name, on):
 
 
 PALETTE = (
-    ("global", "Global main", "global", "#6f7d99", "#b0b7c7", "#8090ff"),
-    ("red", "Red", "red", "#d9363e", "#ef8a8f", "#ff0000"),
-    ("orange", "Orange", "orange", "#e8761c", "#f6b27a", "#ff8c00"),
-    ("yellow", "Yellow", "yellow", "#d9a900", "#f0d36a", "#ffd000"),
-    ("green", "Green", "green", "#2fa84f", "#8ed9a4", "#00ff00"),
-    ("cyan", "Cyan", "cyan", "#1fb5c9", "#7fdbe6", "#00c8ff"),
-    ("blue", "Blue", "blue", "#1c6fe8", "#80b1f6", "#0046ff"),
-    ("purple", "Purple", "purple", "#8a4fd6", "#bf9ae8", "#aa00ff"),
-    ("white", "White", "white", "#b8bec9", "#e6e9ee", "#ffffff"),
-    ("bright-red", "Bright red", "red", "#ff5a5f", "#ffa6a9", "#ff5050"),
-    ("bright-green", "Bright green", "green", "#4cd964", "#a6efb6", "#50ff70"),
-    ("bright-cyan", "Bright cyan", "cyan", "#3de0f5", "#9aeefa", "#70e0ff"),
-    ("bright-blue", "Bright blue", "blue", "#4a90ff", "#9fc4ff", "#5080ff"),
-    ("bright-purple", "Bright purple", "purple", "#b070ff", "#d3b0ff", "#cc66ff"),
-    ("bright-pink", "Bright pink", "pink", "#ff6ab8", "#ffaad6", "#ff70b0"),
+    ("global", "Global main", "global", "#6f7d99", "#b0b7c7"),
+    ("red", "Red", "red", "#d9363e", "#ef8a8f"),
+    ("orange", "Orange", "orange", "#e8761c", "#f6b27a"),
+    ("yellow", "Yellow", "yellow", "#d9a900", "#f0d36a"),
+    ("green", "Green", "green", "#2fa84f", "#8ed9a4"),
+    ("cyan", "Cyan", "cyan", "#1fb5c9", "#7fdbe6"),
+    ("blue", "Blue", "blue", "#1c6fe8", "#80b1f6"),
+    ("purple", "Purple", "purple", "#8a4fd6", "#bf9ae8"),
+    ("white", "White", "white", "#b8bec9", "#e6e9ee"),
+    ("bright-red", "Bright red", "red", "#ff5a5f", "#ffa6a9"),
+    ("bright-green", "Bright green", "green", "#4cd964", "#a6efb6"),
+    ("bright-cyan", "Bright cyan", "cyan", "#3de0f5", "#9aeefa"),
+    ("bright-blue", "Bright blue", "blue", "#4a90ff", "#9fc4ff"),
+    ("bright-purple", "Bright purple", "purple", "#b070ff", "#d3b0ff"),
+    ("bright-pink", "Bright pink", "pink", "#ff6ab8", "#ffaad6"),
 )
 PALETTE_IDS = tuple(c[0] for c in PALETTE)       # the ones the add-on ships; palette_ids() is the list in use (the colour palette editor can delete and add colours)
 FIXED_COLOURS = ("global", "orange")   # never deleted: "Global main" is not a colour of its own, orange is the one everything falls back to
@@ -300,7 +299,7 @@ MAX_CUSTOM_COLOURS = 40
 
 def palette_layout():
     """The user's changes to the list of the palette (Settings > Appearance > Colour palette) over the shipped palette, made safe:
-    {"order", "deleted", "names", "custom"}. The screen colours the user changed are in palette.json, the LED colours in led_colours.json."""
+    {"order", "deleted", "names", "custom"}. The screen colours the user changed are in palette.json."""
     out = {"order": [], "deleted": [], "names": {}, "custom": []}
     try:
         with open(PALETTE_CUSTOM) as f:
@@ -314,8 +313,7 @@ def palette_layout():
         if (isinstance(c, dict) and isinstance(c.get("id"), _STR) and _CUSTOM_ID.match(c["id"]) and c["id"] not in seen and isinstance(c.get("ui"), _STR)
                 and _HEX.match(c["ui"]) and len(out["custom"]) < MAX_CUSTOM_COLOURS):
             seen.add(c["id"])
-            led = c.get("led") if isinstance(c.get("led"), _STR) and _HEX.match(c.get("led")) else c["ui"]
-            out["custom"].append({"id": c["id"], "name": str(c.get("name") or c["id"])[:24], "ui": c["ui"].lower(), "led": led.lower()})
+            out["custom"].append({"id": c["id"], "name": str(c.get("name") or c["id"])[:24], "ui": c["ui"].lower()})
     if isinstance(data.get("deleted"), list):
         out["deleted"] = [i for i in data["deleted"] if i in PALETTE_IDS and i not in FIXED_COLOURS]
     if isinstance(data.get("names"), dict):
@@ -329,7 +327,7 @@ def _palette_entries():
     """The palette in use as tuples like PALETTE: the shipped colours that were not deleted and the custom ones, renamed and in the user's order."""
     lay = palette_layout()
     entries = [c for c in PALETTE if c[0] not in lay["deleted"]]
-    entries += [(c["id"], c["name"], "custom", c["ui"], lighter(c["ui"]), c["ui"]) for c in lay["custom"]]          # its LED colour starts out as its screen colour
+    entries += [(c["id"], c["name"], "custom", c["ui"], lighter(c["ui"])) for c in lay["custom"]]
     entries = [(c[0], lay["names"].get(c[0], c[1])) + tuple(c[2:]) for c in entries]
     rank = dict((i, n) for n, i in enumerate(lay["order"]))
     return sorted(entries, key=lambda c: rank.get(c[0], len(rank)))          # a stable sort: what the order does not name keeps its place at the end
@@ -391,62 +389,47 @@ def colour_ids():
 
 
 def palette_overrides():
-    """{id: {"ui": "#rrggbb", "led": "#rrggbb"}}: what the user changed in a palette colour, on screen (palette.json: the colour palette editor) and on the
-    LED (led_colours.json: the LED module); only valid entries. An older palette.json that also holds "led" values still counts for them."""
+    """{id: {"ui": "#rrggbb"}}: what the user changed in a palette colour on screen (palette.json: the colour palette editor); only valid entries."""
     ids, out = palette_ids(), {}
     for ident, v in _read_dict(PALETTE_FILE).items():
-        if ident in ids and isinstance(v, dict):
-            keep = dict((k, str(v[k]).lower()) for k in ("ui", "led") if isinstance(v.get(k), _STR) and _HEX.match(v[k]))
-            if keep:
-                out[ident] = keep
-    for ident, v in _read_dict(LED_COLOURS).items():
-        if ident in ids and isinstance(v, _STR) and _HEX.match(v):
-            out.setdefault(ident, {})["led"] = v.lower()
+        if ident in ids and isinstance(v, dict) and isinstance(v.get("ui"), _STR) and _HEX.match(v["ui"]):
+            out[ident] = {"ui": v["ui"].lower()}
     return out
 
 
 def colours():
-    """The palette as dicts: id, name, group, ui, ui_l, led, and the defaults (ui_default, led_default) as the add-on ships them."""
+    """The palette as dicts: id, name, group, ui, ui_l and ui_default (as the add-on ships it). A module that shows a colour some other way
+    (the LED module) keeps its own table for that."""
     over, out = palette_overrides(), []
     for c in _palette_entries():
         o = over.get(c[0], {})
         ui = o.get("ui", c[3])
-        out.append({"id": c[0], "name": c[1], "group": c[2], "ui": ui, "ui_l": lighter(ui) if "ui" in o else c[4],
-                    "led": o.get("led", c[5]), "ui_default": c[3], "led_default": c[5]})
+        out.append({"id": c[0], "name": c[1], "group": c[2], "ui": ui, "ui_l": lighter(ui) if "ui" in o else c[4], "ui_default": c[3]})
     # the modules' own colours (colour_tokens()): each is a palette colour that the module that added it names right now (its service
     # "colour:<id>", see service()), e.g. "Selected network" is the colour of the network that is selected
     for t in colour_tokens():
         pick = service("colour:" + t["id"])
         base = ([c for c in out if c["id"] == pick] or [c for c in out if c["id"] == DEFAULT_COLOUR] or out)[0]
-        out.append(dict(base, id=t["id"], name=t["name"], group="token", ui_default=base["ui"], led_default=base["led"], token=True))
+        out.append(dict(base, id=t["id"], name=t["name"], group="token", ui_default=base["ui"], token=True))
     return out
 
 
-def set_palette_colour(ident, ui=None, led=None):
-    """Change a palette colour on screen (ui) and / or on the LED (led), "#rrggbb". A value equal to the default is not kept.
-    Returns False for an unknown id or a value that is not a colour."""
-    if ident not in palette_ids() or any(v is not None and not (isinstance(v, _STR) and _HEX.match(v)) for v in (ui, led)):
+def set_palette_colour(ident, ui):
+    """Change a palette colour on screen, "#rrggbb". A value equal to the default is not kept. Returns False for an unknown id or a value that is not a colour."""
+    if ident not in palette_ids() or not (isinstance(ui, _STR) and _HEX.match(ui)):
         return False
     base = [c for c in _palette_entries() if c[0] == ident][0]
     over = palette_overrides()
-    entry = over.get(ident, {})
-    for key, value, default in (("ui", ui, base[3]), ("led", led, base[5])):
-        if value is None:
-            continue
-        if value.lower() == default.lower():
-            entry.pop(key, None)
-        else:
-            entry[key] = value.lower()
-    if entry:
-        over[ident] = entry
-    else:
+    if ui.lower() == base[3].lower():
         over.pop(ident, None)
+    else:
+        over[ident] = {"ui": ui.lower()}
     _write_palette(over)
     return True
 
 
 def reset_palette(ident=None):
-    """Put one palette colour (or all of them) back to the shipped values, on screen and on the LED."""
+    """Put one palette colour (or all of them) back to the shipped values."""
     over = palette_overrides()
     if ident is None:
         over = {}
@@ -455,43 +438,12 @@ def reset_palette(ident=None):
     _write_palette(over)
 
 
-def reset_palette_ui(ident=None):
-    """The same for how the colour looks on screen only (the colour palette editor); what the LED shows is left alone."""
-    over = palette_overrides()
-    for i in ([ident] if ident else list(over)):
-        if i in over:
-            over[i].pop("ui", None)
-            if not over[i]:
-                del over[i]
-    _write_palette(over)
-
-
-def reset_led_colours(ident=None):
-    """The same for how the LED shows the colour only (the LED module); how it looks on screen is left alone."""
-    over = palette_overrides()
-    for i in ([ident] if ident else list(over)):
-        if i in over:
-            over[i].pop("led", None)
-            if not over[i]:
-                del over[i]
-    _write_palette(over)
-
-
-def set_led_colour(ident, led):
-    """How the LED shows a palette colour, "#rrggbb" (what is asked for, before the white balance and the brightness)."""
-    return set_palette_colour(ident, led=led)
-
-
 def _write_palette(over):
-    """Keep what is changed: the screen colours in palette.json, the LED colours in led_colours.json (two owners, two files)."""
-    for path, key in ((PALETTE_FILE, "ui"), (LED_COLOURS, "led")):
-        part = dict((i, v[key]) for i, v in over.items() if key in v)
-        if key == "ui":
-            part = dict((i, {"ui": u}) for i, u in part.items())
-        tmp = path + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(part, f)
-        os.rename(tmp, path)
+    """Keep what is changed (palette.json)."""
+    tmp = PALETTE_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(dict((i, {"ui": v["ui"]}) for i, v in over.items() if "ui" in v), f)
+    os.rename(tmp, PALETTE_FILE)
 
 
 # ---- the changes the colour palette editor makes (see palette_layout())
@@ -609,7 +561,7 @@ def palette_reset(ident=None):
     """Back to the colours the add-on ships: the whole palette (all colours, names, order, screen colours) or one shipped colour (its name and screen
     colour). What the LED shows for a colour is the LED module's and stays."""
     if ident is None:
-        reset_palette_ui()
+        reset_palette()
         try:
             os.remove(PALETTE_CUSTOM)
         except OSError:
@@ -620,7 +572,7 @@ def palette_reset(ident=None):
     data = _raw_layout()
     data["names"].pop(ident, None)
     _write_layout(data)
-    reset_palette_ui(ident)
+    reset_palette(ident)
     return True
 
 

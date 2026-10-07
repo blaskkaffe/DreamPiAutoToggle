@@ -192,7 +192,7 @@ class SteadyTests(unittest.TestCase):
             ledconfig.save_led_config(ledconfig.default_led_config())
             c = led.watched_files()
             self.assertNotEqual(b, c)                                              # led.json written
-            core.set_palette_colour("red", led="#00ffff")
+            ledconfig.set_led_colour("red", "#00ffff")
             self.assertNotEqual(c, led.watched_files())                            # the palette's LED colour changed
         finally:
             cleanup(tmp)

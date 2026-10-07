@@ -41,7 +41,7 @@ class PaletteTests(unittest.TestCase):
         open(sw.FLAG, "w").close()
         self.assertEqual(core.colour("network")["ui"], core.colour("blue")["ui"])            # DCNET: blue
         core.set_module_colour("switcher", "dcnet", "green")
-        self.assertEqual(core.colour("network")["led"], core.colour("green")["led"])
+        self.assertEqual(ledconfig.led_colour("network"), ledconfig.led_colour("green"))
         self.assertEqual(core.colour("network")["id"], "network")
 
     def test_the_network_buttons_cannot_be_the_selected_network(self):
@@ -62,8 +62,9 @@ class PaletteTests(unittest.TestCase):
 
     def test_every_colour_has_page_and_led_values(self):
         for c in core.colours():
-            for k in ("ui", "ui_l", "led"):
+            for k in ("ui", "ui_l"):
                 self.assertRegex(c[k], r"^#[0-9a-f]{6}$", (c["id"], k))
+            self.assertRegex(ledconfig.led_colour(c["id"]), r"^#[0-9a-f]{6}$", c["id"])
 
     def test_css_has_variables_and_a_class_per_colour(self):
         css = core.colours_css()
@@ -164,7 +165,7 @@ class LedTests(unittest.TestCase):
         cfg = ledconfig.led_config()
         cfg["groups"] = [{"id": "g1", "colour": "dcnow", "messages": ["sel-dcnow"]}]
         ledconfig.save_led_config(cfg)
-        self.assertEqual(self.look()[0]["color"], ledconfig.network_colour("dcnow")["led"])
+        self.assertEqual(self.look()[0]["color"], ledconfig.led_colour(ledconfig.network_colour("dcnow")["id"]))
         core.set_module_colour("switcher", "dcnow", "green")
         self.assertEqual(self.look()[0]["color"], "#00ff00")
 
@@ -172,9 +173,9 @@ class LedTests(unittest.TestCase):
         cfg = ledconfig.led_config()
         cfg["groups"] = [{"id": "g1", "colour": "network", "messages": ["ready"]}]
         ledconfig.save_led_config(cfg)
-        self.assertEqual(self.look()[0]["color"], ledconfig.network_colour("dcnow")["led"])
+        self.assertEqual(self.look()[0]["color"], ledconfig.led_colour(ledconfig.network_colour("dcnow")["id"]))
         open(sw.FLAG, "w").close()
-        self.assertEqual(self.look()[0]["color"], ledconfig.network_colour("dcnet")["led"])
+        self.assertEqual(self.look()[0]["color"], ledconfig.led_colour(ledconfig.network_colour("dcnet")["id"]))
 
 
 class HttpTests(unittest.TestCase):

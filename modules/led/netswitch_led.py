@@ -302,7 +302,7 @@ def _stamp(path):
 
 def watched_files():
     """What the files that settings and the network selection are kept in look like now (changes when one is written or removed)."""
-    return tuple(_stamp(p) for p in (inputs.FLAG, ledconfig.LED_CONFIG, core.PALETTE_FILE, core.LED_COLOURS, core.PALETTE_CUSTOM, core.MODULE_COLOURS, ledconfig.LED_COUNT, ledconfig.LED_GPIO,
+    return tuple(_stamp(p) for p in (inputs.FLAG, ledconfig.LED_CONFIG, core.PALETTE_FILE, ledconfig.LED_COLOURS, core.PALETTE_CUSTOM, core.MODULE_COLOURS, ledconfig.LED_COUNT, ledconfig.LED_GPIO,
                                      core.MODULES_STATE, ledconfig.WB_TEST))
 
 
