@@ -14,8 +14,8 @@ run() {     # run <node script> <env...>: a demo server with that environment, t
     kill $SERVER 2>/dev/null
     wait $SERVER 2>/dev/null
 }
-run audit.js IN=8 WIFIDEMO=1 FAKEUPDATE=1
-run functional.js IN=0 WIFIDEMO=1 FAKEUPDATE=1
+run audit.js IN=8 FAKEUPDATE=1
+run functional.js IN=0 FAKEUPDATE=1
 # the clock module has its own demo server (it is off in the one above so that the box counts stay as they are)
 run clock.js CLOCK=1
 # how the page appears (no pop-in) and the columns of Settings

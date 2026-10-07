@@ -341,7 +341,7 @@ W.worldmap=function(s){
   if(m.dot){me.setAttribute("cx",X(m.dot.lon));me.setAttribute("cy",Y(m.dot.lat));if(!me.firstChild)el("title",{},me);setText(me.firstChild,m.dot.name+" (here) "+m.dot.text);me.style.display=""}
   else me.style.display="none"}
  UPD.push(paint);paint();return host};
-// ---- a list of things from the server, each with a button that opens a small form (the Wi-Fi networks)
+// ---- a list of things from the server, each with a button that opens a small form (for example a list of networks)
 // "style": "buttons": the links as grey buttons, all in one row (as many columns as links)
 W.links=function(s){var btn=s.style==="buttons",el=h("span",{"class":"links keep"+(btn?" btns":"")});
  bind(s.items,function(ls){ls=ls||[];if(btn)el.style.setProperty("--n",ls.length||1);

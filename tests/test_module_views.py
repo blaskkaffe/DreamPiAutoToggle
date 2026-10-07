@@ -6,54 +6,9 @@ import time
 import unittest
 
 from support import core, sandbox, cleanup
-import netswitch_wifi_web as wifi
 import netswitch_rebootupdate as ru
 import netswitch_clock as clock
 import netswitch_tz as tzmod
-
-
-class WifiView(unittest.TestCase):
-    def setUp(self):
-        self.tmp = sandbox()
-
-    def tearDown(self):
-        cleanup(self.tmp)
-
-    def state(self, state, **extra):
-        with open(core.WIFI_STATE, "w") as f:
-            json.dump(dict(extra, state=state, time=time.time()), f)
-        d = {}
-        wifi.api(d, [])
-        return d["wifi"]
-
-    def test_strength_words(self):
-        self.assertEqual([wifi.strength(x) for x in (-40, -60, -70, -90, None)], ["Strong", "Good", "Fair", "Weak", ""])
-
-    def test_networks_are_listed_with_what_the_row_says(self):
-        got = wifi.networks_list([{"ssid": "Home", "secured": True, "signal": -50}, {"ssid": "Cafe", "secured": False, "signal": None}])
-        self.assertEqual([(n["ssid"], n["info"]) for n in got], [("Home", "Secured · Strong"), ("Cafe", "Open")])
-
-    def test_each_state_has_a_button_and_a_sentence(self):
-        for st, button in (("idle", "Search"), ("scanning", "Stop"), ("hosting", "Stop"), ("connecting", "Stop"), ("ok", "Connected"), ("failed", "Stop")):
-            w = self.state(st, ssid="Home")
-            self.assertEqual(w["button"], button, st)
-            self.assertTrue(w["sub"], st)
-        self.assertIn("“Home”", self.state("connecting", ssid="Home")["sub"])
-        self.assertTrue(self.state("ok", ssid="Home")["disabled"])
-        self.assertFalse(self.state("idle")["disabled"])
-
-    def test_the_list_shows_only_while_scanning_or_hosting(self):
-        nets = [{"ssid": "Home", "secured": True, "signal": -50}]
-        self.assertTrue(self.state("hosting", networks=nets)["show_list"])
-        self.assertTrue(self.state("scanning", networks=nets)["show_list"])
-        self.assertFalse(self.state("idle", networks=nets)["show_list"])
-        self.assertEqual(self.state("hosting", networks=nets)["list"][0]["info"], "Secured · Strong")
-
-    def test_demo_mode_says_so(self):
-        open(core.WIFI_DEMO, "w").close()
-        w = self.state("hosting")
-        self.assertIn("DEMO", w["sub"])
-        self.assertTrue(w["sub"].startswith("Pick a network below"))
 
 
 class UpdateView(unittest.TestCase):

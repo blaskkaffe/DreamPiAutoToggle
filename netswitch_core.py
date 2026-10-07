@@ -1,6 +1,6 @@
 # Check-in add-on - shared state and settings.
 # Everything the web service and the modules read or write: file paths, the module state, the colour palette, the time
-# zone and the Wi-Fi setup state files. No server, no probing, so small services can import it cheaply. Python 3.
+# zone and the update state files. No server, no probing, so small services can import it cheaply. Python 3.
 import json
 import os
 import re
@@ -16,7 +16,7 @@ ADDON_COMMIT = os.path.join(BASE_DIR, "version_commit")  # full commit hash of t
 ADDON_SRC = os.path.join(BASE_DIR, "src_dir")            # that checkout's folder, used by the web update
 INSTALL_PORTS = os.path.join(BASE_DIR, "install_ports")  # "<http port> <https port>", so an update keeps them
 UPDATE_ORIGIN = os.path.join(BASE_DIR, "update_origin")  # the checkout's git origin URL when installed; "Update now" refuses another one
-ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for update/restart/Wi-Fi (install.sh --pin)
+ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for update/restart (install.sh --pin)
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
 UPDATE_STATUS = "/tmp/dreampi-netswitch.update"          # running / ok / failed, written by the update script
 UPDATE_LOG = "/tmp/dreampi-netswitch.update.log"
@@ -30,18 +30,6 @@ PHOTOS_DIR = os.path.join(BASE_DIR, "photos")           # <person id>.jpg / .png
 CHECKIN = os.path.join(BASE_DIR, "checkin.json")       # {"rev", "config", "statuses", "people": {id: {in, status, detail, at}}}: the check-in module's live state, shared by every screen
 CLOCK_CONFIG = os.path.join(BASE_DIR, "clock.json")  # {"format": "24h"|"12h"|"12h-ampm", "beat": bool, "world": bool, "large": bool, "cities": [...]}: the clock module's settings
 TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the Pi's own (Settings > About)
-# Wi-Fi setup (the wifi module, install.sh --wifi)
-WIFI_DEMO = os.path.join(BASE_DIR, "wifi_demo")        # exists = Wi-Fi setup runs on dummy networks (install.sh --wifi-demo)
-WIFI_START = os.path.join(BASE_DIR, "wifi_start")   # touched to ask the Wi-Fi service to start
-WIFI_STOP = os.path.join(BASE_DIR, "wifi_stop")     # touched to ask it to stop / cancel
-WIFI_CONNECT = os.path.join(BASE_DIR, "wifi_connect")   # {"ssid":..., "password":...}, an alternative
-                                                         # to the setup access point's own /connect -
-                                                         # lets the regular page pick a network too,
-                                                         # useful when it's reachable some other way
-                                                         # (e.g. Ethernet) while Wi-Fi is being set up
-WIFI_STATE = "/tmp/dreampi-netswitch.wifi"          # written by the Wi-Fi service
-WIFI_STALE = 30       # ignore WIFI_STATE when older than this (the service is down)
-WIFI_AP_SSID = "CheckIn WiFi Config"
 
 
 # ------------------------------------------------------------------ modules
@@ -58,7 +46,7 @@ WIFI_AP_SSID = "CheckIn WiFi Config"
 # (module_order.json) is its priority: the first one shows first and wins where two modules want the same thing.
 # Everything that has to know - the web service and the services of the modules - asks here.
 MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules")
-MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"led": true, "wifi": false, ...} set from the module picker
+MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"clock": true, "imagebg": false, ...} set from the module picker
 
 
 _manifests = {}     # path -> (mtime, parsed): module.json is asked for many times a second, it changes almost never
@@ -559,22 +547,6 @@ def read_file(path):
 
 
 
-
-
-def wifi_state():
-    """Latest Wi-Fi setup state written by the Wi-Fi service: state (idle /
-    scanning / hosting / connecting / ok / failed), ssid, networks (scan
-    results while hosting) and time. {"state": "idle"} when the service
-    hasn't run yet, or hasn't updated the file in a while (it isn't
-    running any more, or crashed mid-setup)."""
-    try:
-        with open(WIFI_STATE) as f:
-            data = json.load(f)
-    except (IOError, OSError, ValueError):
-        return {"state": "idle"}
-    if data.get("state", "idle") != "idle" and time.time() - data.get("time", 0) > WIFI_STALE:
-        return {"state": "idle"}
-    return data
 
 
 def update_status():

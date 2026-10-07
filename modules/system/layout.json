@@ -94,7 +94,7 @@
     {
      "type": "row",
      "title": "PIN",
-     "sub": "4 to 64 characters. It is also asked for before updating, restarting the Pi and joining Wi-Fi.",
+     "sub": "4 to 64 characters. It is also asked for before updating, and restarting the Pi.",
      "control": {
       "type": "pinset"
      }

@@ -13,7 +13,7 @@ from support import ROOT
 class LayeringTests(unittest.TestCase):
     """The small services must not drag the web server in."""
     def test_services_do_not_import_the_web_module(self):
-        for mod in ("netswitch_wifi_setup", "netswitch_core", "netswitch_probes", "netswitch_contacts", "netswitch_checkin"):
+        for mod in ("netswitch_core", "netswitch_probes", "netswitch_contacts", "netswitch_checkin"):
             code = ("import sys; sys.path[:0] = %r; import %s; sys.exit(1 if 'netswitch_web' in sys.modules else 0)"
                     % ([ROOT] + [os.path.join(ROOT, "modules", m) for m in os.listdir(os.path.join(ROOT, "modules"))], mod))
             self.assertEqual(subprocess.call(["python3", "-c", code]), 0, mod)

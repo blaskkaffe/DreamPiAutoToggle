@@ -9,11 +9,12 @@ for ns_dir in "$DEST"/modules/*/; do
     [ -f "$ns_dir/remove.sh" ] && . "$ns_dir/remove.sh"
 done
 
+# dreampi-netswitch-wifi: the service of the removed Wi-Fi setup module, stopped if an old install still has it
 for SERVICE in dreampi-netswitch dreampi-netswitch-wifi; do
     systemctl disable --now "$SERVICE.service" 2>/dev/null
     rm -f "/etc/systemd/system/$SERVICE.service"
 done
 systemctl daemon-reload
 
-rm -rf "$DEST" /tmp/dreampi-netswitch.*      # and the state files in /tmp (Wi-Fi setup, update)
+rm -rf "$DEST" /tmp/dreampi-netswitch.*      # and the state files in /tmp (update)
 echo "Uninstalled."

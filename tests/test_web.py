@@ -52,7 +52,6 @@ class HttpTests(unittest.TestCase):
         d = json.loads(self.get("/api")[2].decode())
         for key in ("pin", "warnings", "now", "enabled", "colours", "checkin"):
             self.assertIn(key, d)
-        self.assertNotIn("wifi", d)             # the Wi-Fi setup module is off by default
         self.assertEqual(d["checkin"]["total"], 0)      # no contacts imported yet
 
     def test_highlight_and_notices_are_always_in_the_api(self):
