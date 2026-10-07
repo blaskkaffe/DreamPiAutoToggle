@@ -199,7 +199,7 @@
  .roster{display:block} .rp-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px} .rp-chips:empty{display:none}
  html.noscroll:has(body:not(.settings-open)){overflow:hidden;height:100%} html.noscroll body:not(.settings-open){overflow:hidden;height:100vh;height:100dvh}   /* Settings > Appearance > No scrolling: the main screen stays put */
  .rp-tile{margin:0}  .rp-box{margin:0 0 12px;padding:0;overflow:hidden;border-radius:var(--r-box);background:var(--card);border:var(--bw) solid var(--line)}
- .rp-gh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0;padding:10px 16px 8px;font-size:1.5em} .rp-gt{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .rp-gh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0;padding:10px 16px 8px;font-size:1.75em;line-height:1.2} .rp-gt{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
  .rp-r{display:flex;align-items:center;gap:8px;min-width:0;margin:0;padding:0 10px 0 0;border:0;border-top:1px solid var(--line);border-radius:0;background:var(--btn-bg);color:var(--text-2)}
  .rp-r.pri{background:rgba(var(--primary-rgb),.82);border-top-color:rgb(var(--primary-l-rgb));color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55)}
  .rp-t{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:4px 16px;background:none;text-align:left;font-size:1.75em;line-height:1.2;color:inherit;text-shadow:inherit}
@@ -210,6 +210,16 @@
  .rp-mq{flex:1;min-width:0;overflow:hidden;white-space:nowrap;font-weight:600} .rp-trk{display:inline-block;animation:marquee var(--d,12s) linear infinite} .rp-trk > span{display:inline-block;padding-right:3em}   /* name and status scroll round like the carousel */
  @media(prefers-reduced-motion:reduce){.rp-trk{animation:none}.rp-trk > span + span{display:none}}
  .rp-io{flex:none;min-width:5.2em;min-height:34px;padding:0 14px;font-weight:700;font-size:var(--fs-md);letter-spacing:.04em}   /* INNE (green) / UTE (red) */
+ /* the building buttons: the top row, at the left of the title, as tall as the cogwheel */
+ header > .rp-chips.in-header{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:2;margin:0;flex-wrap:nowrap;max-width:calc(50% - 84px);overflow-x:auto;scrollbar-width:none}
+ header > .rp-chips.in-header::-webkit-scrollbar{display:none} header > .rp-chips.in-header{gap:6px} header > .rp-chips.in-header .pill-s{flex:none;min-height:40px;padding:0 12px;font-size:var(--fs-sm)}
+ /* the box frame and colour (the check-in settings): the frame is none / thin / thick; "the board colour" gives the frame and the title row the board colour of Appearance */
+ .rp-box[data-frame=none]{border-width:0} .rp-box[data-frame=thick]{border-width:4px}
+ .rp-tile.rp-col .rp-box{border-color:rgb(var(--primary-l-rgb))} .rp-tile.rp-col .rp-gh{background:rgba(var(--primary-rgb),.82);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55)} .rp-tile.rp-col .rp-gh .sub{color:rgba(255,255,255,.85)}
+ /* light theme: the names, the statuses and the buildings in the rows are black and regular (not bold); a coloured row is the lighter shade of its colour so that black reads */
+ html[data-theme=light]:not(.dark-only) .rp-r{color:#000}
+ html[data-theme=light]:not(.dark-only) .rp-r.pri{background:rgba(var(--primary-l-rgb),.9);border-top-color:rgb(var(--primary-rgb));color:#000;text-shadow:none}
+ html[data-theme=light]:not(.dark-only) .rp-n,html[data-theme=light]:not(.dark-only) .rp-mq,html[data-theme=light]:not(.dark-only) .rp-s,html[data-theme=light]:not(.dark-only) .rp-s.rp-stt,html[data-theme=light]:not(.dark-only) .rp-r.out .rp-n{font-weight:400;color:#000;opacity:1}
  /* the status menu: in the middle of the screen, about 60 % of its width */
  .rp-modal{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.62)}
  .rp-sheet{position:relative;box-sizing:border-box;width:clamp(320px,60vw,900px);max-width:100%;max-height:96vh;overflow:auto;padding:20px;border-radius:var(--r-box);background:var(--pop);border:var(--bw) solid var(--ctl-line)}
@@ -237,7 +247,7 @@
  .rp-nb{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:20px}
  .rp-nb.rp-nb3{grid-template-columns:repeat(3,minmax(0,1fr))} .rp-need2 select.rp-big{appearance:auto}
  .rp-dots{margin-left:.5em;font-size:.6em;letter-spacing:.15em;vertical-align:middle;color:var(--c-red-l)}
- body.no-title header h1{display:none} body.no-title header{height:34px;margin:0 0 6px}   /* no title: only a strip for the cogwheel is left */
+ body.no-title header h1{display:none} body.no-title header{height:42px;margin:0 0 6px}   /* no title: only a strip for the cogwheel is left */
  .rp-empty{padding:12px 4px}
  textarea{display:block;box-sizing:border-box;width:100%;min-height:96px;margin:8px 0;padding:10px 12px;background:var(--ctl);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm);resize:vertical} input[type=file],.rp-need input{min-height:var(--h-ctl);max-width:100%;font-size:var(--fs-sm);color:var(--text-2)} .rp-need input{color:var(--text-1);background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);padding:0 8px}
  .rp-ct{margin-top:10px} .rp-sw{margin-right:8px;background:rgb(var(--primary-rgb))}

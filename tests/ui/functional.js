@@ -74,7 +74,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok((await sick.locator('.rp-io').textContent()) === 'UTE', 'a status that checks out shows UTE');
   await sick.locator('.rp-t').click(); await settle(300);
   await page.locator('.rp-sheet button[data-code="LATE"]').click(); await settle(300);
-  ok(await page.locator('.rp-need2 input[type=time]').count() === 1, 'a status that needs a time asks for it');
+  ok(await page.locator('.rp-need2 input[placeholder="tt:mm"]').count() === 1, 'a status that needs a time asks for it');
   await page.locator('.rp-need2 input').fill('08:45'); await page.locator('.rp-need2 button[data-set]').click(); await settle(500);
   ok(/Kommer sent \u00b7 08:45/.test(await sick.textContent()), 'the time is part of the status text');
   await sick.locator('.rp-io').click(); await settle(500);
@@ -248,6 +248,35 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('.pinm button', { hasText: /^Delete$/ }).click(); await settle(1200);
   ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.statuses.length === nSt, 'a status is deleted after a question');
   await closeSettings();
+
+  // ---- the top row (building buttons, title), box titles, frames and colours, the light theme, Swedish date entry
+  await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  const top = await page.evaluate(() => { const hd = document.querySelector('body > header'), c = hd.querySelector('.rp-chips'), h = (() => { const r = document.createRange(); r.selectNodeContents(hd.querySelector('h1')); return r.getBoundingClientRect(); })(), cog = document.getElementById('cog').getBoundingClientRect(), r = c ? c.getBoundingClientRect() : null; return { n: c ? c.querySelectorAll('button').length : 0, left: r && Math.round(r.left), right: r && Math.round(r.right), h1: Math.round(h.left), top: r && Math.round(r.top), cogTop: Math.round(cog.top), ch: r && Math.round(r.height), cogH: Math.round(cog.height) }; });
+  ok(top.n >= 2 && top.right <= top.h1 + 2 && Math.abs((top.top + top.ch / 2) - (top.cogTop + top.cogH / 2)) < 12, 'the building buttons are in the top row, left of the title, in line with the cogwheel (' + JSON.stringify(top) + ')');
+  const tsz = await page.evaluate(() => ({ gt: getComputedStyle(document.querySelector('.rp-gt')).fontSize, gtw: getComputedStyle(document.querySelector('.rp-gt')).fontWeight, name: getComputedStyle(document.querySelector('.rp-t')).fontSize }));
+  ok(tsz.gt === tsz.name && +tsz.gtw >= 700, 'a box title is as large as the names, and bold (' + JSON.stringify(tsz) + ')');
+  await cfg({ title: 'Tavlan', frame: 'thick', box: 'board' }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  ok(await page.evaluate(() => document.querySelector('body > header h1').textContent === 'Tavlan' && document.title === 'Tavlan'), 'the page title is the one chosen in Settings');
+  ok(await page.evaluate(() => document.querySelector('.rp-box').getAttribute('data-frame') === 'thick' && getComputedStyle(document.querySelector('.rp-box')).borderTopWidth === '4px'), 'the frame setting is applied');
+  const gh = await page.evaluate(() => getComputedStyle(document.querySelector('.rp-gh')).backgroundColor);
+  await cfg({ box: 'neutral' }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  const gh2 = await page.evaluate(() => getComputedStyle(document.querySelector('.rp-gh')).backgroundColor);
+  ok(gh !== gh2 && gh !== 'rgba(0, 0, 0, 0)', 'the board colour setting colours the title row of the boxes (' + gh + ' / ' + gh2 + ')');
+  await cfg({ title: '', frame: 'thin', box: 'board' });
+  await page.evaluate(() => fetch('/screen', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ values: { theme: 'light' } }) }));
+  await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  const lt = await page.evaluate(() => { const out = {}; ['.rp-r.pri .rp-n,.rp-r.pri .rp-mq', '.rp-r.out .rp-n', '.rp-s'].forEach(q => { const e = document.querySelector(q); if (e) { const cs = getComputedStyle(e); out[q] = cs.color + '/' + cs.fontWeight; } }); return out; });
+  ok(Object.keys(lt).length >= 2 && Object.values(lt).every(v => v === 'rgb(0, 0, 0)/400'), 'light theme: black, regular text in the rows (' + JSON.stringify(lt) + ')');
+  await page.evaluate(() => fetch('/screen', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ values: { theme: 'dark' } }) }));
+  await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  await person('Maja Berg').locator('.rp-t').click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code="TRAVEL"]').click(); await settle(300);
+  ok(await page.locator('.rp-need2 input[placeholder^="\u00e5\u00e5\u00e5\u00e5"]').count() === 1, 'a date is typed as \u00e5\u00e5\u00e5\u00e5-mm-dd (Swedish), not in the browser\'s own date field');
+  await page.locator('.rp-need2 input').fill('20261340'); await page.locator('.rp-need2 button[data-set]').click(); await settle(200);
+  ok(/mm-dd/.test(await page.locator('.rp-cmsg').textContent()) && await page.locator('.rp-need2').count() === 1, 'an impossible date is refused with a message');
+  await page.locator('.rp-need2 input').fill('20261224'); ok(await page.locator('.rp-need2 input').inputValue() === '2026-12-24', 'the digits are laid out as \u00e5\u00e5\u00e5\u00e5-mm-dd');
+  await page.locator('.rp-need2 button[data-set]').click(); await settle(700);
+  ok(/tillbaka 24\/12/.test(await person('Maja Berg').textContent()), 'the date is kept');
 
   ok(errors.length === 0, 'no JavaScript errors (' + errors.slice(0, 3).join(' | ') + ')');
   await browser.close();

@@ -31,6 +31,8 @@ DEFAULT_STATUSES = [
     {"code": "OTHER", "label": "Annat", "colour": "white", "needs": "note"},
 ]
 GROUPS = ("department", "building")
+FRAMES = ("none", "thin", "thick")      # the frame round a department box
+BOXES = ("neutral", "board")            # its colour: neutral (grey) or the board colour (Appearance > Check-in board colour)
 SCROLLS = ("off", "auto", "on")      # the scrolling of name and status on a row: never, only when it does not fit, always
 AUTO = ("blue", "green", "orange", "purple", "cyan", "yellow", "bright-pink", "red", "bright-blue", "bright-green", "bright-purple", "bright-cyan")
 OUT_COLOUR = "global"       # the grey of a person who is out
@@ -138,7 +140,9 @@ def config(data=None):
     colours = c.get("colours") if isinstance(c.get("colours"), dict) else {}
     out = {"show_title": c.get("show_title") is not False, "group_by": c.get("group_by") if c.get("group_by") in GROUPS else "department",
            "colour_by": c.get("colour_by") if c.get("colour_by") in GROUPS else "department", "colours": {},
-           "scroll": c.get("scroll") if c.get("scroll") in SCROLLS else "on", "show_roles": c.get("show_roles") is not False, "show_buildings": c.get("show_buildings") is True, "keyboard": c.get("keyboard") is True,
+           "scroll": c.get("scroll") if c.get("scroll") in SCROLLS else "on",
+           "title": re.sub(r"\s+", " ", str(c.get("title") or "")).strip()[:40], "frame": c.get("frame") if c.get("frame") in FRAMES else "thin",
+           "box": c.get("box") if c.get("box") in BOXES else "board", "show_roles": c.get("show_roles") is not False, "show_buildings": c.get("show_buildings") is True, "keyboard": c.get("keyboard") is True,
            "roles_shown": _names(c.get("roles_shown")), "buildings_shown": _names(c.get("buildings_shown")),
            "group_order": [str(x)[:80] for x in c.get("group_order", []) if isinstance(x, str)][:200] if isinstance(c.get("group_order"), list) else []}
     for kind in GROUPS:
@@ -237,7 +241,7 @@ def snapshot(data=None):
     n_in = sum(1 for g in groups for p in g["people"] if p["in"])
     buildings = sorted(set(p.get("location") or "" for p in people) - set([""]), key=str.lower)
     return {"rev": "%d.%d" % (data.get("rev", 0), _roster_stamp()), "show_title": cfg["show_title"], "group_by": cfg["group_by"], "colour_by": cfg["colour_by"], "groups": groups,
-            "scroll": cfg["scroll"], "show_roles": cfg["show_roles"], "show_buildings": cfg["show_buildings"], "keyboard": cfg["keyboard"],
+            "scroll": cfg["scroll"], "title": cfg["title"], "frame": cfg["frame"], "box": cfg["box"], "show_roles": cfg["show_roles"], "show_buildings": cfg["show_buildings"], "keyboard": cfg["keyboard"],
             "roles_shown": cfg["roles_shown"], "buildings_shown": cfg["buildings_shown"],
             "statuses": menu, "buildings": buildings, "total": total, "in": n_in,
             "text": "No people yet: import a CSV in Settings > Contacts." if not total else "%d of %d in" % (n_in, total),
@@ -311,12 +315,14 @@ def save_config(values):
         data = _load()
         cur = config(data)
         if isinstance(values, dict):
-            for k, allowed in (("group_by", GROUPS), ("colour_by", GROUPS), ("scroll", SCROLLS)):
+            for k, allowed in (("group_by", GROUPS), ("colour_by", GROUPS), ("scroll", SCROLLS), ("frame", FRAMES), ("box", BOXES)):
                 if values.get(k) in allowed:
                     cur[k] = values[k]
             for k in ("show_title", "show_roles", "show_buildings", "keyboard"):
                 if isinstance(values.get(k), bool):
                     cur[k] = values[k]
+            if isinstance(values.get("title"), str):
+                cur["title"] = re.sub(r"\s+", " ", values["title"]).strip()[:40]
             for k in ("roles_shown", "buildings_shown"):
                 if k in values and (values[k] is None or isinstance(values[k], list)):
                     cur[k] = _names(values[k])
@@ -422,8 +428,10 @@ def _config_reply():
     roster = _roster()
     roles = sorted(set(p.get("role", "") for p in roster) - set([""]), key=str.lower)
     buildings = sorted(set(p.get("location", "") for p in roster) - set([""]), key=str.lower)
-    return {"values": dict((k, c[k]) for k in ("show_title", "group_by", "colour_by", "scroll", "show_roles", "show_buildings", "keyboard", "roles_shown", "buildings_shown")),
+    return {"values": dict((k, c[k]) for k in ("show_title", "title", "group_by", "colour_by", "scroll", "frame", "box", "show_roles", "show_buildings", "keyboard", "roles_shown", "buildings_shown")),
             "options": {"groups": [{"value": "department", "label": "Department"}, {"value": "building", "label": "Building"}],
+                        "frames": [{"value": "none", "label": "None"}, {"value": "thin", "label": "Thin"}, {"value": "thick", "label": "Thick"}],
+                        "boxes": [{"value": "neutral", "label": "Neutral (grey)"}, {"value": "board", "label": "The board colour"}],
                         "scrolls": [{"value": "off", "label": "Off"}, {"value": "auto", "label": "Auto (when it does not fit)"}, {"value": "on", "label": "On (always)"}],
                         "roles": [{"value": r, "label": r} for r in roles], "buildings": [{"value": b, "label": b} for b in buildings]},
             "texts": {"show_title": "Shown" if c["show_title"] else "Hidden", "group_by": c["group_by"].capitalize(), "colour_by": c["colour_by"].capitalize()},

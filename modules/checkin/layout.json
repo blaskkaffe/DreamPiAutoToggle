@@ -39,6 +39,17 @@
        "inline": true
       },
       {
+       "title": "Page title",
+       "inline": true,
+       "controls": [
+        {
+         "type": "text",
+         "key": "title",
+         "label": "Page title (empty = Check-in)"
+        }
+       ]
+      },
+      {
        "title": "Group people by",
        "sub_text": "group_by",
        "controls": [
@@ -73,6 +84,30 @@
          "key": "scroll",
          "options": "scrolls",
          "label": "Scrolling name and status"
+        }
+       ]
+      },
+      {
+       "title": "Box frame",
+       "inline": true,
+       "controls": [
+        {
+         "type": "select",
+         "key": "frame",
+         "options": "frames",
+         "label": "Frame round the boxes"
+        }
+       ]
+      },
+      {
+       "title": "Box colour",
+       "inline": true,
+       "controls": [
+        {
+         "type": "select",
+         "key": "box",
+         "options": "boxes",
+         "label": "Colour of the boxes"
         }
        ]
       },

@@ -738,7 +738,8 @@ W.roster=function(s,ctx){
   modal=h("div",{"class":"rp-modal",style:"display:none"}),
   sel=rosterLocations(),last="",D=null,cur=null,modal2;
  modal2=h("div",{"class":"rp-modal rp-modal2",style:"display:none"});
- el.appendChild(chips);el.appendChild(msg);document.body.appendChild(modal);document.body.appendChild(modal2);
+ var hd=document.querySelector("body > header");if(hd){chips.classList.add("in-header");hd.appendChild(chips)}else el.appendChild(chips);      // the building buttons sit in the top row, at the left of the title
+ el.appendChild(msg);document.body.appendChild(modal);document.body.appendChild(modal2);
  function visible(p){if(!sel.length)return !p.restrict;return sel.indexOf(p.building)>=0||(!p.building&&!p.restrict)}
  function person(id){var r=null;((D&&D.groups)||[]).forEach(function(g){g.people.forEach(function(p){if(p.id===id)r=p})});return r}
  function colourCls(p){return p.colour?" c-"+p.colour:""}
@@ -773,16 +774,19 @@ W.roster=function(s,ctx){
   if(D.total)D.groups.forEach(function(g){var ps=g.people.filter(visible);if(!ps.length)return;
    var chunks=parts(ps);chunks.forEach(function(cp,pi){var id="checkin-"+slug(g.id)+(pi?"-p"+(pi+1):""),fresh=!tiles[id],t=tileFor(id,g.id),k=cp.filter(function(p){return p.in}).length;
     t._want=base()+(n+1)/1000;live[id]=1;n++;if(fresh)changed=true;seq.push(t);
-    setHtml(t._body,'<div class="rp-box"><div class="rp-gh"><span class="rp-gt">'+esc(g.title)+(chunks.length>1?' ('+(pi+1)+'/'+chunks.length+')':'')+'</span><span class="sub">'+k+'/'+cp.length+'</span></div>'+cp.map(row).join("")+'</div>')})});
+    setHtml(t._body,'<div class="rp-box" data-frame="'+(D.frame||"thin")+'"><div class="rp-gh"><span class="rp-gt">'+esc(g.title)+(chunks.length>1?' ('+(pi+1)+'/'+chunks.length+')':'')+'</span><span class="sub">'+k+'/'+cp.length+'</span></div>'+cp.map(row).join("")+'</div>')})});
   Object.keys(tiles).forEach(function(id){if(!live[id]){var t=tiles[id];if(t.parentNode)t.parentNode.removeChild(t);delete tiles[id];changed=true}});
   // the tiles keep the places they have on this screen (the places are only swapped about to follow the host's order); new ones go after the board's own tile
   if(changed){seq.forEach(function(t){t._ord=t._want})}
   else{var ords=seq.map(function(t){return t._ord}).sort(function(x,y){return x-y});seq.forEach(function(t,i){t._ord=ords[i]})}
   setHtml(msg,!D.total?'<div class="sub rp-empty">'+esc(D.text)+'</div>':(n?'':'<div class="sub rp-empty">Nobody to show for the chosen buildings.</div>'));
+  styleTiles();
   if(changed&&window.applyScreen)applyScreen(true);
   fillCarousels();
   var c=capacity();if(c!==usedCap&&!again){usedCap=c;again=true;try{paint()}finally{again=false}}}
  // a carousel needs enough copies of its text to fill a wide row (stretched boxes): half of the track is at least as wide as the row, the track moves by half
+ // the boxes take the board colour (the board colour in Appearance) for their frame and header when the setting says so; the tile already carries that colour as its primary
+ function styleTiles(){var on=D&&D.box==="board";Object.keys(tiles).forEach(function(id){tiles[id].classList.toggle("rp-col",!!on)})}
  var ro=null,raf=0;
  function fillCarousels(){Array.prototype.forEach.call(document.querySelectorAll("#dash .rp-mq"),function(mq){if(window.ResizeObserver){if(!ro)ro=new ResizeObserver(function(){if(!raf)raf=requestAnimationFrame(function(){raf=0;fillCarousels()})});ro.observe(mq)}
   var trk=mq.querySelector(".rp-trk");if(!trk||!trk.firstChild)return;
@@ -821,7 +825,16 @@ W.roster=function(s,ctx){
    '<div class="rp-nb"><button type="button" class="pill-s rp-so" data-back="1">Cancel</button><button type="button" class="pill-s pri rp-so c-'+esc(st.colour)+'" data-set="'+esc(code)+'">Set</button></div></div>';
   var host=modal2.querySelector(".rp-field"),msg=modal2.querySelector(".rp-cmsg");
   if(kb){var keys=onScreenKeys(kind==="note"?"text":kind,{value:st.default||"",twelve:twelve,say:function(t){setText(msg,t)}});keys._done=function(){var b=modal2.querySelector("[data-set]");if(b)b.click()};host.appendChild(keys);modal2._get=function(){return keys.value()}}
-  else{field=h("input",{"class":"rp-big",type:type,value:st.default||"",maxlength:60,"aria-label":st.label});host.appendChild(field);modal2._get=function(){return field.value};if(field.focus)setTimeout(function(){field.focus()},0)}
+  else{var isT=kind==="time",isD=kind==="date";      // not the browser's own time / date fields (they follow the browser's language): 24 h tt:mm and åååå-mm-dd, as in Sweden
+   field=h("input",{"class":"rp-big",type:"text",inputmode:(isT||isD)?"numeric":"text",value:isT?(st.default||""):"",maxlength:isT?5:isD?10:60,placeholder:isT?"tt:mm":isD?"\u00e5\u00e5\u00e5\u00e5-mm-dd":"",autocomplete:"off","aria-label":st.label});
+   if(isT||isD)field.addEventListener("input",function(){var d=field.value.replace(/\D/g,"").slice(0,isT?4:8);
+    field.value=isT?(d.length>2?d.slice(0,2)+":"+d.slice(2):d):(d.length>6?d.slice(0,4)+"-"+d.slice(4,6)+"-"+d.slice(6):d.length>4?d.slice(0,4)+"-"+d.slice(4):d)});
+   host.appendChild(field);
+   modal2._get=function(){var v=field.value.trim(),m;
+    if(isT){m=/^(\d{1,2}):?(\d{2})$/.exec(v);if(!m||+m[1]>23||+m[2]>59){setText(msg,"Type the time as tt:mm, for example 08:30");return null}return (m[1].length<2?"0":"")+m[1]+":"+m[2]}
+    if(isD){m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(v);var dt=m&&new Date(+m[1],+m[2]-1,+m[3]);if(!m||dt.getMonth()!==+m[2]-1){setText(msg,"Type the date as \u00e5\u00e5\u00e5\u00e5-mm-dd, for example 2026-12-24");return null}return v}
+    return v};
+   if(field.focus)setTimeout(function(){field.focus()},0)}
   modal2.style.display=""}
  function closeNeed(){modal2.style.display="none";modal2.innerHTML=""}
  modal2.addEventListener("click",function(e){if(e.target===modal2){closeNeed();return}
@@ -846,7 +859,9 @@ W.roster=function(s,ctx){
     refresh();setTimeout(function(){if(cur===id){var p=person(id);if(p)modal.querySelector(".rp-avl").innerHTML=rosterAvatar(p,"rp-avb")+'<input type="file" accept="image/*" aria-label="Photo of '+esc(p.name)+'" data-photo="1">'}},1300)})};
   img.onerror=function(){URL.revokeObjectURL(url);alert("That file is not a picture")};img.src=url});
  hook("escape",function(){if(modal2.style.display!=="none"){closeNeed();return true}if(cur!==null){closeMenu();return true}});
-bind(s.source,function(d){if(d)document.body.classList.toggle("no-title",d.show_title===false)});
+bind(s.source,function(d){if(!d)return;document.body.classList.toggle("no-title",d.show_title===false);
+ var h1=document.querySelector("body > header h1");if(h1){if(h1._dflt===undefined){h1._dflt=h1.textContent;h1._dtitle=document.title}      // the page title the user chose (Settings, Page title); empty = the project's
+  setText(h1,d.title||h1._dflt);var want=d.title||h1._dtitle;if(document.title!==want)document.title=want}});
  bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+d.groups.length;if(key===last)return;last=key;D=d;paint()});
  return el};
 // the settings list: a department / building per row with a select of palette colours ("Automatic" = the module picks one)
