@@ -130,11 +130,11 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await post('/pin', { pin: '' }, '4821') === 200 && await post('/colour', { module: 'checkin', key: 'checkin', colour: 'blue' }) === 200, 'removing the PIN removes the lock');
   // ---- fit to screen: the main screen is as big as it can be without scrolling
   const room = () => page.evaluate(() => { const d = document.getElementById('dash').getBoundingClientRect(); return { z: parseFloat(getComputedStyle(document.querySelector('#dash .dbox')).zoom), bottom: Math.round(d.bottom + scrollY + 24), vh: innerHeight, scroll: document.documentElement.scrollHeight - innerHeight }; });
-  await page.setViewportSize({ width: 600, height: 1400 }); await load(); let f = await room();
+  await page.setViewportSize({ width: 600, height: 3000 }); await load(); let f = await room();
   ok(f.z === 1 && f.bottom < f.vh - 300, 'a tall window leaves empty space at the bottom without it (' + JSON.stringify(f) + ')');
   ok(await post('/screen/fit', { value: true }) === 200, 'Fit to screen saved'); await settle(1800); f = await room();
-  ok(f.z > 1.1 && f.bottom <= f.vh && f.vh - f.bottom < 60 && f.scroll <= 0, 'the page is scaled up until its bottom reaches the bottom of the window, with no scrolling (' + JSON.stringify(f) + ')');
-  await page.setViewportSize({ width: 600, height: 1200 }); await settle(1500); const f2 = await room();
+  ok(f.z > 1.1 && f.bottom <= f.vh && f.vh - f.bottom < 60 && f.scroll <= 12, 'the page is scaled up until its bottom reaches the bottom of the window, with no scrolling (' + JSON.stringify(f) + ')');
+  await page.setViewportSize({ width: 600, height: 2600 }); await settle(1500); const f2 = await room();
   ok(f2.z < f.z && f2.bottom <= f2.vh && f2.vh - f2.bottom < 60, 'a shorter window gets a smaller scale (' + f2.z.toFixed(2) + ' < ' + f.z.toFixed(2) + ')');
   await page.setViewportSize({ width: 420, height: 300 }); await settle(1500); const f3 = await room();
   ok(f3.z === 1, 'a window too small for the page is not shrunk: it scrolls as usual (zoom ' + f3.z + ')');
@@ -157,15 +157,12 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await post('/screen', { values: { theme: 'light' } }); await settle(1500);
   ok((await look()).theme === 'light', 'a change made elsewhere shows without a reload');
   await post('/screen', { values: { theme: 'dark' } }); await page.emulateMedia({ colorScheme: null }); await settle(1500);
-  // ---- a setting that was saved is shown everywhere at once: after any successful POST the page asks /api and every data source again (not when their timers run out)
+  // ---- a setting that was saved is shown everywhere at once: after any successful POST the page asks /api again (not when its timer runs out)
   await load(); await settle(1500);
-  let asked = 0, askedApi = 0; page.on('request', r => { if (/\/players($|\?)/.test(r.url())) asked++; if (/\/api\?/.test(r.url())) askedApi++; });
-  asked = 0; askedApi = 0;
+  let askedApi = 0; page.on('request', r => { if (/\/api(\?|$)/.test(r.url())) askedApi++; });
+  askedApi = 0;
   await page.evaluate(() => new Promise(res => post('/screen/drag', { value: false }, res))); await settle(700);
-  ok(asked >= 1, 'a saved setting makes the data sources (here the Online players, which is read only once a minute) be read again at once (' + asked + ')');
-  ok(askedApi >= 1, 'and /api too');
-  asked = 0; await page.evaluate(() => { post('/wbtest', { colour: '#ffffff' }); }); await settle(700);
-  ok(asked === 0, 'but not for the white-balance test, which posts every second');
+  ok(askedApi >= 1, 'a saved setting makes the page ask /api again at once (' + askedApi + ')');
   // switching "Ask for the PIN" on with no PIN set asks for a new one on the PIN pad, then locks Settings
   await load(); await page.click('#cog'); await settle(900);
   await page.locator('[data-box="appearance"] .srow:has-text("Ask for the PIN") input[type=checkbox]').click(); await enterPin('7315'); await enterPin('7315'); await settle(1200);

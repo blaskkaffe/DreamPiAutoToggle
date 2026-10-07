@@ -59,15 +59,12 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await box.locator('.srow[data-id="orange"] button.pill-s').click(); await settle(400);
   ok(!(await page.locator('.pop.open button', { hasText: 'Delete' }).isVisible()), 'Orange cannot be deleted (everything falls back to it)');
   await page.keyboard.press('Escape'); await settle(200);
-  await box.locator('.srow[data-id="network"] button.pill-s').click(); await settle(400);
-  ok(!(await page.locator('.pop.open button', { hasText: 'Delete' }).isVisible()) && await page.locator('.pop.open input[type=color]').evaluateAll(es => es.filter(e => e.offsetParent).length) === 0, 'Selected network can be renamed but not deleted or recoloured');
-  await page.keyboard.press('Escape'); await settle(200);
   await box.locator('.srow[data-id="cyan"] button.pill-s').click(); await settle(400);
   await page.locator('.pop.open button', { hasText: 'Delete' }).click(); await settle(1800);
   ok(await rows.count() === 15, 'a colour of the add-on can be deleted too');
   // ---- reset
   await box.locator('button', { hasText: 'Reset palette' }).click(); await settle(1800);
-  ok(await rows.count() === 16 && (await order()).join() === 'global,red,orange,yellow,green,cyan,blue,purple,network,white,bright-red,bright-green,bright-cyan,bright-blue,bright-purple,bright-pink', 'Reset palette brings back the 16 colours in their order');
+  ok(await rows.count() === 16 && (await order()).join() === 'global,red,orange,yellow,green,cyan,blue,purple,teal,white,bright-red,bright-green,bright-cyan,bright-blue,bright-purple,bright-pink', 'Reset palette brings back the 16 colours in their order');
   ok(errors.length === 0, 'no JavaScript or console errors' + (errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''));
   await browser.close();
   console.log(failed ? failed + ' check(s) failed' : 'all checks passed');
