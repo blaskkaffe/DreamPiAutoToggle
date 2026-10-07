@@ -7,6 +7,7 @@ import sys, os, threading, time, json
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from support import web, core, sandbox, ledconfig
 import netswitch_wifi_setup as wifi
+core.CACHE_SECONDS = 0 if os.environ.get('NOCACHE') else web.CACHE_SECONDS      # as on the Pi: the settings reads are kept for a few seconds
 tmp = sandbox(wifi)
 with open(ledconfig.LED_COUNT, 'w') as f: f.write(os.environ.get('LEDS', '3'))
 core.save_module_enabled("debuglog", True)     # off by default; on here so the page shows it (OFF=debuglog switches it off again)

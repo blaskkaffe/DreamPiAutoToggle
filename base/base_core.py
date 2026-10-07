@@ -63,7 +63,7 @@ MODULES_DIR = project_path("modules")
 MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"clock": true, "players": false, ...} set from the module picker
 
 
-CACHE_SECONDS = 0.5      # how long what is read from the settings files is kept (0 = not at all: the tests); every write in here clears it
+CACHE_SECONDS = 0        # how long what is read from the settings files is kept (0 = not at all; the web service sets base_web.CACHE_SECONDS); every write in here clears it
 _cache = {}
 
 

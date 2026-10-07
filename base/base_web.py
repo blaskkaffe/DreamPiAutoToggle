@@ -39,6 +39,9 @@ CERT = os.path.join(core.BASE_DIR, "https.crt")   # self-signed, made by install
 KEY = os.path.join(core.BASE_DIR, "https.key")
 
 
+CACHE_SECONDS = 3.0      # the web service keeps what it reads from the settings files this long (core.cached(); the page asks every second, so most answers are kept ones). A write through the page clears it at once; one by another process shows within this time.
+
+
 def palette_json():
     """The palette as the page needs it: id, name, group, ui, ui_l; a colour token (a colour a module adds, like "Selected network") also says which
     palette colour it is right now ("follows")."""
@@ -639,6 +642,7 @@ def watchdog():
 
 
 if __name__ == "__main__":
+    core.CACHE_SECONDS = CACHE_SECONDS
     if len(sys.argv) > 1:
         PORT = int(sys.argv[1])
     if len(sys.argv) > 2:
