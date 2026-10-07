@@ -6,9 +6,9 @@ background("background",function(host){
  var layer=document.createElement("div");layer.id="dcbg";layer.className="keep-visible";
  host.appendChild(layer);
  function load(src,done){var sc=document.createElement("script");sc.src=src;sc.onload=done;
-  sc.onerror=function(){document.body.classList.remove("dcbg");document.documentElement.classList.remove("dcbg")};document.head.appendChild(sc)}
+  sc.onerror=function(){document.body.classList.remove("dcbg");document.documentElement.classList.remove("dcbg","dark-only")};document.head.appendChild(sc)}
  function go(){if(document.body.classList.contains("dcbg"))DCBackground.start(layer)}
- document.body.classList.add("dcbg");document.documentElement.classList.add("dcbg");
+ document.body.classList.add("dcbg");document.documentElement.classList.add("dcbg","dark-only");      // dark-only: the light theme leaves a page with a background of its own alone
  if(window.DCBackground)go();
  else if(window.THREE)load("/background/dc-background.js",go);
  else load("/background/three.min.js",function(){load("/background/dc-background.js",go)});

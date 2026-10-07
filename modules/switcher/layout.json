@@ -96,6 +96,11 @@
      "post": "/screen",
      "fields": [
       {
+       "title": "Theme",
+       "sub_text": "theme",
+       "controls": [{"type": "choice", "key": "theme", "options": "themes", "label": "Theme"}]
+      },
+      {
        "title": "Max columns: dashboard",
        "sub_text": "dash_cols",
        "controls": [{"type": "choice", "key": "dash_cols", "options": "cols", "label": "Columns"}]

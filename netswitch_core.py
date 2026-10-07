@@ -440,12 +440,13 @@ def colours_css():
     an element (and what is inside it) use that colour as its --primary. The page's own :root has the defaults."""
     def rgb(h):
         return "%d,%d,%d" % (int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16))
-    root, classes = ":root{", ""
+    root, classes, light = ":root{", "", ""
     for c in colours():
         i = c["id"]
         root += "--c-%s:%s;--c-%s-l:%s;--c-%s-rgb:%s;--c-%s-l-rgb:%s;" % (i, c["ui"], i, c["ui_l"], i, rgb(c["ui"]), i, rgb(c["ui_l"]))
+        light += "--c-%s-l:%s;--c-%s-l-rgb:%s;" % (i, c["ui"], i, rgb(c["ui"]))        # the light theme has no pale variant: text and borders in the colour itself
         classes += ".c-%s{--primary:var(--c-%s);--primary-l:var(--c-%s-l);--primary-rgb:var(--c-%s-rgb);--primary-l-rgb:var(--c-%s-l-rgb)}\n" % (i, i, i, i, i)
-    return root + "}\n" + classes
+    return root + "}\nhtml[data-theme=light]:not(.dark-only){" + light + "}\n" + classes
 
 
 def _saved_module_colours():
@@ -516,7 +517,8 @@ def save_settings_pin(on):
 
 
 # ---- screen layout: how many columns the dashboard and Settings may use on a wide screen, and whether the boxes stretch to fill it
-SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False}
+THEMES = ("dark", "light", "auto")
+SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "theme": "dark"}
 MAX_COLUMNS = 6
 
 
@@ -524,7 +526,7 @@ def screen_settings():
     """{"dash_cols": 1-6, "set_cols": 1-6, "stretch": bool, "scale": bool}: the saved layout settings over the defaults (a bad or missing
     file gives the defaults). dash_cols / set_cols are the most columns the dashboard / Settings may use; they only get as many as the screen
     fits (about 430 px each). stretch makes the columns fill the screen's width; scale (only with stretch) makes the boxes' content grow
-    with their width instead of getting more room; drag lets the tiles of the main screen be moved (which reorders the modules)."""
+    with their width instead of getting more room; drag lets the tiles of the main screen be moved (which reorders the modules); theme is "dark", "light" or "auto" (the device's own setting)."""
     out = dict(SCREEN_DEFAULTS)
     try:
         with open(SCREEN) as f:
@@ -539,6 +541,8 @@ def screen_settings():
         for k in ("stretch", "scale", "drag"):
             if isinstance(data.get(k), bool):
                 out[k] = data[k]
+        if data.get("theme") in THEMES:
+            out["theme"] = data["theme"]
     return out
 
 
@@ -554,6 +558,8 @@ def save_screen_settings(changes):
             if 1 <= v <= MAX_COLUMNS:
                 cur[k] = v
         elif k in ("stretch", "scale", "drag") and isinstance(v, bool):
+            cur[k] = v
+        elif k == "theme" and v in THEMES:
             cur[k] = v
     tmp = SCREEN + ".tmp"
     with open(tmp, "w") as f:

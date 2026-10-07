@@ -76,8 +76,10 @@ def _screen_reply():
     """The form widget's answer for Appearance > Max columns (the two toggles under it read S.screen from /api)."""
     cur = core.screen_settings()
     opts = [{"value": n, "label": str(n)} for n in range(1, core.MAX_COLUMNS + 1)]
-    return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"]}, "options": {"cols": opts},
-            "texts": {"dash_cols": "Up to %d" % cur["dash_cols"] + (" column" if cur["dash_cols"] == 1 else " columns"),
+    themes = [{"value": "dark", "label": "Dark"}, {"value": "light", "label": "Light"}, {"value": "auto", "label": "Like the device"}]
+    return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"], "theme": cur["theme"]}, "options": {"cols": opts, "themes": themes},
+            "texts": {"theme": dict((t["value"], t["label"]) for t in themes)[cur["theme"]],
+                      "dash_cols": "Up to %d" % cur["dash_cols"] + (" column" if cur["dash_cols"] == 1 else " columns"),
                       "set_cols": "Up to %d" % cur["set_cols"] + (" column" if cur["set_cols"] == 1 else " columns")}}
 
 
@@ -106,7 +108,7 @@ def build_page():
             return f.read()
     extra = modules.page_parts()
     js = _layout_script() + "\n" + part("page.js") + "\n" + part("widgets.js") + "\n" + extra["js"] + "\n" + part("boot.js")
-    html = part("index.html").replace("@@CSS@@", core.colours_css() + part("page.css") + "\n" + extra["css"]).replace("@@JS@@", js)
+    html = part("index.html").replace("@@THEME@@", core.screen_settings()["theme"]).replace("@@CSS@@", core.colours_css() + part("page.css") + "\n" + extra["css"]).replace("@@JS@@", js)
     return html
 
 
@@ -473,7 +475,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             data = json.loads(self._body(1024).decode("utf-8"))
             if path == "/screen":
-                core.save_screen_settings(dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols")))
+                core.save_screen_settings(dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols", "theme")))
+                refresh_page(force=True)                # the page is built with the theme it starts in (no flash of the other one)
             else:
                 core.save_screen_settings({path.rsplit("/", 1)[1]: data.get("value")})
         except (ValueError, AttributeError, IOError, OSError) as e:

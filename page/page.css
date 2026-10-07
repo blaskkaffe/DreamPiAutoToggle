@@ -1,5 +1,5 @@
 
- :root{--r-box:29px;--r-ctl:12px;--r-pill:999px;--h-ctl:36px;--r:var(--r-box);--bw:4px;   /* the page kit's tokens: radii (boxes / fields and checkboxes / buttons and chips; round things are 50%), one control height, three text levels, a type scale */
+ :root{--page-bg:#111;--text-hi:#fff;--box-rgb:255,255,255;--r-box:29px;--r-ctl:12px;--r-pill:999px;--h-ctl:36px;--r:var(--r-box);--bw:4px;   /* the page kit's tokens: radii (boxes / fields and checkboxes / buttons and chips; round things are 50%), one control height, three text levels, a type scale */
          --btn-bg:rgba(42,42,42,.82);--btn-line:rgb(80,80,80);--danger-bg:rgba(160,30,30,.85);--danger-line:rgb(230,110,110);--danger-on:#d33;--danger-on-line:#f99;   /* a neutral button, a danger one and an armed one */
          --ok:#2c2;--warn:#e0b400;--bad:#d33;--call:#b04cff;--notice-bg:#7a1f1f;--notice-line:#a84a4a;--link:#8bf;   /* the fixed state colours: status dots and the warning banner, links and the focus ring */
          --text-1:#eee;--text-2:#ccc;--text-3:#999;--box-text-2:rgba(255,255,255,.8);--box-text-3:rgba(255,255,255,.65);   /* page text, and the same levels on the coloured boxes */
@@ -9,7 +9,7 @@
          --ctl:#1a1a1a;--ctl-line:#555;--pop:#262626;--sel:#5b6b7e;--sel-line:#9fb0c4;--dim:var(--text-3);--txt2:var(--text-2);--console:#0b0b0b}
  *{box-sizing:border-box}
  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}   /* iOS Safari must not enlarge wide, scrolling lines on its own */
- body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#111;color:#eee;max-width:460px;margin:24px auto;padding:0 16px}
+ body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--page-bg);color:var(--text-1);max-width:460px;margin:24px auto;padding:0 16px}
  header{position:relative;margin-bottom:16px} h1{text-align:center;margin:0;font-size:1.9em}
  h2{font-size:.8em;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:22px 4px 8px;font-weight:600}
  .card{background:var(--card);border-radius:var(--r-box);padding:8px 16px;margin-bottom:12px}
@@ -46,17 +46,17 @@
  @media(prefers-reduced-motion:reduce){.dbox.hl:not(.plain) .now,body.hl-rainbow .dbox.hl:not(.plain) .now,body.hl-rainbow .dbox.hl:not(.plain) .now::before{animation:none}}
  /* status rows inside the network box: closed = just the DreamPi status,
     centred under the network name; open = all rows with their labels */
- .now .row{font-size:var(--fs-md);line-height:1.35;padding:10px 0;border-top:1px solid rgba(255,255,255,.18);text-align:left}
+ .now .row{font-size:var(--fs-md);line-height:1.35;padding:10px 0;border-top:1px solid rgba(var(--box-rgb),.18);text-align:left}
  .now .row.main{justify-content:center;border-top:0;padding:8px 0 2px}
  .now .row.main .k{display:none} .now .row.main .v{flex:none}
  .now .row .k{color:var(--box-text-3)} .now .row .v{min-width:0;display:flex;align-items:baseline} .now .row .v > .dot{flex:none} .now .row .v > span:last-child{min-width:0} .now .sub{color:var(--box-text-3)}
- .now .dot{box-shadow:0 0 0 2px rgba(255,255,255,.35)} .now .row.hang{justify-content:center;padding:12px 0 2px}
+ .now .dot{box-shadow:0 0 0 2px rgba(var(--box-rgb),.35)} .now .row.hang{justify-content:center;padding:12px 0 2px}
  .now .row.hang form{width:100%} .now .row.hang .pill-s{display:flex;width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .now .row.hang{gap:10px}   /* the buttons under an open box are the normal grey ones ... */
  .now .row.hang .pill-s.danger{background:var(--danger-bg);border-color:var(--danger-line)}   /* ... red for a danger one (Hang up) */
  .now .row.hang .pill-s.arm{background:var(--danger-on);border-color:var(--danger-on-line)}
  .nw{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .sub.blk{display:block}
- .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:10px 0;border-top:1px solid rgba(255,255,255,.18)}
+ .now.open .row.main{justify-content:flex-start;margin-top:10px;padding:10px 0;border-top:1px solid rgba(var(--box-rgb),.18)}
  .now.open .row.main .k{display:block} .now.open .row.main .v{flex:1}
  .now.open .row.x-closed{display:none}   /* row options (W.infobox): only while closed ... */
  .now .row.r-full .k{display:none} .now .row.r-full .v{flex:1;display:block;width:100%;min-width:0}   /* ... no label column ... */
@@ -87,8 +87,8 @@
  .wtrig .note{margin:8px 0 0;color:var(--warn)} .wtrig .grip{margin-left:-10px} .wtrig .pop .frow .sub{display:block} .wtrig .pop .tags{margin:8px 0} .pop .frow.stack > span{text-align:left} .stackctl{display:flex;flex-direction:column;gap:8px;align-items:stretch;width:100%} .stackctl .rangev{max-width:none} .stackctl .frow{padding:0}
  .rows.noopen{cursor:default}
  .ibtn{flex:none;width:36px;height:36px;padding:0;border-radius:50%;background:rgba(0,0,0,.25);display:inline-flex;align-items:center;justify-content:center}   /* a round on / off icon button: ui.iconButton() */
- .ibtn svg{width:18px;height:18px;fill:rgba(255,255,255,.45)} .ibtn.on{background:rgba(255,255,255,.9)} .ibtn.on svg{fill:var(--primary)}
- .spin{flex:none;display:inline-block;width:.8em;height:.8em;margin-left:8px;vertical-align:middle;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spin .8s linear infinite}   /* "refreshing": next to a row whose data is being fetched again, the old data stays */
+ .ibtn svg{width:18px;height:18px;fill:rgba(var(--box-rgb),.45)} .ibtn.on{background:rgba(var(--box-rgb),.9)} .ibtn.on svg{fill:var(--primary)}
+ .spin{flex:none;display:inline-block;width:.8em;height:.8em;margin-left:8px;vertical-align:middle;border-radius:50%;border:2px solid rgba(var(--box-rgb),.3);border-top-color:rgb(var(--box-rgb));animation:spin .8s linear infinite}   /* "refreshing": next to a row whose data is being fetched again, the old data stays */
  .spin.alt{display:none} .now:not(.open) .row.main .spin.alt,.now .row.r-full .spin.alt{display:inline-block;order:-1;margin:0 8px 0 0} .now .row.r-full .spin.alt{order:3;margin:0 0 0 8px}      /* a row whose title is not shown has its spinner at the start of the row (the one in the title is hidden with it); a full-width row at its end */
  @keyframes spin{to{transform:rotate(360deg)}} @media(prefers-reduced-motion:reduce){.spin{animation:none}}
  .srow > span:first-child{min-width:0;overflow-wrap:anywhere} .srow .pill-s{flex:none}
@@ -98,11 +98,11 @@
  .range.grid{display:grid;grid-template-columns:5.6em minmax(0,1fr) 3.1em;gap:12px} .range.grid span:last-child{text-align:right}   /* equal slider lengths */
  .tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}
  .tag{display:inline-flex;align-items:center;gap:2px;min-height:var(--h-ctl);padding:0 4px 0 12px;border-radius:var(--r-pill);background:var(--btn-bg);border:var(--bw) solid var(--btn-line);font-size:var(--fs-sm)}
- .tag button{background:none;color:var(--text-3);font-size:1.05em;line-height:1;min-width:32px;min-height:28px;padding:0;margin:0} .tag button:hover{color:#fff}
+ .tag button{background:none;color:var(--text-3);font-size:1.05em;line-height:1;min-width:32px;min-height:28px;padding:0;margin:0} .tag button:hover{color:var(--text-hi)}
  .empty{color:var(--text-3);font-size:var(--fs-sm);margin:8px 0 0}
  .swatches{display:flex;gap:8px;flex:none} .swatch{width:34px;height:34px;padding:0;border-radius:50%;border:var(--bw) solid var(--cl,transparent);background:var(--c);box-shadow:0 0 0 1px rgba(255,255,255,.25) inset}
  .swatches.grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;width:100%;margin-top:6px} .pop .swatches.grid{margin-top:0;gap:10px} .pop .swatches.grid .swatch{max-width:52px} .swatches.grid .swatch{width:100%;height:auto;aspect-ratio:1/1;max-width:36px;justify-self:center}
- .swatch.sel{border-color:#fff} .swatch:focus-visible{outline-offset:3px}
+ .swatch.sel{border-color:var(--text-hi)} .swatch:focus-visible{outline-offset:3px}
  @media(max-width:420px){.pop .swatches.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}   /* eight across would make the balls too small to tap on a phone */
  .msg{color:var(--danger-on-line);font-size:var(--fs-sm)} .msg:empty{display:none}
  .pop{display:none;position:absolute;z-index:20;left:16px;right:16px;box-sizing:border-box;padding:12px 16px;border-radius:var(--r-box);background:var(--pop);box-shadow:0 6px 24px rgba(0,0,0,.6)}
@@ -128,7 +128,7 @@
  .dbox{margin:0} .dbox > h2{margin-top:6px}
  .ctls{display:flex;gap:8px;align-items:center}
  .srow.wrap > .ctls{margin-left:auto}
- .grip{flex:none;width:40px;height:44px;margin:-6px 0 -6px -10px;padding:0;background:none;color:var(--text-3);display:inline-flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none} .grip:hover,.grip:focus-visible{color:#ccc} .grip svg{width:10px;height:16px;fill:currentColor;display:block}
+ .grip{flex:none;width:40px;height:44px;margin:-6px 0 -6px -10px;padding:0;background:none;color:var(--text-3);display:inline-flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none} .grip:hover,.grip:focus-visible{color:var(--text-2)} .grip svg{width:10px;height:16px;fill:currentColor;display:block}
  .mlist .srow:first-child{border-top:0} .pop .mlist{margin:0 0 8px} .srow[data-id] > span:nth-child(2){flex:1} .srow[data-id] > .fixed{flex:none;white-space:nowrap}
  .dragging,.dragging *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none} .dragging .grip{cursor:grabbing}
  .srow.drag{position:relative;z-index:5;will-change:transform;background:var(--card);border-radius:var(--r-ctl);box-shadow:0 8px 22px rgba(0,0,0,.65);border-top-color:transparent}
@@ -144,16 +144,16 @@
  .now .status{display:flex;align-items:baseline;min-width:0} .now .status > .dot{flex:none} .now .status > span:last-child{min-width:0}
  .now .pln{white-space:nowrap} .now .pln+.pln{margin-left:.6em}
  .now .wlist.compact{display:block;width:100%;max-height:40vh;overflow-y:auto;overscroll-behavior:contain}
- .now .wlist .p{display:flex;gap:8px;padding:4px 0;border-top:1px solid rgba(255,255,255,.12)} .now .wlist .p:first-child{border-top:0}
+ .now .wlist .p{display:flex;gap:8px;padding:4px 0;border-top:1px solid rgba(var(--box-rgb),.12)} .now .wlist .p:first-child{border-top:0}
  .now .wlist .pn{flex:1;min-width:0;overflow-wrap:anywhere} .now .wlist .carousel.mq{text-align:left;min-height:0;max-width:100%} .now .wlist .pg .carousel.mq{display:block}      /* names scroll when too long (marquee() in widgets.js) */ .now .wlist .pg{display:block;color:var(--box-text-3)}
- .now .wlist .pl{flex:none;width:5.6em;line-height:1.25;color:var(--box-text-3);white-space:nowrap} .now .wlist .pl b{display:block;font-size:1.15em;color:#fff;font-variant-numeric:tabular-nums} .now .wlist .pn a{color:#fff;text-decoration:none}
+ .now .wlist .pl{flex:none;width:5.6em;line-height:1.25;color:var(--box-text-3);white-space:nowrap} .now .wlist .pl b{display:block;font-size:1.15em;color:rgb(var(--box-rgb));font-variant-numeric:tabular-nums} .now .wlist .pn a{color:rgb(var(--box-rgb));text-decoration:none}
  .now .wlist.grid > div:first-child{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:3px 18px;width:100%} .now .wlist.grid .p{border-top:0;padding:0;justify-content:space-between} .now .wlist.grid .pn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--box-text-2)}   /* "style": "grid": short name / value pairs */
  .now .wlist .pw{flex:none;font-weight:bold;white-space:nowrap}
  .worldmap{width:100%} .cmap{display:block;width:100%;height:auto}   /* the worldmap widget: the bands and the land, the clock's own band and the cities in the box's colour */
- .cmap .band{fill:rgba(255,255,255,.04)} .cmap .band.alt{fill:rgba(255,255,255,.09)} .cmap .band.here{fill:rgba(var(--primary-rgb),.28)}
- .cmap .land{fill:rgba(255,255,255,.34);stroke:rgba(255,255,255,.5);stroke-width:.4}
+ .cmap .band{fill:rgba(var(--box-rgb),.04)} .cmap .band.alt{fill:rgba(var(--box-rgb),.09)} .cmap .band.here{fill:rgba(var(--primary-rgb),.28)}
+ .cmap .land{fill:rgba(var(--box-rgb),.34);stroke:rgba(var(--box-rgb),.5);stroke-width:.4}
  .cmap .hr{fill:var(--box-text-2);font-size:8px;text-anchor:middle}
- .cmap .city{fill:var(--primary-l);stroke:#000;stroke-width:.6} .cmap .here{fill:#fff;stroke:#000;stroke-width:.6}
+ .cmap .city{fill:var(--primary-l);stroke:#000;stroke-width:.6} .cmap .here{fill:rgb(var(--box-rgb));stroke:#000;stroke-width:.6}
  /* a main title over more rows (title_rows): the box is a grid of its three rows (top line, title, bottom row); the title has no size of its own (contain: size) so it never
     changes the box's height, and the title's fit() sizes its text. Open, the box is the plain list again. */
  .now[data-title-rows]:not(.open){display:grid;grid-template-columns:100%;grid-template-rows:auto 2.16em auto}
@@ -163,7 +163,7 @@
  .now[data-title-rows="upper"]:not(.open) > b{grid-row:1 / 3}
  .now[data-title-rows="lower"]:not(.open) > b{grid-row:2 / 4}
  .now[data-title-rows]:not(.open) > .row.main{grid-row:3} .now .wlist .p{align-items:center} .now .wlist .p .ibtn{width:30px;height:30px} .now .wlist .p .join{flex:none;min-height:0;height:30px;padding:0 14px;white-space:nowrap}      /* Join: as high as the star */
- .now .links{display:flex;flex-wrap:wrap;gap:6px} .now .links a{color:#fff;opacity:.9;padding:6px 0} .now .links.btns{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:8px;width:100%} .now .links.btns a.pill-s{display:flex;justify-content:center;align-items:center;min-width:0;padding:0 2px;opacity:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:none}
+ .now .links{display:flex;flex-wrap:wrap;gap:6px} .now .links a{color:rgb(var(--box-rgb));opacity:.9;padding:6px 0} .now .links.btns{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:8px;width:100%} .now .links.btns a.pill-s{display:flex;justify-content:center;align-items:center;min-width:0;padding:0 2px;opacity:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:none}
  .now .st{display:block;overflow-wrap:anywhere}
  .frow.stack{flex-direction:column;align-items:stretch;gap:8px}   /* a pop-up row with its control under the label */
  .rangev{display:flex;align-items:center;gap:10px;flex:1;max-width:60%} .rangev input{flex:1;min-width:0;accent-color:var(--primary)} .rangev .rv{width:3em;text-align:right;color:var(--text-2)}   /* a slider with its value */
@@ -197,9 +197,9 @@
  /* ===== end of the page kit ===== */
  :focus-visible{outline:3px solid var(--link);outline-offset:2px}
  .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:20px 0 0}
- .cog{position:absolute;right:0;top:50%;transform:translateY(-50%);padding:6px;background:transparent;color:#eee;line-height:0}
- .cog svg{width:30px;height:30px;fill:currentColor;display:block} .cog:hover{color:#fff}
- #settings{display:none;position:fixed;top:0;right:0;bottom:0;left:0;background:#111;overflow:auto;z-index:10}
+ .cog{position:absolute;right:0;top:50%;transform:translateY(-50%);padding:6px;background:transparent;color:var(--text-1);line-height:0}
+ .cog svg{width:30px;height:30px;fill:currentColor;display:block} .cog:hover{color:var(--text-hi)}
+ #settings{display:none;position:fixed;top:0;right:0;bottom:0;left:0;background:var(--page-bg);overflow:auto;z-index:10}
  #settings.open{display:block} body.settings-open{overflow:hidden}
  #settings .in{max-width:460px;margin:20px auto 0;padding:0 16px 32px}
  /* Wide screens: the settings sections flow into as many ~420px columns as fit (phones keep the one column) */
@@ -213,7 +213,7 @@
  /* rearranging the main screen: a handle in the corner of each tile, a bar where the dragged one will land */
  #dash .dbox{position:relative} .tilegrip{position:absolute;top:4px;left:4px;z-index:3;margin:0}      /* the handle is the list rows' .grip (flat grey, same size and hover), in the corner of the tile */
  .tile-drag{opacity:.35} .tile-ghost{position:fixed;z-index:40;pointer-events:none;border-radius:var(--r-box);box-shadow:0 8px 22px rgba(0,0,0,.65)} .tile-ghost .tilegrip{display:none}   /* the lifted tile: the same shadow as a lifted row */
- .dropbar{display:none;position:fixed;z-index:30;height:4px;border-radius:var(--r-pill);background:#fff;pointer-events:none} #dash .dbox,#set-boxes .sec{zoom:var(--z,1)}
+ .dropbar{display:none;position:fixed;z-index:30;height:4px;border-radius:var(--r-pill);background:var(--text-hi);pointer-events:none} #dash .dbox,#set-boxes .sec{zoom:var(--z,1)}
  /* nothing is drawn until /api and the data sources have answered (boot.js), so the boxes appear together and in place; the animation shows the page anyway after 3 s if the script died */
  body.booting #dash,body.booting #warnings{opacity:0;pointer-events:none;animation:bootshow 0s 3s forwards} #dash,#warnings{transition:opacity .18s}
  @keyframes bootshow{to{opacity:1;pointer-events:auto}}
@@ -228,11 +228,29 @@
  table{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
  td,th{padding:10px 3px;border-top:1px solid var(--line);vertical-align:top;text-align:left;font-weight:normal}
  tr:first-child td{border-top:0}
- td.n{color:#eee;white-space:nowrap;word-break:keep-all;overflow-wrap:normal;width:1%;padding-right:14px}
+ td.n{color:var(--text-1);white-space:nowrap;word-break:keep-all;overflow-wrap:normal;width:1%;padding-right:14px}
  select.ord{box-sizing:border-box;height:var(--h-ctl);padding:0 26px 0 10px;border-radius:var(--r-ctl);border:var(--bw) solid var(--ctl-line);color:var(--text-1);font:inherit;font-size:var(--fs-sm);
              -webkit-appearance:none;appearance:none;
-             background:#1a1a1a url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23ccc' stroke-width='1.6'/></svg>") no-repeat right 9px center}   /* one height on every device: phones draw native selects at their own size */
+             background:var(--ctl) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23ccc' stroke-width='1.6'/></svg>") no-repeat right 9px center}   /* one height on every device: phones draw native selects at their own size */
  .in{position:relative}
  input[type=password],input[type=text]{width:100%;height:var(--h-ctl);padding:0 12px;margin:0 0 10px;border-radius:var(--r-ctl);border:var(--bw) solid var(--ctl-line);background:var(--ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm)}
  .saved{color:#6c6;font-size:1em;text-transform:none;letter-spacing:0;margin-left:8px;opacity:0;transition:opacity .3s} .saved.show{opacity:1}
  body.settings-open > :not(#settings):not(.keep-visible){visibility:hidden}
+ /* ===== light theme (Settings > Appearance > Theme; <html data-theme="light">): the tokens again, for a page that has no picture or animated background behind it
+    (those keep their dark look). A coloured box is a solid palette colour with white text, a neutral one a white card with dark ink (--box-rgb is that ink). ===== */
+ html{color-scheme:dark} html[data-theme=light]:not(.dark-only){color-scheme:light}
+ html[data-theme=light]:not(.dark-only){--page-bg:#eceef2;--text-1:#1b1c20;--text-2:#34363d;--text-3:#62656e;--text-hi:#000;--card:#fff;--line:#dcdee4;--ctl:#fff;--ctl-line:#aeb2bc;--pop:#fff;--sel:#dbe5f5;--sel-line:#7f9cc4;--console:#f4f5f8;
+   --btn-bg:rgba(255,255,255,.96);--btn-line:#b4b8c2;--link:#1a56c4;--warn:#9a6f00;--ok:#1f9d2a;--danger-on:#c42b2b;--box-text-2:rgba(255,255,255,.85);--box-text-3:rgba(255,255,255,.7)}
+ html[data-theme=light]:not(.dark-only) .dbox.plain .now,html[data-theme=light]:not(.dark-only) .dbox.plain .wlist{--box-rgb:0,0,0;--box-text-2:rgba(0,0,0,.78);--box-text-3:rgba(0,0,0,.6)}
+ html[data-theme=light]:not(.dark-only) .now{color:#fff;background:rgb(var(--primary-rgb))}
+ html[data-theme=light]:not(.dark-only) .dbox.plain .now{color:var(--text-1);background:var(--card)}
+ html[data-theme=light]:not(.dark-only) .dbox.hl.plain .now{--box-rgb:255,255,255;--box-text-2:rgba(255,255,255,.85);--box-text-3:rgba(255,255,255,.7);color:#fff;background:rgb(var(--primary-rgb))}
+ html[data-theme=light]:not(.dark-only) .pill.pri,html[data-theme=light]:not(.dark-only) .pill-s.pri,html[data-theme=light]:not(.dark-only) .pill-s.on,html[data-theme=light]:not(.dark-only) .srow.lk .pill-s,html[data-theme=light]:not(.dark-only) .srow.lk .tag{background:rgb(var(--primary-rgb))}
+ html[data-theme=light]:not(.dark-only) .pill-s.pri,html[data-theme=light]:not(.dark-only) .pill-s.on{color:#fff}
+ html[data-theme=light]:not(.dark-only) .warnbox,html[data-theme=light]:not(.dark-only) .notebox{color:#fff}
+ html[data-theme=light]:not(.dark-only) .notebox{background:rgb(var(--primary-rgb))}
+ html[data-theme=light]:not(.dark-only) .pop{box-shadow:0 6px 24px rgba(0,0,0,.22)} html[data-theme=light]:not(.dark-only) .srow.drag{box-shadow:0 8px 22px rgba(0,0,0,.25)}
+ html[data-theme=light]:not(.dark-only) .dbox.plain .ibtn{background:rgba(0,0,0,.08)}
+ html[data-theme=light]:not(.dark-only) .console .l-err{color:#b3261e} html[data-theme=light]:not(.dark-only) .console .l-ok{color:#1b7a34}
+ html[data-theme=light]:not(.dark-only) .console .l-dim{color:#8a8d96} html[data-theme=light]:not(.dark-only) .console .l-hd{color:#1b1c20} html[data-theme=light]:not(.dark-only) .console .l-mod{color:#5d6068}
+ html[data-theme=light]:not(.dark-only) select.ord{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23444' stroke-width='1.6'/></svg>")}

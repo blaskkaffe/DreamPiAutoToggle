@@ -6,7 +6,7 @@ background("imagebg",function(host){
  host.appendChild(pic);host.appendChild(dim);
  var SIZE={cover:"cover",contain:"contain",stretch:"100% 100%",tile:"auto"};
  function paint(){var v=S.imagebg||{},key=JSON.stringify(v);if(key===last)return;last=key;
-  document.body.classList.toggle("imgbg-on",!!v.has);document.documentElement.classList.toggle("imgbg-on",!!v.has);
+  document.body.classList.toggle("imgbg-on",!!v.has);document.documentElement.classList.toggle("imgbg-on",!!v.has);document.documentElement.classList.toggle("dark-only",!!v.has);
   pic.style.backgroundImage=v.has?"url(/imagebg/image?v="+v.version+")":"none";
   pic.style.backgroundSize=SIZE[v.fit]||"cover";pic.style.backgroundRepeat=v.fit==="tile"?"repeat":"no-repeat";
   dim.style.opacity=String((v.dim||0)/100)}

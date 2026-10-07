@@ -123,6 +123,21 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await post('/dcnet', {}) === 204 && await post('/dcnow', {}) === 204, 'the network buttons still work without it');
   await post('/screen/drag', { value: false }, '4821');
   ok(await post('/pin', { pin: '' }, '4821') === 200 && await post('/colour', { module: 'switcher', key: 'dcnow', colour: 'green' }) === 200, 'removing the PIN removes the lock');
+  // ---- the theme
+  const look = () => page.evaluate(() => ({ theme: document.documentElement.getAttribute('data-theme'), bg: getComputedStyle(document.body).backgroundColor, ink: getComputedStyle(document.body).color,
+    box: getComputedStyle(document.querySelector('.dbox .now')).backgroundColor, boxInk: getComputedStyle(document.querySelector('.dbox .now')).color }));
+  let t = await look();
+  ok(t.theme === 'dark' && t.bg === 'rgb(17, 17, 17)', 'dark is the default (' + t.bg + ')');
+  ok(await post('/screen', { values: { theme: 'light' } }) === 200, 'the theme is saved'); await load(); t = await look();
+  ok(t.theme === 'light' && t.bg === 'rgb(236, 238, 242)' && t.ink === 'rgb(27, 28, 32)' && t.box === 'rgb(255, 255, 255)' && t.boxInk === 'rgb(27, 28, 32)', 'light: a light page with dark ink, and a white box with dark text (' + JSON.stringify(t) + ')');
+  ok(await post('/screen', { values: { theme: 'auto' } }) === 200, 'auto is saved');
+  await page.emulateMedia({ colorScheme: 'light' }); await load(); t = await look();
+  ok(t.theme === 'light', 'auto follows a light device');
+  await page.emulateMedia({ colorScheme: 'dark' }); await settle(500); t = await look();
+  ok(t.theme === 'dark', 'and goes dark when the device does, without a reload');
+  await post('/screen', { values: { theme: 'light' } }); await settle(1500);
+  ok((await look()).theme === 'light', 'a change made elsewhere shows without a reload');
+  await post('/screen', { values: { theme: 'dark' } }); await page.emulateMedia({ colorScheme: null }); await settle(1500);
   ok(errors.length === 0, 'no JavaScript or console errors' + (errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''));
   await browser.close();
   console.log(failed ? failed + ' check(s) failed' : 'all checks passed');
