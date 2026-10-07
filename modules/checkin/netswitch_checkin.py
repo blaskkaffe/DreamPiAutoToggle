@@ -93,7 +93,8 @@ def config(data=None):
     c = (data or _load()).get("config", {})
     colours = c.get("colours") if isinstance(c.get("colours"), dict) else {}
     out = {"show_title": c.get("show_title") is not False, "group_by": c.get("group_by") if c.get("group_by") in GROUPS else "department",
-           "colour_by": c.get("colour_by") if c.get("colour_by") in GROUPS else "department", "colours": {}}
+           "colour_by": c.get("colour_by") if c.get("colour_by") in GROUPS else "department", "colours": {},
+           "group_order": [str(x)[:80] for x in c.get("group_order", []) if isinstance(x, str)][:200] if isinstance(c.get("group_order"), list) else []}
     for kind in GROUPS:
         m = colours.get(kind) if isinstance(colours.get(kind), dict) else {}
         out["colours"][kind] = dict((str(k), _palette_id(v, "")) for k, v in m.items() if _palette_id(v, ""))
@@ -183,7 +184,8 @@ def snapshot(data=None):
             g = index[gname] = {"id": gname, "title": gname, "colour": colour_of.get(gname, "blue") if cfg["colour_by"] == cfg["group_by"] else "", "people": []}
             groups.append(g)
         g["people"].append(item)
-    groups.sort(key=lambda g: g["title"].lower())
+    place = dict((n, i) for i, n in reversed(list(enumerate(cfg["group_order"]))))      # the order the user dragged the boxes into; the rest follow alphabetically
+    groups.sort(key=lambda g: (place.get(g["title"], len(place)), g["title"].lower()))
     total = sum(len(g["people"]) for g in groups)
     n_in = sum(1 for g in groups for p in g["people"] if p["in"])
     buildings = sorted(set(p.get("location") or "" for p in people) - set([""]), key=str.lower)
@@ -269,6 +271,23 @@ def save_config(values):
         return cur
 
 
+def set_group_order(order):
+    """Remember the order the user moved the department / building boxes into (a list of their names). Returns the config, None if bad."""
+    if not isinstance(order, list) or not all(isinstance(x, str) for x in order):
+        return None
+    with _lock:
+        data = _load()
+        cur = config(data)
+        seen = []
+        for x in order:
+            if x and x not in seen:
+                seen.append(x[:80])
+        cur["group_order"] = seen[:200]
+        data["config"] = cur
+        _save(data)
+        return cur
+
+
 def set_group_colour(kind, name, colour):
     """The user's pick for a department or building; colour "" goes back to the automatic one."""
     if kind not in GROUPS or not isinstance(name, str) or not name or len(name) > 80:
@@ -314,6 +333,14 @@ def _post_toggle(h):
 def _post_status(h):
     b = _body(h)
     return _answer(h, set_status(str(b.get("id", "")), str(b.get("code", "")), b.get("detail", "")))
+
+
+def _post_order(h):
+    if set_group_order(_body(h, 32768).get("order")) is None:
+        h.send(json.dumps({"ok": False, "message": "order must be a list of names"}), "application/json", status=400)
+    else:
+        h.send(json.dumps({"ok": True, "checkin": snapshot()}), "application/json")
+    return True
 
 
 def _post_all(h):
@@ -363,4 +390,4 @@ def api(d, warnings):
 OPEN = ("/checkin/toggle", "/checkin/status")       # tapping people in and out works while Settings is locked with the PIN
 GET = {"/checkin": _get_board, "/checkin/config": _get_config}
 POST = {"/checkin/toggle": _post_toggle, "/checkin/status": _post_status, "/checkin/all": _post_all,
-        "/checkin/config": _post_config, "/checkin/colour": _post_colour}
+        "/checkin/config": _post_config, "/checkin/colour": _post_colour, "/checkin/order": _post_order}

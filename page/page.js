@@ -71,6 +71,7 @@ $("warnings").addEventListener("click",function(e){var b=e.target.closest&&e.tar
 function showSettings(open){$("settings").classList.toggle("open",open);
  if(!open){fire("settingsClose");if(S.settings_pin&&S.settings_pin.on)pinValue=""}       // a locked Settings asks again next time
  document.body.classList.toggle("settings-open",open);
+ if(!open&&SCR.noscroll)window.scrollTo(0,0);
  if(open){$("settings").classList.add("settling");fire("settingsOpen");whenLoaded(function(){layoutColumns();$("settings").classList.remove("settling")},900)}}
 // Settings is shown once what its boxes ask for has arrived (every GET in flight), or after limit ms, so the rows do not pop in one by one
 // and the boxes do not move while they fill
@@ -97,7 +98,7 @@ window.addEventListener("resize",function(){applyScreen();if($("settings").class
 // ---- the screen layout (Settings > Appearance; S.screen from /api): how many columns the dashboard and Settings use on a wide screen and
 // whether they stretch. A column is about COLW px wide; there are as many as fit, up to the setting. Stretch: the columns share the whole width
 // (the boxes are wider). Scale content: a stretched box is drawn bigger (CSS zoom) in step with its width, so it is taller too.
-var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false},COLW=428,SGAP=20,scrKey="";
+var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,noscroll:false},COLW=428,SGAP=20,scrKey="";
 function colsFor(max,W){return Math.max(1,Math.min(max,Math.floor((W+SGAP)/(COLW+SGAP))))}
 function scrZoom(n,W){return SCR.stretch&&SCR.scale?Math.max(1,((W-SGAP*(n-1))/n)/COLW):1}
 // The dashboard's boxes in dn columns: each box goes to the column that is shortest so far, in the order of the layout (so the first boxes are at
@@ -131,6 +132,7 @@ function moveTile(tile,spot){var seq=shownTiles().filter(function(t){return t!==
 function commitTiles(seq){var ords=shownTiles().map(function(b){return b._ord}).sort(function(a,b){return a-b}),moved=false;
  seq.forEach(function(b,i){if(b._ord!==ords[i]){moved=true;b._ord=ords[i]}});if(!moved)return;
  dashKey="";layoutDash(colsFor(SCR.dash_cols,document.documentElement.clientWidth-(SCR.stretch&&document.documentElement.clientWidth>=900?48:32)));
+ fire("tiles-moved",seq);
  var names=[],boxes={};(LAY.dashboard||[]).forEach(function(b){boxes[b.id]=b});
  seq.forEach(function(b){((boxes[b.getAttribute("data-box")]||{}).mods||[]).forEach(function(m){if(names.indexOf(m)<0)names.push(m)})});
  post("/modules/dashboard-order",{order:names},function(r){if(!r){alert("The new order was not saved.");location.reload()}})}
@@ -157,6 +159,7 @@ function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;
  var vw=document.documentElement.clientWidth,pad=SCR.stretch&&vw>=900?24:16,W=vw-2*pad,dn=colsFor(SCR.dash_cols,W),dz=scrZoom(dn,W),
   sn=colsFor(SCR.set_cols,W),key=[dn,dz,sn,pad,SCR.stretch,SCR.set_cols].join("/");
  var dash=$("dash"),b=document.body,inn=document.querySelector("#settings .in");
+ document.documentElement.classList.toggle("noscroll",!!SCR.noscroll);
  b.style.maxWidth=SCR.stretch?"none":(dn*COLW+(dn-1)*SGAP+2*pad)+"px";b.style.paddingLeft=b.style.paddingRight=pad+"px";
  dash.style.setProperty("--z",dz);dash.classList.toggle("multi",dn>1);layoutDash(dn);applyGrips();
  if(inn){inn.style.maxWidth=SCR.stretch?"none":(sn*COLW+(sn-1)*SGAP+2*pad)+"px";inn.style.paddingLeft=inn.style.paddingRight=pad+"px"}

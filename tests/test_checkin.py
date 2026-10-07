@@ -192,6 +192,17 @@ class BoardTests(Base):
         self.assertEqual(checkin.snapshot()["total"], 4)
 
 
+    def test_the_order_of_the_boxes_is_kept(self):
+        self.assertEqual([g["title"] for g in checkin.snapshot()["groups"]], ["Kök", "No department", "Servering"])
+        checkin.set_group_order(["Servering", "Kök"])
+        self.assertEqual([g["title"] for g in checkin.snapshot()["groups"]], ["Servering", "Kök", "No department"])       # unknown ones follow
+        self.assertIsNone(checkin.set_group_order("Kök"))
+        self.assertIsNone(checkin.set_group_order([1]))
+        checkin.set_group_order(["Servering", "Servering", "Gone"])                                                    # doubles dropped, a missing name is harmless
+        self.assertEqual(checkin.config()["group_order"], ["Servering", "Gone"])
+        self.assertEqual([g["title"] for g in checkin.snapshot()["groups"]], ["Servering", "Kök", "No department"])
+
+
 class HttpTests(Base):
     """Two 'screens' (two clients) see the same board: a change made by one is in the other's next /api answer."""
     def setUp(self):
@@ -225,6 +236,14 @@ class HttpTests(Base):
         self.post("/checkin/status", {"id": anna, "code": "VACATION", "detail": "2026-07-01"})
         text = [p["text"] for g in self.get("/api")["checkin"]["groups"] for p in g["people"] if p["id"] == anna][0]
         self.assertEqual(text, "Semester · tillbaka 1/7")
+
+    def test_the_order_of_the_boxes_is_posted_and_seen_by_the_other_screen(self):
+        r = self.post("/checkin/order", {"order": ["Servering", "Kök"]})
+        self.assertEqual([g["title"] for g in r["checkin"]["groups"]][:2], ["Servering", "Kök"])
+        self.assertEqual([g["title"] for g in self.get("/api")["checkin"]["groups"]][:2], ["Servering", "Kök"])
+        with self.assertRaises(HTTPError) as e:
+            self.post("/checkin/order", {"order": "Kök"})
+        self.assertEqual(e.exception.code, 400)
 
     def test_bad_requests(self):
         for path, body in (("/checkin/toggle", {"id": "nobody"}), ("/checkin/status", {"id": "x", "code": "SICK"}), ("/checkin/colour", {"kind": "floor", "name": "x"})):

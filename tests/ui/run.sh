@@ -27,4 +27,6 @@ run update.js FAKEUPDATE=1
 run screen.js CLOCK=1
 # the Background image module: choose a picture, fit, darken, a big one is shrunk, remove
 run imagebg.js IMGBG=1
+# a group too long for one column is split over the next ones; No scrolling; the saved order of the boxes
+run columns.js PEOPLE=$(pwd)/long.csv
 exit $RESULT

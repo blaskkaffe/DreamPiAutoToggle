@@ -471,7 +471,7 @@ def save_settings_pin(on):
 
 
 # ---- screen layout: how many columns the dashboard and Settings may use on a wide screen, and whether the boxes stretch to fill it
-SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False}
+SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False}
 MAX_COLUMNS = 6
 
 
@@ -491,7 +491,7 @@ def screen_settings():
             v = data.get(k)
             if isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= MAX_COLUMNS:
                 out[k] = v
-        for k in ("stretch", "scale", "drag"):
+        for k in ("stretch", "scale", "drag", "noscroll"):
             if isinstance(data.get(k), bool):
                 out[k] = data[k]
     return out
@@ -508,7 +508,7 @@ def save_screen_settings(changes):
                 continue
             if 1 <= v <= MAX_COLUMNS:
                 cur[k] = v
-        elif k in ("stretch", "scale", "drag") and isinstance(v, bool):
+        elif k in ("stretch", "scale", "drag", "noscroll") and isinstance(v, bool):
             cur[k] = v
     tmp = SCREEN + ".tmp"
     with open(tmp, "w") as f:

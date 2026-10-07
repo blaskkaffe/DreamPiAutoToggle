@@ -196,6 +196,7 @@
  .bgpart.part{position:fixed;left:0;right:0;z-index:-1;pointer-events:none} .bgpart.part.top{top:0} .bgpart.part.bottom{bottom:0}   /* a background that fills only an area: its module sets the height */
  /* ===== the roster widget (a box per group with a row per person: grey while out, in the person's colour while in; page/widgets.js W.roster) ===== */
  .roster{display:block} .rp-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px} .rp-chips:empty{display:none}
+ html.noscroll:has(body:not(.settings-open)){overflow:hidden;height:100%} html.noscroll body:not(.settings-open){overflow:hidden;height:100vh;height:100dvh}   /* Settings > Appearance > No scrolling: the main screen stays put */
  .rp-tile{margin:0}  .rp-box{margin:0 0 12px;padding:0;overflow:hidden;border-radius:var(--r-box);background:var(--card);border:var(--bw) solid var(--line)}
  .rp-gh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0;padding:8px 16px 6px;font-size:var(--fs-lg)} .rp-gt{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
  .rp-r{display:flex;align-items:center;gap:8px;min-width:0;margin:0;padding:0 10px 0 0;border:0;border-top:1px solid var(--line);border-radius:0;background:var(--btn-bg);color:var(--text-2)}

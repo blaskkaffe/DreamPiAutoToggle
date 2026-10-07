@@ -655,21 +655,32 @@ W.roster=function(s,ctx){
    '<button type="button" class="pill-s pri rp-io c-'+(p.in?"green":"red")+'" data-act="toggle" aria-label="'+esc(p.name)+': '+(p.in?"checked in, tap to check out":"checked out, tap to check in")+'">'+(p.in?"INNE":"UTE")+'</button></div>'}
  // Each group is a tile of the main screen (a .dbox beside the board's own), so the page's columns, stretch, scale and rearranging apply to them
  // like to every other tile. They are made and removed here as the groups change; the board's own tile holds the filter chips.
- var tiles={},anchor=null,order=[];
+ var tiles={},anchor=null,usedCap=0,again=false;
  function slug(t){return String(t).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"x"}
- function tileFor(g,idx){var id="checkin-"+slug(g.id),t=tiles[id];
-  if(!t){t=h("div",{"class":"dbox rp-tile","data-box":id,"data-mod":s.mod||"checkin"});t._body=h("div");t.appendChild(t._body);tiles[id]=t;
-   t.addEventListener("click",tap);anchor=anchor||el.closest(".dbox");$("dash").insertBefore(t,anchor?anchor.nextSibling:null);
-   dashTiles();var base=anchor&&anchor._ord!==undefined?anchor._ord:0;t._ord=base+(idx+1)/1000}
-  return t}
- function paint(){if(!D)return;paintChips();var live={},n=0,changed=false;
+ function tileFor(id,gid){var t=tiles[id];
+  if(!t){t=h("div",{"class":"dbox rp-tile","data-box":id,"data-mod":s.mod||"checkin"});t._body=h("div");t.appendChild(t._body);tiles[id]=t;t._owner=el;
+   t.addEventListener("click",tap);anchor=anchor||el.closest(".dbox");(anchor&&anchor.parentNode||$("dash")).insertBefore(t,anchor?anchor.nextSibling:null);dashTiles()}
+  t._gid=gid;return t}
+ // How many rows fit under one another in a column of the screen (0 = no limit: one column, or nothing drawn yet to measure). A group with more
+ // people than that is cut into near-equal parts, one tile each, which the dashboard then puts in the next columns.
+ function capacity(){var dash=$("dash");if(!dash.classList.contains("multi"))return 0;
+  var r=dash.querySelector(".rp-r"),gh=dash.querySelector(".rp-gh");if(!r||!gh)return 0;
+  var rh=r.getBoundingClientRect().height,avail=window.innerHeight-(dash.getBoundingClientRect().top+(window.pageYOffset||0))-24;
+  return rh>0?Math.max(3,Math.floor((avail-gh.getBoundingClientRect().height-14)/rh)):0}
+ function parts(ps){if(!usedCap||ps.length<=usedCap)return [ps];var n=Math.ceil(ps.length/usedCap),per=Math.ceil(ps.length/n),out=[];for(var i=0;i<ps.length;i+=per)out.push(ps.slice(i,i+per));return out}
+ function paint(){if(!D)return;paintChips();var live={},n=0,changed=false,base=function(){return anchor&&anchor._ord!==undefined?anchor._ord:0};
   if(D.total)D.groups.forEach(function(g){var ps=g.people.filter(visible);if(!ps.length)return;
-   var k=ps.filter(function(p){return p.in}).length,t=tiles["checkin-"+slug(g.id)],fresh=!t;t=tileFor(g,n);t._ord=(anchor&&anchor._ord!==undefined?anchor._ord:0)+(n+1)/1000;
-   live[t.getAttribute("data-box")]=1;n++;if(fresh)changed=true;
-   setHtml(t._body,'<div class="rp-box"><div class="rp-gh"><span class="rp-gt">'+esc(g.title)+'</span><span class="sub">'+k+'/'+ps.length+'</span></div>'+ps.map(row).join("")+'</div>')});
+   var chunks=parts(ps);chunks.forEach(function(cp,pi){var id="checkin-"+slug(g.id)+(pi?"-p"+(pi+1):""),fresh=!tiles[id],t=tileFor(id,g.id),k=cp.filter(function(p){return p.in}).length;
+    t._ord=base()+(n+1)/1000;live[id]=1;n++;if(fresh)changed=true;
+    setHtml(t._body,'<div class="rp-box"><div class="rp-gh"><span class="rp-gt">'+esc(g.title)+(chunks.length>1?' ('+(pi+1)+'/'+chunks.length+')':'')+'</span><span class="sub">'+k+'/'+cp.length+'</span></div>'+cp.map(row).join("")+'</div>')})});
   Object.keys(tiles).forEach(function(id){if(!live[id]){var t=tiles[id];if(t.parentNode)t.parentNode.removeChild(t);delete tiles[id];changed=true}});
   setHtml(msg,!D.total?'<div class="sub rp-empty">'+esc(D.text)+'</div>':(n?'':'<div class="sub rp-empty">Nobody to show for the chosen buildings.</div>'));
-  if(changed&&window.applyScreen)applyScreen(true)}
+  if(changed&&window.applyScreen)applyScreen(true);
+  var c=capacity();if(c!==usedCap&&!again){usedCap=c;again=true;try{paint()}finally{again=false}}}
+ var rz=null;window.addEventListener("resize",function(){clearTimeout(rz);rz=setTimeout(function(){if(D&&capacity()!==usedCap)paint()},150)});
+ // boxes dragged to a new place (Settings > Appearance > Rearrange): the order of the groups is kept on the host, so every screen follows
+ hook("tiles-moved",function(seq){var ids=[];seq.forEach(function(b){if(b._owner===el&&ids.indexOf(b._gid)<0)ids.push(b._gid)});
+  if(!ids.length||!D)return;D.groups.forEach(function(g){if(ids.indexOf(g.id)<0)ids.push(g.id)});post(s.order||"/checkin/order",{order:ids},take)});
  chips.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-loc]");if(!b)return;var n=b.getAttribute("data-loc");
   if(!n)sel=[];else{var i=sel.indexOf(n);if(i>=0)sel.splice(i,1);else sel.push(n)}rosterSaveLocations(sel);paint()});
  function take(r){if(r&&r.checkin){S.checkin=D=r.checkin;last="";paint()}}

@@ -71,6 +71,17 @@
     },
     {
      "type": "row",
+     "title": "No scrolling",
+     "sub": "The main screen never scrolls: it stays as it is drawn, so people can only tap what is on the screen (use with columns, and a screen that is big enough)",
+     "control": {
+      "type": "toggle",
+      "bind": "@screen.noscroll",
+      "post": "/screen/noscroll",
+      "label": "No scrolling"
+     }
+    },
+    {
+     "type": "row",
      "title": "Ask for the PIN to open Settings",
      "sub": "The dashboard keeps working without it; opening Settings and changing anything in it needs the PIN. Set a PIN below first.",
      "control": {
