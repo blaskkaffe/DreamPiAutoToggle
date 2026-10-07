@@ -3,7 +3,7 @@
 import os
 import socket
 
-import netswitch_core as core
+import base_core as core
 
 ADDON_VERSION = os.path.join(core.BASE_DIR, "version")   # written by install.sh
 

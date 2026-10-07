@@ -1,13 +1,36 @@
-# Check-in add-on - shared state and settings.
-# Everything the web service and the modules read or write: file paths, the module state, the colour palette, the time
-# zone and the update state files. No server, no probing, so small services can import it cheaply. Python 3.
+# Base - shared state and settings of the modular dashboard (everything the web service and the services of the modules all read or write).
+# What belongs to the project is in project.json (name, page title, data folder, ...) and in its modules. No server, no probing,
+# so the small services can import it cheaply. Python 3.
 import json
 import os
 import re
 import sys
 import time
 
-BASE_DIR = "/opt/dreampi-netswitch"
+_HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def project_path(name):
+    """A file or folder of the project: next to the base files (installed) or one folder above them (in the repository)."""
+    for folder in (_HERE, os.path.dirname(_HERE)):
+        path = os.path.join(folder, name)
+        if os.path.exists(path):
+            return path
+    return os.path.join(_HERE, name)
+
+
+def _read_project():
+    try:
+        with open(project_path("project.json")) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (IOError, OSError, ValueError):
+        return {}
+
+
+PROJECT = _read_project()      # project.json: {"name", "title" (the page's), "data_dir", "tmp_prefix", "service", "icon", "touch_icon"}
+BASE_DIR = PROJECT.get("data_dir", "/opt/dreampi-netswitch")           # where the project keeps its settings and state
+TMP_PREFIX = PROJECT.get("tmp_prefix", "/tmp/dreampi-netswitch")       # the start of the names of its short-lived state files
 PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the user's changes to the list of the palette (Appearance > Colour palette): {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui"}]}
 PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb"}}: palette colours the user changed
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
@@ -19,8 +42,8 @@ INSTALL_PORTS = os.path.join(BASE_DIR, "install_ports")  # "<http port> <https p
 UPDATE_ORIGIN = os.path.join(BASE_DIR, "update_origin")  # the checkout's git origin URL when installed; "Update now" refuses another one
 ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for update/restart (install.sh --pin)
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
-UPDATE_STATUS = "/tmp/dreampi-netswitch.update"          # running / ok / failed, written by the update script
-UPDATE_LOG = "/tmp/dreampi-netswitch.update.log"
+UPDATE_STATUS = TMP_PREFIX + ".update"          # running / ok / failed, written by the update script
+UPDATE_LOG = TMP_PREFIX + ".update.log"
 IMAGEBG_FILE = os.path.join(BASE_DIR, "background_image")     # the picture of the Background image module (any of PNG, JPEG, GIF, WebP; its type is in the config)
 IMAGEBG_CONFIG = os.path.join(BASE_DIR, "imagebg.json")  # {"fit", "dim", "type", "version"} of the Background image module
 SETTINGS_PIN = os.path.join(BASE_DIR, "settings_pin")   # exists = Settings asks for the PIN (when one is set) before it opens and changes anything
@@ -35,7 +58,7 @@ TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every modul
 
 # ------------------------------------------------------------------ modules
 # Everything the page shows is a module: a folder in modules/ with a module.json (and a layout.json, see
-# netswitch_modules.py). module.json holds
+# base_modules.py). module.json holds
 #   "name"         the title in the module picker                 (older files: "title")
 #   "description"  the text under it in the picker
 #   "enabled"      on by default when it is first loaded           (older files: "default"); the picker's own choice
@@ -45,8 +68,8 @@ TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every modul
 #   list), "colours" / "primary" (see the colour section below)
 # A module is *installed* when its folder is there and *enabled* when it is on in the picker. Its place in the picker
 # (module_order.json) is its priority: the first one shows first and wins where two modules want the same thing.
-# Everything that has to know - the web service and the services of the modules - asks here.
-MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules")
+# Everything that has to know - the web page and the services of the modules - asks here.
+MODULES_DIR = project_path("modules")
 MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"clock": true, "imagebg": false, ...} set from the module picker
 
 
@@ -709,9 +732,9 @@ def save_screen_settings(changes):
 
 
 def time_zone():
-    """The common time zone setting: an IANA name from netswitch_tz.ZONE_CHOICES, or "" = the Pi's own. Any module that shows a
+    """The common time zone setting: an IANA name from base_tz.ZONE_CHOICES, or "" = the Pi's own. Any module that shows a
     time of day reads it here (the clock does; the events module still has a zone of its own). Older installs kept it in clock.json."""
-    import netswitch_tz as tz
+    import base_tz as tz
     zone = read_file(TIME_ZONE)
     if zone is None:
         try:
@@ -724,7 +747,7 @@ def time_zone():
 
 def save_time_zone(value):
     """Save the common time zone ("" = the Pi's own; anything not in the list is the Pi's own too). Returns what is now set."""
-    import netswitch_tz as tz
+    import base_tz as tz
     value = value if value in tz.ZONE_CHOICES else ""
     tmp = TIME_ZONE + ".tmp"
     with open(tmp, "w") as f:

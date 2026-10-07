@@ -8,7 +8,7 @@ import unittest
 from support import core, sandbox, cleanup
 import netswitch_rebootupdate as ru
 import netswitch_clock as clock
-import netswitch_tz as tzmod
+import base_tz as tzmod
 
 
 class UpdateView(unittest.TestCase):

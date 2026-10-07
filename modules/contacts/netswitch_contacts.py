@@ -14,7 +14,7 @@ import os
 import re
 import threading
 
-import netswitch_core as core
+import base_core as core
 
 MAX_BYTES = 1000000
 MAX_PEOPLE = 2000

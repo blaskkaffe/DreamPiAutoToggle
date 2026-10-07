@@ -9,7 +9,7 @@ import unittest
 
 from support import sandbox, cleanup, core, web
 import netswitch_rebootupdate as ru
-import netswitch_security as sec
+import base_security as sec
 import netswitch_update as up
 
 

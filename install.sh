@@ -44,10 +44,9 @@ if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
-cp "$SRC/netswitch_core.py" "$SRC/netswitch_modules.py" "$SRC/netswitch_security.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_tz.py" "$SRC/netswitch_web.py" \
-   "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
+cp "$SRC"/base/base_*.py "$SRC/project.json" "$SRC/netswitch_probes.py" "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/kiosk"
-cp "$SRC"/page/index.html "$SRC"/page/page.css "$SRC"/page/page.js "$SRC"/page/widgets.js "$SRC"/page/boot.js "$DEST/page/"
+cp "$SRC"/base/page/index.html "$SRC"/base/page/page.css "$SRC"/base/page/page.js "$SRC"/base/page/widgets.js "$SRC"/base/page/boot.js "$DEST/page/"
 cp "$SRC"/kiosk/* "$DEST/kiosk/"
 chmod +x "$DEST/kiosk/kiosk-browser.sh"
 # Files of the DreamPi add-on this one grew out of (an install over it is cleaned up: the hook, the buttons and the LED service are gone)
@@ -57,7 +56,7 @@ for ns_old in dreampi-netswitch-led dreampi-netswitch-buttons dreampi-netswitch-
         rm -f "/etc/systemd/system/$ns_old.service"
     fi
 done
-rm -f "$DEST/netswitch_hook.py" "$DEST/netswitch_gpio.py" "$DEST/netswitch_buttons.py" "$DEST/netswitch_update.py" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" \
+rm -f "$DEST/netswitch_core.py" "$DEST/netswitch_modules.py" "$DEST/netswitch_web.py" "$DEST/netswitch_security.py" "$DEST/netswitch_tz.py" "$DEST/netswitch_hook.py" "$DEST/netswitch_gpio.py" "$DEST/netswitch_buttons.py" "$DEST/netswitch_update.py" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" \
       "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" "$DEST/netswitch_players.py" "$DEST/netswitch_wifi_setup.py" "$DEST/wifi_button" "$DEST/wifi_button_enabled"
 # The Wi-Fi setup module is gone: its service (removed above), module folder, state files and /tmp state
 rm -rf "$DEST/modules/wifi"
@@ -73,7 +72,7 @@ fi
 # is gone from $SRC/modules gets its remove.sh run (if it has one) and is deleted - that is how a module is removed.
 # Switching a module on or off is done on the page (Settings > Modules), not here.
 ns_module_enable() {   # ns_module_enable <name> on|off : write the Modules menu's switch
-    (cd "$DEST" && python3 -c "import sys, netswitch_core as c; c.save_module_enabled(sys.argv[1], sys.argv[2] == 'on')" "$1" "$2")
+    (cd "$DEST" && python3 -c "import sys, base_core as c; c.save_module_enabled(sys.argv[1], sys.argv[2] == 'on')" "$1" "$2")
 }
 sync_modules() {
     mkdir -p "$DEST/modules"
@@ -124,8 +123,8 @@ if [ "$PIN" = ask ]; then
 fi
 case "$PIN" in
     keep) ;;
-    off) (cd "$DEST" && python3 netswitch_security.py clear) && echo "PIN removed" ;;
-    *) (cd "$DEST" && NS_PIN="$PIN" python3 netswitch_security.py set) && echo "PIN set: the page asks for it before an update or restart" ;;
+    off) (cd "$DEST" && python3 base_security.py clear) && echo "PIN removed" ;;
+    *) (cd "$DEST" && NS_PIN="$PIN" python3 base_security.py set) && echo "PIN set: the page asks for it before an update or restart" ;;
 esac
 PIN=
 
@@ -170,7 +169,7 @@ StartLimitIntervalSec=0
 [Service]
 # Wi-Fi power saving makes a Pi drop off the network now and then (see the script)
 ExecStartPre=-/bin/sh $DEST/wifi-powersave-off.sh
-ExecStart=$WEBPY $DEST/netswitch_web.py $PORT $HTTPS_PORT
+ExecStart=$WEBPY $DEST/base_web.py $PORT $HTTPS_PORT
 Restart=always
 RestartSec=3
 Nice=-5

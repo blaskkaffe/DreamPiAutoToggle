@@ -51,8 +51,8 @@ if os.environ.get("OFF"):         # modules switched off, as from the module pic
         core.save_module_enabled(name, False)
     web.refresh_page(force=True)
 if os.environ.get("PIN"):
-    import netswitch_security
-    netswitch_security.set_pin(os.environ["PIN"])
+    import base_security
+    base_security.set_pin(os.environ["PIN"])
     __import__("netswitch_rebootupdate")._spawn_reboot = lambda: None
 print("state dir", tmp, flush=True)
 srv = web.Server(('127.0.0.1', int(os.environ.get('PORT', '8734'))), web.Handler)

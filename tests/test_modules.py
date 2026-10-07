@@ -189,7 +189,7 @@ class WithEverything(Base):
         self.assertLess(ids.index("about"), ids.index(first_settings_only))        # first among the settings-only modules (the dashboard ones stay above them)
 
     def test_protected_paths_are_the_modules_own_post_routes(self):
-        import netswitch_modules as mods
+        import base_modules as mods
         self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/contacts/import", "/contacts/active", "/contacts/person", "/contacts/delete"})
         for path in mods._state["protected"]:
             self.assertTrue(mods.route("POST", path), path)
@@ -431,7 +431,7 @@ class InstallerTests(unittest.TestCase):
 
     def test_installer_copies_the_loader_and_the_base_only(self):
         text = open(os.path.join(ROOT, "install.sh")).read()
-        self.assertIn("netswitch_modules.py", text)
+        self.assertIn("base/base_*.py", text)
         for gone in ("netswitch_contacts.py", "netswitch_checkin.py"):
             self.assertNotIn('cp "$SRC/' + gone, text)           # modules are copied as folders, never one by one
 
@@ -444,17 +444,17 @@ class Layering(unittest.TestCase):
             for f in os.listdir(os.path.join(REAL_MODULES, n)):
                 if f.endswith(".py"):
                     module_files.add(f[:-3])
-        for name in sorted(os.listdir(ROOT)):
-            if not name.endswith(".py"):
-                continue
-            with open(os.path.join(ROOT, name)) as f:
+        files = [(n, os.path.join(ROOT, "base", n)) for n in sorted(os.listdir(os.path.join(ROOT, "base"))) if n.endswith(".py")]
+        files += [(n, os.path.join(ROOT, n)) for n in sorted(os.listdir(ROOT)) if n.endswith(".py")]
+        for name, path in files:
+            with open(path) as f:
                 for line in f:
                     m = re.match(r"\s*(?:import|from)\s+(\w+)", line)
                     if m and m.group(1) in module_files:
                         self.fail("%s imports module code: %s" % (name, line))
 
     def test_modules_only_use_the_base_and_themselves(self):
-        base = set(f[:-3] for f in os.listdir(ROOT) if f.endswith(".py"))
+        base = set(f[:-3] for d in (ROOT, os.path.join(ROOT, "base")) for f in os.listdir(d) if f.endswith(".py"))
         for n in ALL:
             own = set(f[:-3] for f in os.listdir(os.path.join(REAL_MODULES, n)) if f.endswith(".py"))
             for f in own:

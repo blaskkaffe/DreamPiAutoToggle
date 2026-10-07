@@ -11,7 +11,7 @@ import re
 import threading
 import time
 
-import netswitch_core as core
+import base_core as core
 
 # [code, label, palette colour, needs, checks out]; the list CheckinChicken starts with. "needs": "time", "date", "note" or "".
 # IN / OUT are the two fixed ones; the others can be changed in checkin.json "statuses" (a list of objects with these keys).

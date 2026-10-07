@@ -12,7 +12,7 @@ import time
 
 from urllib.request import urlopen, Request
 
-import netswitch_core as core
+import base_core as core
 import netswitch_probes as probes
 
 DEFAULT_REPO = "blaskkaffe/DreamPiAutoToggle"

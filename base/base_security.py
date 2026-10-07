@@ -22,7 +22,7 @@ try:
 except ImportError:   # Python 2.7
     from urlparse import urlparse
 
-import netswitch_core as core
+import base_core as core
 
 PIN_MIN, PIN_MAX = 4, 64
 ITERATIONS = 50000
@@ -184,7 +184,7 @@ def reset_for_tests():
         _fails.update(count=0, until=0.0)
 
 
-if __name__ == "__main__":     # used by install.sh: NS_PIN=... python3 netswitch_security.py set | clear
+if __name__ == "__main__":     # used by install.sh: NS_PIN=... python3 base_security.py set | clear
     import sys
     if sys.argv[1:] == ["set"]:
         try:

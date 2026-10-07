@@ -5,7 +5,7 @@ import os
 import unittest
 
 from support import core, sandbox, cleanup
-import netswitch_modules as mods
+import base_modules as mods
 
 
 class LayoutBase(unittest.TestCase):

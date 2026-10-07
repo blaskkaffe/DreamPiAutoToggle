@@ -14,7 +14,7 @@ function fire(name,arg){var handled=false;(HOOKS[name]||[]).forEach(function(f){
 //                  p.close() / p.isOpen(); set p.onclose to be told when it closes. It moves into its card the first time it opens.
 //                  Esc, a click elsewhere, opening another pop-up and closing Settings close it by themselves.
 // =====
-var ui={version:2,_pops:[]};   // keep in step with UI_KIT in netswitch_modules.py
+var ui={version:2,_pops:[]};   // keep in step with UI_KIT in base_modules.py
 ui.closePopups=function(except){ui._pops.forEach(function(p){if(p!==except)p.close()})};
 // the drag handle (list rows and main-screen tiles): two columns of three dots, drawn, so it looks the same in every font
 var GRIP_SVG='<svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>';
