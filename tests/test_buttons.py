@@ -241,7 +241,7 @@ class ButtonTests(unittest.TestCase):
             self.assertTrue(f[0] in b._BUTTON_FUNCTIONS or f[0] in b._SWITCH_FUNCTIONS, f[0])
 
     def test_pull_constants_differ_per_register(self):
-        import netswitch_gpio as g
+        import base_gpio as g
         # classic GPPUD and the Pi 4 register encode up/down opposite ways round
         self.assertEqual(g.PI4_PULL_UP, g.GPPUD_PULL_DOWN)
         self.assertEqual(g.PI4_PULL_DOWN, g.GPPUD_PULL_UP)

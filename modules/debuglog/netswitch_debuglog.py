@@ -7,7 +7,7 @@ import json
 import os
 import re
 
-import netswitch_core as core
+import base_core as core
 
 TEXT_TAIL = 256000    # "Newest 256 KB" shows this much unless ?all
 

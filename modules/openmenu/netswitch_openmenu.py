@@ -27,7 +27,7 @@ import re
 import threading
 import time
 
-import netswitch_core as core
+import base_core as core
 
 SEEN_WINDOW = 15          # seconds: openMenu polls every 3, so it is "connected" while it was heard this recently
 LAUNCH_TTL = 60           # a launch nobody collected within this time is dropped

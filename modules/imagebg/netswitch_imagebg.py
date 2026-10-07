@@ -10,7 +10,7 @@ import json
 import os
 import time
 
-import netswitch_core as core
+import base_core as core
 
 MAX_BYTES = 8000000
 FITS = [("cover", "Cover the screen"), ("contain", "Show it whole"), ("stretch", "Stretch"), ("tile", "Tile")]

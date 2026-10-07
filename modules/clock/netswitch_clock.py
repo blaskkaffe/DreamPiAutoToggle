@@ -3,13 +3,13 @@
 # the Pi's own when none is set); the top line is empty or the .beat time; the bottom line is empty or a scrolling list of world
 # times (cities the user picks, up to 12). With "large" on the time takes the rows that .beat and world time leave free (view()
 # "size"). With world time on, a tap opens the cities as a list and a map of the world's time zones. Summer time comes from
-# netswitch_tz (zoneinfo, or the system's tz files on older Python). Runs in the web service (Python 3).
+# base_tz (zoneinfo, or the system's tz files on older Python). Runs in the web service (Python 3).
 import json
 import os
 import time
 
-import netswitch_core as core
-import netswitch_tz as tz
+import base_core as core
+import base_tz as tz
 
 FORMATS = ("12h", "12h-ampm", "24h")
 LABELS = {"12h": "12h", "12h-ampm": "12h am/pm", "24h": "24h"}

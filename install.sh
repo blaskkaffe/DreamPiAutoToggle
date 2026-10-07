@@ -77,12 +77,13 @@ if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
-cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_modules.py" "$SRC/netswitch_security.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_tz.py" "$SRC/netswitch_web.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" \
+cp "$SRC"/base/base_*.py "$SRC/project.json" "$SRC/netswitch_hook.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_buttons.py" \
    "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/static"
-cp "$SRC"/page/index.html "$SRC"/page/page.css "$SRC"/page/page.js "$SRC"/page/widgets.js "$SRC"/page/boot.js "$DEST/page/"
+cp "$SRC"/base/page/index.html "$SRC"/base/page/page.css "$SRC"/base/page/page.js "$SRC"/base/page/widgets.js "$SRC"/base/page/boot.js "$DEST/page/"
 cp "$SRC"/static/*.png "$DEST/static/"
 # Files an older layout kept next to the base (the features are folders in modules/ now)
+rm -f "$DEST/netswitch_core.py" "$DEST/netswitch_modules.py" "$DEST/netswitch_web.py" "$DEST/netswitch_security.py" "$DEST/netswitch_tz.py" "$DEST/netswitch_gpio.py"
 rm -f "$DEST/netswitch_update.py" "$DEST/static/three.min.js" "$DEST/static/dc-background.js" "$DEST/static/LICENSES.txt" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" \
       "$DEST/netswitch_players.py" "$DEST/netswitch_wifi_setup.py" "$DEST/page/led.html" "$DEST/page/led.js" "$DEST/page/led.css" "$DEST/page/players.js"
 
@@ -91,7 +92,7 @@ rm -f "$DEST/netswitch_update.py" "$DEST/static/three.min.js" "$DEST/static/dc-b
 # is gone from $SRC/modules gets its remove.sh run (if it has one) and is deleted - that is how a module is removed.
 # Switching a module on or off is done on the page (Settings > Modules), not here.
 ns_module_enable() {   # ns_module_enable <name> on|off : write the Modules menu's switch
-    (cd "$DEST" && python3 -c "import sys, netswitch_core as c; c.save_module_enabled(sys.argv[1], sys.argv[2] == 'on')" "$1" "$2")
+    (cd "$DEST" && python3 -c "import sys, base_core as c; c.save_module_enabled(sys.argv[1], sys.argv[2] == 'on')" "$1" "$2")
 }
 sync_modules() {
     mkdir -p "$DEST/modules"
@@ -142,8 +143,8 @@ if [ "$PIN" = ask ]; then
 fi
 case "$PIN" in
     keep) ;;
-    off) (cd "$DEST" && python3 netswitch_security.py clear) && echo "PIN removed" ;;
-    *) (cd "$DEST" && NS_PIN="$PIN" python3 netswitch_security.py set) && echo "PIN set: the page asks for it before an update, restart or Wi-Fi connect" ;;
+    off) (cd "$DEST" && python3 base_security.py clear) && echo "PIN removed" ;;
+    *) (cd "$DEST" && NS_PIN="$PIN" python3 base_security.py set) && echo "PIN set: the page asks for it before an update, restart or Wi-Fi connect" ;;
 esac
 PIN=
 
@@ -200,7 +201,7 @@ StartLimitIntervalSec=0
 [Service]
 # Wi-Fi power saving makes a Pi drop off the network now and then (see the script)
 ExecStartPre=-/bin/sh $DEST/wifi-powersave-off.sh
-ExecStart=$WEBPY $DEST/netswitch_web.py $PORT $HTTPS_PORT
+ExecStart=$WEBPY $DEST/base_web.py $PORT $HTTPS_PORT
 Restart=always
 RestartSec=3
 Nice=-5

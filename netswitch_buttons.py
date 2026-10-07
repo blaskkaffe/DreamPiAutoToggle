@@ -4,7 +4,7 @@
 # touches wifi_start / wifi_stop; the module's own service (modules/wifi/netswitch_wifi_service.py) does the setup.
 #
 # Runs as root (service dreampi-netswitch-buttons). Watches up to two GPIO
-# button pins (see netswitch_gpio.py), each independently configured from the
+# button pins (see base_gpio.py), each independently configured from the
 # page's Settings > GPIO with its own pin and short-press function (off,
 # toggle the selected network, or select DCNow!/DCNET outright). Holding the
 # button(s) assigned to Wi-Fi setup for 3 s starts or stops it. Pins and
@@ -17,8 +17,8 @@ import threading
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import netswitch_core as core  # noqa: E402  (paths, settings, debug_log())
-from netswitch_gpio import peripheral_base, Block, GPIO_OFFSET, set_input_pullup, read_level  # noqa: E402
+import base_core as core  # noqa: E402  (paths, settings, debug_log())
+from base_gpio import peripheral_base, Block, GPIO_OFFSET, set_input_pullup, read_level  # noqa: E402
 
 HOLD_SECONDS = 3.0        # button hold before Wi-Fi setup starts/stops
 SHORT_PRESS_MIN = 0.03    # ignore a debounced press shorter than this

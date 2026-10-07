@@ -7,7 +7,7 @@ import json
 import os
 import time
 
-import netswitch_core as core
+import base_core as core
 import netswitch_probes as probes
 
 
@@ -137,8 +137,8 @@ def _hangup(h):
 
 
 def _status(h):
-    import netswitch_web
-    d = netswitch_web.api_state()
+    import base_web
+    d = base_web.api_state()
     h.send("network=%s\ntag=%s\ndreampi=%s\nmodem=%s\ninternet=%s\npi=%s\n" % (
         d["network"], core.tag(), d["dreampi"]["text"],
         d["modem"]["text"], d["internet"]["text"], d["pi"]["text"]), "text/plain; charset=utf-8")

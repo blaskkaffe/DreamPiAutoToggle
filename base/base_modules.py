@@ -1,6 +1,6 @@
 # DreamPi Netswitch add-on - loads the optional modules for the web service.
 #
-# A module is a folder in modules/ with a module.json (see netswitch_core.module_manifest()). The web
+# A module is a folder in modules/ with a module.json (see base_core.module_manifest()). The web
 # service runs the Python part of every *enabled* module (the "web" entry in its manifest) and builds the
 # module's files into the page:
 #   layout.json  what the module shows (below), drawn by the standard widgets of page/widgets.js
@@ -34,7 +34,7 @@ import re
 import sys
 import threading
 
-import netswitch_core as core
+import base_core as core
 
 UI_KIT = 2       # the version of the page kit (ui in page/page.js, the kit block in page.css); a module may ask for an older one
 _PAGE_FILES = ("page.css", "page.js")

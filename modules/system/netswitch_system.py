@@ -2,7 +2,7 @@
 import json
 
 import netswitch_probes as probes
-import netswitch_security as security
+import base_security as security
 
 
 def _about(h):

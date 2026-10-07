@@ -15,8 +15,8 @@ import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)
-sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))     # the base folder, for netswitch_core
-import netswitch_core as core  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))     # the base folder, for base_core
+import base_core as core  # noqa: E402
 import netswitch_wifi_setup as wifi  # noqa: E402
 
 HEARTBEAT = 2             # seconds between looks at the flag files (also keeps the state file from going stale)

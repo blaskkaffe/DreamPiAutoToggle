@@ -53,7 +53,7 @@ class ManifestTests(PickerBase):
         self.assertTrue(core.module_enabled("fixed"))
 
     def test_the_picker_lists_the_always_on_modules_too_so_they_can_be_moved(self):
-        import netswitch_modules as mods
+        import base_modules as mods
         self.add("fixed", {"name": "Fixed", "description": "d", "enabled": True, "visible": False})
         self.layout("fixed", {"settings": [{"box": "x", "items": [{"type": "text", "text": "a"}]}]})
         got = dict((m["name"], m) for m in mods.listing())
@@ -68,7 +68,7 @@ class ManifestTests(PickerBase):
 
 class ShownInThePickerTests(PickerBase):
     def names(self):
-        import netswitch_modules as mods
+        import base_modules as mods
         return [m["name"] for m in mods.listing()]
 
     def test_a_module_with_a_dashboard_box_a_settings_box_or_a_background_is_always_listed(self):

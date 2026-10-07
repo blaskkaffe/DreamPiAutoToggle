@@ -17,7 +17,7 @@ try:
 except ImportError:   # Python 2.7
     from urllib2 import urlopen, Request
 
-import netswitch_core as core
+import base_core as core
 import netswitch_probes as probes
 
 DEFAULT_REPO = "blaskkaffe/DreamPiAutoToggle"

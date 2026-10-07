@@ -10,7 +10,7 @@ import re
 import os
 import time
 
-import netswitch_core as core
+import base_core as core
 
 # -------------------------------------------------------------------- the messages
 # The messages themselves are announced by the modules (module.json "led_messages"); the detection of when each is true is

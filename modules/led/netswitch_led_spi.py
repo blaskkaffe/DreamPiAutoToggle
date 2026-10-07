@@ -14,8 +14,8 @@ import subprocess
 import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (netswitch_core)
-import netswitch_core as core  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (base_core)
+import base_core as core  # noqa: E402
 
 CONFIG_CANDIDATES = ["/boot/firmware/config.txt", "/boot/config.txt"]
 MARKER = "dtparam=spi=on  # added by dreampi-netswitch"

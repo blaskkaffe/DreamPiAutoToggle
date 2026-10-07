@@ -18,8 +18,8 @@ import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)                                            # this module's other files
-sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (netswitch_core ...)
-import netswitch_core as core  # noqa: E402  (module on/off)
+sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (base_core ...)
+import base_core as core  # noqa: E402  (module on/off)
 import netswitch_ledconfig as ledconfig  # noqa: E402  (led.json, messages: shared with the web service)
 import netswitch_led_drivers as drivers  # noqa: E402  (open_output(), wire orders)
 import netswitch_led_spi as spi  # noqa: E402  (SPI on/off in config.txt for GPIO10)

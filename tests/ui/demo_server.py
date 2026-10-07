@@ -81,8 +81,8 @@ if os.environ.get("OFF"):         # modules switched off, as from the module pic
         core.save_module_enabled(name, False)
     web.refresh_page(force=True)
 if os.environ.get("PIN"):
-    import netswitch_security
-    netswitch_security.set_pin(os.environ["PIN"])
+    import base_security
+    base_security.set_pin(os.environ["PIN"])
     __import__("netswitch_rebootupdate")._spawn_reboot = lambda: None
 if os.environ.get("FAKEPLAYERS"):
     import netswitch_players as pl

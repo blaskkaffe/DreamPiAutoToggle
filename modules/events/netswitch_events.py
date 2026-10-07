@@ -36,8 +36,8 @@ except ImportError:                       # Python 2
     from urllib2 import Request, urlopen  # noqa: F401
     from urlparse import parse_qs, urlsplit  # noqa: F401
 
-import netswitch_core as core
-import netswitch_tz as tz
+import base_core as core
+import base_tz as tz
 
 SITE = "https://dc99.net"
 SOURCE_URL = SITE + "/community/"

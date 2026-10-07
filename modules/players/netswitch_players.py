@@ -15,7 +15,7 @@ try:
 except ImportError:   # Python 2.7
     from urllib2 import urlopen, Request
 
-import netswitch_core as core
+import base_core as core
 
 # [{"name": "DC99", "url": "http://.../players.json", "network": "DCNET"}, ...]
 # "network" is only the fallback label for entries that don't say which network they are on.

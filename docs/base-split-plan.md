@@ -30,7 +30,7 @@ install.sh uninstall.sh   the project's installer (copies base/ and modules/ to 
 | selected network (`dcnet_mode`), `tag()`, DCNET checks, `network_colour()`, boot reset, DreamPi / modem state readers, hook checks | `switcher` | files: `dcnet_mode`, the state files; openMenu asks the `switcher` service in the web process |
 | `netswitch_probes.py` (internet, link, Pi health, hang up, modem id, checker loop) | `switcher` (the About rows to `system`) | `net` state file (`/tmp/....net`) for the LED |
 | `netswitch_hook.py` (inside DreamPi) | `switcher` (the numbers matching to `numbers`) | `module.json` `hook` files, as now |
-| `netswitch_buttons.py`, `netswitch_gpio.py`, the button settings | `switcher` (its own service) | `led` has its own GPIO driver copy-free: it imports nothing from here (the LED output uses its own small register code) |
+| `netswitch_buttons.py`, `base_gpio.py`, the button settings | `switcher` (its own service) | `led` has its own GPIO driver copy-free: it imports nothing from here (the LED output uses its own small register code) |
 | update / reboot marks, `update_info()`, `ADDON_*` | `rebootupdate` | files `updateinfo`, `update`, `reboot` read by `led` |
 | `WIFI_*`, Wi-Fi button | `wifi` | files `wifi`, `wifi_start` ... |
 | events paths, `event_reminder()`, `next_event()` | `events` | file `event_reminders.json` read by `led` and `openmenu` |

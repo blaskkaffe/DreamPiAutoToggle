@@ -10,7 +10,7 @@ import sys
 import threading
 import time
 
-import netswitch_core as core
+import base_core as core
 
 INTERNET_EVERY = 30   # seconds between internet checks while it works
 INTERNET_RETRY = 5    # ... and while it doesn't

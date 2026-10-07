@@ -213,7 +213,7 @@ class WithEverything(Base):
         self.assertIsNone(core.save_dashboard_order("clock"))
 
     def test_protected_paths_are_the_modules_own_post_routes(self):
-        import netswitch_modules as mods
+        import base_modules as mods
         self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/wificonnect"})
         for path in mods._state["protected"]:
             self.assertTrue(mods.route("POST", path), path)
@@ -263,7 +263,7 @@ class WithNothing(Base):
         self.assertEqual([m["name"] for m in self.json("/modules")["modules"]], ["switcher", "system"])      # only the always-on ones are left
 
     def test_the_dreampi_dot_still_has_a_look(self):
-        import netswitch_modules as mods
+        import base_modules as mods
         switcher = mods.get("switcher")
         for state, effect in (("ok", "solid"), ("busy", "blink"), ("off", "blink"), ("call-dcnow", "solid")):
             look = switcher._dot_look(state)
@@ -425,7 +425,7 @@ class Services(unittest.TestCase):
     def test_buttons_service_loads_no_module_code(self):
         """Wi-Fi is layered on top: a button hold only touches wifi_start / wifi_stop; the module has its own service."""
         code = ("import sys; sys.path[:0] = %r; import netswitch_buttons; "
-                "sys.exit(1 if 'netswitch_wifi_setup' in sys.modules else 0)" % [ROOT])
+                "sys.exit(1 if 'netswitch_wifi_setup' in sys.modules else 0)" % [ROOT, os.path.join(ROOT, "base")])
         self.assertEqual(subprocess.call(["python3", "-c", code]), 0)
 
     def test_wifi_service_idles_while_module_is_off_and_runs_a_requested_setup(self):
@@ -523,7 +523,7 @@ class InstallerTests(unittest.TestCase):
 
     def test_installer_copies_the_loader_and_the_base_only(self):
         text = open(os.path.join(ROOT, "install.sh")).read()
-        self.assertIn("netswitch_modules.py", text)
+        self.assertIn("base/base_*.py", text)
         for gone in ("netswitch_ledconfig.py\" ", "netswitch_players.py\" ", "page/led.html\" "):
             self.assertNotIn('cp "$SRC/' + gone.strip(), text)
 
@@ -536,10 +536,10 @@ class Layering(unittest.TestCase):
             for f in os.listdir(os.path.join(REAL_MODULES, n)):
                 if f.endswith(".py"):
                     module_files.add(f[:-3])
-        for name in sorted(os.listdir(ROOT)):
-            if not name.endswith(".py"):
-                continue
-            with open(os.path.join(ROOT, name)) as f:
+        files = [(n, os.path.join(ROOT, "base", n)) for n in sorted(os.listdir(os.path.join(ROOT, "base"))) if n.endswith(".py")]
+        files += [(n, os.path.join(ROOT, n)) for n in sorted(os.listdir(ROOT)) if n.endswith(".py")]
+        for name, path in files:
+            with open(path) as f:
                 for line in f:
                     m = re.match(r"\s*(?:import|from)\s+(\w+)", line)
                     if m and m.group(1) in module_files:
@@ -547,7 +547,7 @@ class Layering(unittest.TestCase):
                         self.assertIn((name, m.group(1)), [("netswitch_hook.py", "netswitch_hookdebug")], (name, line))
 
     def test_modules_only_use_the_base_and_themselves(self):
-        base = set(f[:-3] for f in os.listdir(ROOT) if f.endswith(".py"))
+        base = set(f[:-3] for d in (ROOT, os.path.join(ROOT, "base")) for f in os.listdir(d) if f.endswith(".py"))
         for n in ALL:
             own = set(f[:-3] for f in os.listdir(os.path.join(REAL_MODULES, n)) if f.endswith(".py"))
             for f in own:

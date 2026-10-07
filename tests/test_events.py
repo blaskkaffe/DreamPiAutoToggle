@@ -8,7 +8,7 @@ import unittest
 
 from support import core, ledconfig, sandbox, cleanup
 import netswitch_events as ev
-import netswitch_tz as tz
+import base_tz as tz
 
 
 def utc(*a):

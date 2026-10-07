@@ -3,11 +3,12 @@
 # Shows DreamPi's and the modem's live status and internet access, plus an
 # optional debug timeline. It only creates/removes the files that
 # netswitch_hook.py reads. This module is the HTTP side (page, API, HTTPS,
-# watchdog); settings and state are in netswitch_core.py, the optional features in modules/ (netswitch_modules.py loads them), measurements in
+# watchdog); settings and state are in base_core.py, the optional features in modules/ (base_modules.py loads them), measurements in
 # netswitch_probes.py. Works on Python 3 and 2.7.
 import gzip
 import io
 import json
+import re
 import os
 import socket
 import ssl
@@ -22,20 +23,23 @@ except ImportError:
     from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
     from SocketServer import ThreadingMixIn
 
-import netswitch_core as core
-import netswitch_modules as modules
+import base_core as core
+import base_modules as modules
 import netswitch_probes as probes
-import netswitch_security as security
+import base_security as security
 
-STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-STATIC_FILES = {   # only these are served from /static/
-    "favicon-dcnow.png": "image/png",   # DreamPi logo (without the text)
-    "favicon-dcnet.png": "image/png",   # Flycast logo while DCNET is selected
-    "touch-dcnow.png": "image/png",
-    "touch-dcnet.png": "image/png",
-}
+STATIC_DIR = core.project_path("static")          # the project's pictures: served from /static/ (a plain file name with one of these endings)
+STATIC_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".ico": "image/x-icon", ".svg": "image/svg+xml"}
+_STATIC_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def _static_type(name):
+    """The content type of a file of static/, or None (not a picture, not a plain name, or not there)."""
+    if not _STATIC_NAME.match(name or "") or os.path.splitext(name)[1].lower() not in STATIC_TYPES or not os.path.isfile(os.path.join(STATIC_DIR, name)):
+        return None
+    return STATIC_TYPES[os.path.splitext(name)[1].lower()]
 PORT = 80
-HTTPS_PORT = 443   # 0 = no HTTPS; both can be given on the command line: netswitch_web.py [port] [https port]
+HTTPS_PORT = 443   # 0 = no HTTPS; both can be given on the command line: base_web.py [port] [https port]
 CERT = os.path.join(core.BASE_DIR, "https.crt")   # self-signed, made by install.sh
 KEY = os.path.join(core.BASE_DIR, "https.key")
 
@@ -106,13 +110,13 @@ def _palette_reply(extra=None):
 
 def _timezone_reply():
     """The form widget's answer for the common time zone (Settings > About)."""
-    import netswitch_tz as tz
+    import base_tz as tz
     zone = core.time_zone()
     return {"values": {"zone": zone}, "options": {"zones": tz.zone_options()}, "texts": {"zone": tz.zone_text(zone)}}
 
 
 def _layout_script():
-    """window.LAYOUT: the boxes, data sources, colours and backgrounds of the enabled modules (netswitch_modules.layout()),
+    """window.LAYOUT: the boxes, data sources, colours and backgrounds of the enabled modules (base_modules.layout()),
     plus the palette. Put in a <script> tag, so a "</" inside a text is escaped."""
     lay = modules.layout()
     lay["palette"] = [{"id": c["id"], "name": c["name"], "group": c["group"], "ui": c["ui"], "ui_l": c["ui_l"]} for c in core.colours()]
@@ -122,14 +126,14 @@ def _layout_script():
 def build_page():
     """The page is one document: page/index.html with page/page.css, page/widgets.js, page/page.js and page/boot.js put in where
     it says @@CSS@@ and @@JS@@ (one request, kept in memory as PAGE_BYTES). Edit those files, not this module. The
-    enabled modules add themselves (netswitch_modules.page_parts()): their layout (window.LAYOUT, drawn by the engine in
+    enabled modules add themselves (base_modules.page_parts()): their layout (window.LAYOUT, drawn by the engine in
     widgets.js), their styles after page.css and their script after the base script (custom widgets, hooks, a background)."""
     def part(name):
         with io.open(os.path.join(PAGE_DIR, name), encoding="utf-8", newline="") as f:
             return f.read()
     extra = modules.page_parts()
     js = _layout_script() + "\n" + part("page.js") + "\n" + part("widgets.js") + "\n" + extra["js"] + "\n" + part("boot.js")
-    html = part("index.html").replace("@@THEME@@", core.screen_settings()["theme"]).replace("@@CSS@@", core.colours_css() + part("page.css") + "\n" + extra["css"]).replace("@@JS@@", js)
+    html = part("index.html").replace("@@TITLE@@", core.PROJECT.get("title", "Dashboard")).replace("@@ICON@@", core.PROJECT.get("icon", "")).replace("@@TOUCH@@", core.PROJECT.get("touch_icon", core.PROJECT.get("icon", ""))).replace("@@THEME@@", core.screen_settings()["theme"]).replace("@@CSS@@", core.colours_css() + part("page.css") + "\n" + extra["css"]).replace("@@JS@@", js)
     return html
 
 
@@ -180,8 +184,8 @@ refresh_page(force=True)
 
 
 def _static(name):
-    """A file from static/ (only those in STATIC_FILES), kept in memory."""
-    if name not in STATIC_FILES:
+    """A picture of static/ (see _static_type()), kept in memory."""
+    if _static_type(name) is None:
         return None
     if name not in _static_cache:
         try:
@@ -311,7 +315,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Length", "0")
                 self.end_headers()
                 return
-            self.send(body, STATIC_FILES[name], cache=86400, fixed=True)
+            self.send(body, _static_type(name), cache=86400, fixed=True)
         elif path == "/modules":
             self.send(json.dumps({"modules": modules.listing()}), "application/json")
         elif path == "/colours":

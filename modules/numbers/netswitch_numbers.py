@@ -7,7 +7,7 @@ import json
 import os
 import re
 
-import netswitch_core as core
+import base_core as core
 import netswitch_hook as hook
 
 MIN_LEN, MAX_LEN, MAX_PER_ROW, MAX_ROWS = 3, 12, 10, 30

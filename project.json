@@ -1,0 +1,9 @@
+{
+ "name": "DreamPi Netswitch",
+ "title": "DreamPi",
+ "data_dir": "/opt/dreampi-netswitch",
+ "tmp_prefix": "/tmp/dreampi-netswitch",
+ "service": "dreampi-netswitch",
+ "icon": "/static/favicon-dcnow.png",
+ "touch_icon": "/static/touch-dcnow.png"
+}

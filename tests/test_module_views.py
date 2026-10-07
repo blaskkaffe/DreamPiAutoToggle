@@ -12,7 +12,7 @@ import netswitch_rebootupdate as ru
 import netswitch_switcher as sw
 import netswitch_probes as probes
 import netswitch_clock as clock
-import netswitch_tz as tzmod
+import base_tz as tzmod
 
 
 class PlayersView(unittest.TestCase):

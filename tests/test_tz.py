@@ -1,4 +1,4 @@
-"""netswitch_tz: time zone offsets with summer time on any Python. Without zoneinfo (Python before 3.9) the module reads the system's
+"""base_tz: time zone offsets with summer time on any Python. Without zoneinfo (Python before 3.9) the module reads the system's
 TZif files itself; these tests check that reader against zoneinfo (when this Python has it) and against known dates."""
 import calendar
 import random
@@ -6,7 +6,7 @@ import struct
 import unittest
 
 import support  # noqa: F401  (puts the repo on the path)
-import netswitch_tz as tz
+import base_tz as tz
 
 
 def utc(*a):

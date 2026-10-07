@@ -252,7 +252,7 @@ class LiveInfo(Base):
         self.assertEqual(core.poke_stamp("players"), first)                     # a fresh list: nothing to ask for
 
     def test_the_module_announces_a_launcher_and_the_page_gets_it(self):
-        import netswitch_modules as mods
+        import base_modules as mods
         lay = mods.layout()
         self.assertEqual(lay["launcher"], {"mod": "openmenu", "title": "openMenu", "state": "openmenu", "games": "om_games", "start": "/openmenu/launch"})
         self.assertIn("om_games", lay["data"])

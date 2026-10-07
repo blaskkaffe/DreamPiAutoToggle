@@ -8,7 +8,7 @@
 import json
 import os
 
-import netswitch_core as core
+import base_core as core
 import netswitch_ledconfig as ledconfig
 
 

@@ -62,7 +62,7 @@ Rules:
   `POST /triggers {op, source, action, value, opts, args}`.
 - A standard widget, **`triggered_by`**, draws the chips under an action in the owning module's Settings (the switcher gets a box
   "Network triggers", wifi "Wi-Fi triggers"). Modules only name the action; no module code draws a chip.
-- The base never imports module code: it calls the source's web entry through the loader (`netswitch_modules.py`), as it does for every `api()`.
+- The base never imports module code: it calls the source's web entry through the loader (`base_modules.py`), as it does for every `api()`.
 
 ## 4. Variables and placeholders
 
@@ -104,7 +104,7 @@ An announced action may declare variables:
 
 Today only the DreamPi hook runs actions. The buttons service and the web service need to as well.
 
-- A small base file, `netswitch_actions.py` (Python 2/3, imports only `netswitch_core`), takes over `_module_part()` / `_action()`
+- A small base file, `netswitch_actions.py` (Python 2/3, imports only `base_core`), takes over `_module_part()` / `_action()`
   from the hook: `run(action_id, args, ctx)` finds the module's hook file, checks the module is on and the required variables
   are there, calls the function `ACTIONS[id]` with the call, catches and logs errors, and returns the short text of what happened.
 - `call` keeps what the switcher's functions use today (`.base_dir`, `.log`, `.raw`, `.number`) and gains `.args` (the variables),

@@ -1,14 +1,35 @@
-# DreamPi Netswitch add-on - shared state and settings.
-# Everything the web page, the LED service and the buttons service all read or
-# write: file paths, the DreamPi/modem/network/Wi-Fi state files, the debug log,
-# button settings and the paths of everything else. No server, no probing, so the
-# small services can import it cheaply. Works on Python 3 and 2.7.
+# Base - shared state and settings of the modular dashboard (everything the web service and the services of the modules all read or write).
+# What belongs to the project is in project.json (name, page title, data folder, ...) and in its modules. No server, no probing,
+# so the small services can import it cheaply. Works on Python 3 and 2.7.
 import json
 import os
 import re
 import time
 
-BASE_DIR = "/opt/dreampi-netswitch"
+_HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def project_path(name):
+    """A file or folder of the project: next to the base files (installed) or one folder above them (in the repository)."""
+    for folder in (_HERE, os.path.dirname(_HERE)):
+        path = os.path.join(folder, name)
+        if os.path.exists(path):
+            return path
+    return os.path.join(_HERE, name)
+
+
+def _read_project():
+    try:
+        with open(project_path("project.json")) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (IOError, OSError, ValueError):
+        return {}
+
+
+PROJECT = _read_project()      # project.json: {"name", "title" (the page's), "data_dir", "tmp_prefix", "service", "icon", "touch_icon"}
+BASE_DIR = PROJECT.get("data_dir", "/opt/dreampi-netswitch")           # where the project keeps its settings and state
+TMP_PREFIX = PROJECT.get("tmp_prefix", "/tmp/dreampi-netswitch")       # the start of the names of its short-lived state files
 FLAG = os.path.join(BASE_DIR, "dcnet_mode")
 PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the user's changes to the list of the palette (Appearance > Colour palette): {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui", "led"}]}
 LED_COLOURS = os.path.join(BASE_DIR, "led_colours.json")   # {"red": "#rrggbb"}: how the LED shows a palette colour when that is not the default (Status LED > Colours, the LED module's)
@@ -25,10 +46,10 @@ INSTALL_PORTS = os.path.join(BASE_DIR, "install_ports")  # "<http port> <https p
 UPDATE_ORIGIN = os.path.join(BASE_DIR, "update_origin")  # the checkout's git origin URL when installed; "Update now" refuses another one
 ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for update/restart/Wi-Fi (install.sh --pin)
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
-UPDATE_STATUS = "/tmp/dreampi-netswitch.update"          # running / ok / failed, written by the update script
-UPDATE_LOG = "/tmp/dreampi-netswitch.update.log"
-UPDATE_INFO = "/tmp/dreampi-netswitch.updateinfo"        # {"addon": bool|None, "dreampi": bool, "time"}: the latest check, written by the update module for the LEDs
-REBOOT_MARK = "/tmp/dreampi-netswitch.reboot"            # unix time a reboot was asked for (the LEDs show "about to reboot")
+UPDATE_STATUS = TMP_PREFIX + ".update"          # running / ok / failed, written by the update script
+UPDATE_LOG = TMP_PREFIX + ".update.log"
+UPDATE_INFO = TMP_PREFIX + ".updateinfo"        # {"addon": bool|None, "dreampi": bool, "time"}: the latest check, written by the update module for the LEDs
+REBOOT_MARK = TMP_PREFIX + ".reboot"            # unix time a reboot was asked for (the LEDs show "about to reboot")
 PLAYERS_SOURCES = os.path.join(BASE_DIR, "players_sources.json")   # JSON addresses for the optional online-players list
 PLAYERS_CACHE = os.path.join(BASE_DIR, "players_cache.json")   # the last list the players module read (shown again after a restart while the new one loads)
 PLAYERS_FAVORITES = os.path.join(BASE_DIR, "players_favorites.json")   # {"games": [names], "players": [names]} the user watches
@@ -49,10 +70,10 @@ LED_CONFIG = os.path.join(BASE_DIR, "led.json")     # brightness, colours, wire 
 LED_COUNT = os.path.join(BASE_DIR, "led_count")      # number of LEDs, editable from the page
 LED_GPIO = os.path.join(BASE_DIR, "led_gpio")        # output pin (10, 12, 18 or 21), likewise
 SPI_ADDED = os.path.join(BASE_DIR, "spi_added")      # the config.txt this add-on put dtparam=spi=on into (so it can take it out again)
-STATUS = "/tmp/dreampi-netswitch.active"
-STATE = "/tmp/dreampi-netswitch.state"
-MODEM = "/tmp/dreampi-netswitch.modem"
-DTMF_LOG = "/tmp/dreampi-netswitch-dtmf.log"
+STATUS = TMP_PREFIX + ".active"
+STATE = TMP_PREFIX + ".state"
+MODEM = TMP_PREFIX + ".modem"
+DTMF_LOG = TMP_PREFIX + "-dtmf.log"
 # Wi-Fi setup (netswitch_buttons.py, install.sh --wifi); the buttons themselves are always installed
 WIFI_DEMO = os.path.join(BASE_DIR, "wifi_demo")        # exists = Wi-Fi setup runs on dummy networks (install.sh --wifi-demo)
 WIFI_START = os.path.join(BASE_DIR, "wifi_start")   # touched to ask netswitch_buttons.py to start
@@ -62,19 +83,19 @@ WIFI_CONNECT = os.path.join(BASE_DIR, "wifi_connect")   # {"ssid":..., "password
                                                          # lets the regular page pick a network too,
                                                          # useful when it's reachable some other way
                                                          # (e.g. Ethernet) while Wi-Fi is being set up
-WIFI_STATE = "/tmp/dreampi-netswitch.wifi"          # written by netswitch_buttons.py
+WIFI_STATE = TMP_PREFIX + ".wifi"          # written by netswitch_buttons.py
 WIFI_STALE = 30       # ignore WIFI_STATE when older than this (the service is down)
 WIFI_AP_SSID = "DreamPi WiFi Config"
-NET_STATE = "/tmp/dreampi-netswitch.net"   # shared with the LED service
+NET_STATE = TMP_PREFIX + ".net"   # shared with the LED service
 NET_STALE = 20        # ignore NET_STATE when older than this (web service down)
-POKE_PREFIX = "/tmp/dreampi-netswitch.poke."   # poke(name): "measure it again now", see poke()
-PLAYERS_WATCH = "/tmp/dreampi-netswitch.players"   # {"time", "games": [favourite games being played], "friends": [favourite players online]}, written by the players module for the LEDs
+POKE_PREFIX = TMP_PREFIX + ".poke."   # poke(name): "measure it again now", see poke()
+PLAYERS_WATCH = TMP_PREFIX + ".players"   # {"time", "games": [favourite games being played], "friends": [favourite players online]}, written by the players module for the LEDs
 PLAYERS_WATCH_STALE = 300     # ignore it when older than this (web service down / list not reachable)
 
 
 # ------------------------------------------------------------------ modules
 # Everything the page shows is a module: a folder in modules/ with a module.json (and a layout.json, see
-# netswitch_modules.py). module.json holds
+# base_modules.py). module.json holds
 #   "name"         the title in the module picker                 (older files: "title")
 #   "description"  the text under it in the picker
 #   "enabled"      on by default when it is first loaded           (older files: "default"); the picker's own choice
@@ -85,7 +106,7 @@ PLAYERS_WATCH_STALE = 300     # ignore it when older than this (web service down
 # A module is *installed* when its folder is there and *enabled* when it is on in the picker. Its place in the picker
 # (module_order.json) is its priority: the first one shows first and wins where two modules want the same thing.
 # Everything that has to know - the web page, the LED service, the buttons service - asks here.
-MODULES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modules")
+MODULES_DIR = project_path("modules")
 MODULES_STATE = os.path.join(BASE_DIR, "modules.json")     # {"led": true, "wifi": false, ...} set from the module picker
 
 
@@ -892,9 +913,9 @@ def set_module_tint(name, key, coloured):
 
 
 def time_zone():
-    """The common time zone setting: an IANA name from netswitch_tz.ZONE_CHOICES, or "" = the Pi's own. Any module that shows a
+    """The common time zone setting: an IANA name from base_tz.ZONE_CHOICES, or "" = the Pi's own. Any module that shows a
     time of day reads it here (the clock does; the events module still has a zone of its own). Older installs kept it in clock.json."""
-    import netswitch_tz as tz
+    import base_tz as tz
     zone = read_file(TIME_ZONE)
     if zone is None:
         try:
@@ -907,7 +928,7 @@ def time_zone():
 
 def save_time_zone(value):
     """Save the common time zone ("" = the Pi's own; anything not in the list is the Pi's own too). Returns what is now set."""
-    import netswitch_tz as tz
+    import base_tz as tz
     value = value if value in tz.ZONE_CHOICES else ""
     tmp = TIME_ZONE + ".tmp"
     with open(tmp, "w") as f:
@@ -1309,4 +1330,4 @@ def save_wifi_button(v):
     os.rename(tmp, WIFI_BUTTON_FILE)
 
 
-WB_TEST = "/tmp/dreampi-netswitch.wbtest"   # unix time, touched while the white-balance test is on
+WB_TEST = TMP_PREFIX + ".wbtest"   # unix time, touched while the white-balance test is on

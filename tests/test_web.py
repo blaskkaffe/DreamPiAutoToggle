@@ -373,7 +373,7 @@ class HttpTests(unittest.TestCase):
     def test_static_whitelist(self):
         self.assertEqual(self.get("/static/favicon-dcnow.png")[0], 200)
         with self.assertRaises(HTTPError) as cm:
-            self.get("/static/netswitch_web.py")
+            self.get("/static/base_web.py")
         self.assertEqual(cm.exception.code, 404)
 
     def test_about_and_log(self):

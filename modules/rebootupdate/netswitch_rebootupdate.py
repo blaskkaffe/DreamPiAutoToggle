@@ -9,7 +9,7 @@
 import json
 import subprocess
 
-import netswitch_core as core
+import base_core as core
 import netswitch_update as updater
 
 PROTECTED = ("/reboot", "/update/start")      # run as root: the PIN is asked for when one is set

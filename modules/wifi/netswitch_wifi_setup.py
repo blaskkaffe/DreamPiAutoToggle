@@ -52,8 +52,8 @@ from urllib.parse import parse_qs
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)                                            # this module's other files
-sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (netswitch_core ...)
-import netswitch_core as core  # noqa: E402  (paths, settings, debug_log())
+sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (base_core ...)
+import base_core as core  # noqa: E402  (paths, settings, debug_log())
 import netswitch_probes as probes  # noqa: E402  (check_internet())
 
 BASE_DIR = core.BASE_DIR

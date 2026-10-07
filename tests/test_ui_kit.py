@@ -7,11 +7,11 @@ import re
 import unittest
 
 from support import ROOT
-import netswitch_modules as mods
+import base_modules as mods
 
-CSS = os.path.join(ROOT, "page", "page.css")
-JS = os.path.join(ROOT, "page", "page.js")
-WIDGETS_JS = os.path.join(ROOT, "page", "widgets.js")
+CSS = os.path.join(ROOT, "base", "page", "page.css")
+JS = os.path.join(ROOT, "base", "page", "page.js")
+WIDGETS_JS = os.path.join(ROOT, "base", "page", "widgets.js")
 MODULES = os.path.join(ROOT, "modules")
 THEME_MODULES = ("background", "imagebg")       # a theme restyles the base classes on purpose
 
@@ -98,7 +98,7 @@ class KitTests(unittest.TestCase):
         self.assertEqual(int(re.search(r"var ui=\{version:(\d+)", read(JS)).group(1)), mods.UI_KIT)
 
     def test_every_widget_the_loader_accepts_is_drawn_by_the_page(self):
-        """The loader (netswitch_modules.WIDGETS) and the page (W.<type> in widgets.js) must list the same widgets, and a
+        """The loader (base_modules.WIDGETS) and the page (W.<type> in widgets.js) must list the same widgets, and a
         form's controls (CONTROLS) must be built by control()."""
         js = read(WIDGETS_JS)
         for t in mods.WIDGETS:
@@ -168,14 +168,14 @@ class KitTests(unittest.TestCase):
             self.assertNotRegex(read(path), r"getElementById\(.(dash|set-boxes).\)|\$\(.(dash|set-boxes).\)", "%s draws into the page's boxes by hand: put it in layout.json" % path)
 
     def test_the_base_page_has_no_module_markup_left(self):
-        html = read(os.path.join(ROOT, "page", "index.html"))
+        html = read(os.path.join(ROOT, "base", "page", "index.html"))
         for gone in ("SLOT", "gpio-section", "mod-list", "colours-section", 'id="net"', "dcnow-b"):
             self.assertNotIn(gone, html, gone)
 
     def test_a_module_for_a_newer_kit_is_not_loaded(self):
         import tempfile
         import shutil
-        import netswitch_core as core
+        import base_core as core
         tmp = tempfile.mkdtemp()
         saved = core.MODULES_DIR
         try:
