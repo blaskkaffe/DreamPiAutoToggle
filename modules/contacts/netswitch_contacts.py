@@ -162,6 +162,25 @@ def update_person(pid, fields):
         return p
 
 
+def delete_person(pid):
+    """Remove one person for good (and their photo). True when there was such a person. (Switching a person off keeps them on file; a CSV
+    import with the same name, department and building would bring a deleted person back as a new one.)"""
+    with _lock:
+        data = read()
+        keep = [p for p in data["people"] if p["id"] != pid]
+        if len(keep) == len(data["people"]):
+            return False
+        data["people"] = keep
+        _write(data)
+    path = photo_files().get(pid)
+    if path:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    return True
+
+
 def export_csv():
     out = io.StringIO()
     w = csv.writer(out, lineterminator="\n")
@@ -225,6 +244,16 @@ def _post_person(h):
         h.send(json.dumps({"ok": False, "message": str(e) or "That did not work"}), "application/json", status=400)
         return True
     h.send(json.dumps({"ok": True, "message": "Saved"}), "application/json")
+    return True
+
+
+def _post_delete(h):
+    try:
+        body = json.loads(h._body(4096).decode("utf-8"))
+        ok = delete_person(str(body.get("id", "")))
+    except (ValueError, UnicodeDecodeError, AttributeError):
+        ok = False
+    h.send(json.dumps({"ok": ok, "message": "Deleted" if ok else "Unknown person"}), "application/json", status=200 if ok else 400)
     return True
 
 
@@ -302,8 +331,8 @@ def _get_photo(h):
 
 GET = {"/contacts": _get_view, "/contacts.csv": _get_csv}
 GET_PREFIX = {"/contacts/photo/": _get_photo}
-POST = {"/contacts/import": _post_import, "/contacts/active": _post_active, "/contacts/person": _post_person, "/contacts/photo": _post_photo}
-PROTECTED = ("/contacts/import", "/contacts/active", "/contacts/person")
+POST = {"/contacts/import": _post_import, "/contacts/active": _post_active, "/contacts/person": _post_person, "/contacts/delete": _post_delete, "/contacts/photo": _post_photo}
+PROTECTED = ("/contacts/import", "/contacts/active", "/contacts/person", "/contacts/delete")
 OPEN = ("/contacts/photo",)          # a photo is set from the status menu on the board
 
 

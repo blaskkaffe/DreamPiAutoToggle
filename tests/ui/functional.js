@@ -198,6 +198,17 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(copies > 2 && copies % 2 === 0, 'in a stretched wide row the carousel has more copies of its text to fill it (' + copies + ')');
   await page.evaluate(() => Promise.all([['/screen', { values: { dash_cols: 1 } }], ['/screen/stretch', { value: false }]].map(([u, b]) => fetch(u, { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify(b) }))));
 
+  // ---- delete a person (the editor, two taps), the CSV box in the app's own look
+  await openSettings();
+  const nBefore = (await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length;
+  ok(await page.locator('[data-box="contacts"] .cpick').count() === 1 && await page.locator('[data-box="contacts"] input[type=file]').isHidden(), 'the CSV box has a styled Choose file button instead of the browser one');
+  await page.locator('[data-box="contacts"] .cpeople .srow').last().locator('span').first().click(); await settle(400);
+  await page.locator('.rp-need2 [data-del]').click(); await settle(200);
+  ok(/again/.test(await page.locator('.rp-need2 [data-del]').textContent()) && (await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length === nBefore, 'the first tap on Delete person only asks');
+  await page.locator('.rp-need2 [data-del]').click(); await settle(1200);
+  ok((await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length === nBefore - 1 && await page.locator('.rp-modal:visible').count() === 0, 'the second tap deletes the person');
+  await closeSettings();
+
   ok(errors.length === 0, 'no JavaScript errors (' + errors.slice(0, 3).join(' | ') + ')');
   await browser.close();
   console.log(failed ? failed + ' check(s) failed' : 'all checks passed');

@@ -167,7 +167,21 @@ function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;
  fire("screen")}
 // The PIN (when one is set with install.sh --pin) is asked for once per page load, before update / restart.
 var pinNeeded=false,pinValue="";
-function withPin(go){if(!pinNeeded||pinValue)return go();var p=prompt("Enter the PIN");if(p===null)return;pinValue=p;go()}
+// askPin(title, cb): a PIN pad in the middle of the screen (round number keys, a field that also takes the keyboard); cb(pin) when OK or Enter, nothing when it is cancelled
+var pinDlg=null;
+function askPin(title,cb){closePin();var m=h("div",{"class":"rp-modal keep-visible pinm",role:"dialog","aria-modal":"true","aria-label":title}),
+  inp=h("input",{type:"password","class":"pininp",autocomplete:"off",maxlength:64,"aria-label":title}),keys=h("div",{"class":"pinpad"});
+ function key(label,act,aria){var b=h("button",{type:"button","class":"pill-s pinkey","data-k":act,text:label});if(aria)b.setAttribute("aria-label",aria);return b}
+ "123456789".split("").forEach(function(d){keys.appendChild(key(d,d))});keys.appendChild(key("\u2715","x","Cancel"));keys.appendChild(key("0","0"));keys.appendChild(key("\u232b","back","Backspace"));
+ var sheet=h("div",{"class":"rp-sheet pinsheet"},[h("div",{"class":"rp-wn",text:title}),inp,keys,h("button",{type:"button","class":"pill-s pri c-green pinok","data-k":"ok",text:"OK"})]);m.appendChild(sheet);
+ function done(ok){var v=inp.value;closePin();if(ok&&v)cb(v)}
+ m.addEventListener("click",function(e){if(e.target===m){done(false);return}var b=e.target.closest&&e.target.closest("[data-k]");if(!b)return;var a=b.getAttribute("data-k");
+  if(a==="x")done(false);else if(a==="ok")done(true);else if(a==="back")inp.value=inp.value.slice(0,-1);else if(inp.value.length<64)inp.value+=a;inp.focus()});
+ inp.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();done(true)}});
+ document.body.appendChild(m);pinDlg=m;inp.focus()}
+function closePin(){if(pinDlg&&pinDlg.parentNode)pinDlg.parentNode.removeChild(pinDlg);pinDlg=null}
+hook("escape",function(){if(pinDlg){closePin();return true}});
+function withPin(go){if(!pinNeeded||pinValue)return go();askPin("Enter the PIN",function(p){pinValue=p;go()})}
 function xhrJson(method,url,cb,body){var x=new XMLHttpRequest(),counted=method!=="POST";if(counted)inflight++;x.open(method,url,true);
  if(method=="POST"){x.setRequestHeader("X-Requested-With","netswitch");if(pinValue)x.setRequestHeader("X-Netswitch-Pin",pinValue);
   if(body!==undefined)x.setRequestHeader("Content-Type","application/json")}
@@ -176,8 +190,8 @@ function xhrJson(method,url,cb,body){var x=new XMLHttpRequest(),counted=method!=
   cb(x.status==200?r:null,x.status,r)};x.onerror=function(){if(counted)inflight--;cb(null,0,null)};x.send(body===undefined?undefined:JSON.stringify(body))}
 // Settings locked with the PIN (Appearance > Ask for the PIN): the cog asks for it first; the server checks it (and counts wrong tries)
 function unlockThen(go){if(!(S.settings_pin&&S.settings_pin.on)||pinValue)return go();
- var p=prompt("Enter the PIN to open Settings");if(p===null)return;pinValue=p;
- xhrJson("POST","/pin/check",function(r,st,b){if(r)return go();pinValue="";alert(b&&b.message?b.message:"Wrong PIN")},{})}
+ askPin("Enter the PIN to open Settings",function(p){pinValue=p;
+  xhrJson("POST","/pin/check",function(r,st,b){if(r)return go();pinValue="";alert(b&&b.message?b.message:"Wrong PIN")},{})})}
 $("cog").onclick=function(){unlockThen(function(){showSettings(true)})};
 $("close-settings").onclick=function(){showSettings(false)};
 document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(!fire("escape"))showSettings(false)}});

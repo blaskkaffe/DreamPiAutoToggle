@@ -209,6 +209,17 @@ class BoardTests(Base):
         with self.assertRaises(ValueError):
             contacts.update_person(erik["id"], {"name": "Anna S", "department": "Servering", "location": "Område A"})            # would be a double
 
+    def test_a_person_can_be_deleted_with_the_photo(self):
+        anna = self.people()["Anna Svensson"]
+        os.makedirs(core.PHOTOS_DIR, exist_ok=True)
+        open(os.path.join(core.PHOTOS_DIR, anna["id"] + ".jpg"), "wb").write(b"x")
+        self.assertTrue(contacts.delete_person(anna["id"]))
+        self.assertNotIn("Anna Svensson", self.people())
+        self.assertEqual(checkin.snapshot()["total"], 3)
+        self.assertFalse(os.path.exists(os.path.join(core.PHOTOS_DIR, anna["id"] + ".jpg")))
+        self.assertFalse(contacts.delete_person(anna["id"]))
+        self.assertFalse(contacts.delete_person(""))
+
     def test_the_order_of_the_boxes_is_kept(self):
         self.assertEqual([g["title"] for g in checkin.snapshot()["groups"]], ["Kök", "No department", "Servering"])
         checkin.set_group_order(["Servering", "Kök"])
@@ -262,6 +273,15 @@ class HttpTests(Base):
         self.assertEqual(got["role"], "Chef")
         with self.assertRaises(HTTPError) as e:
             self.post("/contacts/person", {"id": anna, "name": ""})
+        self.assertEqual(e.exception.code, 400)
+
+    def test_a_person_is_deleted_over_http(self):
+        board = self.get("/api")["checkin"]
+        anna = [p for g in board["groups"] for p in g["people"] if p["name"] == "Anna Svensson"][0]["id"]
+        self.assertTrue(self.post("/contacts/delete", {"id": anna})["ok"])
+        self.assertEqual(self.get("/api")["checkin"]["total"], 3)
+        with self.assertRaises(HTTPError) as e:
+            self.post("/contacts/delete", {"id": anna})
         self.assertEqual(e.exception.code, 400)
 
     def test_the_order_of_the_boxes_is_posted_and_seen_by_the_other_screen(self):

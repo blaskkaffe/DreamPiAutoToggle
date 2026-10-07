@@ -158,7 +158,7 @@ W.pinset=function(s,ctx){var set=h("button",{type:"button","class":"pill-s",text
  el=h("span",{"class":"optrow"},[set,rem]);
  function send(pin,okText){withPin(function(){post("/pin",{pin:pin},function(r,st){if(r){pinValue=pin;alert(okText);refresh();ctx.saved()}
   else alert(st===400?"The PIN must be 4 to 64 characters.":"The PIN was not changed.")})})}
- set.onclick=function(e){e.stopPropagation();var a=prompt("New PIN (4 to 64 characters)");if(a===null)return;if(prompt("Enter the new PIN again")!==a){alert("The two PINs are not the same.");return}send(a,"The PIN is set.")};
+ set.onclick=function(e){e.stopPropagation();askPin("New PIN (4 to 64 characters)",function(a){askPin("Enter the new PIN again",function(b){if(b!==a){alert("The two PINs are not the same.");return}send(a,"The PIN is set.")})})};
  rem.onclick=function(e){e.stopPropagation();if(confirm("Remove the PIN?"))send("","The PIN is removed.")};
  function paint(){var has=!!(S.settings_pin&&S.settings_pin.pin);set.textContent=has?"Change PIN":"Set PIN";sh(rem,has)}
  UPD.push(paint);paint();return el};

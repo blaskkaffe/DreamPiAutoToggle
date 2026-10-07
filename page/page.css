@@ -226,12 +226,15 @@
  .rp-kb{margin-top:4px} .rp-kr{display:flex;gap:6px;margin-top:6px} .rp-kr.pad{max-width:420px;margin-left:auto;margin-right:auto}
  .rp-k{flex:1 1 0;min-width:0;min-height:56px;padding:0 4px;justify-content:center;font-size:1.3em} .rp-kr.pad .rp-k{min-height:64px;font-size:1.6em} .rp-kw{flex:1.5 1 0} .rp-ksp{flex:5 1 0} .rp-kn{visibility:hidden} .rp-k.on{box-shadow:0 0 0 3px var(--text-1)}
  .chkbox{max-height:46vh;overflow-y:auto;margin-top:8px}
+ .pinm{z-index:40} .pinsheet{width:clamp(300px,34vw,420px);text-align:center} .pinsheet .rp-wn{margin-bottom:12px}
+.pinsheet input.pininp{display:block;box-sizing:border-box;width:100%;height:auto;min-height:60px;margin:0 0 16px;text-align:center;font-size:2em;letter-spacing:.3em}
+ .pinpad{display:grid;grid-template-columns:repeat(3,72px);gap:14px;justify-content:center;margin-bottom:16px} .pinkey{width:72px;height:72px;min-height:72px;padding:0;border-radius:50%;font-size:1.8em} .pinok{width:100%;min-height:56px;font-size:1.2em}
  .rp-modal2{z-index:31} .rp-need2{width:clamp(300px,42vw,620px)} .rp-nl{display:block;margin:18px 0 0;font-size:1.1em;color:var(--text-2)}
  input.rp-big{display:block;box-sizing:border-box;width:100%;height:auto;min-height:64px;margin:8px 0 0;padding:8px 14px;font:inherit;font-size:1.6em;color:var(--text-1);background:var(--ctl);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl)}
  .rp-nb{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:20px}
  body.no-title header h1{display:none} body.no-title header{height:34px;margin:0 0 6px}   /* no title: only a strip for the cogwheel is left */
  .rp-empty{padding:12px 4px}
- textarea{display:block;width:100%;margin:8px 0;padding:8px 10px;background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm);resize:vertical} input[type=file],.rp-need input{min-height:var(--h-ctl);max-width:100%;font-size:var(--fs-sm);color:var(--text-2)} .rp-need input{color:var(--text-1);background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);padding:0 8px}
+ textarea{display:block;box-sizing:border-box;width:100%;min-height:96px;margin:8px 0;padding:10px 12px;background:var(--ctl);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm);resize:vertical} input[type=file],.rp-need input{min-height:var(--h-ctl);max-width:100%;font-size:var(--fs-sm);color:var(--text-2)} .rp-need input{color:var(--text-1);background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);padding:0 8px}
  .rp-ct{margin-top:10px} .rp-sw{margin-right:8px;background:rgb(var(--primary-rgb))}
  /* ===== end of the page kit ===== */
  :focus-visible{outline:3px solid var(--link);outline-offset:2px}

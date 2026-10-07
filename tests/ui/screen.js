@@ -11,9 +11,10 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error' && !/status of (400|401|409)/.test(m.text())) errors.push(m.text().slice(0, 150)); });     // the refused requests of the PIN checks are expected
-  let prompts = [], alerts = [];
-  page.on('dialog', d => { if (d.type() === 'prompt') { prompts.push(d.message()); return d.accept(answers.shift() || ''); } alerts.push(d.message()); return d.accept(); });
-  const answers = [];
+  let alerts = [], pinDialogs = 0;
+  page.on('dialog', d => { alerts.push(d.message()); return d.accept(); });
+  // the PIN pad: round keys; type the digits on them and press OK
+  const enterPin = async pin => { await page.waitForSelector('.pinm .pinkey'); pinDialogs++; for (const c of pin) await page.click('.pinm [data-k="' + c + '"]'); await page.click('.pinm .pinok'); };
   const post = (path, body, pin) => page.evaluate(([p, b, pn]) => fetch(p, { method: 'POST', headers: Object.assign({ 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, pn ? { 'X-Netswitch-Pin': pn } : {}), body: JSON.stringify(b || {}) }).then(r => r.status), [path, body, pin]);
   const load = async () => { await page.goto(URL, { waitUntil: 'networkidle' }); await settle(1200); };
   const info = () => page.evaluate(() => {
@@ -111,14 +112,18 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await post('/pin', { pin: '4821' }) === 200 && await post('/settings-pin', { value: true }) === 200, 'a PIN is set and Settings is locked');
   await load();
   ok(await page.locator('#dash .tilegrip:visible').count() === 0, 'while Settings is locked the tiles have no handles (moving them would change settings)');
-    answers.push('0000'); await page.click('#cog'); await settle(900);
-  ok(prompts.length === 1 && /PIN/.test(prompts[0]) && alerts.length === 1 && !(await page.evaluate(() => document.getElementById('settings').classList.contains('open'))), 'a wrong PIN does not open Settings (' + alerts[0] + ')');
-  answers.push('4821'); await page.click('#cog'); await settle(1500);
+  await page.click('#cog'); await enterPin('0000'); await settle(900);
+  ok(pinDialogs === 1 && alerts.length === 1 && !(await page.evaluate(() => document.getElementById('settings').classList.contains('open'))), 'a wrong PIN does not open Settings (' + alerts[0] + ')');
+  await page.click('#cog'); await enterPin('4821'); await settle(1500);
   ok(await page.evaluate(() => document.getElementById('settings').classList.contains('open')), 'the right PIN opens it');
   await page.click('#close-settings'); await settle(400);
-  answers.push('4821'); const asked0 = prompts.length; await page.click("#cog"); await settle(1000);
-  ok(prompts.length === asked0 + 1, 'closing Settings locks it again: the cog asks again');
+  const asked0 = pinDialogs; await page.click('#cog'); await enterPin('4821'); await settle(1000);
+  ok(pinDialogs === asked0 + 1, 'closing Settings locks it again: the cog asks again');
   await page.click('#close-settings'); await settle(300);
+  await page.click('#cog'); await page.waitForSelector('.pinm .pinkey');
+  ok(await page.locator('.pinm .pinkey').evaluateAll(els => els.length === 12 && els.every(e => getComputedStyle(e).borderRadius === '50%' || parseFloat(getComputedStyle(e).borderRadius) >= e.getBoundingClientRect().width / 2)), 'the PIN pad keys are round');
+  await page.keyboard.press('Escape'); await settle(200);
+  ok(await page.locator('.pinm').count() === 0, 'Esc closes the PIN pad');
   ok(await post('/colour', { module: 'checkin', key: 'checkin', colour: 'blue' }) === 401, 'a request for a setting without the PIN is refused by the service');
   ok(await post('/checkin/toggle', { id: 'nobody' }) === 400, 'tapping people in and out still works without it (answered, not refused)');
   await post('/screen/drag', { value: false }, '4821');
