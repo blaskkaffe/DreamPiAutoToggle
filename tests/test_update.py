@@ -299,3 +299,93 @@ class HttpUpdateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UsbUpdateTests(unittest.TestCase):
+    """An update from the folder called "update" on a USB stick."""
+    def setUp(self):
+        self.tmp = sandbox(up)
+        self.media = os.path.join(self.tmp, "media")
+        os.makedirs(self.media)
+        self._roots, self._spawn = up.USB_ROOTS, up._spawn
+        up.USB_ROOTS = [os.path.join(self.media, "*")]
+        self.spawned = []
+        up._spawn = self.spawned.append
+
+    def tearDown(self):
+        up.USB_ROOTS, up._spawn = self._roots, self._spawn
+        cleanup(self.tmp)
+
+    def stick(self, name, valid=True, age=0):
+        folder = os.path.join(self.media, name, "update")
+        os.makedirs(os.path.join(folder, "modules"))
+        if valid:
+            os.makedirs(os.path.join(folder, "base"))
+            open(os.path.join(folder, "base", "base_web.py"), "w").close()
+            with open(os.path.join(folder, "install.sh"), "w") as f:
+                f.write('#!/bin/sh\necho "$NS_KEEP_SRC|$NS_VERSION|$@" > "%s/usb-installer.out"\n' % self.tmp)
+            os.utime(os.path.join(folder, "install.sh"), (time.time() - age, time.time() - age))
+        return folder
+
+    def test_only_a_folder_that_looks_like_the_add_on_counts(self):
+        self.assertEqual(up.usb_candidates(), [])
+        self.stick("EMPTY", valid=False)
+        self.assertEqual(up.usb_candidates(), [])                                          # no install.sh and no base/
+        old, new = self.stick("OLD", age=86400), self.stick("NEW")
+        os.makedirs(os.path.join(self.media, "LINK"))
+        os.symlink(new, os.path.join(self.media, "LINK", "update"))
+        got = up.usb_candidates()
+        self.assertEqual([c["path"] for c in got], [new, old])                             # newest first, the link is not followed
+        self.assertEqual(got[0]["drive"], "NEW")
+
+    def test_the_script_is_built_from_safe_values_only(self):
+        folder = self.stick("STICK")
+        script = up.usb_script(folder, 8080, 0, "USB update 2026-10-07 10:00")
+        for part in ("cp -r", "NS_KEEP_SRC=1", "NS_VERSION='USB update 2026-10-07 10:00'", "8080 --https-port=0", "usb_src"):
+            self.assertIn(part, script)
+        self.assertEqual(subprocess.run(["sh", "-n", "-c", script], stderr=subprocess.PIPE).returncode, 0)
+        for bad in ("/media/x/it's/update", "relative/update", "/media/x/../etc/update", "/media/$(x)/update"):
+            with self.assertRaises(ValueError):
+                up.usb_script(bad, 80, 443, "v")
+        with self.assertRaises(ValueError):
+            up.usb_script(folder, 80, 443, "v; rm -rf /")
+
+    def test_start_needs_a_stick_and_runs_one_update_at_a_time(self):
+        started, message = up.start_usb_update()
+        self.assertFalse(started)
+        self.assertIn("No USB stick", message)
+        self.assertEqual(self.spawned, [])
+        self.stick("STICK")
+        started, message = up.start_usb_update()
+        self.assertTrue(started, message)
+        self.assertEqual(len(self.spawned), 1)
+        self.assertEqual(up.update_state(), "running")
+        self.assertFalse(up.start_usb_update()[0])
+
+    def test_the_script_copies_the_folder_and_runs_its_installer(self):
+        folder = self.stick("STICK")
+        with open(core.INSTALL_PORTS, "w") as f:
+            f.write("8080 0")
+        started, _message = up.start_usb_update()
+        self.assertTrue(started)
+        done = subprocess.run(["sh", "-c", self.spawned[0][-1]], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.assertEqual(done.returncode, 0, done.stderr.decode())
+        self.assertEqual(core.read_file(core.UPDATE_STATUS).strip(), "ok")
+        self.assertTrue(os.path.exists(os.path.join(core.BASE_DIR, "usb_src", "base", "base_web.py")))     # a copy in the data folder: the stick can be pulled out
+        ran = open(os.path.join(self.tmp, "usb-installer.out")).read().strip()
+        self.assertRegex(ran, r"^1\|USB update \d{4}-\d\d-\d\d \d\d:\d\d\|8080 --https-port=0$")
+        self.assertTrue(os.path.exists(folder))                                                          # the stick's folder is left alone
+
+    def test_the_page_shows_the_stick_only_while_nothing_runs(self):
+        import rebootupdate_web as rw
+        self.assertFalse(rw.view({"state": "idle", "usb": [], "time": 1})["show_usb"])
+        got = rw.view({"state": "idle", "usb": [{"path": "/media/pi/STICK/update", "drive": "STICK", "time": 1790000000}], "time": 1})
+        self.assertTrue(got["show_usb"])
+        self.assertIn("STICK", got["usb_text"])
+        self.assertFalse(rw.view({"state": "running", "usb": [{"path": "/x/update", "drive": "x", "time": 1}], "time": 1})["show_usb"])
+        self.assertIn("/update/usb", rw.PROTECTED)
+
+    def test_the_installer_keeps_the_recorded_checkout_for_a_usb_update(self):
+        text = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "install.sh")).read()
+        for part in ('[ -n "$NS_VERSION" ]', '[ -z "$NS_KEEP_SRC" ]', 'rm -f "$DEST/version_commit"'):
+            self.assertIn(part, text)

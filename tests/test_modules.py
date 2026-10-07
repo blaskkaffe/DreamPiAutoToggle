@@ -191,7 +191,7 @@ class WithEverything(Base):
 
     def test_protected_paths_are_the_modules_own_post_routes(self):
         import base_modules as mods
-        self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/contacts/import", "/contacts/active", "/contacts/person", "/contacts/delete"})
+        self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/update/usb", "/contacts/import", "/contacts/active", "/contacts/person", "/contacts/delete"})
         for path in mods._state["protected"]:
             self.assertTrue(mods.route("POST", path), path)
 

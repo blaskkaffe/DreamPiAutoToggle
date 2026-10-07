@@ -109,19 +109,27 @@ sync_modules() {
 sync_modules
 # <<< sync_modules
 chmod +x "$DEST/uninstall.sh"
-# Add-on version for the settings page: date and commit of this checkout
-if command -v git >/dev/null 2>&1 && git -C "$SRC" rev-parse >/dev/null 2>&1; then
+# Add-on version for the settings page: date and commit of this checkout. An update from a USB stick (the page's "Install from USB") runs this
+# installer from a copy of the stick's folder with NS_KEEP_SRC=1 and NS_VERSION: it names its own version and leaves the recorded checkout alone,
+# so that "Update now" from GitHub keeps working.
+if [ -n "$NS_VERSION" ]; then
+    echo "$NS_VERSION" > "$DEST/version"
+elif command -v git >/dev/null 2>&1 && git -C "$SRC" rev-parse >/dev/null 2>&1; then
     git -c safe.directory="$SRC" -C "$SRC" log -1 --format='%cd (%h)' --date=format:'%Y-%m-%d %H:%M' > "$DEST/version" 2>/dev/null || echo unknown > "$DEST/version"
 else
     echo unknown > "$DEST/version"
 fi
 # For the update check and the page's "Update now": which commit this is, where
 # the checkout lives, and the ports to keep when the installer is re-run.
-git -c safe.directory="$SRC" -C "$SRC" rev-parse HEAD > "$DEST/version_commit" 2>/dev/null || rm -f "$DEST/version_commit"
-echo "$SRC" > "$DEST/src_dir"
+if [ -z "$NS_KEEP_SRC" ]; then
+    git -c safe.directory="$SRC" -C "$SRC" rev-parse HEAD > "$DEST/version_commit" 2>/dev/null || rm -f "$DEST/version_commit"
+    echo "$SRC" > "$DEST/src_dir"
+else
+    rm -f "$DEST/version_commit"      # this install is not that commit any more
+fi
 echo "$PORT $HTTPS_PORT" > "$DEST/install_ports"
 # "Update now" only pulls from the address the checkout had when it was installed
-if command -v git >/dev/null 2>&1; then
+if [ -z "$NS_KEEP_SRC" ] && command -v git >/dev/null 2>&1; then
     git -c safe.directory="$SRC" -C "$SRC" config --get remote.origin.url > "$DEST/update_origin" 2>/dev/null || rm -f "$DEST/update_origin"
 fi
 

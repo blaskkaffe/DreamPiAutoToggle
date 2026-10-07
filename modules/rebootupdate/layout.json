@@ -31,6 +31,20 @@
      }
     },
     {
+     "type": "row",
+     "title": "Update from a USB stick",
+     "sub": "@update.usb_text",
+     "show": "@update.show_usb",
+     "control": {
+      "type": "button",
+      "label": "Install from USB",
+      "post": "/update/usb",
+      "reload": "update",
+      "pin": true,
+      "confirm": "Install the update from the USB stick now? The page is unavailable for a few seconds."
+     }
+    },
+    {
      "type": "console",
      "lines": "@update.log",
      "hide_empty": true,

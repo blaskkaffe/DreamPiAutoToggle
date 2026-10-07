@@ -3,6 +3,7 @@
 # System with a manual update guide; "Update now" fast-forwards the checkout that
 # install.sh recorded (src_dir) and re-runs its installer, detached so the
 # restart of this web service doesn't kill it. Python 3.
+import glob
 import json
 import os
 import re
@@ -165,6 +166,56 @@ def _log_tail(n=14):
     return [l for l in lines if l.strip()][-n:]
 
 
+# ---- an update from a USB stick: a folder called "update" on a removable drive holds the add-on's files (a copy of the repository: install.sh, base/,
+# modules/ ...). "Install from USB" copies it to the data folder (so the stick can be pulled out) and runs its install.sh as root, like the GitHub update.
+USB_NAME = "update"
+USB_ROOTS = ["/media/*", "/media/*/*", "/run/media/*/*", "/mnt/*", "/mnt/*/*"]      # where a stick is mounted (replaced by the tests)
+
+
+def usb_candidates():
+    """[{"path", "drive", "time"}]: the folders called "update" on mounted drives that look like the add-on (install.sh, base/base_web.py, modules/), newest
+    first. A link is not followed."""
+    out, seen = [], set()
+    for pattern in USB_ROOTS:
+        for root in sorted(glob.glob(pattern)):
+            path = os.path.join(root, USB_NAME)
+            if path in seen or os.path.islink(path) or not os.path.isdir(path):
+                continue
+            seen.add(path)
+            installer = os.path.join(path, "install.sh")
+            if not (os.path.isfile(installer) and not os.path.islink(installer) and os.path.isfile(os.path.join(path, "base", "base_web.py"))
+                    and os.path.isdir(os.path.join(path, "modules"))):
+                continue
+            try:
+                when = int(os.path.getmtime(installer))
+            except OSError:
+                when = 0
+            out.append({"path": path, "drive": os.path.basename(root), "time": when})
+    return sorted(out, key=lambda c: -c["time"])
+
+
+def usb_script(folder, http_port, https_port, version):
+    """The shell script that installs from a USB folder (built from validated values only: it runs as root): copy the folder to the data folder, then run
+    its install.sh from the copy with NS_KEEP_SRC (the recorded checkout stays) and NS_VERSION (what the page shows as the version)."""
+    work = os.path.join(core.BASE_DIR, "usb_src")
+    ok_path = re.compile(r"^[A-Za-z0-9._/ +@=:-]+$")
+    for p in (folder, work):
+        if not os.path.isabs(p) or not ok_path.match(p) or ".." in p.split("/"):
+            raise ValueError("unsafe update folder")
+    if not re.match(r"^[A-Za-z0-9 :.()_-]{1,60}$", version):
+        raise ValueError("unsafe version text")
+    ports = ["%d" % int(http_port), "--https-port=%d" % int(https_port)]
+    return (
+        "S=%s; D=%s; L=%s; ST=%s\n"
+        "rm -f \"$L\" \"$ST\"; set -C                      # never write through a link someone left in /tmp\n"
+        "exec >\"$L\" 2>&1\n"
+        "echo running > \"$ST\"\n"
+        "echo \"Copying the update from $S\"\n"
+        "rm -rf \"$D.new\" && cp -r \"$S\" \"$D.new\" && [ -f \"$D.new/install.sh\" ] && rm -rf \"$D\" && mv \"$D.new\" \"$D\" && cd \"$D\" "
+        "&& NS_KEEP_SRC=1 NS_VERSION=%s sh \"$D/install.sh\" %s && echo ok >| \"$ST\" || echo failed >| \"$ST\"\n"
+    ) % ("'%s'" % folder, "'%s'" % work, "'%s'" % core.UPDATE_LOG, "'%s'" % core.UPDATE_STATUS, "'%s'" % version, " ".join(ports))
+
+
 def can_update():
     _repo, _branch, src = source()
     return bool(src and os.path.exists(os.path.join(src, "install.sh")) and _git(["rev-parse", "HEAD"]))
@@ -176,7 +227,7 @@ def status():
     with _lock:
         out = dict(_info)
     out.update({"state": update_state(), "log": _log_tail() if update_state() != "idle" else [],
-                "can_update": can_update(), "src": src, "repo": repo, "branch": branch,
+                "can_update": can_update(), "usb": usb_candidates(), "src": src, "repo": repo, "branch": branch,
                 "version_file": (core.read_file(probes.ADDON_VERSION) or "unknown").strip()})
     return out
 
@@ -260,6 +311,34 @@ def _spawn(cmd):
 
 
 _start_lock = threading.Lock()
+
+
+def start_usb_update():
+    """Begin an update from the first USB stick that has an update folder; returns (started, message). One update at a time."""
+    with _start_lock:
+        if update_state() == "running":
+            return False, "An update is already running"
+        found = usb_candidates()
+        if not found:
+            return False, "No USB stick with an update folder was found"
+        pick = found[0]
+        http, https = _ports()
+        label = "USB update %s" % time.strftime("%Y-%m-%d %H:%M", time.localtime(pick["time"]))
+        try:
+            script = usb_script(pick["path"], http, https, label)
+        except ValueError as e:
+            return False, "Update refused: %s" % e
+        try:
+            _write_status("running")
+            _spawn(["sh", "-c", script])
+        except OSError as e:
+            try:
+                _write_status("failed")
+            except OSError:
+                pass
+            return False, "Could not start the update (%s)" % e
+    core.log("web page: update from USB started (%s)" % pick["path"])
+    return True, "Update started"
 
 
 def start_update():

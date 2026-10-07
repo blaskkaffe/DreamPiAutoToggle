@@ -39,6 +39,11 @@ if os.environ.get("FAKEUPDATE"):
         return ""
     up.fetch = fake
     up._spawn = lambda cmd: open(core.UPDATE_STATUS, "w").write("running")
+    if os.environ.get("USB"):          # a USB stick with an update folder (the install itself is faked like the GitHub one)
+        stick = os.path.join(tmp, "media", "STICK", "update")
+        os.makedirs(os.path.join(stick, "base")); os.makedirs(os.path.join(stick, "modules"))
+        open(os.path.join(stick, "base", "base_web.py"), "w").close(); open(os.path.join(stick, "install.sh"), "w").write("#!/bin/sh\n")
+        up.USB_ROOTS = [os.path.join(tmp, "media", "*")]
     if os.environ.get("FAKELOG"):      # a finished update with a messy log: long lines, colour codes, progress
         open(core.UPDATE_STATUS, "w").write("failed")
         open(core.UPDATE_LOG, "w").write("Updating /home/pi/checkout from origin/main\nFrom https://github.com/blaskkaffe/DreamPiAutoToggle\n"

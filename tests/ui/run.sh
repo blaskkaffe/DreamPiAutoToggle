@@ -22,6 +22,8 @@ run clock.js CLOCK=1
 run boot.js CLOCK=1
 # the update controls: Check shows the Update now row at once, a finished update reloads the page with Settings open
 run update.js FAKEUPDATE=1
+# an update from a USB stick that has an update folder
+run usb.js FAKEUPDATE=1 USB=1
 
 # the screen layout (max columns, stretch, scale), rearranging the tiles and the PIN lock on Settings
 run screen.js CLOCK=1
