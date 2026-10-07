@@ -100,7 +100,7 @@ window.addEventListener("resize",function(){applyScreen();if($("settings").class
 // ---- the screen layout (Settings > Appearance; S.screen from /api): how many columns the dashboard and Settings use on a wide screen and
 // whether they stretch. A column is about COLW px wide; there are as many as fit, up to the setting. Stretch: the columns share the whole width
 // (the boxes are wider). Scale content: a stretched box is drawn bigger (CSS zoom) in step with its width, so it is taller too.
-var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,noscroll:false,fit:false,theme:"dark"},COLW=428,SGAP=20,scrKey="";
+var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,noscroll:false,fit:false,autohide:false,theme:"dark"},COLW=428,SGAP=20,scrKey="";
 function colsFor(max,W){return Math.max(1,Math.min(max,Math.floor((W+SGAP)/(COLW+SGAP))))}
 function scrZoom(n,W){return SCR.stretch&&SCR.scale?Math.max(1,((W-SGAP*(n-1))/n)/COLW):1}
 // The dashboard's boxes in dn columns: each box goes to the column that is shortest so far, in the order of the layout (so the first boxes are at
@@ -187,6 +187,7 @@ function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;applyLook();
   sn=colsFor(SCR.set_cols,W),key=[dn,dz,sn,pad,SCR.stretch,SCR.set_cols].join("/");
  var dash=$("dash"),b=document.body,inn=document.querySelector("#settings .in");
  document.documentElement.classList.toggle("noscroll",!!SCR.noscroll);
+ document.body.classList.toggle("hdr-auto",!!SCR.autohide);if(!SCR.autohide)document.body.classList.remove("hdr-show");b.style.setProperty("--pad",pad+"px");
  b.style.maxWidth=wide?"none":(dn*COLW+(dn-1)*SGAP+2*pad)+"px";b.style.paddingLeft=b.style.paddingRight=pad+"px";
  dash.style.setProperty("--z",SCR.fit?fitState.z:dz);dash.classList.toggle("multi",dn>1);layoutDash(dn);applyGrips();
  if(SCR.fit)dash.style.setProperty("--z",fitZoom(dn,W));else fitState={key:"",z:1};
@@ -231,6 +232,15 @@ $("cog").onclick=function(){unlockThen(function(){showSettings(true)})};
 $("close-settings").onclick=function(){showSettings(false)};
 document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(!fire("escape"))showSettings(false)}});
 // the palette (/api "palette" and "palette_css") comes only when it is not the version the page has (PV); it changes when the user edits it (Appearance > Colour palette)
+// Settings > Appearance > Hide the top bar: the bar with the building buttons, the title and the cogwheel is out of sight, so the people can use the whole screen;
+// it comes down when the pointer is at the top edge or the top edge is tapped, and goes up again after a few seconds
+var hdrTimer=null,hdrHot=null;
+function hdrShow(){var b=document.body;if(!b.classList.contains("hdr-auto"))return;b.classList.add("hdr-show");clearTimeout(hdrTimer);hdrTimer=setTimeout(hdrHide,4000)}
+function hdrHide(){var hd=document.querySelector("body > header"),m=document.querySelector(".rp-chipmenu");
+ if((hd&&(hd.matches(":hover")||hd.contains(document.activeElement)))||(m&&m.style.display!=="none")){hdrTimer=setTimeout(hdrHide,2000);return}document.body.classList.remove("hdr-show")}
+document.addEventListener("pointermove",function(e){if(e.clientY<=8)hdrShow()});
+document.addEventListener("pointerdown",function(e){if(e.clientY<=28)hdrShow()});
+document.addEventListener("focusin",function(e){var hd=document.querySelector("body > header");if(hd&&hd.contains(e.target))hdrShow()});
 var PV="";
 function PAL(){return S.palette||LAY.palette||[]}
 function applyPalette(d){PV=d.palette_v;S.palette=d.palette;

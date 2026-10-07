@@ -26,7 +26,10 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await page.locator('.rp-r').count() === 23, 'a row per person (23: two belong to one building only)');
   ok(await page.locator('.rp-box').count() === 5, 'one box per department (5)');
   ok(await page.locator('.rp-r.out').count() === 23, 'everybody starts out and grey');
-  ok(await page.locator('.rp-chips button').count() === 3, 'two buildings and "All" are offered as a filter');
+  // the building buttons are in the top row; when they do not fit there they are one button that opens the list
+  const buildingBtns = () => page.locator('.rp-chips button[data-loc], .rp-chipmenu button[data-loc]');
+  const pickBuilding = async name => { if (await page.locator('.rp-chips [data-chipmenu]').count()) await page.locator('.rp-chips [data-chipmenu]').click(); await page.locator('.rp-chips button[data-loc], .rp-chipmenu button[data-loc]', { hasText: name }).filter({ visible: true }).first().click(); };
+  ok(await buildingBtns().count() === 3 || await buildingBtns().count() === 6, 'two buildings and "All" are offered as a filter');
   const widthOf = sel => page.locator(sel).first().evaluate(e => Math.round(e.getBoundingClientRect().height));
   ok(await widthOf('.rp-r') >= 36, 'a person row is tall enough to tap (' + await widthOf('.rp-r') + 'px)');
   ok(await page.locator('.rp-n').first().evaluate(e => parseFloat(getComputedStyle(e).fontSize)) >= 26, 'the names are large (26px or more)');
@@ -106,12 +109,12 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
 
   // ---- the buildings filter (kept in this browser) and the person that belongs to one building only
   ok(await page.locator('.rp-r').count() === 23, 'people who show in one building only are left out of "All" (23)');
-  await page.locator('.rp-chips button', { hasText: 'Område B' }).click(); await settle(300);
+  await pickBuilding('Område B'); await settle(300);
   const shownB = await page.locator('.rp-r').count();
   ok(shownB > 0 && shownB < 23, 'a building shows its own people (' + shownB + ')');
   await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
   ok(await page.locator('.rp-r').count() === shownB, 'the choice is kept after a reload');
-  await page.locator('.rp-chips button', { hasText: 'All' }).click(); await settle(300);
+  await pickBuilding('All'); await settle(300);
 
   // ---- settings: the look, the colours, the import
   await openSettings();
@@ -229,6 +232,10 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   sc = await scrollIs('on');
   ok(sc.trk > 0 && sc.still === 0, 'on: always scrolls (' + JSON.stringify(sc) + ')');
 
+  sc = await scrollIs('status');
+  ok(await page.evaluate(() => document.querySelectorAll('#dash .rp-sm .rp-mq').length > 0 && document.querySelectorAll('#dash .rp-r .rp-n').length > 0 && document.querySelectorAll('#dash .rp-mq:not(.rp-sm .rp-mq)').length === 0), 'only the status: the name stays and only the status has the carousel (' + JSON.stringify(sc) + ')');
+  await cfg({ scroll: 'on' });
+
   // ---- the status editor (Settings > Statuses)
   await openSettings();
   const nSt = await page.locator('[data-box="statuses"] .cstatuses .srow').count();
@@ -252,7 +259,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   // ---- the top row (building buttons, title), box titles, frames and colours, the light theme, Swedish date entry
   await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
   const top = await page.evaluate(() => { const hd = document.querySelector('body > header'), c = hd.querySelector('.rp-chips'), h = (() => { const r = document.createRange(); r.selectNodeContents(hd.querySelector('h1')); return r.getBoundingClientRect(); })(), cog = document.getElementById('cog').getBoundingClientRect(), r = c ? c.getBoundingClientRect() : null; return { n: c ? c.querySelectorAll('button').length : 0, left: r && Math.round(r.left), right: r && Math.round(r.right), h1: Math.round(h.left), top: r && Math.round(r.top), cogTop: Math.round(cog.top), ch: r && Math.round(r.height), cogH: Math.round(cog.height) }; });
-  ok(top.n >= 2 && top.right <= top.h1 + 2 && Math.abs((top.top + top.ch / 2) - (top.cogTop + top.cogH / 2)) < 12, 'the building buttons are in the top row, left of the title, in line with the cogwheel (' + JSON.stringify(top) + ')');
+  ok(top.n >= 1 && top.right <= top.h1 + 2 && Math.abs((top.top + top.ch / 2) - (top.cogTop + top.cogH / 2)) < 12, 'the building buttons are in the top row, left of the title, in line with the cogwheel (' + JSON.stringify(top) + ')');
   const tsz = await page.evaluate(() => ({ gt: getComputedStyle(document.querySelector('.rp-gt')).fontSize, gtw: getComputedStyle(document.querySelector('.rp-gt')).fontWeight, name: getComputedStyle(document.querySelector('.rp-t')).fontSize }));
   ok(tsz.gt === tsz.name && +tsz.gtw >= 700, 'a box title is as large as the names, and bold (' + JSON.stringify(tsz) + ')');
   await cfg({ title: 'Tavlan', frame: 'thick', box: 'board' }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
@@ -277,6 +284,29 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('.rp-need2 input').fill('20261224'); ok(await page.locator('.rp-need2 input').inputValue() === '2026-12-24', 'the digits are laid out as \u00e5\u00e5\u00e5\u00e5-mm-dd');
   await page.locator('.rp-need2 button[data-set]').click(); await settle(700);
   ok(/tillbaka 24\/12/.test(await person('Maja Berg').textContent()), 'the date is kept');
+
+  // ---- the building buttons become one button when they do not fit; the top bar can hide
+  await page.setViewportSize({ width: 360, height: 900 }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  ok(await page.evaluate(() => { const c = document.querySelector('body > header .rp-chips'); return c.classList.contains('compact') && c.scrollWidth <= c.clientWidth + 1 && !!c.querySelector('[data-chipmenu]'); }), 'in a narrow window the building buttons are one button');
+  await page.locator('body > header .rp-chips [data-chipmenu]').click(); await settle(300);
+  ok(await page.locator('.rp-chipmenu [data-loc]').count() >= 3 && await page.locator('.rp-chipmenu').isVisible(), 'which opens the list of buildings');
+  await page.locator('.rp-chipmenu [data-loc]').nth(1).click(); await settle(500);
+  ok(await page.locator('.rp-chipmenu').isHidden() && await page.evaluate(() => document.querySelector('body > header .rp-chips [data-chipmenu]').textContent.trim().startsWith('1')), 'a pick closes it and the button says how many are chosen');
+  await page.locator('body > header .rp-chips [data-chipmenu]').click(); await page.locator('.rp-chipmenu [data-loc=""]').click(); await settle(400);
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await page.evaluate(() => fetch('/screen/autohide', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ value: true }) }));
+  await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  const hdTop = () => page.evaluate(() => Math.round(document.querySelector('body > header').getBoundingClientRect().bottom));
+  ok(await hdTop() <= 0, 'Hide the top bar: the bar is out of sight (bottom ' + await hdTop() + ')');
+  ok(await page.evaluate(() => document.querySelector('.rp-box').getBoundingClientRect().top < 60), 'and the first box starts at the top');
+  await page.mouse.move(500, 3); await settle(600);
+  ok(await hdTop() > 20, 'moving the pointer to the top edge brings it down');
+  ok(await hdTop() > 20, 'and it stays while the pointer is on it'); await settle(5200);
+  ok(await hdTop() > 20, 'and it stays while the pointer is on it');
+  await page.mouse.move(500, 400); await settle(5200);
+  ok(await hdTop() <= 0, 'and it goes up again a few seconds after the pointer has left');
+  await page.mouse.move(500, 400); await page.evaluate(() => fetch('/screen/autohide', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ value: false }) }));
+  await page.reload({ waitUntil: 'networkidle' }); await settle(1200);
 
   ok(errors.length === 0, 'no JavaScript errors (' + errors.slice(0, 3).join(' | ') + ')');
   await browser.close();

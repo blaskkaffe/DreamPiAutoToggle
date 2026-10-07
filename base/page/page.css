@@ -206,13 +206,14 @@
  .rp-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600} .rp-s{flex:none;max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.6em;opacity:.85}
  .rp-r.out .rp-n{font-weight:500}
  .rp-s.rp-stt{max-width:60%;font-size:.8em;font-weight:600;opacity:1}
+ .rp-sm{flex:0 1 auto;min-width:0;max-width:60%;overflow:hidden;font-size:.8em} .rp-sm .rp-mq{display:block;max-width:100%}   /* only the status scrolls: the name stays */
  .rp-mq.still .rp-trk{animation:none} .rp-mq.still .rp-trk > span + span{display:none} .rp-mq.still .rp-trk > span{padding-right:0}
  .rp-mq{flex:1;min-width:0;overflow:hidden;white-space:nowrap;font-weight:600} .rp-trk{display:inline-block;animation:marquee var(--d,12s) linear infinite} .rp-trk > span{display:inline-block;padding-right:3em}   /* name and status scroll round like the carousel */
  @media(prefers-reduced-motion:reduce){.rp-trk{animation:none}.rp-trk > span + span{display:none}}
  .rp-io{flex:none;min-width:5.2em;min-height:34px;padding:0 14px;font-weight:700;font-size:var(--fs-md);letter-spacing:.04em}   /* INNE (green) / UTE (red) */
  /* the building buttons: the top row, at the left of the title, as tall as the cogwheel */
- header > .rp-chips.in-header{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:2;margin:0;flex-wrap:nowrap;max-width:calc(50% - 84px);overflow-x:auto;scrollbar-width:none}
- header > .rp-chips.in-header::-webkit-scrollbar{display:none} header > .rp-chips.in-header{gap:6px} header > .rp-chips.in-header .pill-s{flex:none;min-height:40px;padding:0 12px;font-size:var(--fs-sm)}
+ header > .rp-chips.in-header{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:2;margin:0;flex-wrap:nowrap;max-width:calc(50% - 84px);overflow:hidden;gap:6px}
+ .rp-chipmenu{position:fixed;z-index:25;display:flex;flex-direction:column;gap:6px;padding:10px;background:var(--pop);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl);box-shadow:0 6px 24px rgba(0,0,0,.4)} .rp-chipmenu .pill-s{justify-content:center} header > .rp-chips.in-header .pill-s{flex:none;min-height:40px;padding:0 12px;font-size:var(--fs-sm)}
  /* the box frame and colour (the check-in settings): the frame is none / thin / thick; "the board colour" gives the frame and the title row the board colour of Appearance */
  .rp-box[data-frame=none]{border-width:0} .rp-box[data-frame=thick]{border-width:4px}
  .rp-tile.rp-col .rp-box{border-color:rgb(var(--primary-l-rgb))} .rp-tile.rp-col .rp-gh{background:rgba(var(--primary-rgb),.82);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55)} .rp-tile.rp-col .rp-gh .sub{color:rgba(255,255,255,.85)}
@@ -247,6 +248,9 @@
  .rp-nb{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:20px}
  .rp-nb.rp-nb3{grid-template-columns:repeat(3,minmax(0,1fr))} .rp-need2 select.rp-big{appearance:auto}
  .rp-dots{margin-left:.5em;font-size:.6em;letter-spacing:.15em;vertical-align:middle;color:var(--c-red-l)}
+ body.hdr-auto > header{position:fixed;top:0;left:0;right:0;z-index:20;box-sizing:border-box;height:56px;margin:0;padding:0 var(--pad,16px);background:var(--card);border-bottom:var(--bw) solid var(--line);box-shadow:0 4px 18px rgba(0,0,0,.35);transform:translateY(-110%);transition:transform .2s ease}
+ body.hdr-auto.hdr-show > header{transform:none} body.hdr-auto{padding-top:8px} body.hdr-auto > header .cog{right:var(--pad,16px)} body.hdr-auto > header > .rp-chips.in-header{left:var(--pad,16px)}
+ body.hdr-auto > header h1{line-height:56px;font-size:1.6em} @media(prefers-reduced-motion:reduce){body.hdr-auto > header{transition:none}}   /* Settings > Appearance > Hide the top bar */
  body.no-title header h1{display:none} body.no-title header{height:42px;margin:0 0 6px}   /* no title: only a strip for the cogwheel is left */
  .rp-empty{padding:12px 4px}
  textarea{display:block;box-sizing:border-box;width:100%;min-height:96px;margin:8px 0;padding:10px 12px;background:var(--ctl);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl);color:var(--text-1);font:inherit;font-size:var(--fs-sm);resize:vertical} input[type=file],.rp-need input{min-height:var(--h-ctl);max-width:100%;font-size:var(--fs-sm);color:var(--text-2)} .rp-need input{color:var(--text-1);background:var(--ctl);border:1px solid var(--ctl-line);border-radius:var(--r-ctl);padding:0 8px}

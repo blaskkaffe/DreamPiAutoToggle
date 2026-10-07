@@ -358,7 +358,9 @@ class HttpTests(Base):
         self.assertEqual(self.get("/api")["checkin"]["scroll"], "auto")
         self.post("/checkin/config", {"values": {"scroll": "sideways"}})                                              # not one of off / auto / on: kept
         self.assertEqual(self.get("/api")["checkin"]["scroll"], "auto")
-        self.assertEqual([o["value"] for o in r["options"]["scrolls"]], ["off", "auto", "on"])
+        self.assertEqual([o["value"] for o in r["options"]["scrolls"]], ["off", "auto", "status", "on"])
+        self.post("/checkin/config", {"values": {"scroll": "status"}})
+        self.assertEqual(self.get("/api")["checkin"]["scroll"], "status")
         self.post("/checkin/config", {"values": {"scroll": "on"}})
         self.assertIn("Kökschef", [o["value"] for o in r["options"]["roles"]])
         self.assertEqual([o["value"] for o in r["options"]["buildings"]], ["Område A", "Område B"])

@@ -104,6 +104,17 @@
      }
     },
     {
+     "type": "row",
+     "title": "Hide the top bar",
+     "sub": "The bar with the building buttons, the title and the cogwheel is out of sight, so the whole screen is for the people. Move the pointer to the top edge or tap there to bring it down; it goes up again after a few seconds.",
+     "control": {
+      "type": "toggle",
+      "bind": "@screen.autohide",
+      "post": "/screen/autohide",
+      "label": "Hide the top bar"
+     }
+    },
+    {
      "type": "palette"
     },
     {

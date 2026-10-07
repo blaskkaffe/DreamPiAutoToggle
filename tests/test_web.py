@@ -85,13 +85,13 @@ class HttpTests(unittest.TestCase):
 
     def test_screen_layout_settings(self):
         d = json.loads(self.get("/api")[2].decode())
-        self.assertEqual(d["screen"], {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "theme": "dark"})
+        self.assertEqual(d["screen"], {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "theme": "dark"})
         self.post("/screen", {"values": {"dash_cols": 3, "set_cols": 2}})
         self.post("/screen/stretch", {"value": True})
         self.post("/screen/scale", {"value": True})
         self.post("/screen/fit", {"value": True})
         d = json.loads(self.get("/api")[2].decode())
-        self.assertEqual(d["screen"], {"dash_cols": 3, "set_cols": 2, "stretch": True, "scale": True, "drag": False, "noscroll": False, "fit": True, "theme": "dark"})
+        self.assertEqual(d["screen"], {"dash_cols": 3, "set_cols": 2, "stretch": True, "scale": True, "drag": False, "noscroll": False, "fit": True, "autohide": False, "theme": "dark"})
         self.post("/screen/fit", {"value": False})
         reply = json.loads(self.get("/screen")[2].decode())
         self.assertEqual(reply["values"], {"dash_cols": 3, "set_cols": 2, "theme": "dark"})

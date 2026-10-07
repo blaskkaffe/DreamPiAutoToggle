@@ -42,6 +42,20 @@ def base_classes():
 
 
 class KitTests(unittest.TestCase):
+    def test_the_css_comments_are_closed(self):
+        """An unclosed /* swallows the rules after it up to the next */ (a missing carousel animation once came from that)."""
+        for path in [CSS] + glob.glob(os.path.join(ROOT, "modules", "*", "page.css")):
+            text = open(path, encoding="utf-8").read()
+            pos = 0
+            while True:
+                i = text.find("/*", pos)
+                if i < 0:
+                    break
+                j = text.find("*/", i + 2)
+                self.assertGreater(j, 0, "%s: a comment opened at character %d is never closed" % (os.path.basename(path), i))
+                self.assertEqual(text.find("/*", i + 2, j), -1, "%s: a comment opened at character %d contains another /*, so one is not closed" % (os.path.basename(path), i))
+                pos = j + 2
+
     def test_the_thick_borders_of_boxes_and_buttons_are_opaque(self):
         """A box's or button's border is a solid colour (the backgrounds may be see-through); a translucent one over a see-through
         background looks duller than the same border on a button."""

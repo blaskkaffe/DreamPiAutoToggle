@@ -743,14 +743,23 @@ W.roster=function(s,ctx){
  function visible(p){if(!sel.length)return !p.restrict;return sel.indexOf(p.building)>=0||(!p.building&&!p.restrict)}
  function person(id){var r=null;((D&&D.groups)||[]).forEach(function(g){g.people.forEach(function(p){if(p.id===id)r=p})});return r}
  function colourCls(p){return p.colour?" c-"+p.colour:""}
- function paintChips(){var b=(D&&D.buildings)||[],html=b.length<2?"":['<button type="button" class="pill-s'+(sel.length?"":" pri")+'" data-loc="">All</button>'].concat(b.map(function(n){
-  return '<button type="button" class="pill-s'+(sel.indexOf(n)>=0?" pri":"")+'" data-loc="'+esc(n)+'">'+esc(n)+'</button>'})).join("");setHtml(chips,html)}
+ var chipMenu=h("div",{"class":"rp-chipmenu",style:"display:none"});document.body.appendChild(chipMenu);
+ function closeChipMenu(){chipMenu.style.display="none"}
+ // the building buttons: all in a row when they fit the top row, else one button that opens the list
+ function paintChips(){var b=(D&&D.buildings)||[];if(b.length<2){setHtml(chips,"");closeChipMenu();return}
+  var full=['<button type="button" class="pill-s'+(sel.length?"":" pri")+'" data-loc="">All</button>'].concat(b.map(function(n){
+   return '<button type="button" class="pill-s'+(sel.indexOf(n)>=0?" pri":"")+'" data-loc="'+esc(n)+'">'+esc(n)+'</button>'})).join("");
+  setHtml(chips,full);chips.classList.remove("compact");
+  if(chips.scrollWidth>chips.clientWidth+1){chips.classList.add("compact");
+   setHtml(chips,'<button type="button" class="pill-s'+(sel.length?" pri":"")+'" data-chipmenu="1" aria-haspopup="true" aria-label="Choose buildings">'+(sel.length?sel.length:"All")+' \u25be</button>')}
+  setHtml(chipMenu,full)}
  // a row: tap it for the status menu; the button at its right is in (INNE, green) / out (UTE, red) and switches. With a status the name and the status scroll round like a carousel.
  // the small grey text at the right of a row: the role and / or the building, as chosen in Settings (Display roles / Display buildings, each with a list of the ones to show)
  function shownIn(list,v){return !!v&&(list==null||list.indexOf(v)>=0)}
  function sideText(p){var out=[];if(D.show_roles!==false&&shownIn(D.roles_shown,p.role))out.push(p.role);if(D.show_buildings&&shownIn(D.buildings_shown,p.building))out.push(p.building);return out.join(" \u00b7 ")}
  function row(p){var text=p.name+(p.text?"  ·  "+p.text:""),state=p.text?p.text:(p.in?"in":"out"),
-  inner=p.status&&D.scroll==="off"?'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-s rp-stt">'+esc(p.text)+'</span>'+(p.dots?'<span class="rp-dots" aria-label="'+p.dots+(p.dots>1?' dots':' dot')+'">'+"\u25cf".repeat(p.dots)+'</span>':'')
+  inner=p.status&&D.scroll==="status"?'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-sm"><span class="rp-mq" data-scroll="auto" style="--d:'+Math.max(8,Math.round(String(p.text).length*.45))+'s"><span class="rp-trk"><span>'+esc(p.text)+'</span><span>'+esc(p.text)+'</span></span></span></span>'+(p.dots?'<span class="rp-dots" aria-label="'+p.dots+(p.dots>1?' dots':' dot')+'">'+"\u25cf".repeat(p.dots)+'</span>':'')
+   :p.status&&D.scroll==="off"?'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-s rp-stt">'+esc(p.text)+'</span>'+(p.dots?'<span class="rp-dots" aria-label="'+p.dots+(p.dots>1?' dots':' dot')+'">'+"\u25cf".repeat(p.dots)+'</span>':'')
    :p.status?'<span class="rp-mq" data-scroll="'+(D.scroll==="auto"?"auto":"on")+'" style="--d:'+Math.max(8,Math.round(text.length*.45))+'s"><span class="rp-trk"><span>'+esc(text)+'</span><span>'+esc(text)+'</span></span></span>'+(p.dots?'<span class="rp-dots" aria-label="'+p.dots+(p.dots>1?' dots':' dot')+'">'+"\u25cf".repeat(p.dots)+'</span>':'')
    :'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-s">'+esc(sideText(p))+'</span>';
   return '<div class="rp-r '+(p.colour?"pri"+colourCls(p):"out")+'" data-id="'+esc(p.id)+'"><button type="button" class="rp-t" data-act="menu" aria-label="'+esc(p.name)+': '+esc(state)+', open the status menu">'+inner+'</button>'+
@@ -798,12 +807,16 @@ W.roster=function(s,ctx){
   if(have!==k){var t=trk.firstChild.textContent;trk.innerHTML="";for(var i=0;i<2*k;i++){var sp=document.createElement("span");sp.textContent=t;trk.appendChild(sp)}}
   mq.style.setProperty("--d",Math.max(8,Math.round(k*one/(70*(zoom||1))))+"s")})}
  hook("screen",fillCarousels);
- var rz=null;window.addEventListener("resize",function(){clearTimeout(rz);rz=setTimeout(function(){if(D&&capacity()!==usedCap)paint();else fillCarousels()},150)});
+ var rz=null;window.addEventListener("resize",function(){clearTimeout(rz);rz=setTimeout(function(){if(D){paintChips();if(capacity()!==usedCap)paint();else fillCarousels()}},150)});
  // boxes dragged to a new place (Settings > Appearance > Rearrange): the order of the groups is kept on the host, so every screen follows
  hook("tiles-moved",function(seq){var ids=[];seq.forEach(function(b){if(b._owner===el&&ids.indexOf(b._gid)<0)ids.push(b._gid)});
   if(!ids.length||!D)return;D.groups.forEach(function(g){if(ids.indexOf(g.id)<0)ids.push(g.id)});post(s.order||"/checkin/order",{order:ids},take)});
- chips.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-loc]");if(!b)return;var n=b.getAttribute("data-loc");
-  if(!n)sel=[];else{var i=sel.indexOf(n);if(i>=0)sel.splice(i,1);else sel.push(n)}rosterSaveLocations(sel);paint()});
+ function pickLoc(e){var m=e.target.closest&&e.target.closest("[data-chipmenu]");
+  if(m){e.stopPropagation();if(chipMenu.style.display!=="none"){closeChipMenu();return}var r=chips.getBoundingClientRect();chipMenu.style.left=Math.max(4,r.left)+"px";chipMenu.style.top=(r.bottom+6)+"px";chipMenu.style.display="";return}
+  var b=e.target.closest&&e.target.closest("[data-loc]");if(!b)return;var n=b.getAttribute("data-loc");
+  if(!n)sel=[];else{var i=sel.indexOf(n);if(i>=0)sel.splice(i,1);else sel.push(n)}rosterSaveLocations(sel);closeChipMenu();paint()}
+ chips.addEventListener("click",pickLoc);chipMenu.addEventListener("click",function(e){e.stopPropagation();pickLoc(e)});
+ document.addEventListener("click",closeChipMenu);hook("escape",function(){if(chipMenu.style.display!=="none"){closeChipMenu();return true}});
  function take(r){if(r&&r.checkin){S.checkin=D=r.checkin;last="";paint()}}
  function tap(e){var b=e.target.closest&&e.target.closest("[data-act]");if(!b)return;var r=b.closest(".rp-r"),id=r&&r.getAttribute("data-id");if(!id)return;
   if(b.getAttribute("data-act")==="menu"){openMenu(id);return}

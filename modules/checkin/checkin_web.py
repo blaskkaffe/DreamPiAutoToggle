@@ -33,7 +33,7 @@ DEFAULT_STATUSES = [
 GROUPS = ("department", "building")
 FRAMES = ("none", "thin", "thick")      # the frame round a department box
 BOXES = ("neutral", "board")            # its colour: neutral (grey) or the board colour (Appearance > Check-in board colour)
-SCROLLS = ("off", "auto", "on")      # the scrolling of name and status on a row: never, only when it does not fit, always
+SCROLLS = ("off", "auto", "status", "on")      # the scrolling on a row: never; only when name and status do not fit; only the status, and only when it does not fit (the name stays); always
 AUTO = ("blue", "green", "orange", "purple", "cyan", "yellow", "bright-pink", "red", "bright-blue", "bright-green", "bright-purple", "bright-cyan")
 OUT_COLOUR = "global"       # the grey of a person who is out
 DETAIL_MAX = 60
@@ -432,7 +432,7 @@ def _config_reply():
             "options": {"groups": [{"value": "department", "label": "Department"}, {"value": "building", "label": "Building"}],
                         "frames": [{"value": "none", "label": "None"}, {"value": "thin", "label": "Thin"}, {"value": "thick", "label": "Thick"}],
                         "boxes": [{"value": "neutral", "label": "Neutral (grey)"}, {"value": "board", "label": "The board colour"}],
-                        "scrolls": [{"value": "off", "label": "Off"}, {"value": "auto", "label": "Auto (when it does not fit)"}, {"value": "on", "label": "On (always)"}],
+                        "scrolls": [{"value": "off", "label": "Off"}, {"value": "auto", "label": "Auto (when it does not fit)"}, {"value": "status", "label": "Auto, only the status"}, {"value": "on", "label": "On (always)"}],
                         "roles": [{"value": r, "label": r} for r in roles], "buildings": [{"value": b, "label": b} for b in buildings]},
             "texts": {"show_title": "Shown" if c["show_title"] else "Hidden", "group_by": c["group_by"].capitalize(), "colour_by": c["colour_by"].capitalize()},
             "colours": kinds, "total": snap["total"]}
