@@ -14,12 +14,12 @@ from urllib.request import Request, urlopen
 from support import ROOT, web, core, sandbox, cleanup
 
 REAL_MODULES = os.path.join(ROOT, "modules")
-NAMES = ["background", "clock", "debuglog", "events", "imagebg", "led", "numbers", "openmenu", "players", "rebootupdate", "wifi"]      # the modules the picker can switch
+NAMES = ["background", "clock", "debuglog", "events", "imagebg", "led", "numbers", "openmenu", "players", "rebootupdate", "snow", "wifi"]      # the modules the picker can switch
 HIDDEN = ["switcher", "system"]                                                # always on, not in the picker
 ALL = sorted(NAMES + HIDDEN)
 # a path only that module answers (GET, or POST when None)
 ENDPOINT = {"background": ("GET", "/background/dc-background.js"), "clock": ("GET", "/clock"), "events": ("GET", "/events/view"), "imagebg": ("GET", "/imagebg"), "numbers": ("GET", "/numbers"), "openmenu": ("GET", "/openmenu/view"), "players": ("GET", "/players"), "debuglog": ("GET", "/dtmf"),
-            "led": ("GET", "/ledconfig"), "wifi": ("POST", "/wifitoggle"), "rebootupdate": ("GET", "/update")}
+            "led": ("GET", "/ledconfig"), "wifi": ("POST", "/wifitoggle"), "rebootupdate": ("GET", "/update"), "snow": ("GET", "/snow")}
 HIDDEN_ENDPOINT = {"switcher": ("GET", "/status"), "system": ("GET", "/about")}
 BASE_IDS = ('id="dash"', 'id="set-boxes"', 'id="settings"', 'id="bg"', 'id="warnings"')
 
@@ -53,7 +53,7 @@ class Base(unittest.TestCase):
         self.modules = os.path.join(self.tmp, "modules")
         shutil.copytree(REAL_MODULES, self.modules, ignore=shutil.ignore_patterns("__pycache__"))
         self.saved_dir, core.MODULES_DIR = core.MODULES_DIR, self.modules
-        for off_by_default in ("debuglog", "background", "imagebg"):
+        for off_by_default in ("debuglog", "background", "imagebg", "snow"):
             core.save_module_enabled(off_by_default, True)   # the tests want to see them
         if self.ENABLE_WIFI:
             core.save_module_enabled("wifi", True)
@@ -129,7 +129,7 @@ class RepoModules(unittest.TestCase):
 
     def test_defaults(self):
         on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["enabled"]) for n in ALL)
-        self.assertEqual(on, {"background": False, "clock": True, "debuglog": False, "events": True, "imagebg": False, "led": True, "numbers": True, "openmenu": True, "players": True, "rebootupdate": True, "switcher": True, "system": True, "wifi": False})
+        self.assertEqual(on, {"background": False, "clock": True, "debuglog": False, "events": True, "imagebg": False, "led": True, "numbers": True, "openmenu": True, "players": True, "rebootupdate": True, "snow": False, "switcher": True, "system": True, "wifi": False})
         hidden = [n for n in ALL if json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["visible"] is False]
         self.assertEqual(hidden, HIDDEN)                   # the network switcher and the system info can't be switched off
 
@@ -162,8 +162,8 @@ class WithEverything(Base):
         self.assertEqual(ids[-1], "system")                                                                # System is the very last box
         self.assertLess(ids.index("about"), ids.index("background-image"))                                  # settings-only modules come before the backgrounds
         appearance = [b for b in lay["settings"] if b["id"] == "appearance"][0]
-        self.assertEqual((appearance["mods"], appearance["title"]), (["base", "switcher", "clock", "players", "events", "openmenu", "debuglog", "imagebg", "background"], "Appearance"))      # the base's own settings (base/layout.json) first, then the colours (network, clock, players, events, openMenu link, debug log) and the background's switch
-        self.assertEqual([w["control"]["module"] for w in appearance["items"] if w["type"] == "row" and w["control"]["type"] == "toggle" and "module" in w["control"]], ["imagebg", "background"])
+        self.assertEqual((appearance["mods"], appearance["title"]), (["base", "switcher", "clock", "players", "events", "openmenu", "debuglog", "imagebg", "snow", "background"], "Appearance"))      # the base's own settings (base/layout.json) first, then the colours (network, clock, players, events, openMenu link, debug log) and the background's switch
+        self.assertEqual([w["control"]["module"] for w in appearance["items"] if w["type"] == "row" and w["control"]["type"] == "toggle" and "module" in w["control"]], ["imagebg", "snow", "background"])
         about = [b for b in lay["settings"] if b["id"] == "about"][0]
         self.assertEqual((about["mods"], about["title"]), (["system"], "About"))               # the versions are their own box, not part of System
         self.assertEqual([b["id"] for b in lay["dashboard"]], ["network", "clock", "players", "events", "openmenu", "debug log"])
@@ -201,14 +201,14 @@ class WithEverything(Base):
         self.assertEqual(groups, sorted(groups))
         self.assertEqual(sorted(set(groups)), [0, 1, 2])
         self.assertEqual((core.module_group("switcher"), core.module_group("system"), core.module_group("imagebg")), (0, 1, 2))
-        self.assertEqual([n for n in names if core.module_group(n) == 2], ["background", "imagebg"])        # inside a group the user's order stays
+        self.assertEqual([n for n in names if core.module_group(n) == 2], ["background", "imagebg", "snow"])        # inside a group the user's order stays
         self.assertLess(names.index("debuglog"), names.index("clock"))
 
     def test_moving_tiles_on_the_main_screen_reorders_those_modules_only(self):
         core.save_module_order(["switcher", "clock", "players", "events", "openmenu", "debuglog", "numbers", "led", "system", "wifi", "rebootupdate", "imagebg", "background"])
         new = core.save_dashboard_order(["debuglog", "players", "clock"])                                   # three tiles moved: they take each other's places
         self.assertEqual(new[:6], ["switcher", "debuglog", "players", "events", "openmenu", "clock"])
-        self.assertEqual(new[6:], ["numbers", "led", "system", "wifi", "rebootupdate", "imagebg", "background"])
+        self.assertEqual(new[6:], ["numbers", "led", "system", "wifi", "rebootupdate", "imagebg", "background", "snow"])
         self.assertEqual(core.save_dashboard_order(["nope", "events"])[:6], ["switcher", "debuglog", "players", "events", "openmenu", "clock"])      # unknown names are ignored
         self.assertIsNone(core.save_dashboard_order("clock"))
 
@@ -220,7 +220,7 @@ class WithEverything(Base):
 
     def test_modules_menu_lists_them_all(self):
         got = self.json("/modules")["modules"]
-        self.assertEqual([m["name"] for m in got], ["switcher", "clock", "players", "events", "openmenu", "debuglog", "numbers", "led", "system", "wifi", "rebootupdate", "imagebg", "background"])   # picker order, the always-on modules included
+        self.assertEqual([m["name"] for m in got], ["switcher", "clock", "players", "events", "openmenu", "debuglog", "numbers", "led", "system", "wifi", "rebootupdate", "imagebg", "snow", "background"])   # picker order, the always-on modules included
         self.assertEqual([m["name"] for m in got if m["visible"] is False], ["switcher", "system"])                     # which the page lists without a switch
         self.assertTrue(all(m["enabled"] for m in got))
         self.assertTrue(all(m["title"] and m["description"] for m in got))

@@ -321,3 +321,56 @@ def posix_offset(rule, now):
     if start < end:                                                     # northern hemisphere
         return dst if start <= now < end else std
     return std if end <= now < start else dst                          # southern: summer over the new year
+
+
+# ---- the sun: where it is over a time zone's place (the day / night of the page: theme by the time of day, a background that follows the day)
+import math
+
+
+def sun_elevation(lat, lon, now=None):
+    """The sun's height over the horizon in degrees (negative = below it) at latitude lat and longitude lon (degrees, east positive), at the Unix time `now`
+    (default: now). The usual low-precision formulas (about a tenth of a degree); no refraction."""
+    t = time.time() if now is None else now
+    d = t / 86400.0 + 2440587.5 - 2451545.0              # days since J2000
+    g = math.radians((357.529 + 0.98560028 * d) % 360)
+    q = (280.459 + 0.98564736 * d) % 360
+    lam = math.radians((q + 1.915 * math.sin(g) + 0.020 * math.sin(2 * g)) % 360)
+    eps = math.radians(23.439 - 0.00000036 * d)
+    ra = math.atan2(math.cos(eps) * math.sin(lam), math.cos(lam))
+    dec = math.asin(math.sin(eps) * math.sin(lam))
+    gmst = (18.697374558 + 24.06570982441908 * d) % 24
+    ha = math.radians(((gmst + lon / 15.0) % 24) * 15) - ra
+    la = math.radians(lat)
+    return math.degrees(math.asin(math.sin(la) * math.sin(dec) + math.cos(la) * math.cos(dec) * math.cos(ha)))
+
+
+def own_zone_name():
+    """The machine's own time zone name ("Europe/Stockholm") from /etc/timezone or the /etc/localtime link, or ""."""
+    try:
+        with open("/etc/timezone") as f:
+            name = f.read().strip()
+        if _NAME.match(name):
+            return name
+    except (IOError, OSError):
+        pass
+    try:
+        link = os.path.realpath("/etc/localtime")
+        for root in ZONEINFO_DIRS:
+            if link.startswith(root + "/"):
+                name = link[len(root) + 1:]
+                if name.startswith("posix/") or name.startswith("right/"):
+                    name = name.split("/", 1)[1]
+                return name if _NAME.match(name) else ""
+    except OSError:
+        pass
+    return ""
+
+
+def zone_place(zone):
+    """(latitude, longitude) of a time zone: its first city of CITIES, or - for a zone that has no city (UTC, the machine's own zone not in the list) -
+    the middle of the band of its present UTC offset at 50 degrees north."""
+    for c in CITIES:
+        if c[1] == zone:
+            return c[3], c[2]
+    return 50.0, offset(zone) / 3600.0 * 15.0
+

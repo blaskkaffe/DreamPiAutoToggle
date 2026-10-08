@@ -11,6 +11,8 @@ Check this before saying something works. Anything not listed under Verified has
 
 ## Not yet verified
 
+- The Snow background (from the `checkin2.0` branch; `core.daylight()`, `base_tz.sun_elevation()`): its settings, the module system with it and the sun's height are tested off-hardware; the storm was looked at in headless Chromium with a software WebGL (dark and light page, no console errors). Not tried on a real screen or on the Pi's own browser: the frame rate and the load of WebGL on a weak device.
+
 - Button sounds (from the `checkin2.0` branch): the sound files, the `/sounds/` route, the settings and the form are tested off-hardware; the playback in a real browser on the user's device has not been tried here.
 
 - The settings cache (`core.cached()`): measured on a PC only (an `/api` answer 13 ms -> 3 ms, a page load and a POST similar); the Pi's own speed after it has not been measured. The lag the user saw on the Pi after the base split was the repeated palette / module lookups; whether it is gone on the Pi is for the user to say.

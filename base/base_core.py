@@ -895,6 +895,19 @@ def time_zone():
     return zone if zone in tz.ZONE_CHOICES else ""
 
 
+def daylight(now=None):
+    """Where the sun is at the place of the common time zone (the machine's own zone when none is set): {"elev": degrees, "day": bool, "zone": name}.
+    "day" is the sun above the horizon (a little below it, for the sky's glow). A background module can draw the day and the night from "elev"."""
+    import base_tz as tz
+    zone = time_zone() or tz.own_zone_name()
+    try:
+        lat, lon = tz.zone_place(zone) if zone else (50.0, -time.timezone / 3600.0 * 15.0)
+    except Exception:
+        lat, lon = 50.0, 0.0
+    elev = tz.sun_elevation(lat, lon, now)
+    return {"elev": round(elev, 2), "day": elev > -0.8, "zone": zone}
+
+
 def save_time_zone(value):
     """Save the common time zone ("" = the Pi's own; anything not in the list is the Pi's own too). Returns what is now set."""
     import base_tz as tz

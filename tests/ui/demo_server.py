@@ -1,7 +1,7 @@
 """Demo server for looking at the page and for tests/ui/audit.js: the real web
 service on a sandbox (all paths in a temp dir). Switches via environment:
 LEDS=n (default 3), WIFI=1, WIFIDEMO=1 (dummy Wi-Fi networks + the setup loop),
-BG=1 (the Dreamcast background module on), IMGBG=1 (the Background image module on), CLOCK=1 (the clock module on; off by default so the box counts are stable), EVENTS=1 (the DC99 events module on, with its sample events; EVENTSOON=1 adds a reminded event 5 minutes ahead), OPENMENU=1 (the openMenu link module on, with a made-up SD card of 72 games and a Dreamcast that polls every 3 s; OPENMENU=quiet: the Dreamcast never polls), FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log), FAKEPLAYERS=1 (made-up
+BG=1 (the Dreamcast background module on), SNOW=1 (the Snow background module on), IMGBG=1 (the Background image module on), CLOCK=1 (the clock module on; off by default so the box counts are stable), EVENTS=1 (the DC99 events module on, with its sample events; EVENTSOON=1 adds a reminded event 5 minutes ahead), OPENMENU=1 (the openMenu link module on, with a made-up SD card of 72 games and a Dreamcast that polls every 3 s; OPENMENU=quiet: the Dreamcast never polls), FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log), FAKEPLAYERS=1 (made-up
 players; PLAYERSFAST=1 makes the downloads slow and the list stale after 3 s), OFF=led,wifi,... (modules switched off in the module picker; OFF=all = every module the picker can switch, only the always-on ones stay), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
 import sys, os, threading, time, json
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
@@ -80,6 +80,7 @@ if os.environ.get("FAKEUPDATE"):
             "Updating 3baa024..21d1ad8\nFast-forward\n page/players.js | 84 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
             " 4 files changed, 64 insertions(+), 37 deletions(-)\n\x1b[31mERROR\x1b[0m: could not write /etc/systemd/system/dreampi-netswitch.service (Read-only file system)\n"
             "A_very_long_unbroken_path_/opt/dreampi-netswitch/page/players_and_more_and_more_and_more_and_more.js\nfailed\n")
+if os.environ.get("SNOW"): core.save_module_enabled("snow", True); web.refresh_page(force=True)      # the Snow background (SNOW=1)
 if os.environ.get("OFF"):         # modules switched off, as from the module picker (the always-on ones can't be)
     for name in (core.module_names() if os.environ["OFF"] == "all" else os.environ["OFF"].split(",")):
         core.save_module_enabled(name, False)
