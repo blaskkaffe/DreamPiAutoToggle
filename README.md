@@ -12,9 +12,10 @@ What you get:
 - **Screens in step in real time.** The host (one Linux machine) keeps everything; every other screen is only a browser that opens the host's address, in kiosk mode if you like (`kiosk/kiosk-browser.sh`). A change on one screen is on the others within about a second.
 - **A screen per building:** with several buildings a row of chips picks what a screen shows (kept in that browser; `?location=Område A` in the address sets it).
 - **Contacts:** import a CSV (a file or pasted text), export it again, switch people off, tap a person to edit their name, department, role, phone and building (or delete them). The status menu is editable too (names, colours, time / date / note, dots, counts as out, sticky). The board can show each person's role and building (pick which ones), and has an optional on-screen number pad / keyboard for times, dates and notes.
+- **Screens with nothing installed:** a kiosk computer can boot over the network into a small Linux image that shows the board in Firefox, behind a whitelist of serial numbers / MAC addresses, with a menu, per-computer settings, an optional install to the local disk, and a loading screen with the chicken logo. Each screen keeps its **own layout and settings** on the host, so they are back after a reload or a reboot.
 - A **clock** (12 or 24-hour, `.beat`, world times and a time zone map), **update and reboot buttons** on the page and an optional **PIN** for them.
 
-**Tested so far:** on a development machine only, not on a real host or kiosk screen: unit tests (`sh tests/run.sh`) and the page driven in Chromium against a demo server (`sh tests/ui/run.sh`). See [docs/hardware-status.md](docs/hardware-status.md) for what has and has not been seen on real hardware.
+**Tested so far:** on a development machine only, not on a real host or kiosk screen, and **the network boot has never been run on real hardware**: unit tests (`sh tests/run.sh`) and the page driven in Chromium against a demo server (`sh tests/ui/run.sh`). See [docs/hardware-status.md](docs/hardware-status.md) for what has and has not been seen on real hardware.
 
 ## Install
 
@@ -27,7 +28,7 @@ sudo ./install.sh
 ```
 Then open **http://&lt;the host's name&gt;.local** or its IP address in a browser on the same network, open **Settings** (the cogwheel) > **Contacts** and import your people.
 
-Other screens only need a browser (or no setup at all: [boot them from the network](docs/pxe.md), `pxe/`: a boot menu of images, only whitelisted serial numbers / MAC addresses may boot (new ones are listed for you to allow or block), a screen set by serial number goes straight to the board, I installs it on the local disk, and each screen keeps its own layout on the host): open the same address, or run `kiosk/kiosk-browser.sh <host>` (Chromium full screen; `kiosk/checkin-kiosk-autostart.desktop` starts it at every login, so a power cut is no problem). `./kiosk-browser.sh 192.168.1.20 "Område A"` pins that screen to one building.
+Other screens only need a browser (or no setup at all: see [Screens that boot from the network](#screens-that-boot-from-the-network)): open the same address, or run `kiosk/kiosk-browser.sh <host>` (Chromium full screen; `kiosk/checkin-kiosk-autostart.desktop` starts it at every login, so a power cut is no problem). `./kiosk-browser.sh 192.168.1.20 "Område A"` pins that screen to one building.
 
 ### The CSV
 
@@ -68,6 +69,7 @@ The web page runs on the host as root, because it has to reboot the machine and 
 - **Update from a USB stick.** Put a folder called `update` on a USB stick (the add-on's files: a copy of the repository with `install.sh`, `base/` and `modules/`; `git clone` it or copy it) and plug the stick into the host. **Settings > System** then shows **Update from a USB stick**; **Install from USB** (it asks for the PIN when one is set, and for confirmation) copies the folder to `/opt/checkin-board/usb_src`, so the stick can be pulled out, and runs its `install.sh` as root. The settings and the people are kept. The version then reads "USB update" with the date of the files; **Update now** from GitHub still works. Only plug in sticks you trust: what is in the folder runs as root. Tested with a folder on a disk, not with a real stick.
 - **Update now is limited to GitHub.** It only pulls from the git address the checkout had when the add-on was installed (it must be a GitHub address, and a changed one is refused), fetches from exactly that address, and only fast-forwards, so it can't pull in changes that don't continue your copy.
 - **The web service is fenced in** (systemd: no new privileges, read-only `/usr`, `/boot` and `/etc`, no kernel-module or cgroup changes) and the add-on's files in `/opt/checkin-board` are root-owned.
+- **The network boot server** (if you use it) lets only whitelisted computers boot and fetch the image; a copied serial number / MAC address gets past that, and any computer on the network is offered the small iPXE program (details in [docs/pxe.md](docs/pxe.md)).
 - **Not covered:** anybody who can open the page can also tap people in and out and change the board: there is no per-person login (the PIN only guards the actions above); someone who is already logged in on the host (or can run code on it) can do more than this add-on ever could, and the status files in `/tmp` are guessable names (the update's status file is not written through a planted link).
 
 ### Modules
@@ -83,16 +85,31 @@ Everything the page shows is a module, one folder in `modules/`. **Settings > Sy
 | Background image | A picture of your own as the page's background: choose it in Settings > Background image (big pictures are shrunk in the browser first), fit and darken it | **off** |
 | Reboot and Update | Update the add-on from GitHub, reboot the host | on |
 
-Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), [docs/checkin.md](docs/checkin.md) (the board and the contacts), [docs/web.md](docs/web.md). `CLAUDE.md` is the short guide for working on the code.
+Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), [docs/checkin.md](docs/checkin.md) (the board and the contacts), [docs/web.md](docs/web.md), [docs/pxe.md](docs/pxe.md) (network boot), [docs/hardware-status.md](docs/hardware-status.md). `CLAUDE.md` is the short guide for working on the code.
+
+### Screens that boot from the network
+
+Opt-in, and separate from `install.sh`. Full description: [docs/pxe.md](docs/pxe.md). **Not tested on real hardware yet.**
+
+```
+sudo ./pxe/build-image.sh        # once, on a Debian / Ubuntu computer with internet: builds the image (a few minutes, 500-700 MB)
+sudo ./pxe/install-pxe.sh        # on the host: proxy DHCP + TFTP + the boot server (your router keeps handing out addresses)
+```
+Then set a screen's BIOS / UEFI to boot from the network (PXE); nothing is installed on it (it needs about 2 GB of memory).
+
+- **Whitelist.** Only approved computers boot. A new one shows its serial number and MAC address on its screen and is listed as pending: `checkin-pxe pending`, then `checkin-pxe allow <serial or MAC>` (or `block`). `checkin-pxe mode open` turns the check off.
+- **Menu or straight in.** An approved computer that is not set to anything gets a menu: the available images, install an image on the local disk (when the image allows it), a Linux shell, the iPXE shell, boot the local disk. `checkin-pxe assign <serial> kiosk --location "Område A"` sets one computer's boot settings (image, buildings, board address, kernel arguments): it skips the menu and boots at once, and pressing **I** while it boots starts the install wizard for the local disk.
+- **Layout stays.** The screen opens `<host>/?screen=<its serial number>`; the host keeps that screen's columns, theme, tile places and building choice apart from the other screens.
+- **Limits.** The whitelist checks what the computer says its serial number and MAC address are, so it keeps strangers away but is not strong authentication; use it on a network you trust. See [Safety](#safety) and [docs/pxe.md](docs/pxe.md).
 
 ### Uninstall
 
-`sudo /opt/checkin-board/uninstall.sh` removes the services and everything under `/opt/checkin-board`, **people and who is in included**. Export the contacts first (Settings > Contacts > Download).
+`sudo /opt/checkin-board/uninstall.sh` removes the services and everything under `/opt/checkin-board`, **people and who is in included**. Export the contacts first (Settings > Contacts > Download). The network boot server is removed separately: `sudo ./pxe/install-pxe.sh --remove`.
 
 ## Requirements
 
 - A computer for the host: any Linux machine with `systemd` (a small, cheap one is plenty; Debian and Ubuntu are the families it is written for), Python 3 and `git`. No Python packages and no internet are needed at run time (the update check and **Update now** need GitHub).
-- A browser on every screen; the kiosk script assumes Chromium (`chromium-browser` or `chromium`).
+- A browser on every screen; the kiosk script assumes Chromium (`chromium-browser` or `chromium`); the network-booted image brings its own Firefox. The network boot server needs `apt` (it installs `dnsmasq-base` and `ipxe`) and an image built with `pxe/build-image.sh` (needs `debootstrap`, internet and a few GB of disk).
 
 ## Web page
 
