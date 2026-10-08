@@ -8,7 +8,9 @@
 #
 # Needs: the image from build-image.sh. Installs dnsmasq-base and ipxe. Runs its own dnsmasq as proxy DHCP, so the router's
 # DHCP server keeps handing out addresses (no second DHCP server, nothing else on the network to change), plus TFTP for
-# iPXE and a small HTTP server on --http-port for the kernel and the image. Open UDP 67, 69, 4011 and TCP 8069 if a firewall is on.
+# iPXE and the boot server (pxe_server.py) on --http-port: the kernel and the images as files, and the script each computer gets when it
+# reports its serial number and MAC address (a menu of the images, or straight into the one it is set to with checkin-pxe).
+# Open UDP 67, 69, 4011 and TCP 8069 if a firewall is on.
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -32,6 +34,7 @@ for arg in "$@"; do
                 systemctl disable --now "$s.service" 2>/dev/null || true
                 rm -f "/etc/systemd/system/$s.service"
             done
+            rm -f /usr/local/bin/checkin-pxe
             systemctl daemon-reload
             rm -rf "$DEST"
             echo "The network boot server is removed (the packages dnsmasq-base and ipxe are left)."
@@ -60,13 +63,18 @@ for f in undionly.kpxe ipxe.efi; do
     [ -f "/usr/lib/ipxe/$f" ] || { echo "/usr/lib/ipxe/$f is missing (package ipxe)" >&2; exit 1; }
 done
 
-mkdir -p "$DEST/tftp" "$DEST/www/screens"
+mkdir -p "$DEST/tftp" "$DEST/www/images/kiosk" "$DEST/data"
 cp /usr/lib/ipxe/undionly.kpxe /usr/lib/ipxe/ipxe.efi "$DEST/tftp/"
-cp "$IMAGE/vmlinuz" "$IMAGE/initrd.img" "$IMAGE/filesystem.squashfs" "$DEST/www/"
-cp "$HERE"/screens/*.ipxe "$DEST/www/screens/" 2>/dev/null || true
+# the check-in screen image: the menu shows it first. More images: a folder in www/images/ with an image.json (docs/pxe.md)
+cp "$IMAGE/vmlinuz" "$IMAGE/initrd.img" "$IMAGE/filesystem.squashfs" "$DEST/www/images/kiosk/"
+cp "$HERE/kiosk-image.json" "$DEST/www/images/kiosk/image.json"
+cp "$HERE/pxe_boot.py" "$HERE/pxe_server.py" "$HERE/pxectl.py" "$DEST/"
+chmod +x "$DEST/pxe_server.py" "$DEST/pxectl.py"
+ln -sf "$DEST/pxectl.py" /usr/local/bin/checkin-pxe
 python3 "$HERE/pxe_config.py" --ip "$IP" --interface "$IFACE" --network "$NETWORK" \
     --board-url "$BOARD_URL" --http-port "$HTTP_PORT" --dest "$DEST"
 chmod -R a+rX "$DEST"
+chown -R nobody "$DEST/data"
 
 cat > /etc/systemd/system/checkin-board-pxe.service <<UNIT
 [Unit]
@@ -87,17 +95,18 @@ WantedBy=multi-user.target
 UNIT
 cat > /etc/systemd/system/checkin-board-pxe-http.service <<UNIT
 [Unit]
-Description=Check-in screens - kernel and image over HTTP
+Description=Check-in screens - boot server (images and boot scripts over HTTP)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 User=nobody
-ExecStart=/usr/bin/python3 -m http.server $HTTP_PORT --bind $IP --directory $DEST/www
+ExecStart=/usr/bin/python3 $DEST/pxe_server.py --ip $IP --port $HTTP_PORT --dir $DEST --board-url $BOARD_URL
 Restart=always
 RestartSec=3
 NoNewPrivileges=yes
 ProtectSystem=strict
+ReadWritePaths=$DEST/data
 ProtectHome=yes
 PrivateTmp=yes
 
@@ -112,4 +121,5 @@ done
 
 echo "The network boot server is running on $IFACE ($IP). Screens show $BOARD_URL"
 echo "Set a screen to boot from the network (PXE) in its BIOS/UEFI setup; nothing is installed on it."
-echo "Per-building screens: see pxe/screens/README.txt. Do not run a second DHCP server for this."
+echo "It shows a menu the first time. Then: checkin-pxe list, and checkin-pxe assign <id> kiosk to send a screen straight to the board."
+echo "Do not run a second DHCP server for this."

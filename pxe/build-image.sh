@@ -5,7 +5,8 @@
 #   sudo ./pxe/build-image.sh [output folder]        (default: pxe/out)
 #
 # Run it on any Debian or Ubuntu computer with internet access (it needs debootstrap and squashfs-tools, installed if missing).
-# It takes a few minutes and produces vmlinuz, initrd.img and filesystem.squashfs (about 400-600 MB).
+# It takes a few minutes and produces vmlinuz, initrd.img and filesystem.squashfs (about 500-700 MB; /boot stays inside the squashfs because the
+# local install copies the system, kernel included, to the disk).
 # Then sudo ./pxe/install-pxe.sh serves them. Environment: SUITE (default bookworm), MIRROR, EXTRA_PACKAGES (e.g. more firmware).
 set -eu
 
@@ -24,6 +25,8 @@ PACKAGES="linux-image-amd64,live-boot,initramfs-tools,systemd-sysv,systemd-resol
 PACKAGES="$PACKAGES,xserver-xorg-core,xserver-xorg-legacy,xserver-xorg-input-libinput,xserver-xorg-video-fbdev,xserver-xorg-video-vesa"
 PACKAGES="$PACKAGES,xinit,x11-xserver-utils,openbox,firefox-esr,fonts-dejavu-core,fonts-liberation"
 PACKAGES="$PACKAGES,firmware-realtek,firmware-misc-nonfree,firmware-amd-graphics"
+# the local-install wizard (checkin-install) and a usable shell
+PACKAGES="$PACKAGES,whiptail,parted,dosfstools,e2fsprogs,rsync,grub2-common,grub-pc-bin,grub-efi-amd64-bin,nano,pciutils,iputils-ping,less,bash"
 [ -z "$EXTRA_PACKAGES" ] || PACKAGES="$PACKAGES,$EXTRA_PACKAGES"
 
 WORK=$(mktemp -d /var/tmp/checkin-pxe-build.XXXXXX)
@@ -49,12 +52,13 @@ chroot "$ROOT" /bin/sh -e <<'CHROOT'
 useradd --create-home --shell /usr/sbin/nologin --groups video,audio,input,render kiosk || true
 passwd -l root
 ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
-systemctl enable systemd-networkd.service systemd-resolved.service kiosk.service
+systemctl enable systemd-networkd.service systemd-resolved.service kiosk.service checkin-install.service checkin-shell.service   # which one runs: the kernel command line (see their Condition lines)
 systemctl mask getty@tty1.service
 systemctl set-default graphical.target
 # the root file system lives in memory: nothing is written back, a reboot is a fresh start
 update-initramfs -u -k all
 apt-get clean
+rm -f /etc/machine-id
 rm -rf /var/lib/apt/lists/* /usr/share/doc/* /usr/share/man/* /var/cache/debconf/*-old
 CHROOT
 
@@ -63,7 +67,7 @@ mkdir -p "$OUT"
 cp -L "$ROOT"/boot/vmlinuz-* "$OUT/vmlinuz"
 cp -L "$ROOT"/boot/initrd.img-* "$OUT/initrd.img"
 rm -f "$OUT/filesystem.squashfs"
-mksquashfs "$ROOT" "$OUT/filesystem.squashfs" -comp xz -e boot -noappend
+mksquashfs "$ROOT" "$OUT/filesystem.squashfs" -comp xz -noappend
 chmod 644 "$OUT"/vmlinuz "$OUT"/initrd.img "$OUT"/filesystem.squashfs
 ls -lh "$OUT"
 echo "Done. Next: sudo $HERE/install-pxe.sh"

@@ -248,7 +248,13 @@ function askConfirm(text,okLabel,cb){closePin();var m=h("div",{"class":"rp-modal
  m.addEventListener("click",function(e){if(e.target===m)done(false)});no.onclick=function(){done(false)};yes.onclick=function(){done(true)};
  document.body.appendChild(m);pinDlg=m;no.focus()}
 function withPin(go){if(!pinNeeded||pinValue)return go();askPin("Enter the PIN",function(p){pinValue=p;go()})}
+// A screen names itself with ?screen=<id> in its address (a kiosk computer: its serial number); the id is kept for this tab and sent with every
+// request, so the host keeps that screen's layout and settings apart and they stay across a reload and a reboot of the computer.
+var SCREEN_ID="";
+try{var sm=(window.location.search||"").match(/[?&]screen=([A-Za-z0-9][A-Za-z0-9_-]{0,63})(&|$)/);
+ if(sm){SCREEN_ID=sm[1];sessionStorage.setItem("screen",SCREEN_ID)}else SCREEN_ID=sessionStorage.getItem("screen")||""}catch(e){}
 function xhrJson(method,url,cb,body){var x=new XMLHttpRequest(),counted=method!=="POST";if(counted)inflight++;x.open(method,url,true);
+ if(SCREEN_ID)x.setRequestHeader("X-Screen",SCREEN_ID);
  if(method=="POST"){x.setRequestHeader("X-Requested-With","page");if(pinValue)x.setRequestHeader("X-Pin",pinValue);
   if(body!==undefined)x.setRequestHeader("Content-Type","application/json")}
  x.onload=function(){if(counted)inflight--;var r=null;try{r=JSON.parse(x.responseText)}catch(e){}
@@ -278,7 +284,7 @@ function applyPalette(d){PV=d.palette_v;S.palette=d.palette;
  st.textContent=d.palette_css;
  var inl=document.documentElement.style,i,drop=[];for(i=0;i<inl.length;i++)if(inl[i].indexOf("--c-")===0)drop.push(inl[i]);drop.forEach(function(k){inl.removeProperty(k)});      // a colour changed on this page (the Global main picker) is the server's now
  if(window.engineUpdate)engineUpdate()}
-function refresh(){var x=new XMLHttpRequest();x.open("GET","/api?pv="+PV,true);
+function refresh(){var x=new XMLHttpRequest();x.open("GET","/api?pv="+PV,true);if(SCREEN_ID)x.setRequestHeader("X-Screen",SCREEN_ID);
  x.onload=function(){if(x.status==200){var r=JSON.parse(x.responseText);render(r);if(r.palette)applyPalette(r)}bootDone("api")};x.onerror=function(){bootDone("api")};x.send()}
 // The first draw waits for /api and for the data sources that have no kept answer from an earlier visit (at most BOOT_LIMIT ms), then every
 // box is shown at once: nothing pops in one box after the other

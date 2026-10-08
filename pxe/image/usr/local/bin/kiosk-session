@@ -5,17 +5,22 @@
 # KIOSK_DRY_RUN=1 only prints the address (the tests use it); CMDLINE_FILE replaces /proc/cmdline for the same reason.
 
 CMDLINE_FILE="${CMDLINE_FILE:-/proc/cmdline}"
+CONFIG_FILE="${CONFIG_FILE:-/etc/checkin-kiosk.conf}"      # written by checkin-install on a computer that has the system on its own disk
 
 param() {
   tr ' ' '\n' < "$CMDLINE_FILE" | sed -n "s/^$1=//p" | head -n 1
 }
 
-URL=$(param checkin_url)
+# the kernel command line wins (a network boot), else the config file (a local install): CHECKIN_URL, CHECKIN_SCREEN, CHECKIN_LOCATION
+[ ! -r "$CONFIG_FILE" ] || . "$CONFIG_FILE"
+URL=$(param checkin_url);            [ -n "$URL" ] || URL="$CHECKIN_URL"
+SCREEN=$(param checkin_screen);      [ -n "$SCREEN" ] || SCREEN="$CHECKIN_SCREEN"
+LOCATION=$(param checkin_location);  [ -n "$LOCATION" ] || LOCATION="$CHECKIN_LOCATION"   # buildings as on the board's buttons, spaces as +, several separated by comma
 [ -n "$URL" ] || URL="http://checkin.local/"
 URL="${URL%/}/"
-LOCATION=$(param checkin_location)          # buildings as on the board's buttons, spaces as +, several separated by comma
-SHOW="$URL"
-[ -z "$LOCATION" ] || SHOW="${URL}?location=${LOCATION}"
+# ?screen=<id> makes the board keep this computer's layout and settings apart from the other screens' (it survives a reboot: the host keeps it)
+SHOW="${URL}?screen=${SCREEN:-$(hostname)}"
+[ -z "$LOCATION" ] || SHOW="${SHOW}&location=${LOCATION}"
 
 if [ -n "$KIOSK_DRY_RUN" ]; then
   echo "$SHOW"

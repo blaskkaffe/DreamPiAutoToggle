@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -197,11 +198,52 @@ def save_dashboard_order(names):
 TILE_LAYOUT = os.path.join(BASE_DIR, "tile_layout.json")
 _TILE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
 
+# ---- one set of layout settings per screen: a screen that names itself (the page sends its id in the X-Screen header; a kiosk
+# computer uses its serial number) keeps its own screen settings and tile places in screens/<id>/ - they survive a reload and a reboot of that
+# screen, and what one screen changes does not move another. A screen with no file of its own starts from the shared ones.
+SCREENS_DIR = os.path.join(BASE_DIR, "screens")
+MAX_SCREENS = 200
+_SCREEN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+_here = threading.local()
+
+
+def set_screen(ident):
+    """The screen the current request comes from (the thread's context): an id, or "" for a plain browser. Returns the id used."""
+    _here.screen = ident if isinstance(ident, _STR) and _SCREEN_ID.match(ident) else ""
+    return _here.screen
+
+
+def screen_id():
+    return getattr(_here, "screen", "")
+
+
+def _screen_path(name, shared):
+    """Where to read: the screen's own file when it has one, else the shared file."""
+    sid = screen_id()
+    own = os.path.join(SCREENS_DIR, sid, name) if sid else None
+    return own if own and os.path.exists(own) else shared
+
+
+def _screen_write_path(name, shared):
+    """Where to write: the screen's own file (its folder is made; None when there are already MAX_SCREENS screens), else the shared file."""
+    sid = screen_id()
+    if not sid:
+        return shared
+    folder = os.path.join(SCREENS_DIR, sid)
+    if not os.path.isdir(folder):
+        try:
+            if len(os.listdir(SCREENS_DIR)) >= MAX_SCREENS:
+                return None
+        except OSError:
+            pass
+        os.makedirs(folder, exist_ok=True)
+    return os.path.join(folder, name)
+
 
 def tile_layout():
     """{"<columns>": [[ids] per column]}: the saved places of the tiles, only what is valid (a bad or missing file gives {})."""
     try:
-        with open(TILE_LAYOUT) as f:
+        with open(_screen_path("tile_layout.json", TILE_LAYOUT)) as f:
             data = json.load(f)
     except (IOError, OSError, ValueError):
         return {}
@@ -229,10 +271,13 @@ def save_tile_layout(count, columns):
         return None
     data = tile_layout()
     data[str(count)] = columns
-    tmp = TILE_LAYOUT + ".tmp"
+    target = _screen_write_path("tile_layout.json", TILE_LAYOUT)
+    if target is None:
+        return None
+    tmp = target + ".tmp"
     with open(tmp, "w") as f:
         json.dump(data, f, sort_keys=True)
-    os.rename(tmp, TILE_LAYOUT)
+    os.rename(tmp, target)
     return tile_layout()
 
 
@@ -714,6 +759,13 @@ SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": Fal
 MAX_COLUMNS = 6
 
 
+def _clean_locations(v):
+    """The buildings a screen shows: a list of at most 50 short texts (the roster's filter; only kept for a screen that has an id)."""
+    if not isinstance(v, list):
+        return []
+    return [x.strip() for x in v if isinstance(x, _STR) and x.strip() and len(x) <= 80][:50]
+
+
 def screen_settings():
     """{"dash_cols": 1-6, "set_cols": 1-6, "stretch": bool, "scale": bool}: the saved layout settings over the defaults (a bad or missing
     file gives the defaults). dash_cols / set_cols are the most columns the dashboard / Settings may use; they only get as many as the screen
@@ -721,11 +773,13 @@ def screen_settings():
     with their width instead of getting more room; fit scales the main screen up until its bottom meets the bottom of the screen; drag lets the tiles of the main screen be moved (which reorders the modules); noscroll stops the main screen from scrolling; autohide hides the top bar until the pointer or a tap is at the top edge; theme is "dark", "light" or "auto" (the device's own setting)."""
     out = dict(SCREEN_DEFAULTS)
     try:
-        with open(SCREEN) as f:
+        with open(_screen_path("screen.json", SCREEN)) as f:
             data = json.load(f)
     except (IOError, OSError, ValueError):
         data = {}
     if isinstance(data, dict):
+        if screen_id():
+            out["locations"] = _clean_locations(data.get("locations"))      # only a screen that names itself has building choice kept here
         for k in ("dash_cols", "set_cols"):
             v = data.get(k)
             if isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= MAX_COLUMNS:
@@ -753,10 +807,15 @@ def save_screen_settings(changes):
             cur[k] = v
         elif k == "theme" and v in THEMES:
             cur[k] = v
-    tmp = SCREEN + ".tmp"
+        elif k == "locations" and screen_id():
+            cur[k] = _clean_locations(v)
+    target = _screen_write_path("screen.json", SCREEN)
+    if target is None:
+        return cur
+    tmp = target + ".tmp"
     with open(tmp, "w") as f:
         json.dump(cur, f, sort_keys=True)
-    os.rename(tmp, SCREEN)
+    os.rename(tmp, target)
     return cur
 
 

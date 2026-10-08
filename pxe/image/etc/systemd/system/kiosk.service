@@ -1,6 +1,8 @@
 [Unit]
 Description=Check-in board kiosk (X and Firefox)
 After=systemd-user-sessions.service systemd-networkd.service
+ConditionKernelCommandLine=!checkin_install
+ConditionKernelCommandLine=!checkin_shell
 Conflicts=getty@tty1.service
 After=getty@tty1.service
 

@@ -1,0 +1,23 @@
+[Unit]
+Description=Check-in screen - a shell on the console
+ConditionKernelCommandLine=checkin_shell
+After=systemd-user-sessions.service systemd-networkd.service
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+
+[Service]
+Type=idle
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+StandardInput=tty-force
+StandardOutput=tty
+StandardError=tty
+Environment=TERM=linux HOME=/root
+ExecStartPre=/bin/sh -c 'echo; echo "Check-in screen: shell (root). Type exit to start it again, reboot to restart, checkin-install to install on the disk."'
+ExecStart=/bin/bash -l
+Restart=always
+RestartSec=0
+
+[Install]
+WantedBy=graphical.target

@@ -133,6 +133,15 @@ def build_page():
     def part(name):
         with io.open(os.path.join(PAGE_DIR, name), encoding="utf-8", newline="") as f:
             return f.read()
+    mine = core.screen_id()
+    core.set_screen("")                    # the page is the same for every screen: it starts from the shared settings
+    try:
+        return _build_page(part)
+    finally:
+        core.set_screen(mine)
+
+
+def _build_page(part):
     extra = modules.page_parts()
     js = _layout_script() + "\n" + part("page.js") + "\n" + part("widgets.js") + "\n" + extra["js"] + "\n" + part("boot.js")
     html = part("index.html").replace("@@TITLE@@", core.PROJECT.get("title", "Dashboard")).replace("@@ICON@@", core.PROJECT.get("icon", "")).replace("@@TOUCH@@", core.PROJECT.get("touch_icon", core.PROJECT.get("icon", ""))).replace("@@THEME@@", core.screen_settings()["theme"]).replace("@@CSS@@", core.colours_css() + part("page.css") + "\n" + extra["css"]).replace("@@JS@@", js)
@@ -259,6 +268,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send(message + "\n", "text/plain; charset=utf-8", status=status)
 
     def do_GET(self):
+        core.set_screen(self.headers.get("X-Screen"))       # the screen this request comes from (the page sends its id), "" for a plain browser
         if self.headers.get("Content-Length") not in (None, "0"):
             self.close_connection = True      # a GET with a body: don't try to parse the body as the next request
         if not security.host_allowed(self.headers.get("Host")):
@@ -267,6 +277,7 @@ class Handler(BaseHTTPRequestHandler):
         self._safely(self._get)
 
     def do_POST(self):
+        core.set_screen(self.headers.get("X-Screen"))
         self._body_read = 0
         try:
             if not security.host_allowed(self.headers.get("Host")):
@@ -369,7 +380,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_highlight()
         if path == "/timezone":
             return self._post_timezone()
-        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/fit", "/screen/drag", "/screen/noscroll", "/screen/autohide"):
+        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/fit", "/screen/drag", "/screen/noscroll", "/screen/autohide", "/screen/locations"):
             return self._post_screen(path)
         if path == "/palette":
             return self._post_palette()

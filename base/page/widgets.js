@@ -700,10 +700,14 @@ W.info=function(s){var el=h("table",{"class":"about"});
 // a coloured one is in (the colour of the person's department or building), a status colours it with its own colour and puts its name on it.
 // Only the palette's ids are used for colour. With several buildings a row of chips picks which ones this screen shows (kept in this browser;
 // ?location=A,B in the address sets it). "mode": "colours": the settings list of departments / buildings with a colour pick each (GET s.get, POST s.post).
+// A screen that has an id (?screen=<id>, a kiosk computer's serial number) keeps the choice on the host too (S.screen.locations), so it survives a
+// reboot of a computer that forgets its browser: an address with ?location= is the starting choice, else the browser's own, else the host's.
+var ROSTER_FROM={url:false,local:false};
 function rosterLocations(){var sel=[],q=(window.location.search||"").match(/[?&]location=([^&]*)/),k="checkin:locations";
- try{if(q){sel=decodeURIComponent(q[1].replace(/\+/g," ")).split(",").map(function(x){return x.trim()}).filter(Boolean);localStorage.setItem(k,sel.join("|"))}
-  else sel=(localStorage.getItem(k)||"").split("|").filter(Boolean)}catch(e){}return sel}
-function rosterSaveLocations(sel){try{localStorage.setItem("checkin:locations",sel.join("|"))}catch(e){}}
+ try{if(q){ROSTER_FROM.url=true;sel=decodeURIComponent(q[1].replace(/\+/g," ")).split(",").map(function(x){return x.trim()}).filter(Boolean);localStorage.setItem(k,sel.join("|"))}
+  else{var v=localStorage.getItem(k);ROSTER_FROM.local=v!==null;sel=(v||"").split("|").filter(Boolean)}}catch(e){}return sel}
+function rosterSaveLocations(sel){try{localStorage.setItem("checkin:locations",sel.join("|"))}catch(e){}
+ if(SCREEN_ID)xhrJson("POST","/screen/locations",function(){},{value:sel})}
 var ROSTER_TONES=["blue","green","orange","purple","cyan","yellow","bright-pink","red"];
 function rosterAvatar(p,cls){var h0=0,i,n=String(p.name||"");for(i=0;i<n.length;i++)h0=(h0*31+n.charCodeAt(i))>>>0;
  var parts=n.trim().split(/\s+/).filter(Boolean),ini=parts.length>1?(parts[0][0]+parts[parts.length-1][0]):(parts[0]||"?").slice(0,2);
@@ -760,7 +764,9 @@ W.roster=function(s,ctx){
  if(s.mode==="colours")return rosterColours(s,ctx);
  var el=h("div",{"class":"roster"}),chips=h("div",{"class":"rp-chips"}),msg=h("div"),
   modal=h("div",{"class":"rp-modal",style:"display:none"}),
-  sel=rosterLocations(),last="",D=null,cur=null,modal2;
+  sel=rosterLocations(),last="",D=null,cur=null,modal2,adopted=false;
+ function adopt(){if(adopted||!SCREEN_ID||!S.screen)return;adopted=true;var srv=S.screen.locations||[];
+  if(ROSTER_FROM.url){if(srv.join("|")!==sel.join("|"))rosterSaveLocations(sel)}else if(!ROSTER_FROM.local&&srv.length)sel=srv.slice()}
  modal2=h("div",{"class":"rp-modal rp-modal2",style:"display:none"});
  var hd=document.querySelector("body > header");if(hd){chips.classList.add("in-header");hd.appendChild(chips)}else el.appendChild(chips);      // the building buttons sit in the top row, at the left of the title
  el.appendChild(msg);document.body.appendChild(modal);document.body.appendChild(modal2);
@@ -899,7 +905,7 @@ W.roster=function(s,ctx){
 bind(s.source,function(d){if(!d)return;document.body.classList.toggle("no-title",d.show_title===false);
  var h1=document.querySelector("body > header h1");if(h1){if(h1._dflt===undefined){h1._dflt=h1.textContent;h1._dtitle=document.title}      // the page title the user chose (Settings, Page title); empty = the project's
   setText(h1,d.title||h1._dflt);var want=d.title||h1._dtitle;if(document.title!==want)document.title=want}});
- bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+d.groups.length;if(key===last)return;last=key;D=d;paint()});
+ bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+d.groups.length;if(key===last)return;last=key;D=d;adopt();paint()});
  return el};
 // the settings list: a department / building per row with a select of palette colours ("Automatic" = the module picks one)
 function rosterColours(s,ctx){var el=h("div",{"class":"roster-cols"}),R=null;

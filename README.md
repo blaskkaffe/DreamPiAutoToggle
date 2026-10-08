@@ -27,7 +27,7 @@ sudo ./install.sh
 ```
 Then open **http://&lt;the host's name&gt;.local** or its IP address in a browser on the same network, open **Settings** (the cogwheel) > **Contacts** and import your people.
 
-Other screens only need a browser (or no setup at all: [boot them from the network](docs/pxe.md), `pxe/`): open the same address, or run `kiosk/kiosk-browser.sh <host>` (Chromium full screen; `kiosk/checkin-kiosk-autostart.desktop` starts it at every login, so a power cut is no problem). `./kiosk-browser.sh 192.168.1.20 "Område A"` pins that screen to one building.
+Other screens only need a browser (or no setup at all: [boot them from the network](docs/pxe.md), `pxe/`: a boot menu of images, a screen set by serial number goes straight to the board, I installs it on the local disk, and each screen keeps its own layout on the host): open the same address, or run `kiosk/kiosk-browser.sh <host>` (Chromium full screen; `kiosk/checkin-kiosk-autostart.desktop` starts it at every login, so a power cut is no problem). `./kiosk-browser.sh 192.168.1.20 "Område A"` pins that screen to one building.
 
 ### The CSV
 
