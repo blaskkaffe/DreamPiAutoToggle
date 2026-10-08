@@ -1,0 +1,24 @@
+[Unit]
+Description=Check-in board kiosk (X and Firefox)
+After=systemd-user-sessions.service systemd-networkd.service
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+
+[Service]
+User=kiosk
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+WorkingDirectory=~
+ExecStart=/usr/bin/xinit /usr/local/bin/kiosk-session -- :0 vt1 -nolisten tcp -nocursor
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical.target

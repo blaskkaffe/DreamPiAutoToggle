@@ -3,13 +3,12 @@
 #   POST /update/check    run a check now
 #   POST /update/start    fetch and install the new version (needs the PIN when one is set)
 #   POST /update/usb      install the update folder of a USB stick (needs the PIN when one is set)
-#   POST /reboot          reboot the Pi (needs the PIN when one is set)
+#   POST /reboot          reboot the computer (needs the PIN when one is set)
 # GET /update also carries the texts the page's widgets show (view() below), so the page needs no code of its own to draw them.
 # The update logic is in rebootupdate_update.py next to this file. Without the module the page has no update or
 # reboot controls and these paths answer 404.
 import json
 import os
-import re
 import subprocess
 import time
 
@@ -20,18 +19,10 @@ PROTECTED = ("/reboot", "/update/start", "/update/usb")      # run as root: the 
 
 
 def _spawn_reboot():
-    """Reboot the Pi a couple of seconds from now, so the HTTP answer gets out first. Detached from this service
+    """Reboot the computer a couple of seconds from now, so the HTTP answer gets out first. Detached from this service
     (which the reboot stops). Replaced by the tests."""
     subprocess.Popen(["sh", "-c", "sleep 2; systemctl reboot || reboot"],
                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-
-def in_call():
-    """DreamPi is in a call now (the state file says so and DreamPi is still running)."""
-    m = re.search(r"pid=(\d+)", core.read_file(STATUS) or "")
-    if m and not os.path.exists("/proc/" + m.group(1)):          # DreamPi is not running any more
-        return False
-    return (core.read_file(STATE) or "").startswith("call ")
 
 
 def mark_reboot():
@@ -43,7 +34,7 @@ def mark_reboot():
 
 
 def start_reboot():
-    """Reboot the whole Raspberry Pi (the add-on starts again with it). Returns (started, message)."""
+    """Reboot the whole computer (the add-on starts again with it). Returns (started, message)."""
     try:
         _spawn_reboot()
     except OSError as e:
@@ -123,7 +114,7 @@ def _post_update(h):
 
 def api(d, warnings):
     """The text the Reboot button asks to confirm."""
-    d["reboot"] = {"confirm": "Reboot the Raspberry Pi now? The boards are back in about a minute."}
+    d["reboot"] = {"confirm": "Reboot the computer now? The boards are back in about a minute."}
 
 
 GET = {"/update": _get_update}

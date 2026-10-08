@@ -204,7 +204,7 @@ def _colour_reply():
 
 class Handler(BaseHTTPRequestHandler):
     timeout = 20          # a client that stops talking can't hold a thread forever
-    protocol_version = "HTTP/1.1"   # keep-alive: the page asks /api every second, a new TLS handshake each time is heavy on a Pi
+    protocol_version = "HTTP/1.1"   # keep-alive: the page asks /api every second, a new TLS handshake each time is heavy on a computer
     _body_read = 0
 
     def send(self, body, ctype, cache=None, status=200, fixed=False):

@@ -1,6 +1,6 @@
 # Check-in add-on - the dashboard clock (web service side).
 # The middle line is the time in 24-hour, 12-hour or 12-hour AM/PM form, in the common time zone (core.time_zone(), Settings > About;
-# the Pi's own when none is set); the top line is empty or the .beat time; the bottom line is empty or a scrolling list of world
+# the computer's own when none is set); the top line is empty or the .beat time; the bottom line is empty or a scrolling list of world
 # times (cities the user picks, up to 12). With "large" on the time takes the rows that .beat and world time leave free (view()
 # "size"). With world time on, a tap opens the cities as a list and a map of the world's time zones. Summer time comes from
 # base_tz (zoneinfo, or the system's tz files on older Python). Runs in the web service (Python 3).
@@ -95,14 +95,14 @@ def beats(now=None):
 
 
 def pi_offset(now=None):
-    """The Pi's own UTC offset in seconds (its system time zone, with summer time)."""
+    """The computer's own UTC offset in seconds (its system time zone, with summer time)."""
     now = time.time() if now is None else now
     t = time.localtime(now)
     return t.tm_gmtoff if hasattr(t, "tm_gmtoff") else -(time.altzone if t.tm_isdst > 0 else time.timezone)
 
 
 def clock_offset(cfg, now=None):
-    """The offset (seconds) the clock shows: the picked zone's, or the Pi's own when none is picked or it is unknown here."""
+    """The offset (seconds) the clock shows: the picked zone's, or the computer's own when none is picked or it is unknown here."""
     if cfg.get("zone"):
         off = tz.offset(cfg["zone"], now)
         if off is not None:
@@ -120,7 +120,7 @@ def _text(now, off, mode, seconds):
 
 
 def format_time(mode, now=None, off=None):
-    """The time of day at an offset (default: the Pi's own): "13:05:09" (24h), "1:05:09" (12h) or "1:05:09 PM" (12h-ampm). Mode "beat": "@041"."""
+    """The time of day at an offset (default: the computer's own): "13:05:09" (24h), "1:05:09" (12h) or "1:05:09 PM" (12h-ampm). Mode "beat": "@041"."""
     now = time.time() if now is None else now
     if mode == "beat":
         return "@%03d" % beats(now)
@@ -150,7 +150,7 @@ def world(cfg, now=None):
 
 
 def _system_zone():
-    """The Pi's own time zone name ("Europe/Stockholm") from /etc/timezone or the /etc/localtime link, or ""."""
+    """The computer's own time zone name ("Europe/Stockholm") from /etc/timezone or the /etc/localtime link, or ""."""
     try:
         with open("/etc/timezone") as f:
             name = f.read().strip()
@@ -167,7 +167,7 @@ def _system_zone():
 
 def here(cfg, now, off):
     """Where the clock's own time zone is on the map: {"name", "lon", "lat", "text"}. The place is the first city in the catalogue that
-    has the zone (the picked one, or the Pi's own); a zone that has no city is put in the middle of the band of its winter-time offset,
+    has the zone (the picked one, or the computer's own); a zone that has no city is put in the middle of the band of its winter-time offset,
     so summer time does not move it into the next band."""
     zone = cfg.get("zone") or _system_zone()
     for c in CATALOGUE:

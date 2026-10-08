@@ -1,8 +1,8 @@
 # Check-in board
 
-A check-in board for any Linux computer (a Raspberry Pi is a good, cheap fit) that **several screens show in step**: who is in, who is out and why, in real time. The people come from a CSV file, and each one is a row that is grey while they are out and coloured while they are in, in the colour of their department or building. A green **INNE** / red **UTE** button on the row checks them in and out, and a tap on the row opens a status menu (sick, late, on a trip, holiday ...) whose status the row then shows in the status' own colour.
+A check-in board for any Linux computer (a small, cheap one is plenty) that **several screens show in step**: who is in, who is out and why, in real time. The people come from a CSV file, and each one is a row that is grey while they are out and coloured while they are in, in the colour of their department or building. A green **INNE** / red **UTE** button on the row checks them in and out, and a tap on the row opens a status menu (sick, late, on a trip, holiday ...) whose status the row then shows in the status' own colour.
 
-It is built on the module base of the DreamPi network switcher, and the board and its features follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken) (a Node.js check-in board): same CSV columns, same statuses, same ideas (several buildings, a screen per building, kiosk screens). Everything the page shows is a module, so the rest of the base (clock, updates, reboot) is there too.
+The board and its features follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken) (a Node.js check-in board): same CSV columns, same statuses, same ideas (several buildings, a screen per building, kiosk screens). Everything the page shows is a module, so the rest of the base (clock, updates, reboot) is there too.
 
 <p align="center"><img src="docs/images/board.png" alt="The board: a box per department, a row per person, grey while out and coloured while in, a status shows on the row" width="420"> <img src="docs/images/status-menu.png" alt="The status menu" width="420"></p>
 
@@ -18,7 +18,7 @@ What you get:
 
 ## Install
 
-On the host (any Debian-family Linux with `systemd`, such as Debian, Ubuntu or Raspberry Pi OS):
+On the host (any Debian-family Linux with `systemd`, such as Debian or Ubuntu):
 ```
 git clone https://github.com/blaskkaffe/DreamPiAutoToggle.git
 cd DreamPiAutoToggle
@@ -27,7 +27,7 @@ sudo ./install.sh
 ```
 Then open **http://&lt;the host's name&gt;.local** or its IP address in a browser on the same network, open **Settings** (the cogwheel) > **Contacts** and import your people.
 
-Other screens only need a browser: open the same address, or run `kiosk/kiosk-browser.sh <host>` (Chromium full screen; `kiosk/checkin-kiosk-autostart.desktop` starts it at every login, so a power cut is no problem). `./kiosk-browser.sh 192.168.1.20 "Område A"` pins that screen to one building.
+Other screens only need a browser (or no setup at all: [boot them from the network](docs/pxe.md), `pxe/`): open the same address, or run `kiosk/kiosk-browser.sh <host>` (Chromium full screen; `kiosk/checkin-kiosk-autostart.desktop` starts it at every login, so a power cut is no problem). `./kiosk-browser.sh 192.168.1.20 "Område A"` pins that screen to one building.
 
 ### The CSV
 
@@ -57,13 +57,13 @@ The page can do it for you while the **Reboot and Update** module is on: **Setti
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
 ```
-Settings, people and who is in are kept. An install made under the old names (`/opt/dreampi-netswitch`, the service `dreampi-netswitch`) is moved to `/opt/checkin-board` and the service `checkin-board`; the data comes along. An install over the old DreamPi network switcher removes its hook, buttons and LED service; the DreamPi itself was never changed.
+Settings, people and who is in are kept. An install made under the old names (`/opt/dreampi-netswitch`, the service `dreampi-netswitch`) is moved to `/opt/checkin-board` and the service `checkin-board`; the data comes along. An install over an older version of this add-on removes the hook, buttons and LED service it left.
 
 ### Safety
 
 The web page runs on the host as root, because it has to reboot the machine and run the updater. There are no user accounts: **anybody who can reach the page on your network can use it**, so only put the host on a network you trust, and don't forward its ports from the internet. What the add-on does to limit the risk:
 
-- **PIN (optional).** `sudo ./install.sh --pin` sets a PIN that the page asks for (once per page load) before **Update now**, **Reboot** and a **contacts import**. It is stored only as a salted hash, and five wrong tries lock those actions for a minute. The PIN can also be set, changed or removed in **Settings > Appearance > PIN** (changing or removing it asks for the old one; while no PIN is set anybody on your network can set one there, which is why `sudo ./install.sh --no-pin` stays as the way back). **Ask for the PIN to open Settings** (same box) locks Settings: the cogwheel asks for the PIN and every change needs it, while tapping people in and out keeps working. Use the `https://` address when you use a PIN: over plain `http://` the PIN travels unencrypted. Forgot it? `sudo ./install.sh --no-pin`. Without a PIN, anybody on your network can update or reboot the Pi.
+- **PIN (optional).** `sudo ./install.sh --pin` sets a PIN that the page asks for (once per page load) before **Update now**, **Reboot** and a **contacts import**. It is stored only as a salted hash, and five wrong tries lock those actions for a minute. The PIN can also be set, changed or removed in **Settings > Appearance > PIN** (changing or removing it asks for the old one; while no PIN is set anybody on your network can set one there, which is why `sudo ./install.sh --no-pin` stays as the way back). **Ask for the PIN to open Settings** (same box) locks Settings: the cogwheel asks for the PIN and every change needs it, while tapping people in and out keeps working. Use the `https://` address when you use a PIN: over plain `http://` the PIN travels unencrypted. Forgot it? `sudo ./install.sh --no-pin`. Without a PIN, anybody on your network can update or reboot the computer.
 - **Other websites can't use it.** Every change (all `POST`s) must come from the page itself: a request from another site (a form or script on a web page you have open in your browser) is refused, and so is a request that reaches the host under a name that isn't the host's (the trick used to attack devices on a home network from a web page). The page answers to IP addresses, `.local`-style names and the host's own name; if your router gives it another domain name and the page says "Unknown host name", list that name in `/opt/checkin-board/allowed_hosts` (one per line). The page can't be shown inside another site's frame.
 - **Update from a USB stick.** Put a folder called `update` on a USB stick (the add-on's files: a copy of the repository with `install.sh`, `base/` and `modules/`; `git clone` it or copy it) and plug the stick into the host. **Settings > System** then shows **Update from a USB stick**; **Install from USB** (it asks for the PIN when one is set, and for confirmation) copies the folder to `/opt/checkin-board/usb_src`, so the stick can be pulled out, and runs its `install.sh` as root. The settings and the people are kept. The version then reads "USB update" with the date of the files; **Update now** from GitHub still works. Only plug in sticks you trust: what is in the folder runs as root. Tested with a folder on a disk, not with a real stick.
 - **Update now is limited to GitHub.** It only pulls from the git address the checkout had when the add-on was installed (it must be a GitHub address, and a changed one is refused), fetches from exactly that address, and only fast-forwards, so it can't pull in changes that don't continue your copy.
@@ -91,7 +91,7 @@ Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), 
 
 ## Requirements
 
-- A computer for the host: any Linux machine with `systemd` (a Raspberry Pi 3 or newer is plenty; Debian, Ubuntu and Raspberry Pi OS are the families it is written for), Python 3 and `git`. No Python packages and no internet are needed at run time (the update check and **Update now** need GitHub).
+- A computer for the host: any Linux machine with `systemd` (a small, cheap one is plenty; Debian and Ubuntu are the families it is written for), Python 3 and `git`. No Python packages and no internet are needed at run time (the update check and **Update now** need GitHub).
 - A browser on every screen; the kiosk script assumes Chromium (`chromium-browser` or `chromium`).
 
 ## Web page
@@ -114,4 +114,4 @@ The page works on a phone as well as a wall display: the dashboard is one column
 
 ## Credits
 
-The board, the statuses and the CSV format follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken). The module base, the clock and the update / reboot controls come from the DreamPi network switcher this add-on grew out of; the names of the service and of `/opt/checkin-board` are still its.
+The board, the statuses and the CSV format follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken). The module base, the clock and the update / reboot controls come from an earlier add-on of the same author.

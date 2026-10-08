@@ -45,7 +45,7 @@ if os.environ.get("FAKEUPDATE"):
         up.USB_ROOTS = [os.path.join(tmp, "media", "*")]
     if os.environ.get("FAKELOG"):      # a finished update with a messy log: long lines, colour codes, progress
         open(up.UPDATE_STATUS, "w").write("failed")
-        open(up.UPDATE_LOG, "w").write("Updating /home/pi/checkout from origin/main\nFrom https://github.com/blaskkaffe/DreamPiAutoToggle\n"
+        open(up.UPDATE_LOG, "w").write("Updating /home/user/checkout from origin/main\nFrom https://github.com/blaskkaffe/DreamPiAutoToggle\n"
             " * branch            main       -> FETCH_HEAD\nReceiving objects:  10%\rReceiving objects: 100% (42/42), done.\n"
             "Updating 3baa024..21d1ad8\nFast-forward\n page/widgets.js | 84 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
             " 4 files changed, 64 insertions(+), 37 deletions(-)\n\x1b[31mERROR\x1b[0m: could not write /etc/systemd/system/checkin-board.service (Read-only file system)\n"

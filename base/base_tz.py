@@ -3,7 +3,7 @@
 # the clock and the events modules).
 #
 # Python 3.9+ has zoneinfo, which reads the system's tz database. Older Python has nothing for "the time in New York": only the
-# Pi's own zone (time.localtime) and fixed offsets. The rules are on the Pi all the same, in /usr/share/zoneinfo (Debian's tzdata
+# computer's own zone (time.localtime) and fixed offsets. The rules are on the computer all the same, in /usr/share/zoneinfo (Debian's tzdata
 # package), as TZif files - so without zoneinfo this module reads those files itself: the list of past and planned changes, and
 # for the years after the list the POSIX TZ rule at its end ("CET-1CEST,M3.5.0,M10.5.0/3" = Central European time, summer time
 # from the last Sunday in March 02:00 to the last Sunday in October 03:00). Works on Python 3 and 2.7.
@@ -93,13 +93,13 @@ CITIES = (
 )
 
 
-def zone_options(now=None, own="This Pi's own time zone"):
-    """The form widget's options for a time zone: "" = the Pi's own, then the cities by region (with their offset now), then UTC.
+def zone_options(now=None, own="This computer's own time zone"):
+    """The form widget's options for a time zone: "" = the computer's own, then the cities by region (with their offset now), then UTC.
     Zones this system does not know are left out."""
     now = time.time() if now is None else now
     t = time.localtime(now)
-    pi = t.tm_gmtoff if hasattr(t, "tm_gmtoff") else -(time.altzone if t.tm_isdst > 0 else time.timezone)
-    opts = [{"value": "", "label": "%s (%s now)" % (own, utc_text(pi))}]
+    own_off = t.tm_gmtoff if hasattr(t, "tm_gmtoff") else -(time.altzone if t.tm_isdst > 0 else time.timezone)
+    opts = [{"value": "", "label": "%s (%s now)" % (own, utc_text(own_off))}]
     for name, zone, _lon, _lat, region in CITIES:
         off = offset(zone, now)
         if off is not None:
@@ -115,11 +115,11 @@ def zone_text(zone, now=None):
     """The grey line under the time zone setting: which zone it is and its offset now."""
     if not zone:
         t = time.localtime(time.time() if now is None else now)
-        pi = t.tm_gmtoff if hasattr(t, "tm_gmtoff") else -(time.altzone if t.tm_isdst > 0 else time.timezone)
-        return "This Pi's own time zone, %s now" % utc_text(pi)
+        own_off = t.tm_gmtoff if hasattr(t, "tm_gmtoff") else -(time.altzone if t.tm_isdst > 0 else time.timezone)
+        return "This computer's own time zone, %s now" % utc_text(own_off)
     off = offset(zone, now)
     if off is None:
-        return "%s is not known on this Pi: its own time zone is used" % zone
+        return "%s is not known on this computer: its own time zone is used" % zone
     return "%s, %s now (summer and winter time follow the zone)" % (zone_name(zone), utc_text(off))
 
 

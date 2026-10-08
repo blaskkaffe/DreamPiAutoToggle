@@ -42,7 +42,7 @@ ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the 
 HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id: how a highlighted box looks (Settings > Appearance)
 SETTINGS_PIN = os.path.join(BASE_DIR, "settings_pin")   # exists = Settings asks for the PIN (when one is set) before it opens and changes anything
 SCREEN = os.path.join(BASE_DIR, "screen.json")         # how the page is laid out on a wide screen: max columns, stretch, scale (Settings > Appearance)
-TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the Pi's own (Settings > About)
+TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the computer's own (Settings > About)
 DEBUG_LOG = TMP_PREFIX + PROJECT.get("debug_log", "-debug.log")           # the debug timeline
 POKE_PREFIX = TMP_PREFIX + ".poke."   # poke(name): "measure it again now", see poke()
 
@@ -824,7 +824,7 @@ def set_module_tint(name, key, coloured):
 
 
 def time_zone():
-    """The common time zone setting: an IANA name from base_tz.ZONE_CHOICES, or "" = the Pi's own. Any module that shows a
+    """The common time zone setting: an IANA name from base_tz.ZONE_CHOICES, or "" = the computer's own. Any module that shows a
     time of day reads it here."""
     import base_tz as tz
     zone = read_file(TIME_ZONE)
@@ -832,7 +832,7 @@ def time_zone():
 
 
 def save_time_zone(value):
-    """Save the common time zone ("" = the Pi's own; anything not in the list is the Pi's own too). Returns what is now set."""
+    """Save the common time zone ("" = the computer's own; anything not in the list is the computer's own too). Returns what is now set."""
     import base_tz as tz
     value = value if value in tz.ZONE_CHOICES else ""
     tmp = TIME_ZONE + ".tmp"

@@ -1,6 +1,6 @@
 {
  "name": "About",
- "description": "Versions of the add-on and the Pi, the time zone, the global colours and a link to the project on GitHub.",
+ "description": "Versions of the add-on and the computer, the time zone, the global colours and a link to the project on GitHub.",
  "enabled": true,
  "visible": false,
  "order": 55,

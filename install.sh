@@ -9,7 +9,7 @@
 #   modules/ (see docs/modules.md): a folder that is not there is not installed (and one that was installed before is
 #   removed). Which modules are on is the page's Settings > System > Modules.
 #   sudo ./install.sh --pin        ask for a PIN that the page then wants before it updates, restarts
-#                                  the Pi or imports contacts (--pin=1234 gives it on the command line,
+#                                  the computer or imports contacts (--pin=1234 gives it on the command line,
 #                                  which shows in the shell history); --no-pin removes it. It is kept
 #                                  across updates. Without a PIN anybody on your network can use those.
 #
@@ -188,7 +188,7 @@ After=network.target
 StartLimitIntervalSec=0
 
 [Service]
-# Wi-Fi power saving makes a Pi drop off the network now and then (see the script)
+# Wi-Fi power saving makes a computer drop off the network now and then (see the script)
 ExecStartPre=-/bin/sh $DEST/wifi-powersave-off.sh
 ExecStart=$WEBPY $DEST/base_web.py $PORT $HTTPS_PORT
 Restart=always

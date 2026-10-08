@@ -42,7 +42,7 @@ class UpdateView(unittest.TestCase):
     def test_reboot_confirm_names_the_pi(self):
         d = {}
         ru.api(d, [])
-        self.assertIn("Reboot the Raspberry Pi", d["reboot"]["confirm"])
+        self.assertIn("Reboot the computer", d["reboot"]["confirm"])
 
 
 class ClockView(unittest.TestCase):
@@ -83,7 +83,7 @@ class ClockView(unittest.TestCase):
             json.dump({"format": "24h", "zone": "Europe/Stockholm"}, f)
         clock.read_config()                                                               # the clock module carries it over when it reads its settings
         self.assertEqual(core.time_zone(), "Europe/Stockholm")
-        core.save_time_zone("")                                                           # once set (even to the Pi's own) the file wins
+        core.save_time_zone("")                                                           # once set (even to the computer's own) the file wins
         self.assertEqual(core.time_zone(), "")
 
     def test_an_older_mode_file_is_carried_over(self):
@@ -140,7 +140,7 @@ class ClockView(unittest.TestCase):
 
     def test_the_clock_follows_the_picked_zone_with_summer_time(self):
         summer, winter = 1783080000, 1767268800                           # 2026-07-03 12:00 UTC, 2026-01-01 12:00 UTC
-        self.assertEqual(clock.view(summer)["time"], "12:00:00")           # the Pi's own zone (UTC here)
+        self.assertEqual(clock.view(summer)["time"], "12:00:00")           # the computer's own zone (UTC here)
         core.save_time_zone("Europe/Stockholm")
         self.assertEqual(clock.view(summer)["time"], "14:00:00")
         self.assertEqual(clock.view(winter)["time"], "13:00:00")

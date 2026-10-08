@@ -1,6 +1,6 @@
 {
  "name": "Reboot and Update",
- "description": "Update the add-on from GitHub and reboot the Pi.",
+ "description": "Update the add-on from GitHub and reboot the computer.",
  "enabled": true,
  "visible": true,
  "order": 65,

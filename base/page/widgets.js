@@ -39,7 +39,7 @@ function colourClass(el,ref,mod){el.setAttribute("data-own-colour","1");
 var afterPostTimer=null;
 function settledSoon(){clearTimeout(afterPostTimer);afterPostTimer=setTimeout(function(){refresh();reloadData()},250)}
 function post(url,body,done){xhrJson("POST",url,function(r,st,b){if(r&&!/^\/wbtest/.test(url))settledSoon();if(done)done(r,st,b)},body)}
-// after a button's POST: "reload" the page, "wait" until the Pi is back (a reboot), or just look at the new state
+// after a button's POST: "reload" the page, "wait" until the computer is back (a reboot), or just look at the new state
 function afterPost(s,r,el){
  if(r&&r.started===false){alert(r.message||"That did not start");return}
  if(s.then==="reload"){try{sessionStorage.setItem("reopen",s.reopen?"1":"")}catch(e){}location.reload();return}
@@ -805,9 +805,9 @@ W.roster=function(s,ctx){
  function parts(ps){if(!usedCap||ps.length<=usedCap)return [ps];var n=Math.ceil(ps.length/usedCap),per=Math.ceil(ps.length/n),out=[];for(var i=0;i<ps.length;i+=per)out.push(ps.slice(i,i+per));return out}
  function paint(){if(!D)return;paintChips();var live={},n=0,changed=false,seq=[],base=function(){return anchor&&anchor._ord!==undefined?anchor._ord:0};
   if(D.total)D.groups.forEach(function(g){var ps=g.people.filter(visible);if(!ps.length)return;
-   var chunks=parts(ps);chunks.forEach(function(cp,pi){var id="checkin-"+slug(g.id)+(pi?"-p"+(pi+1):""),fresh=!tiles[id],t=tileFor(id,g.id),k=cp.filter(function(p){return p.in}).length;
+   var chunks=parts(ps);chunks.forEach(function(cp,ci){var id="checkin-"+slug(g.id)+(ci?"-p"+(ci+1):""),fresh=!tiles[id],t=tileFor(id,g.id),k=cp.filter(function(p){return p.in}).length;
     t._want=base()+(n+1)/1000;live[id]=1;n++;if(fresh)changed=true;seq.push(t);
-    setHtml(t._body,'<div class="rp-box" data-frame="'+(D.frame||"thin")+'"><div class="rp-gh"><span class="rp-gt">'+esc(g.title)+(chunks.length>1?' ('+(pi+1)+'/'+chunks.length+')':'')+'</span><span class="sub">'+k+'/'+cp.length+'</span></div>'+cp.map(row).join("")+'</div>')})});
+    setHtml(t._body,'<div class="rp-box" data-frame="'+(D.frame||"thin")+'"><div class="rp-gh"><span class="rp-gt">'+esc(g.title)+(chunks.length>1?' ('+(ci+1)+"/"+chunks.length+')':'')+'</span><span class="sub">'+k+'/'+cp.length+'</span></div>'+cp.map(row).join("")+'</div>')})});
   Object.keys(tiles).forEach(function(id){if(!live[id]){var t=tiles[id];if(t.parentNode)t.parentNode.removeChild(t);delete tiles[id];changed=true}});
   // the tiles keep the places they have on this screen (the places are only swapped about to follow the host's order); new ones go after the board's own tile
   if(changed){seq.forEach(function(t){t._ord=t._want})}

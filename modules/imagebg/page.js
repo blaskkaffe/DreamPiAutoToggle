@@ -1,6 +1,6 @@
 // Background image module, page side. The background: a fixed picture layer (and a black layer over it that darkens it) drawn from
 // S.imagebg ({has, fit, dim, version} in /api), so a change made on another device shows here too. The widget "imagebg-pick" (Settings >
-// Background image) chooses the picture: a big one is shrunk in the browser first (at most 2560 px, JPEG) before it is sent to the Pi.
+// Background image) chooses the picture: a big one is shrunk in the browser first (at most 2560 px, JPEG) before it is sent to the computer.
 background("imagebg",function(host){
  var pic=h("div",{id:"imgbg"}),dim=h("div",{id:"imgbg-dim"}),last="";
  host.appendChild(pic);host.appendChild(dim);

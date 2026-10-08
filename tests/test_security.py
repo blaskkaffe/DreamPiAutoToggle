@@ -27,8 +27,8 @@ class HostAndOriginTests(unittest.TestCase):
         tmp = sandbox()
         try:
             with open(core.ALLOWED_HOSTS, "w") as f:
-                f.write("# mine\npi.example.org\n")
-            self.assertTrue(sec.host_allowed("pi.example.org:443"))
+                f.write("# mine\nhost.example.org\n")
+            self.assertTrue(sec.host_allowed("host.example.org:443"))
             self.assertFalse(sec.host_allowed("other.example.org"))
         finally:
             cleanup(tmp)
@@ -284,7 +284,7 @@ class UpdateOriginTests(unittest.TestCase):
     def test_branch_cannot_look_like_an_option(self):
         for branch in ("-x", "--upload-pack=sh", "a/../b", "a/"):
             with self.assertRaises(ValueError):
-                up.update_script("/home/pi/x", branch, 80, 443)
+                up.update_script("/home/user/x", branch, 80, 443)
 
     def test_script_with_url_is_valid_shell(self):
         script = up.update_script(self.src, "main", 80, 443, "https://github.com/a/b.git")

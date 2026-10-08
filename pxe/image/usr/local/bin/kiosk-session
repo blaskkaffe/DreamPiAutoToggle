@@ -1,0 +1,36 @@
+#!/bin/sh
+# kiosk-session - runs inside X on a diskless check-in screen (started by kiosk.service through xinit).
+# Reads the board's address from the kernel command line (checkin_url=..., optional checkin_location=...; set by boot.ipxe),
+# waits until the board answers, then shows it in Firefox full screen. If Firefox quits it is started again.
+# KIOSK_DRY_RUN=1 only prints the address (the tests use it); CMDLINE_FILE replaces /proc/cmdline for the same reason.
+
+CMDLINE_FILE="${CMDLINE_FILE:-/proc/cmdline}"
+
+param() {
+  tr ' ' '\n' < "$CMDLINE_FILE" | sed -n "s/^$1=//p" | head -n 1
+}
+
+URL=$(param checkin_url)
+[ -n "$URL" ] || URL="http://checkin.local/"
+URL="${URL%/}/"
+LOCATION=$(param checkin_location)          # buildings as on the board's buttons, spaces as +, several separated by comma
+SHOW="$URL"
+[ -z "$LOCATION" ] || SHOW="${URL}?location=${LOCATION}"
+
+if [ -n "$KIOSK_DRY_RUN" ]; then
+  echo "$SHOW"
+  exit 0
+fi
+
+xsetroot -solid black
+xset s off -dpms s noblank
+openbox --sm-disable &
+
+PROFILE=/tmp/kiosk-profile
+mkdir -p "$PROFILE"
+
+while true; do
+  until curl -fs -o /dev/null --max-time 3 "$URL"; do sleep 3; done
+  firefox-esr --kiosk --no-remote --profile "$PROFILE" "$SHOW"
+  sleep 2
+done

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Check-in add-on - run by the web page service before it starts.
-# Wi-Fi power saving makes a Raspberry Pi drop off the network now and then,
+# Wi-Fi power saving makes a computer drop off the network now and then,
 # which looks like the web page being unreachable. This switches it off for
 # every Wi-Fi interface. It resets on reboot, and runs again at every start.
 for dev in /sys/class/net/*; do

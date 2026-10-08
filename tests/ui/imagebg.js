@@ -32,7 +32,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(l.size === 'cover' && l.dim === '0.25', 'cover and 25 % darker to start with');
   ok(l.bodyBg === 'rgba(0, 0, 0, 0)', 'the page itself is see-through then');
   const got = await page.evaluate(() => fetch(document.getElementById('imgbg').style.backgroundImage.slice(5, -2)).then(r => r.headers.get('content-type')));
-  ok(got === 'image/png', 'the Pi serves it as an image (' + got + ')');
+  ok(got === 'image/png', 'the computer serves it as an image (' + got + ')');
   ok(await row.locator('button', { hasText: 'Remove' }).isVisible(), 'now there is a Remove button');
   // fit and darken
   await box.locator('.srow', { hasText: 'Fit' }).locator('button').click(); await settle(300);

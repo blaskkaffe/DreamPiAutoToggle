@@ -80,7 +80,7 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(got["values"], {"zone": "Europe/Stockholm"})
         self.assertIn("Stockholm", got["texts"]["zone"])
         self.assertEqual(core.time_zone(), "Europe/Stockholm")
-        self.post("/timezone", {"values": {"zone": "Mars/Olympus"}})     # not a zone of the list: the Pi's own
+        self.post("/timezone", {"values": {"zone": "Mars/Olympus"}})     # not a zone of the list: the computer's own
         self.assertEqual(core.time_zone(), "")
 
     def test_screen_layout_settings(self):
