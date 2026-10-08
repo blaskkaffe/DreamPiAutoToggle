@@ -1,7 +1,7 @@
 #!/bin/sh
 # kiosk-session - runs inside X on a diskless check-in screen (started by kiosk.service through xinit).
 # Reads the board's address from the kernel command line (checkin_url=..., optional checkin_location=...; set by boot.ipxe),
-# waits until the board answers, then shows it in Firefox full screen. If Firefox quits it is started again.
+# shows the chicken logo (loading.html) in Firefox full screen, which opens the board when it answers. If Firefox quits it is started again.
 # KIOSK_DRY_RUN=1 only prints the address (the tests use it); CMDLINE_FILE replaces /proc/cmdline for the same reason.
 
 CMDLINE_FILE="${CMDLINE_FILE:-/proc/cmdline}"
@@ -27,15 +27,17 @@ if [ -n "$KIOSK_DRY_RUN" ]; then
   exit 0
 fi
 
-xsetroot -solid black
+SHARE=/usr/local/share/checkin-kiosk
+xsetroot -solid '#f5f7fb'
 xset s off -dpms s noblank
 openbox --sm-disable &
+[ ! -r "$SHARE/logo.png" ] || feh --bg-max --image-bg '#f5f7fb' "$SHARE/logo.png" &     # the chicken, until Firefox has started
 
 PROFILE=/tmp/kiosk-profile
 mkdir -p "$PROFILE"
 
+# Firefox opens the loading page (the chicken logo), which opens the board itself as soon as the board answers.
 while true; do
-  until curl -fs -o /dev/null --max-time 3 "$URL"; do sleep 3; done
-  firefox-esr --kiosk --no-remote --profile "$PROFILE" "$SHOW"
+  firefox-esr --kiosk --no-remote --profile "$PROFILE" "file://$SHARE/loading.html#$SHOW"
   sleep 2
 done

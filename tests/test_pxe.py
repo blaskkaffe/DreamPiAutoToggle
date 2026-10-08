@@ -109,6 +109,17 @@ class Files(unittest.TestCase):
         for path in glob.glob(os.path.join(PXE, "*.sh")):
             self.assertEqual(subprocess.run([bash, "-n", path]).returncode, 0, path)
 
+    def test_the_loading_screen_is_the_chicken_logo(self):
+        share = os.path.join(PXE, "image", "usr", "local", "share", "checkin-kiosk")
+        with open(os.path.join(share, "logo.png"), "rb") as f:
+            self.assertEqual(f.read(8), b"\x89PNG\r\n\x1a\n")
+        with open(os.path.join(share, "loading.html")) as f:
+            html = f.read()
+        self.assertIn('src="logo.png"', html)
+        self.assertIn("location.hash", html)                                           # the board's address comes after the #
+        with open(SESSION) as f:
+            self.assertIn("loading.html#$SHOW", f.read())
+
     def test_firefox_policy_is_json(self):
         with open(os.path.join(PXE, "image", "etc", "firefox", "policies", "policies.json")) as f:
             self.assertTrue(json.load(f)["policies"]["DisableAppUpdate"])
