@@ -13,25 +13,34 @@ A screen with no disk and nothing installed: it boots from its network card, sho
 
 ## How a screen boots
 1. The firmware asks for DHCP. The router answers as usual; dnsmasq (proxy mode) adds "boot from here". BIOS gets `undionly.kpxe`, UEFI gets `ipxe.efi` (TFTP); iPXE asks again, is recognised (option 175) and gets `boot.ipxe`.
-2. `boot.ipxe` **reports the computer to the boot server**: `GET /boot?serial=${serial}&mac=${net0/mac}&product=..&ip=..` (iPXE reads the serial number from the BIOS). The server remembers it (`data/registry.json`: serial, MAC, address, first / last seen, boots) and answers with an iPXE script.
+2. `boot.ipxe` **reports the computer to the boot server**: `GET /boot?serial=${serial}&mac=${net0/mac}&product=..&ip=..` (iPXE reads the serial number from the BIOS). The server always remembers it (`data/registry.json`: serial, MAC, address, first / last seen, boots: the **"has connected" list**), then checks the **whitelist** (`data/access.json`):
+   - **Not on it (pending) or blocked:** no boot script. The screen prints "This computer is not approved yet" with its serial number, MAC address and name (or "has been blocked"), waits 15 s and boots its own disk. It stays in the list so the admin can allow or block it.
+   - **On it** (its name / serial **or** its MAC is allowed; a block wins): the server gives its address a 30 minute pass to fetch the images, the screen prints "Connected to the check-in boot server: approved (...)" and the script below follows.
 3. The script depends on the computer:
    - **Set to an image** (`checkin-pxe assign`): no menu. It says what it boots and waits 3 s: **press I to install on the local disk** (only when the image can be installed), else it boots the image.
    - **Installed on its own disk**: boots the disk after 3 s; press **N** for the network menu.
    - **Otherwise a menu** (20 s, then the first image): every image (`1`, `2` ...), **Install ... on the local disk** (`i`) and **Linux shell** (`s`) for the images that allow them, **iPXE shell**, **Boot from the local disk**.
 4. A Linux image gets a command line with `checkin_url=` (the board), `checkin_server=`, `checkin_screen=` (the computer's name, below) and `checkin_location=`. `live-boot` downloads the squashfs, `kiosk.service` starts X and `kiosk-session` shows the **chicken logo** (`feh` on the X background at once, then Firefox opens `loading.html#<board address>`), which asks the board's `/ping` every 2 s and opens `<board>/?screen=<id>&location=...` as soon as it answers; so there is one loading screen from X starting to the board appearing, also when the board is slow after a power cut. The logo is copied from the CheckinChicken repository (`public/logo.png`). There is no boot splash before X (the text of the kernel and live-boot shows first); a Plymouth splash is not built.
 
-## Computer names, assigning
+## Computer names, the whitelist, per-computer settings
 A computer is named by its serial number in lower case (other characters become `_`); a computer with no usable serial number ("To Be Filled By O.E.M.", all zeros, ...) is named `mac-<mac without dashes>`. Computers that share one serial number share one name (and one layout) - give them different ones by assigning from the MAC-named list or fix the BIOS.
 
 ```
-checkin-pxe list                                  # who has booted, what each is set to
+checkin-pxe pending                               # connected but not decided (the "has connected" list, only the waiting ones)
+checkin-pxe list                                  # everybody: status (allowed / PENDING / blocked), MAC, address, last seen, settings
+checkin-pxe allow <serial or MAC> ...             # whitelist (also for a computer that has not connected yet)
+checkin-pxe block <serial or MAC> ...             # never boots; wins over the whitelist
+checkin-pxe clear <serial or MAC> ...             # off both lists (pending again)
+checkin-pxe mode whitelist | open                 # whitelist is the default; open = everybody boots (the old behaviour, no checks)
 checkin-pxe images                                # what the menu offers
-checkin-pxe assign <id> kiosk --location "Område A,Område B"   # skip the menu, show those buildings
+checkin-pxe assign <id> kiosk --location "Område A,Område B" --board-url http://other/ --args "foo=bar"
+                                                  # this computer's boot settings: skip the menu, boot that image, show those buildings,
+                                                  # another board address, extra kernel arguments (letters, digits and _.=,:/+%@- only)
 checkin-pxe unassign <id>                         # the menu again
 checkin-pxe reinstall <id>                        # an installed computer boots from the network again
-checkin-pxe forget <id>
+checkin-pxe forget <id>                           # off the has-connected list
 ```
-Assignments are in `data/assignments.json`, read at every boot. There is no web page for this yet.
+Settings are in `data/assignments.json`, the whitelist in `data/access.json`, both read at every boot. There is no web page for this yet.
 
 ## More images
 A folder `/opt/checkin-board-pxe/www/images/<id>/` with the files and an `image.json` appears in the menu at the next boot: `name`, `kernel`, `initrd` (file names), `args` (the kernel command line), optional `install_args` (the command line that starts its installer: if it is there the image can be installed on the local disk; the menu and the I key offer it), `shell_args` (a command line that opens a shell), `order`. In the command lines `{base}` (the image's folder on the server), `{server}`, `{board}`, `{screen}` and `{location}` are filled in. The check-in image's own manifest is `pxe/kiosk-image.json`.
@@ -46,7 +55,8 @@ A folder `/opt/checkin-board-pxe/www/images/<id>/` with the files and an `image.
 The page sends `X-Screen: <id>` (from `?screen=<id>` in its address, kept in `sessionStorage`). `base_core` then reads and writes `screens/<id>/screen.json` (columns, stretch, scale, theme ..., and `locations`: the buildings the screen shows) and `screens/<id>/tile_layout.json` (where the tiles are), starting from the shared files until the screen changes something. At most 200 screens; a plain browser (no id) uses the shared files as before. Module colours, the palette, the module order and the roster itself stay shared. The roster keeps its building choice in the browser, and for a screen with an id also on the host (`POST /screen/locations`): `?location=` in the address is the starting choice, else the browser's, else the host's.
 
 ## Rules
-- The image knows no secrets; the board's PIN is for its settings only. Use this on a network you trust: anybody on it can boot from the server, read the image and see the board, and the boot server does not ask who tells it "installed".
+- The whitelist keeps strangers from booting from the server and from fetching the image (files are only served to the address of an approved computer for 30 minutes after its `/boot` request). It is **not strong authentication**: the serial number and MAC address are what the computer says they are, so somebody who copies an approved computer's numbers on the same network gets in; and the DHCP / TFTP part (the small iPXE program) is offered to every computer. The image holds no secrets and the board's PIN protects its settings, but anybody on the network can open the board's address in a browser anyway.
 - Do not run another DHCP server for this; the router stays the DHCP server.
 - The address given to the screens is `--board-url` (default `http://<server ip>/`, the plain HTTP port; the kiosk does not need the self-signed HTTPS certificate).
+- A computer that gets no script boots its own disk; it is never locked out of the machine itself.
 - Firewall: UDP 67, 69 and 4011 (proxy DHCP), TCP 8069 on the server.

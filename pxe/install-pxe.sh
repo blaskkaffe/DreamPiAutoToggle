@@ -121,5 +121,6 @@ done
 
 echo "The network boot server is running on $IFACE ($IP). Screens show $BOARD_URL"
 echo "Set a screen to boot from the network (PXE) in its BIOS/UEFI setup; nothing is installed on it."
-echo "It shows a menu the first time. Then: checkin-pxe list, and checkin-pxe assign <id> kiosk to send a screen straight to the board."
+echo "Only whitelisted computers boot. A new one shows its serial number and MAC address on its screen and appears in: checkin-pxe pending"
+echo "Approve it with: checkin-pxe allow <serial or MAC>   (checkin-pxe assign <id> kiosk sends it straight to the board)."
 echo "Do not run a second DHCP server for this."

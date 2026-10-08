@@ -188,7 +188,7 @@ class BootLogic(unittest.TestCase):
             self.assertTrue(st.set_installed("ser1"))
             self.assertFalse(st.set_installed("nobody"))
             st.assign("ser1", "kiosk", "A")
-            self.assertEqual(st.assignments(), {"ser1": {"image": "kiosk", "location": "A"}})
+            self.assertEqual(st.assignments(), {"ser1": {"image": "kiosk", "location": "A", "board_url": "", "args": ""}})
             self.assertTrue(st.unassign("ser1"))
         finally:
             shutil.rmtree(d)
@@ -219,27 +219,65 @@ class BootServer(unittest.TestCase):
     def get(self, path):
         return urlopen("http://127.0.0.1:%d%s" % (self.port, path), timeout=10).read().decode()
 
-    def test_report_assign_install_flow(self):
+    def test_an_unknown_computer_is_listed_but_does_not_boot_until_allowed(self):
+        self.srv.store._grants.clear()                                                 # (every test here comes from the same address)
         text = self.get("/boot?serial=SN-77&mac=aa-bb-cc-dd-ee-01&product=Box&ip=10.0.0.7")
-        self.assertIn("menu Check-in screen sn-77", text)                              # not set to anything: the menu
-        rec = self.store.registry()["sn-77"]
-        self.assertEqual((rec["serial"], rec["mac"], rec["ip"]), ("SN-77", "aa-bb-cc-dd-ee-01", "10.0.0.7"))     # and it is remembered
-        self.store.assign("sn-77", "kiosk", "A")
-        self.assertIn("goto boot-kiosk", self.get("/boot?serial=SN-77&mac=aa-bb-cc-dd-ee-01").split(":menu")[0])
-        self.assertEqual(self.get("/installed?id=sn-77").strip(), "ok")
-        self.assertTrue(self.store.registry()["sn-77"]["installed"])
+        self.assertIn("not approved yet", text)                                        # no boot script, only its numbers and what to do
+        self.assertIn("Serial number: SN-77", text)
+        self.assertIn("MAC address:   aa-bb-cc-dd-ee-01", text)
+        self.assertNotIn("kernel", text)
+        rec = self.store.registry()["sn-77"]                                           # but it is in the "has connected" list
+        self.assertEqual((rec["serial"], rec["mac"], rec["ip"]), ("SN-77", "aa-bb-cc-dd-ee-01", "10.0.0.7"))
+        self.assertEqual(self.store.status("sn-77", "aa-bb-cc-dd-ee-01"), "pending")
+        with self.assertRaises(HTTPError) as e:                                        # and the image files are not served to it
+            self.get("/images/kiosk/vmlinuz")
+        self.assertEqual(e.exception.code, 403)
+
+    def test_allow_assign_install_flow(self):
+        self.get("/boot?serial=SN-78&mac=aa-bb-cc-dd-ee-03")
+        self.assertTrue(self.store.allow("SN-78"))
+        text = self.get("/boot?serial=SN-78&mac=aa-bb-cc-dd-ee-03")
+        self.assertIn("menu Check-in screen sn-78", text)                              # allowed, not set to anything: the menu
+        self.assertIn("approved (sn-78", text)                                         # and it says it is connected
+        self.assertEqual(self.get("/images/kiosk/vmlinuz"), "kernel")                  # its address may fetch the files now
+        self.store.assign("sn-78", "kiosk", "A", "http://other/", "foo=bar")
+        head = self.get("/boot?serial=SN-78&mac=aa-bb-cc-dd-ee-03")
+        self.assertIn("goto boot-kiosk", head.split(":menu")[0])
+        self.assertIn("checkin_url=http://other/", head)                               # per-computer settings
+        self.assertIn("foo=bar", head)
+        self.assertEqual(self.get("/installed?id=sn-78").strip(), "ok")
+        self.assertTrue(self.store.registry()["sn-78"]["installed"])
         with self.assertRaises(HTTPError) as e:
             self.get("/installed?id=nobody")
         self.assertEqual(e.exception.code, 404)
+
+    def test_a_mac_on_the_whitelist_is_enough_and_a_block_wins(self):
+        self.store.allow("AA:BB:CC:DD:EE:04")                                         # before the computer has ever connected
+        self.assertIn("kernel", self.get("/boot?serial=SN-79&mac=aa-bb-cc-dd-ee-04"))
+        self.store.block("sn-79")
+        text = self.get("/boot?serial=SN-79&mac=aa-bb-cc-dd-ee-04")
+        self.assertIn("has been blocked", text)
+        self.assertNotIn("kernel", text)
+
+    def test_open_mode_lets_everybody_boot(self):
+        self.store.set_mode("open")
+        try:
+            self.assertIn("kernel", self.get("/boot?serial=SN-80&mac=aa-bb-cc-dd-ee-05"))
+        finally:
+            self.store.set_mode("whitelist")
 
     def test_a_computer_without_a_serial_is_named_by_its_mac(self):
         self.get("/boot?serial=To+Be+Filled+By+O.E.M.&mac=AA-BB-CC-DD-EE-02")
         self.assertIn("mac-aabbccddee02", self.store.registry())
 
-    def test_image_files_are_served_but_folders_are_not_listed(self):
-        self.assertEqual(self.get("/images/kiosk/vmlinuz"), "kernel")
-        with self.assertRaises(HTTPError):
-            self.get("/images/kiosk/")
+    def test_image_folders_are_not_listed(self):
+        self.store.set_mode("open")
+        try:
+            self.get("/boot?serial=x1&mac=aa-bb-cc-dd-ee-06")
+            with self.assertRaises(HTTPError):
+                self.get("/images/kiosk/")
+        finally:
+            self.store.set_mode("whitelist")
 
 
 class AdminTool(unittest.TestCase):
@@ -257,8 +295,18 @@ class AdminTool(unittest.TestCase):
                 p = subprocess.run([sys.executable, tool] + list(a), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 return p.returncode, p.stdout.decode()
             self.assertEqual(run("assign", "SER9", "kiosk", "--location", "Område A")[0], 0)
-            self.assertEqual(pxe_boot.Store(os.path.join(root, "data")).assignments(), {"ser9": {"image": "kiosk", "location": "Område A"}})
-            self.assertIn("kiosk (Område A)", run("list")[1])
+            self.assertEqual(pxe_boot.Store(os.path.join(root, "data")).assignments()["ser9"]["location"], "Område A")
+            self.assertIn("kiosk  location=Område A", run("list")[1])
+            self.assertEqual(run("assign", "ser9", "kiosk", "--args", "bad;rm -rf")[0], 1)                   # kernel arguments are checked
+            self.assertEqual(run("allow", "SER9", "AA:BB:CC:DD:EE:07")[0], 0)
+            self.assertIn("allowed", run("list")[1])
+            self.assertIn("ser9", run("list")[1])
+            self.assertEqual(run("pending")[1].count("PENDING"), 0)
+            self.assertEqual(run("block", "ser9")[0], 0)
+            self.assertIn("blocked", run("list")[1])
+            self.assertEqual(run("clear", "ser9")[0], 0)
+            self.assertEqual(run("allow", "not a key!")[0], 1)
+            self.assertEqual(run("mode", "open")[0], 0)
             self.assertEqual(run("assign", "ser9", "nope")[0], 1)                          # an image that does not exist
             self.assertEqual(run("unassign", "ser9")[0], 0)
         finally:

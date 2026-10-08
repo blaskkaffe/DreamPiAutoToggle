@@ -16,7 +16,9 @@ JUNK_SERIALS = ("", "0", "none", "null", "n/a", "na", "unknown", "default string
 _MAC = re.compile(r"^[0-9a-f]{2}([-:][0-9a-f]{2}){5}$")
 _ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 MAX_MACHINES = 5000
+GRANT_SECONDS = 1800          # an approved computer may fetch the images from its address this long after it asked for its boot script
 _lock = threading.Lock()
+_EXTRA_ARGS = re.compile(r"^[A-Za-z0-9_.=,:/+%@-]+( [A-Za-z0-9_.=,:/+%@-]+)*$")
 
 
 def clean_mac(text):
@@ -55,13 +57,77 @@ def _write(path, data):
     os.rename(tmp, path)
 
 
+def access_key(text):
+    """What the admin typed in a whitelist: a MAC address (any separator) or a serial number / computer name, normalised; "" when unusable."""
+    t = (text or "").strip().lower()
+    return clean_mac(t) or (t if _ID.match(t) else "")
+
+
 class Store(object):
-    """registry.json ({id: machine}) and assignments.json ({id: {"image", "location"}}) in the data folder."""
+    """In the data folder: registry.json ({id: machine}: every computer that has asked to boot), assignments.json ({id: its boot settings}:
+    image, location, board_url, args) and access.json ({"mode": "whitelist" | "open", "allow": [...], "block": [...]}: the entries are computer
+    names (serial numbers) or MAC addresses; a computer is allowed when its name or its MAC is on the allow list)."""
 
     def __init__(self, data_dir):
         self.dir = data_dir
         self.registry_file = os.path.join(data_dir, "registry.json")
         self.assignments_file = os.path.join(data_dir, "assignments.json")
+        self.access_file = os.path.join(data_dir, "access.json")
+        self._grants = {}
+
+    def access(self):
+        a = _read(self.access_file, {})
+        return {"mode": "open" if a.get("mode") == "open" else "whitelist",
+                "allow": [x for x in a.get("allow", []) if isinstance(x, str)], "block": [x for x in a.get("block", []) if isinstance(x, str)]}
+
+    def status(self, ident, mac=""):
+        """"allowed", "blocked" or "pending" (not on any list: it is in the "has connected" list until the admin decides). A block wins."""
+        a = self.access()
+        keys = set(k for k in (ident, clean_mac(mac)) if k)
+        if keys & set(a["block"]):
+            return "blocked"
+        if a["mode"] == "open" or keys & set(a["allow"]):
+            return "allowed"
+        return "pending"
+
+    def _set_access(self, key, where):
+        k = access_key(key)
+        if not k:
+            return False
+        with _lock:
+            a = self.access()
+            for name in ("allow", "block"):
+                a[name] = [x for x in a[name] if x != k]
+            if where:
+                a[where].append(k)
+                a[where].sort()
+            _write(self.access_file, a)
+        return True
+
+    def allow(self, key):
+        return self._set_access(key, "allow")
+
+    def block(self, key):
+        return self._set_access(key, "block")
+
+    def clear_access(self, key):
+        return self._set_access(key, None)
+
+    def set_mode(self, mode):
+        with _lock:
+            a = self.access()
+            a["mode"] = "open" if mode == "open" else "whitelist"
+            _write(self.access_file, a)
+
+    def grant(self, ip):
+        """An approved computer was told its boot script: its address may fetch the images for a while."""
+        with _lock:
+            now = time.time()
+            self._grants = dict((k, v) for k, v in self._grants.items() if v > now)
+            self._grants[ip] = now + GRANT_SECONDS
+
+    def granted(self, ip):
+        return self._grants.get(ip, 0) > time.time() or self.access()["mode"] == "open"
 
     def registry(self):
         return _read(self.registry_file, {})
@@ -92,10 +158,11 @@ class Store(object):
             _write(self.registry_file, reg)
             return True
 
-    def assign(self, ident, image, location=""):
+    def assign(self, ident, image, location="", board_url="", args=""):
+        """Boot settings for one computer: the image it boots without the menu, the buildings it shows, another board address, extra kernel arguments."""
         with _lock:
             data = self.assignments()
-            data[ident] = {"image": image, "location": location or ""}
+            data[ident] = {"image": image, "location": location or "", "board_url": board_url or "", "args": args or ""}
             _write(self.assignments_file, data)
 
     def unassign(self, ident):
@@ -152,11 +219,13 @@ def _one_line(text):
     return re.sub(r"[\r\n]+", " ", str(text))
 
 
-def command_line(template, image, server, board, screen, location):
+def command_line(template, image, server, board, screen, location, extra=""):
     base = "%s/images/%s" % (server, image["id"])
     out = template
     for key, val in (("{base}", base), ("{board}", board), ("{screen}", screen), ("{location}", encode_location(location)), ("{server}", server)):
         out = out.replace(key, val)
+    if extra and _EXTRA_ARGS.match(extra):
+        out += " " + extra
     return _one_line(out).strip()
 
 
@@ -168,6 +237,16 @@ def _boot_lines(label, image, args, server, title):
             "boot || goto failed"]
 
 
+def refusal_script(ident, serial, mac, status):
+    """What a computer that is not on the whitelist sees: why, and the numbers the admin needs. Then it boots its own disk."""
+    why = "has been blocked" if status == "blocked" else "is not approved yet"
+    return "\n".join(["#!ipxe", "echo", "echo This computer %s for network boot." % why,
+                       "echo   Serial number: %s" % (_one_line(serial) or "-"), "echo   MAC address:   %s" % (_one_line(mac) or "-"),
+                       "echo   Name:          %s" % ident,
+                       "echo" if status == "blocked" else "echo Ask the administrator to approve it (checkin-pxe allow %s)." % ident,
+                       "sleep 15", "exit", ""])
+
+
 def boot_script(ident, serial, mac, machine, images, assignment, server, board):
     """The iPXE script for a computer. images: load_images(); assignment: {"image", "location"} or None; machine: its registry record.
     - set to an image: boots it after a short pause (press I there for the local install, if the image has one);
@@ -175,11 +254,13 @@ def boot_script(ident, serial, mac, machine, images, assignment, server, board):
     - otherwise a menu: each image, "install on the local disk" and "shell" for those that have them, the iPXE shell, the local disk."""
     lst = ordered(images)
     location = (assignment or {}).get("location", "")
+    board = (assignment or {}).get("board_url") or board
+    extra = (assignment or {}).get("args", "")
     chosen = images.get((assignment or {}).get("image", ""))
-    lines = ["#!ipxe", "echo Check-in screen %s (serial %s, MAC %s)" % (ident, _one_line(serial) or "-", _one_line(mac) or "-")]
+    lines = ["#!ipxe", "echo Connected to the check-in boot server: approved (%s, serial %s, MAC %s)" % (ident, _one_line(serial) or "-", _one_line(mac) or "-")]
 
     def args_for(image, template):
-        return command_line(template, image, server, board, ident, location)
+        return command_line(template, image, server, board, ident, location, extra)
 
     if machine.get("installed") and not chosen:
         lines += ["prompt --key 0x6e --timeout 3000 Booting from the local disk. Press N for the network boot menu || exit"]
