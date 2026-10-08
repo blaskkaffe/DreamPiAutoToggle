@@ -13,6 +13,8 @@ What you get:
 - **A screen per building:** with several buildings a row of chips picks what a screen shows (kept in that browser; `?location=Område A` in the address sets it).
 - **Contacts:** import a CSV (a file or pasted text), export it again, switch people off, tap a person to edit their name, department, role, phone and building (or delete them). The status menu is editable too (names, colours, time / date / note, dots, counts as out, sticky). The board can show each person's role and building (pick which ones), and has an optional on-screen number pad / keyboard for times, dates and notes.
 - **Screens with nothing installed:** a kiosk computer can boot over the network into a small Linux image that shows the board in Firefox, behind a whitelist of serial numbers / MAC addresses, with a menu, per-computer settings, an optional install to the local disk, and a loading screen with the chicken logo. Each screen keeps its **own layout and settings** on the host, so they are back after a reload or a reboot.
+- **Text and sound:** the text of the board has its own **size** (0.5 to 2 times, with presets) and **colour** (black by default, or any palette colour), separate from Stretch / Scale / Fit (which grow the rows and the spacing, never the text); **button sounds** (a small pop; copy more `.wav` / `.mp3` / `.ogg` files into `/opt/checkin-board/sounds`); the theme can follow **the time of day** at the time zone (light by day, dark at night) for a computer without a light / dark setting of its own.
+- **Dates and notes:** a status can ask for a time, a date, or a date and a time, with a **calendar** next to the date field and a **Skip** button; the on-screen keyboard is laid out like the iPhone's Swedish one, with emoji and an even number pad. Pictures of people are chosen in Settings > Contacts only.
 - A **clock** (12 or 24-hour, `.beat`, world times and a time zone map), **update and reboot buttons** on the page and an optional **PIN** for them.
 
 **Tested so far:** on a development machine only, not on a real host or kiosk screen, and **the network boot has never been run on real hardware**: unit tests (`sh tests/run.sh`) and the page driven in Chromium against a demo server (`sh tests/ui/run.sh`). See [docs/hardware-status.md](docs/hardware-status.md) for what has and has not been seen on real hardware.
@@ -26,7 +28,7 @@ cd DreamPiAutoToggle
 git checkout checkin2.0
 sudo ./install.sh
 ```
-Then open **http://&lt;the host's name&gt;.local** or its IP address in a browser on the same network, open **Settings** (the cogwheel) > **Contacts** and import your people.
+Then open **http://&lt;the host's name&gt;.local** or its IP address in a browser (`sudo ./install.sh --hostname=checkinchicken` names the computer so that it is **http://checkinchicken.local**, the address the kiosk screens use when they are not told another one; `.local` names need avahi-daemon on the host) on the same network, open **Settings** (the cogwheel) > **Contacts** and import your people.
 
 Other screens only need a browser (or no setup at all: see [Screens that boot from the network](#screens-that-boot-from-the-network)): open the same address, or run `kiosk/kiosk-browser.sh <host>` (Chromium full screen; `kiosk/checkin-kiosk-autostart.desktop` starts it at every login, so a power cut is no problem). `./kiosk-browser.sh 192.168.1.20 "Område A"` pins that screen to one building.
 
@@ -84,6 +86,7 @@ Everything the page shows is a module, one folder in `modules/`. **Settings > Sy
 | About | Versions, the time zone, the global colours, a link to the project (always on) | on |
 | Background image | A picture of your own as the page's background: choose it in Settings > Background image (big pictures are shrunk in the browser first), fit and darken it | **off** |
 | Reboot and Update | Update the add-on from GitHub, reboot the host | on |
+| Snow background | A snowstorm in soft fog behind everything (3D, WebGL), with a day and night that follow the time zone | **off** |
 
 Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), [docs/checkin.md](docs/checkin.md) (the board and the contacts), [docs/web.md](docs/web.md), [docs/pxe.md](docs/pxe.md) (network boot), [docs/offline.md](docs/offline.md) (offline install), [docs/hardware-status.md](docs/hardware-status.md). `CLAUDE.md` is the short guide for working on the code.
 

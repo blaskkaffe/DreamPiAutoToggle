@@ -13,6 +13,11 @@ rsync
 firefox-esr
 chromium
 mpv
+fonts-noto-color-emoji
+
+# so that checkinchicken.local resolves (the board's default address)
+avahi-daemon
+libnss-mdns
 
 # the network boot server (pxe/install-pxe.sh)
 dnsmasq-base

@@ -57,6 +57,6 @@ The page sends `X-Screen: <id>` (from `?screen=<id>` in its address, kept in `se
 ## Rules
 - The whitelist keeps strangers from booting from the server and from fetching the image (files are only served to the address of an approved computer for 30 minutes after its `/boot` request). It is **not strong authentication**: the serial number and MAC address are what the computer says they are, so somebody who copies an approved computer's numbers on the same network gets in; and the DHCP / TFTP part (the small iPXE program) is offered to every computer. The image holds no secrets and the board's PIN protects its settings, but anybody on the network can open the board's address in a browser anyway.
 - Do not run another DHCP server for this; the router stays the DHCP server.
-- The address given to the screens is `--board-url` (default `http://<server ip>/`, the plain HTTP port; the kiosk does not need the self-signed HTTPS certificate).
+- A screen that is told no address uses `http://checkinchicken.local/` (the image has avahi / nss-mdns; `install.sh --hostname=checkinchicken` makes the host answer to it). The address given to the screens is `--board-url` (default `http://<server ip>/`, the plain HTTP port; the kiosk does not need the self-signed HTTPS certificate).
 - A computer that gets no script boots its own disk; it is never locked out of the machine itself.
 - Firewall: UDP 67, 69 and 4011 (proxy DHCP), TCP 8069 on the server.

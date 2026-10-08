@@ -15,11 +15,11 @@ from urllib.request import Request, urlopen
 from support import ROOT, web, core, sandbox, cleanup
 
 REAL_MODULES = os.path.join(ROOT, "modules")
-NAMES = ["checkin", "clock", "contacts", "imagebg", "rebootupdate"]      # the modules the picker can switch
+NAMES = ["checkin", "clock", "contacts", "imagebg", "rebootupdate", "snow"]      # the modules the picker can switch
 HIDDEN = ["system"]                                                # always on, not in the picker
 ALL = sorted(NAMES + HIDDEN)
 # a path only that module answers (GET, or POST when None)
-ENDPOINT = {"checkin": ("GET", "/checkin"), "clock": ("GET", "/clock"), "contacts": ("GET", "/contacts"), "imagebg": ("GET", "/imagebg"), "rebootupdate": ("GET", "/update")}
+ENDPOINT = {"checkin": ("GET", "/checkin"), "clock": ("GET", "/clock"), "contacts": ("GET", "/contacts"), "imagebg": ("GET", "/imagebg"), "rebootupdate": ("GET", "/update"), "snow": ("GET", "/snow")}
 HIDDEN_ENDPOINT = {"system": ("GET", "/about")}
 BASE_IDS = ('id="dash"', 'id="set-boxes"', 'id="settings"', 'id="bg"', 'id="warnings"')
 
@@ -52,7 +52,8 @@ class Base(unittest.TestCase):
         self.modules = os.path.join(self.tmp, "modules")
         shutil.copytree(REAL_MODULES, self.modules, ignore=shutil.ignore_patterns("__pycache__"))
         self.saved_dir, core.MODULES_DIR = core.MODULES_DIR, self.modules
-        core.save_module_enabled("imagebg", True)        # off by default: the tests want to see it
+        core.save_module_enabled("imagebg", True)        # off by default: the tests want to see them
+        core.save_module_enabled("snow", True)
         web.refresh_page(force=True)
         self.srv = web.Server(("127.0.0.1", 0), web.Handler)
         threading.Thread(target=self.srv.serve_forever, daemon=True).start()
@@ -125,7 +126,7 @@ class RepoModules(unittest.TestCase):
 
     def test_defaults(self):
         on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["enabled"]) for n in ALL)
-        self.assertEqual(on, {"checkin": True, "clock": True, "contacts": True, "imagebg": False, "rebootupdate": True, "system": True})
+        self.assertEqual(on, {"checkin": True, "clock": True, "contacts": True, "imagebg": False, "rebootupdate": True, "snow": False, "system": True})
         hidden = [n for n in ALL if json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["visible"] is False]
         self.assertEqual(hidden, HIDDEN)                   # the system info can't be switched off
 
@@ -156,7 +157,7 @@ class WithEverything(Base):
         about = [b for b in lay["settings"] if b["id"] == "about"][0]
         self.assertEqual((about["mods"], about["title"]), (["system"], "About"))               # the versions are their own box, not part of System
         self.assertEqual([b["id"] for b in lay["dashboard"]], ["checkin", "clock"])
-        self.assertEqual([b["id"] for b in lay["settings"]], ["appearance", "colours", "check-in", "statuses", "clock", "contacts", "about", "background-image", "system"])
+        self.assertEqual([b["id"] for b in lay["settings"]], ["appearance", "colours", "check-in", "statuses", "clock", "contacts", "about", "background-image", "snow-background", "system"])
 
     def test_the_picker_lists_dashboard_modules_then_settings_only_then_backgrounds(self):
         core.save_module_order(["imagebg", "rebootupdate", "contacts", "clock", "system", "checkin"])      # the user's own mix
@@ -167,10 +168,10 @@ class WithEverything(Base):
         self.assertLess(names.index("clock"), names.index("checkin"))                       # inside a group the user's order stays: clock was before checkin
 
     def test_moving_tiles_on_the_main_screen_reorders_those_modules_only(self):
-        core.save_module_order(["checkin", "clock", "contacts", "system", "rebootupdate", "imagebg"])
+        core.save_module_order(["checkin", "clock", "contacts", "system", "rebootupdate", "imagebg", "snow"])
         new = core.save_dashboard_order(["clock", "checkin"])                                # two tiles moved: they take each other's places
         self.assertEqual(new[:2], ["clock", "checkin"])
-        self.assertEqual(new[2:], ["contacts", "system", "rebootupdate", "imagebg"])
+        self.assertEqual(new[2:], ["contacts", "system", "rebootupdate", "imagebg", "snow"])
         self.assertEqual(core.save_dashboard_order(["nope", "checkin"])[:2], ["clock", "checkin"])      # unknown names are ignored
         self.assertIsNone(core.save_dashboard_order("clock"))
 
@@ -197,7 +198,7 @@ class WithEverything(Base):
 
     def test_modules_menu_lists_them_all(self):
         got = self.json("/modules")["modules"]
-        self.assertEqual([m["name"] for m in got], ["checkin", "clock", "contacts", "system", "rebootupdate", "imagebg"])   # picker order, the always-on modules included
+        self.assertEqual([m["name"] for m in got], ["checkin", "clock", "contacts", "system", "rebootupdate", "imagebg", "snow"])   # picker order, the always-on modules included
         self.assertEqual([m["name"] for m in got if m["visible"] is False], ["system"])                     # which the page lists without a switch
         self.assertTrue(all(m["enabled"] for m in got))
         self.assertTrue(all(m["title"] and m["description"] for m in got))

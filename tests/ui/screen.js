@@ -20,7 +20,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   const info = () => page.evaluate(() => {
     const d = document.getElementById('dash'), cols = d.querySelectorAll(':scope > .dcol'), b = document.body;
     const boxes = Array.from(d.querySelectorAll('.dbox')).filter(x => x.offsetHeight);
-    return { cols: cols.length, bodyMax: b.style.maxWidth, dashW: Math.round(d.getBoundingClientRect().width), zoom: getComputedStyle(boxes[0]).zoom,
+    return { cols: cols.length, bodyMax: b.style.maxWidth, dashW: Math.round(d.getBoundingClientRect().width), zoom: d.style.getPropertyValue('--z').trim() || '1', nameFs: getComputedStyle(boxes[0].querySelector('.rp-n') || boxes[0]).fontSize,
              boxW: Math.round(boxes[0].getBoundingClientRect().width), n: boxes.length, inCols: cols.length ? Array.from(cols).map(c => Array.from(c.querySelectorAll('.dbox')).filter(x => x.offsetHeight).length) : [] };
   });
   await load();
@@ -32,7 +32,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(await post('/screen', { values: { dash_cols: 3, set_cols: 6 } }) === 200, 'Max columns are saved');
   await load(); i = await info();
   ok(i.cols === 3 && i.inCols.reduce((a, b) => a + b, 0) === i.n && Math.max.apply(null, i.inCols) - Math.min.apply(null, i.inCols) <= 2, 'three dashboard columns with the boxes shared out (' + i.inCols + ')');
-  ok(i.bodyMax === (3 * 428 + 2 * 20 + 32) + 'px' && i.dashW <= 3 * 428 + 40, 'not stretched: the columns keep their usual width (' + i.dashW + ' px)');
+  ok(i.bodyMax === (3 * 428 + 2 * 12 + 32) + 'px' && i.dashW <= 3 * 428 + 24, 'not stretched: the columns keep their usual width (' + i.dashW + ' px)');
   await page.setViewportSize({ width: 800, height: 900 }); await settle(500); i = await info();
   ok(i.cols === 0, 'a screen that fits one column only gets one, however many are allowed (800 px)');
   await page.setViewportSize({ width: 1000, height: 900 }); await settle(500); i = await info();
@@ -45,9 +45,10 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(i.zoom === '1', 'without Scale content the boxes only get wider (zoom ' + i.zoom + ')');
   ok(await post('/screen/scale', { value: true }) === 200, 'Scale content saved');
   await settle(1500); i = await info();
-  const want = ((1500 - 48 - 40) / 3) / 428;
-  ok(Math.abs(parseFloat(i.zoom) - want) < 0.02 && i.zoom !== '1', 'with Scale content the boxes are drawn bigger in step with their width (zoom ' + i.zoom + ', wanted ' + want.toFixed(2) + ')');
-  ok(Math.abs(i.boxW - (1500 - 48 - 40) / 3) <= 2, 'each box is as wide as its column (' + i.boxW + ' px)');
+  const want = ((1500 - 48 - 24) / 3) / 428, fs0 = i.nameFs;
+  ok(Math.abs(parseFloat(i.zoom) - want) < 0.02 && i.zoom !== '1', 'with Scale content the rows and the spacing grow in step with the width of the boxes (--z ' + i.zoom + ', wanted ' + want.toFixed(2) + ')');
+  ok(i.nameFs === '28px' && fs0 === '28px', 'but the text keeps its size (' + i.nameFs + '): Stretch, Scale content and Fit never scale it');
+  ok(Math.abs(i.boxW - (1500 - 48 - 24) / 3) <= 2, 'each box is as wide as its column (' + i.boxW + ' px)');
   await page.setViewportSize({ width: 420, height: 900 }); await settle(600); i = await info();
   ok(i.cols === 0 && i.zoom === '1', 'a phone stays one column at its normal size');
   await page.setViewportSize({ width: 1500, height: 900 }); await settle(600);
@@ -152,7 +153,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await post('/screen/drag', { value: false }, '4821');
   ok(await post('/pin', { pin: '' }, '4821') === 200 && await post('/colour', { module: 'checkin', key: 'checkin', colour: 'blue' }) === 200, 'removing the PIN removes the lock');
   // ---- fit to screen: the main screen is as big as it can be without scrolling
-  const room = () => page.evaluate(() => { const d = document.getElementById('dash').getBoundingClientRect(); return { z: parseFloat(getComputedStyle(document.querySelector('#dash .dbox')).zoom), bottom: Math.round(d.bottom + scrollY + 24), vh: innerHeight, scroll: document.documentElement.scrollHeight - innerHeight }; });
+  const room = () => page.evaluate(() => { const d = document.getElementById('dash').getBoundingClientRect(); return { z: parseFloat(document.getElementById('dash').style.getPropertyValue('--z')), bottom: Math.round(d.bottom + scrollY + 24), vh: innerHeight, scroll: document.documentElement.scrollHeight - innerHeight }; });
   await page.setViewportSize({ width: 600, height: 3000 }); await load(); let f = await room();
   ok(f.z === 1 && f.bottom < f.vh - 300, 'a tall window leaves empty space at the bottom without it (' + JSON.stringify(f) + ')');
   ok(await post('/screen/fit', { value: true }) === 200, 'Fit to screen saved'); await settle(1800); f = await room();

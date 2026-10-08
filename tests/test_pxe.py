@@ -85,7 +85,7 @@ class KioskSession(unittest.TestCase):
                          "http://10.0.0.2/?screen=abc&location=Omr%C3%A5de+A,B")
 
     def test_default_when_nothing_is_given(self):
-        self.assertRegex(session_url("quiet"), r"^http://checkin\.local/\?screen=\S+$")
+        self.assertRegex(session_url("quiet"), r"^http://checkinchicken\.local/\?screen=\S+$")
 
     def test_a_local_install_reads_its_config_file(self):
         d = tempfile.mkdtemp()

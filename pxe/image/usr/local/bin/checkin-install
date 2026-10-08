@@ -35,7 +35,7 @@ DISK=$(whiptail --title "$TITLE" --menu "Which disk should the system be install
 NAME_DEFAULT=$( [ -n "$SCREEN" ] && echo "checkin-$SCREEN" || echo checkin-screen )
 HOSTNAME_NEW=$(whiptail --title "$TITLE" --inputbox "Name of this computer on the network:" 10 70 "${NAME_DEFAULT:0:40}" 3>&1 1>&2 2>&3) || exit 0
 echo "$HOSTNAME_NEW" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9-]{0,62}$' || die "That is not a usable computer name (letters, digits and dashes)."
-URL=$(whiptail --title "$TITLE" --inputbox "Address of the check-in board:" 10 70 "${URL:-http://checkin.local/}" 3>&1 1>&2 2>&3) || exit 0
+URL=$(whiptail --title "$TITLE" --inputbox "Address of the check-in board:" 10 70 "${URL:-http://checkinchicken.local/}" 3>&1 1>&2 2>&3) || exit 0
 echo "$URL" | grep -Eq '^https?://[A-Za-z0-9._:/-]+$' || die "That is not a usable address (http://host/)."
 LOCATION=$(whiptail --title "$TITLE" --inputbox "Buildings this screen shows (empty = everybody; spaces as +, several separated by a comma):" 11 70 "$LOCATION" 3>&1 1>&2 2>&3) || exit 0
 echo "$LOCATION" | grep -Eq '^[A-Za-z0-9+,%._-]*$' || die "Buildings: only letters, digits and + , % . _ - are allowed."

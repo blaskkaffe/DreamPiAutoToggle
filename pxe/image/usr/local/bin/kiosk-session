@@ -18,7 +18,7 @@ SCREEN=$(param checkin_screen);      [ -n "$SCREEN" ] || SCREEN="$CHECKIN_SCREEN
 LOCATION=$(param checkin_location);  [ -n "$LOCATION" ] || LOCATION="$CHECKIN_LOCATION"   # buildings as on the board's buttons, spaces as +, several separated by comma
 BROWSER=$(param checkin_browser);    [ -n "$BROWSER" ] || BROWSER="$CHECKIN_BROWSER"          # firefox (default) or chromium
 case "$BROWSER" in chromium) ;; *) BROWSER=firefox ;; esac
-[ -n "$URL" ] || URL="http://checkin.local/"
+[ -n "$URL" ] || URL="http://checkinchicken.local/"
 URL="${URL%/}/"
 # ?screen=<id> makes the board keep this computer's layout and settings apart from the other screens' (it survives a reboot: the host keeps it)
 SHOW="${URL}?screen=${SCREEN:-$(hostname)}"

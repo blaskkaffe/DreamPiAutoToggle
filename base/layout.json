@@ -25,6 +25,40 @@
        ]
       },
       {
+       "title": "Text size",
+       "sub_text": "font_scale",
+       "controls": [
+        {
+         "type": "choice",
+         "key": "font_scale",
+         "options": "sizes",
+         "label": "Text size"
+        },
+        {
+         "type": "slider",
+         "key": "font_scale",
+         "min": 0.5,
+         "max": 2,
+         "step": 0.05,
+         "unit": "×",
+         "aria": "Text scale",
+         "label": "Text scale"
+        }
+       ]
+      },
+      {
+       "title": "Text colour",
+       "sub_text": "font_colour",
+       "controls": [
+        {
+         "type": "select",
+         "key": "font_colour",
+         "options": "font_colours",
+         "label": "Colour of the text on the board"
+        }
+       ]
+      },
+      {
        "title": "Max columns: dashboard",
        "sub_text": "dash_cols",
        "controls": [
@@ -47,6 +81,24 @@
          "label": "Columns"
         }
        ]
+      },
+      {
+       "title": "Button sound",
+       "sub_text": "sound_name",
+       "controls": [
+        {
+         "type": "select",
+         "key": "sound_name",
+         "options": "sounds",
+         "label": "Sound (more: copy .wav, .mp3 or .ogg files into /opt/checkin-board/sounds)"
+        },
+        {
+         "type": "slider",
+         "key": "sound_volume",
+         "aria": "Volume",
+         "label": "Volume"
+        }
+       ]
       }
      ]
     },
@@ -64,7 +116,7 @@
     {
      "type": "row",
      "title": "Scale content",
-     "sub": "The content of a stretched box grows with it, so the box is taller too (off: the content keeps its size)",
+     "sub": "The rows and the spacing of a stretched box grow with it, so the box is taller too. The text keeps its size (see Text size).",
      "show": "@screen.stretch",
      "control": {
       "type": "toggle",
@@ -76,12 +128,23 @@
     {
      "type": "row",
      "title": "Fit to screen",
-     "sub": "The main screen is made as big as it can be without scrolling, so there is no empty space under it (the columns fill the width; neither Stretch nor scaling is needed)",
+     "sub": "The main screen is made as tall as it can be without scrolling, so there is no empty space under it: the columns fill the width and the rows grow, the text keeps its size (see Text size).",
      "control": {
       "type": "toggle",
       "bind": "@screen.fit",
       "post": "/screen/fit",
       "label": "Fit to screen"
+     }
+    },
+    {
+     "type": "row",
+     "title": "Button sounds",
+     "sub": "A small click when a button is pressed",
+     "control": {
+      "type": "toggle",
+      "bind": "@screen.sound",
+      "post": "/screen/sound",
+      "label": "Button sounds"
      }
     },
     {

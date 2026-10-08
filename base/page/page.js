@@ -68,7 +68,7 @@ function lookDot(el,look){setClass(el,"dot");if(!look||!look.colour){setStyle(el
 function render(d){
  pinNeeded=!!d.pin;
  for(var k in d)S[k]=d[k];       // S keeps the data sources' answers and the page's own state between /api answers
- NOTICES=d.notices||[];
+ NOTICES=d.notices||[];if(SCR.theme==="time")applyLook();
  setHtml($("warnings"),d.warnings.map(function(w){return '<div class="warnbox">'+esc(w)+'</div>'}).join("")+
   NOTICES.map(function(n,i){return '<div class="notebox" role="status"><span>'+esc(n.text)+'</span>'+(n.post?'<button type="button" class="nx" data-n="'+i+'" title="Dismiss" aria-label="Dismiss">&#10005;</button>':'')+'</div>'}).join(""));
  engineUpdate();
@@ -107,8 +107,9 @@ function layoutColumns(force){var cols=$("set-boxes"),GAP=SGAP;applyScreen(true)
 window.addEventListener("resize",function(){applyScreen();if($("settings").classList.contains("open"))layoutColumns()});
 // ---- the screen layout (Settings > Appearance; S.screen from /api): how many columns the dashboard and Settings use on a wide screen and
 // whether they stretch. A column is about COLW px wide; there are as many as fit, up to the setting. Stretch: the columns share the whole width
-// (the boxes are wider). Scale content: a stretched box is drawn bigger (CSS zoom) in step with its width, so it is taller too.
-var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,noscroll:false,fit:false,autohide:false,theme:"dark"},COLW=428,SGAP=20,scrKey="";
+// (the boxes are wider). Scale content: a stretched box grows in step with its width (--z: the rows are taller, the spacing larger) but its text keeps its size;
+// the text has its own scaler (font_scale, 0.5 to 2: --fz) and colour (font_colour: --rp-text, black by default).
+var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,noscroll:false,fit:false,autohide:false,theme:"dark",font_scale:1,font_colour:"black",sound:true,sound_name:"pop.wav",sound_volume:.6},COLW=428,SGAP=12,scrKey="";
 function colsFor(max,W){return Math.max(1,Math.min(max,Math.floor((W+SGAP)/(COLW+SGAP))))}
 function scrZoom(n,W){return SCR.stretch&&SCR.scale?Math.max(1,((W-SGAP*(n-1))/n)/COLW):1}
 // The dashboard's boxes in dn columns: each box goes to the column that is shortest so far, in the order of the layout (so the first boxes are at
@@ -197,19 +198,40 @@ function gripEvents(tile,grip){
   grip.addEventListener("pointermove",move);grip.addEventListener("pointerup",up);grip.addEventListener("pointercancel",lost);document.addEventListener("keydown",esc,true);show(e)})}
 // the theme: "dark", "light" or "auto" (the device's own setting); the page is built with it, this follows a change made here or on another device
 var themeMedia=window.matchMedia?matchMedia("(prefers-color-scheme: light)"):null;
-function applyLook(){var pref=SCR.theme||"dark",d=document.documentElement,want=pref==="auto"?(themeMedia&&themeMedia.matches?"light":"dark"):pref;
+// ---- button sounds (Appearance > Button sound): a short click when a button is pressed (pointer down, so it is heard at once). The sound is one of the files in the
+// host's sounds folder (/opt/checkin-board/sounds: pop.wav, tick.wav ... and any .wav / .mp3 / .ogg copied in by hand), played with the Web Audio API at the chosen volume.
+var Snd={ctx:null,buf:{},want:"",on:true,vol:.6,asked:{}};
+function sndCtx(){if(!Snd.ctx){try{var C=window.AudioContext||window.webkitAudioContext;if(C)Snd.ctx=new C()}catch(e){}}return Snd.ctx}      // made at the first press (a page may only start sound after one)
+function sndLoad(name){if(!name||Snd.buf[name]||Snd.asked[name])return;Snd.asked[name]=1;
+ var x=new XMLHttpRequest();x.open("GET","/sounds/"+encodeURIComponent(name),true);x.responseType="arraybuffer";
+ x.onload=function(){if(x.status!==200)return;try{var O=window.OfflineAudioContext||window.webkitOfflineAudioContext,d=new O(1,1,44100);      // decoded without a sound context, so nothing needs a press first
+  var ok=function(b){Snd.buf[name]=b},p=d.decodeAudioData(x.response,ok,function(){});if(p&&p.then)p.then(ok,function(){})}catch(e){}};x.send()}
+function sndPlay(){if(!Snd.on||!Snd.vol)return;var c=sndCtx(),b=Snd.buf[Snd.want];if(!c||!b)return;try{if(c.state==="suspended")c.resume();
+ var src=c.createBufferSource(),g=c.createGain();g.gain.value=Snd.vol;src.buffer=b;src.connect(g);g.connect(c.destination);src.start(0)}catch(e){}}
+function sndApply(){Snd.on=SCR.sound!==false;Snd.vol=Math.max(0,Math.min(1,+SCR.sound_volume));if(isNaN(Snd.vol))Snd.vol=.6;Snd.want=SCR.sound_name||"pop.wav";if(Snd.on)sndLoad(Snd.want)}
+document.addEventListener("pointerdown",function(e){var t=e.target&&e.target.closest&&e.target.closest('button,.pill-s,[role=button],summary,input[type=checkbox],.swatch,.tgl,select');
+ if(t&&!t.disabled&&!(t.getAttribute&&t.getAttribute("aria-disabled")==="true"))sndPlay()},true);
+// The text colour and size of the board (Appearance > Text colour / Text size). A dark text colour gives light boxes and rows (html[data-rows=light]).
+function fontLook(){var f=SCR.font_colour||"black",hex=f==="black"?"#000000":f==="white"?"#ffffff":"",d=document.documentElement;
+ if(!hex)(PAL()||[]).forEach(function(c){if(c.id===f)hex=c.ui});if(!/^#[0-9a-f]{6}$/i.test(hex||""))hex="#000000";
+ var n=parseInt(hex.slice(1),16),lum=(0.299*(n>>16)+0.587*((n>>8)&255)+0.114*(n&255))/255,fz=Math.max(.5,Math.min(2,+SCR.font_scale||1));
+ d.style.setProperty("--rp-text",hex);d.style.setProperty("--fz",fz);var rows=lum<0.55?"light":"dark";if(d.getAttribute("data-rows")!==rows)d.setAttribute("data-rows",rows)}
+// Theme "time": light while the sun is up at the place of the time zone (S.daylight from /api), dark at night - for a computer whose system has no light / dark setting of its own.
+function applyLook(){fontLook();sndApply();var pref=SCR.theme||"dark",d=document.documentElement,
+ want=pref==="auto"?(themeMedia&&themeMedia.matches?"light":"dark"):pref==="time"?((S.daylight&&S.daylight.day)?"light":"dark"):pref;
  if(d.getAttribute("data-pref")!==pref)d.setAttribute("data-pref",pref);if(d.getAttribute("data-theme")!==want)d.setAttribute("data-theme",want);
  var m=document.querySelector('meta[name=theme-color]'),c=getComputedStyle(document.body).backgroundColor;if(m&&c&&c.indexOf("rgba(0, 0, 0, 0)")!==0)m.setAttribute("content",c)}
 if(themeMedia&&themeMedia.addEventListener)themeMedia.addEventListener("change",function(){applyLook()});
 // Fit to screen: the main screen is drawn as big as it can be without scrolling, so there is no empty space under it. The columns fill the width
 // (as with Stretch boxes) and the zoom is the biggest one (found by trying, ten steps) at which the bottom of the page is still on the screen; never
-// smaller than 1 (a screen that is too small for it scrolls as usual) and never so big that a column is narrower than 280 px of content.
+// smaller than 1 (a screen that is too small for it scrolls as usual). Rows and spacing grow with it, not the text (that is Text size).
 var fitState={key:"",z:1};
 function pageBottom(){return $("dash").getBoundingClientRect().bottom+window.scrollY+(parseFloat(getComputedStyle(document.body).marginBottom)||0)}
 function fitZoom(dn,W){var dash=$("dash"),vh=window.innerHeight,key=[W,vh,dn,Math.round(pageBottom())].join("/");
  if(key===fitState.key)return fitState.z;
  function put(z){dash.style.setProperty("--z",z)}
- var lo=1,hi=Math.min(3.5,Math.max(1,((W-SGAP*(dn-1))/dn)/280)),i;put(1);
+ var lo=1,hi=12,i;      // only rows and spacing grow, never the text, so the limit is high
+ put(1);
  if(pageBottom()<=vh)for(i=0;i<10;i++){var mid=(lo+hi)/2;put(mid);if(pageBottom()<=vh)lo=mid;else hi=mid}
  put(lo);fitState={key:[W,vh,dn,Math.round(pageBottom())].join("/"),z:lo};return lo}
 function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;applyLook();
@@ -283,7 +305,7 @@ function applyPalette(d){PV=d.palette_v;S.palette=d.palette;
  var st=document.getElementById("palette-css");if(!st){st=document.createElement("style");st.id="palette-css";document.head.appendChild(st)}
  st.textContent=d.palette_css;
  var inl=document.documentElement.style,i,drop=[];for(i=0;i<inl.length;i++)if(inl[i].indexOf("--c-")===0)drop.push(inl[i]);drop.forEach(function(k){inl.removeProperty(k)});      // a colour changed on this page (the Global main picker) is the server's now
- if(window.engineUpdate)engineUpdate()}
+ fontLook();if(window.engineUpdate)engineUpdate()}
 function refresh(){var x=new XMLHttpRequest();x.open("GET","/api?pv="+PV,true);if(SCREEN_ID)x.setRequestHeader("X-Screen",SCREEN_ID);
  x.onload=function(){if(x.status==200){var r=JSON.parse(x.responseText);render(r);if(r.palette)applyPalette(r)}bootDone("api")};x.onerror=function(){bootDone("api")};x.send()}
 // The first draw waits for /api and for the data sources that have no kept answer from an earlier visit (at most BOOT_LIMIT ms), then every

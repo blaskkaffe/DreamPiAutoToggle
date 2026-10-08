@@ -1,0 +1,38 @@
+{
+ "background": {"type": "fullscreen"},
+ "settings": [
+  {
+   "box": "snow-background",
+   "title": "Snow background",
+   "items": [
+    {
+     "type": "form",
+     "get": "/snow",
+     "post": "/snow",
+     "fields": [
+      {
+       "title": "Snow",
+       "sub_text": "amount",
+       "controls": [{"type": "choice", "key": "amount", "options": "amounts", "label": "Amount of snow"}]
+      },
+      {
+       "title": "Wind",
+       "sub_text": "wind",
+       "controls": [{"type": "choice", "key": "wind", "options": "winds", "label": "Wind"}]
+      },
+      {
+       "title": "Fog",
+       "sub_text": "fog",
+       "controls": [{"type": "choice", "key": "fog", "options": "fogs", "label": "Fog"}]
+      },
+      {
+       "title": "Time of day",
+       "sub_text": "time",
+       "controls": [{"type": "choice", "key": "time", "options": "times", "label": "Time of day"}]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

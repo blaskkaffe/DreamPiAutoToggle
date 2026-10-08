@@ -754,9 +754,56 @@ def save_settings_pin(on):
 
 
 # ---- screen layout: how many columns the dashboard and Settings may use on a wide screen, and whether the boxes stretch to fill it
-THEMES = ("dark", "light", "auto")
-SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "theme": "dark"}
+THEMES = ("dark", "light", "auto", "time")      # "auto": like the device's own setting; "time": light by day, dark by night at the common time zone
+SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "theme": "dark", "font_scale": 1.0, "font_colour": "black",
+                   "sound": True, "sound_name": "pop.wav", "sound_volume": 0.6}
 MAX_COLUMNS = 6
+SOUNDS_DIR = os.path.join(BASE_DIR, "sounds")   # the button sounds: the add-on's own (pop.wav ...) and any .wav / .mp3 / .ogg the user copies in by hand
+SOUND_TYPES = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg"}
+SOUND_MAX = 2000000                             # bytes of a sound file
+_SOUND_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,60}$")
+
+
+def list_sounds():
+    """The sound files in SOUNDS_DIR (plain names, a known ending, at most SOUND_MAX bytes), sorted."""
+    out = []
+    try:
+        for n in sorted(os.listdir(SOUNDS_DIR)):
+            if _SOUND_NAME.match(n) and os.path.splitext(n)[1].lower() in SOUND_TYPES and os.path.isfile(os.path.join(SOUNDS_DIR, n)) \
+                    and os.path.getsize(os.path.join(SOUNDS_DIR, n)) <= SOUND_MAX:
+                out.append(n)
+    except OSError:
+        pass
+    return out
+
+
+def sound_path(name):
+    """The file of a sound, or None (not a plain name, not there, not a sound)."""
+    return os.path.join(SOUNDS_DIR, name) if name in list_sounds() else None
+
+
+FONT_SCALE_MIN, FONT_SCALE_MAX = 0.5, 2.0       # the text scaler of the dashboard
+FONT_COLOURS = ("black", "white")               # and a palette colour id: the colour of the board's text (black by default)
+
+
+def _font_scale(v):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    return round(min(FONT_SCALE_MAX, max(FONT_SCALE_MIN, v)), 2) if v == v else None
+
+
+def _volume(v):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    return round(min(1.0, max(0.0, v)), 2) if v == v and not isinstance(v, bool) else None
+
+
+def _font_colour(v):
+    return v if isinstance(v, _STR) and (v in FONT_COLOURS or v in palette_ids()) else None
 
 
 def _clean_locations(v):
@@ -789,6 +836,16 @@ def screen_settings():
                 out[k] = data[k]
         if data.get("theme") in THEMES:
             out["theme"] = data["theme"]
+        if not isinstance(data.get("font_scale"), bool) and _font_scale(data.get("font_scale")) is not None:
+            out["font_scale"] = _font_scale(data["font_scale"])
+        if _font_colour(data.get("font_colour")):
+            out["font_colour"] = data["font_colour"]
+        if isinstance(data.get("sound"), bool):
+            out["sound"] = data["sound"]
+        if isinstance(data.get("sound_name"), _STR) and _SOUND_NAME.match(data["sound_name"]):
+            out["sound_name"] = data["sound_name"]
+        if _volume(data.get("sound_volume")) is not None:
+            out["sound_volume"] = _volume(data["sound_volume"])
     return out
 
 
@@ -807,6 +864,16 @@ def save_screen_settings(changes):
             cur[k] = v
         elif k == "theme" and v in THEMES:
             cur[k] = v
+        elif k == "font_scale" and not isinstance(v, bool) and _font_scale(v) is not None:
+            cur[k] = _font_scale(v)
+        elif k == "font_colour" and _font_colour(v):
+            cur[k] = v
+        elif k == "sound" and isinstance(v, bool):
+            cur[k] = v
+        elif k == "sound_name" and isinstance(v, _STR) and _SOUND_NAME.match(v):
+            cur[k] = v
+        elif k == "sound_volume" and not isinstance(v, bool) and _volume(v) is not None:
+            cur[k] = _volume(v)
         elif k == "locations" and screen_id():
             cur[k] = _clean_locations(v)
     target = _screen_write_path("screen.json", SCREEN)
@@ -888,6 +955,20 @@ def time_zone():
     import base_tz as tz
     zone = read_file(TIME_ZONE)
     return zone if zone in tz.ZONE_CHOICES else ""
+
+
+def daylight(now=None):
+    """Where the sun is at the place of the common time zone (the computer's own zone when none is set): {"elev": degrees, "day": bool, "zone": name}.
+    "day" is the sun above the horizon (a little below it, for the sky's glow). The page's theme can follow it (Appearance > Theme > By the time of day)
+    and a background module draws the day and the night from "elev"."""
+    import base_tz as tz
+    zone = time_zone() or tz.own_zone_name()
+    try:
+        lat, lon = tz.zone_place(zone) if zone else (50.0, -time.timezone / 3600.0 * 15.0)
+    except Exception:
+        lat, lon = 50.0, 0.0
+    elev = tz.sun_elevation(lat, lon, now)
+    return {"elev": round(elev, 2), "day": elev > -0.8, "zone": zone}
 
 
 def save_time_zone(value):

@@ -33,4 +33,6 @@ run imagebg.js IMGBG=1
 run columns.js PEOPLE=$(pwd)/long.csv
 # the Colour palette module: add, edit, rearrange, delete and reset colours; the rest of the page follows at once
 run palette.js CLOCK=1
+# the look: text colour and size, Classic boxes, corners and gaps, theme by the time of day, button sounds, the Snow background
+run look.js IN=6
 exit $RESULT

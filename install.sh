@@ -8,6 +8,8 @@
 #   The check-in board, the contacts, the clock and the system controls are modules, one folder each in
 #   modules/ (see docs/modules.md): a folder that is not there is not installed (and one that was installed before is
 #   removed). Which modules are on is the page's Settings > System > Modules.
+#   sudo ./install.sh --hostname=checkinchicken   give the computer that name, so the board is at http://checkinchicken.local
+#                                  (the address the kiosk screens use when they are not told another one; needs avahi-daemon for the .local name)
 #   sudo ./install.sh --pin        ask for a PIN that the page then wants before it updates, restarts
 #                                  the computer or imports contacts (--pin=1234 gives it on the command line,
 #                                  which shows in the shell history); --no-pin removes it. It is kept
@@ -27,6 +29,7 @@ if [ -f "$DEST/install_ports" ]; then
     case "$OLD_HTTPS" in ''|*[!0-9]*) ;; *) HTTPS_PORT=$OLD_HTTPS ;; esac
 fi
 PIN=keep
+NEW_HOSTNAME=""
 for arg in "$@"; do
     case "$arg" in
         --pin) PIN=ask ;;
@@ -35,12 +38,21 @@ for arg in "$@"; do
         --no-pin) PIN=off ;;
         --https-port=*) HTTPS_PORT="${arg#--https-port=}" ;;
         --no-https) HTTPS_PORT=0 ;;
+        --hostname=*) NEW_HOSTNAME="${arg#--hostname=}"
+                      case "$NEW_HOSTNAME" in ''|-*|*[!A-Za-z0-9-]*) echo "The host name may only have letters, digits and dashes"; exit 1 ;; esac ;;
         [0-9]*) PORT="$arg" ;;
         *) echo "Unknown option: $arg"; exit 1 ;;
     esac
 done
 
 if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https]"; exit 1; fi
+
+if [ -n "$NEW_HOSTNAME" ] && [ "$(hostname)" != "$NEW_HOSTNAME" ]; then
+    if command -v hostnamectl >/dev/null 2>&1; then hostnamectl set-hostname "$NEW_HOSTNAME"; else echo "$NEW_HOSTNAME" > /etc/hostname; hostname "$NEW_HOSTNAME"; fi
+    # the new name must resolve on this computer (sudo and the tools that look it up complain otherwise)
+    if grep -q '^127\.0\.1\.1' /etc/hosts 2>/dev/null; then sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$NEW_HOSTNAME/" /etc/hosts; else printf '127.0.1.1\t%s\n' "$NEW_HOSTNAME" >> /etc/hosts; fi
+    echo "The computer is now called $NEW_HOSTNAME (http://$NEW_HOSTNAME.local with avahi-daemon running)"
+fi
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
@@ -49,6 +61,7 @@ mkdir -p "$DEST/page" "$DEST/kiosk"
 cp "$SRC"/base/page/index.html "$SRC"/base/page/page.css "$SRC"/base/page/page.js "$SRC"/base/page/widgets.js "$SRC"/base/page/boot.js "$DEST/page/"
 cp "$SRC"/kiosk/* "$DEST/kiosk/"
 chmod +x "$DEST/kiosk/kiosk-browser.sh"
+mkdir -p "$DEST/sounds"; cp "$SRC"/base/sounds/* "$DEST/sounds/"      # the button sounds (copy more .wav / .mp3 / .ogg files in by hand: Settings > Appearance > Button sound lists them)
 
 # >>> sync_modules
 # The optional features: every folder in modules/ is copied to $DEST/modules/. A folder that was installed before but

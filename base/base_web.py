@@ -56,7 +56,7 @@ def api_state(have_palette=""):
          "highlight": {},       # {dashboard box id: why}: a module asks for one of its boxes to stand out for a while (an event soon, say)
          "notices": [],         # banners over the boxes that are not warnings: {"id", "text", "post" (dismiss: POST {"id"} there)}
          "theme": {"highlight": core.highlight_style()},
-         "screen": core.screen_settings(), "tile_layout": core.tile_layout(),
+         "screen": core.screen_settings(), "tile_layout": core.tile_layout(), "daylight": core.daylight(),
          "settings_pin": {"on": security.settings_locked(), "pin": security.pin_required()}}
     modules.apply_api(d, warnings)          # what the enabled modules add: each module's data
     version = core.palette_version()
@@ -87,9 +87,19 @@ def _screen_reply():
     """The form widget's answer for Appearance > Max columns (the two toggles under it read S.screen from /api)."""
     cur = core.screen_settings()
     opts = [{"value": n, "label": str(n)} for n in range(1, core.MAX_COLUMNS + 1)]
-    themes = [{"value": "dark", "label": "Dark"}, {"value": "light", "label": "Light"}, {"value": "auto", "label": "Like the device"}]
-    return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"], "theme": cur["theme"]}, "options": {"cols": opts, "themes": themes},
+    themes = [{"value": "dark", "label": "Dark"}, {"value": "light", "label": "Light"}, {"value": "auto", "label": "Like the device"},
+              {"value": "time", "label": "By the time of day"}]
+    sizes = [{"value": v, "label": l} for v, l in ((0.8, "Small"), (1.0, "Normal"), (1.25, "Large"), (1.5, "Larger"), (2.0, "Largest"))]
+    colours = [{"value": "black", "label": "Black"}, {"value": "white", "label": "White"}] + \
+              [{"value": c["id"], "label": c["name"]} for c in core.colours() if not c.get("token")]
+    sounds = [{"value": n, "label": os.path.splitext(n)[0]} for n in core.list_sounds()]
+    return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"], "theme": cur["theme"], "font_scale": cur["font_scale"], "font_colour": cur["font_colour"],
+                       "sound_name": cur["sound_name"], "sound_volume": cur["sound_volume"]},
+            "options": {"cols": opts, "themes": themes, "sizes": sizes, "font_colours": colours, "sounds": sounds},
             "texts": {"theme": dict((t["value"], t["label"]) for t in themes)[cur["theme"]],
+                      "font_scale": "Text size %s\u00d7" % ("%g" % cur["font_scale"]),
+                      "sound_name": os.path.splitext(cur["sound_name"])[0] + ("" if cur["sound"] else " (off)"),
+                      "font_colour": dict((c["value"], c["label"]) for c in colours).get(cur["font_colour"], "Black"),
                       "dash_cols": "Up to %d" % cur["dash_cols"] + (" column" if cur["dash_cols"] == 1 else " columns"),
                       "set_cols": "Up to %d" % cur["set_cols"] + (" column" if cur["set_cols"] == 1 else " columns")}}
 
@@ -324,6 +334,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             self.send(body, _static_type(name), cache=86400, fixed=True)
+        elif path.startswith("/sounds/"):          # a button sound of SOUNDS_DIR (copy more files in by hand)
+            from urllib.parse import unquote
+            name = unquote(path[len("/sounds/"):])
+            file = core.sound_path(name)
+            if file is None:
+                return self._refuse(404, "No such sound")
+            with open(file, "rb") as f:
+                self.send(f.read(), core.SOUND_TYPES[os.path.splitext(name)[1].lower()], cache=3600)
         elif path == "/modules":
             self.send(json.dumps({"modules": modules.listing()}), "application/json")
         elif path == "/colours":
@@ -380,7 +398,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_highlight()
         if path == "/timezone":
             return self._post_timezone()
-        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/fit", "/screen/drag", "/screen/noscroll", "/screen/autohide", "/screen/locations"):
+        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/fit", "/screen/drag", "/screen/noscroll", "/screen/autohide", "/screen/locations", "/screen/sound"):
             return self._post_screen(path)
         if path == "/palette":
             return self._post_palette()
@@ -550,7 +568,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             data = json.loads(self._body(1024).decode("utf-8"))
             if path == "/screen":
-                core.save_screen_settings(dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols", "theme")))
+                core.save_screen_settings(dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols", "theme", "font_scale", "font_colour", "sound_name", "sound_volume") if k in (data.get("values") or {})))
                 refresh_page(force=True)                # the page is built with the theme it starts in (no flash of the other one)
             else:
                 core.save_screen_settings({path.rsplit("/", 1)[1]: data.get("value")})

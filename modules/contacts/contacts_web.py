@@ -208,8 +208,9 @@ def view():
             text += " (%d switched off)" % (len(people) - len(active))
     else:
         text = "No people yet: import a CSV file."
+    photos = dict((pid, "/contacts/photo/%s?v=%d" % (pid, os.stat(path).st_mtime_ns // 1000000)) for pid, path in photo_files().items())
     return {"text": text, "count": len(active), "columns": ", ".join(COLUMNS),
-            "people": [{"id": p["id"], "title": p["name"], "tag": p["department"] + (" / " + p["location"] if p["location"] else ""),
+            "people": [{"id": p["id"], "photo": photos.get(p["id"], ""), "title": p["name"], "tag": p["department"] + (" / " + p["location"] if p["location"] else ""),
                         "active": p.get("active", True), "name": p["name"], "department": p["department"], "role": p.get("role", ""),
                         "phone": p.get("phone", ""), "location": p.get("location", ""), "restrict": bool(p.get("restrictToLocation"))} for p in people]}
 

@@ -20,6 +20,8 @@ if not os.environ.get("EMPTY"):
         people = [p for g in checkin.snapshot()["groups"] for p in g["people"]]
         for p in people[:n]: checkin.toggle(p["id"])
         if n > 2: checkin.set_status(people[1]["id"], "LATE", "08:15"); checkin.set_status(people[2]["id"], "SICK")
+import shutil
+shutil.copytree(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "base", "sounds"), core.SOUNDS_DIR, dirs_exist_ok=True)      # the shipped button sounds
 if os.environ.get("IMGBG"): core.save_module_enabled("imagebg", True)
 if os.environ.get("FAKEUPDATE"):
     import subprocess
