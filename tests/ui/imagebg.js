@@ -8,6 +8,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 420, height: 900 } });
+  const openMenus = () => page.evaluate(() => document.querySelectorAll('.wmenu .menubtn[aria-expanded="false"]').forEach(b => b.click()));      // Settings has menus (Layout, Text, Colours, Background): open them all
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 150)); });
@@ -17,10 +18,10 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
     return { on: document.body.classList.contains('imgbg-on'), shown: p ? getComputedStyle(p).display : '', img: p ? p.style.backgroundImage : '', size: p ? p.style.backgroundSize : '', dim: d ? d.style.opacity : '', bodyBg: getComputedStyle(document.body).backgroundColor }; });
   let l = await look();
   ok(!l.on && l.shown === 'none', 'without a picture the page looks as usual (' + JSON.stringify(l) + ')');
-  await page.click('#cog'); await settle(1200);
-  const box = page.locator('[data-box="background-image"]');
-  ok(await box.count() === 1, 'Settings has a Background image box');
-  const row = box.locator('.srow', { hasText: 'Picture' });
+  await page.click('#cog'); await settle(1200); await openMenus(); await settle(300);
+  const box = page.locator('.wmenu', { has: page.locator('.menuhead', { hasText: /^Background/ }) });
+  ok(await box.count() === 1 && await box.locator('.srow', { hasText: /^Picture/ }).count() === 1, 'Settings has the picture in Appearance > Background');
+  const row = box.locator('.srow', { hasText: /^Picture/ });
   ok(!(await row.locator('button', { hasText: 'Remove' }).isVisible()), 'with no picture there is no Remove button');
   // a small picture: a 40x30 PNG made in the page
   const png = async (w, h, noise) => Buffer.from((await page.evaluate(([w, h, noise]) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
@@ -35,10 +36,10 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(got === 'image/png', 'the computer serves it as an image (' + got + ')');
   ok(await row.locator('button', { hasText: 'Remove' }).isVisible(), 'now there is a Remove button');
   // fit and darken
-  await box.locator('.srow', { hasText: 'Fit' }).locator('button').click(); await settle(300);
+  await box.locator('.srow', { hasText: /^Fit/ }).locator('button').click(); await settle(300);
   await page.locator('.pop.open .optrow button', { hasText: 'Stretch' }).click(); await settle(1500);
   ok((await look()).size === '100% 100%', 'Stretch changes how it is fitted');
-  await box.locator('.srow', { hasText: 'Darken' }).locator('button').click(); await settle(300);
+  await box.locator('.srow', { hasText: /^Darken/ }).locator('button').click(); await settle(300);
   await page.locator('.pop.open .optrow button', { hasText: '75 %' }).click(); await settle(1500);
   ok((await look()).dim === '0.75', 'Darken changes how dark it is');
   // a big picture is shrunk first

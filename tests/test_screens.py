@@ -37,11 +37,11 @@ class PerScreen(unittest.TestCase):
     def test_a_screens_settings_stay_with_it(self):
         self.post("/screen/stretch", {"value": True}, "serial-1")
         self.post("/screen/locations", {"value": ["Område A", " ", "B"]}, "serial-1")
-        self.post("/modules/dashboard-layout", {"cols": 2, "columns": [["checkin"], ["clock"]]}, "serial-1")
+        self.post("/modules/dashboard-layout", {"cols": 2, "columns": [["checkin"], ["contacts"]]}, "serial-1")
         mine = self.api("serial-1")                                    # a reload or a reboot of that computer: asks again with its id
         self.assertTrue(mine["screen"]["stretch"])
         self.assertEqual(mine["screen"]["locations"], ["Område A", "B"])
-        self.assertEqual(mine["tile_layout"], {"2": [["checkin"], ["clock"]]})
+        self.assertEqual(mine["tile_layout"], {"2": [["checkin"], ["contacts"]]})
         other = self.api("serial-2")                                   # another screen and a plain browser are not touched
         plain = self.api()
         for d in (other, plain):

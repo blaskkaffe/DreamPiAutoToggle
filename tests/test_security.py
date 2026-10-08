@@ -11,8 +11,8 @@ from support import sandbox, cleanup, core, web
 import rebootupdate_web as ru
 import base_security as sec
 import rebootupdate_update as up
-import clock_web as clock
 import checkin_web as checkin
+import snow_web as snow
 
 
 class HostAndOriginTests(unittest.TestCase):
@@ -96,6 +96,7 @@ class HttpSecurityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = sandbox(up)
+        core.save_module_enabled("snow", True)        # off by default: its POST is the module's own, unprotected one
         cls.srv = web.Server(("127.0.0.1", 0), web.Handler)
         cls.port = cls.srv.server_address[1]
         threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
@@ -143,10 +144,10 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertFalse(os.path.exists(checkin.CHECKIN))
 
     def test_same_site_post_without_the_page_header_still_works(self):
-        status, _b, _r = self.req("POST", "/clock/cities", {"Origin": "http://127.0.0.1:%d" % self.port,
-                                                           "Host": "127.0.0.1:%d" % self.port}, b'{"cities": ["Tokyo"]}')
+        status, _b, _r = self.req("POST", "/snow", {"Origin": "http://127.0.0.1:%d" % self.port,
+                                                    "Host": "127.0.0.1:%d" % self.port}, b'{"values": {"amount": "heavy"}}')
         self.assertEqual(status, 200)                      # the page's own origin is enough for a module's own (unprotected) POST
-        self.assertEqual(json.load(open(clock.CLOCK_CONFIG))["cities"], ["Tokyo"])
+        self.assertEqual(json.load(open(snow.SNOW_CONFIG))["amount"], "heavy")
 
     def test_reboot_form_post_is_never_enough(self):
         status, _b, _r = self.req("POST", "/reboot", {"Origin": "http://127.0.0.1:%d" % self.port,
@@ -189,7 +190,7 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertEqual(self.req("POST", "/settings-pin", h, b'{"value": true}')[0], 200)
         api = json.loads(self.req("GET", "/api")[1].decode())
         self.assertEqual(api["settings_pin"], {"on": True, "pin": True})
-        for path in ("/colour", "/screen", "/screen/stretch", "/modules", "/clock/beat", "/highlight", "/settings-pin", "/contacts/import", "/checkin/all", "/checkin/config"):
+        for path in ("/colour", "/screen", "/screen/stretch", "/modules", "/snow", "/settings-pin", "/contacts/import", "/checkin/all", "/checkin/config"):
             sec.reset_for_tests()
             self.assertEqual(self.req("POST", path, h, b"{}")[0], 401, path)
         self.assertFalse(os.path.exists(core.SCREEN))

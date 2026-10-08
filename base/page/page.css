@@ -31,20 +31,6 @@
  .notebox span{flex:1;min-width:0} .notebox .nx{flex:none;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.28)}
  .now{font-size:var(--fs-md);margin:0 0 var(--gap);padding:14px 24px;border-radius:var(--r-box);text-align:center;background:rgba(var(--primary-rgb),.62);border:var(--bw) solid rgb(var(--primary-l-rgb));line-height:1.35}
  .now .nlabel{font-size:1.3em} .now b{font-size:1.6em;display:block} .now b.small{font-size:1em}      /* the box's own lines are larger; every row inside it is the size of a settings row */
- /* notification highlight: a module asks for one of its dashboard boxes to stand out for a while (/api "highlight", an event about to
-    start, say). A neutral box (class plain: its colour's Highlight switch is off) takes its own colour; a box that is coloured
-    already gets the global look of Settings > Appearance > Notification highlight: an animated rainbow edge (body.hl-rainbow) or
-    a glow in one palette colour (--hl-rgb). */
- .dbox.hl.plain .now{background:rgba(var(--primary-rgb),.62);border-color:rgb(var(--primary-l-rgb))}
- .dbox.hl:not(.plain) .now{border-color:rgb(var(--hl-rgb));animation:hlglow 1.6s ease-in-out infinite}
- @keyframes hlglow{0%,100%{box-shadow:0 0 4px 0 rgba(var(--hl-rgb),.45)}50%{box-shadow:0 0 22px 4px rgba(var(--hl-rgb),.95)}}
- body.hl-rainbow .dbox.hl:not(.plain) .now{position:relative;border-color:transparent;animation:hlwhite 1.6s ease-in-out infinite}
- body.hl-rainbow .dbox.hl:not(.plain) .now::before{content:"";position:absolute;inset:calc(-1 * var(--bw));border-radius:inherit;padding:var(--bw);pointer-events:none;
-   background:linear-gradient(90deg,#ff4d4d,#ffa133,#ffe14d,#4dd96b,#4dc3ff,#5b6bff,#c35bff,#ff4d4d,#ffa133,#ffe14d) 0 0/200% 100%;
-   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:hlrainbow 2.4s linear infinite}
- @keyframes hlrainbow{to{background-position:-200% 0}}
- @keyframes hlwhite{0%,100%{box-shadow:0 0 4px 0 rgba(255,255,255,.25)}50%{box-shadow:0 0 20px 3px rgba(255,255,255,.6)}}
- @media(prefers-reduced-motion:reduce){.dbox.hl:not(.plain) .now,body.hl-rainbow .dbox.hl:not(.plain) .now,body.hl-rainbow .dbox.hl:not(.plain) .now::before{animation:none}}
  /* status rows inside the network box: closed = just the first status,
     centred under the network name; open = all rows with their labels */
  .now .row{font-size:var(--fs-md);line-height:1.35;padding:10px 0;border-top:1px solid rgba(var(--box-rgb),.18);text-align:left}
@@ -242,6 +228,9 @@
  .rp-who{display:flex;align-items:center;gap:18px;margin:0 48px 16px 0} .rp-wt{min-width:0}
  .rp-wn{font-size:1.6em;font-weight:600;line-height:1.2;overflow-wrap:break-word} .rp-wl{font-size:1.05em;color:var(--text-2);margin-top:2px;overflow-wrap:break-word}
  .cphoto{flex:none}
+ /* a menu (a row that opens its settings under it) and a divider line */
+ .wmenu > .msub{margin:0 0 6px 12px;padding:0 0 0 10px;border-left:var(--bw) solid var(--line)} .wmenu.open > .menuhead{border-bottom-color:transparent} .menubtn{min-width:5.2em}
+ .wdiv{height:0;margin:8px 0;border-top:var(--bw) solid var(--line)}
  .rp-av{display:flex;align-items:center;justify-content:center;border-radius:50%;background-color:rgb(var(--primary-rgb));background-size:cover;background-position:center;color:#fff;font-weight:700}
  .rp-avb{width:96px;height:96px;font-size:2.2em}
  .rp-opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}

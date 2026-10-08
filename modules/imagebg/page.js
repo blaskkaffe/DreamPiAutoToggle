@@ -33,4 +33,5 @@ custom("imagebg-pick",function(host,ctx){
  r.btn2.onclick=function(e){e.stopPropagation();if(confirm("Remove the background picture?"))post("/imagebg/remove",{},function(v){if(v){refresh();ctx.saved()}})};
  function paint(){var v=S.imagebg||{};r.setSub(v.has?"A picture is set":"No picture yet: choose one from this device");sh(r.btn2,!!v.has);sh(thumb,!!v.has);
   var u=v.has?"url(/imagebg/image?v="+v.version+")":"none";if(thumb._u!==u){thumb._u=u;thumb.style.backgroundImage=u}}
+ host._sum=function(){var v=S.imagebg||{};return v.has?"Picture set":"No picture"};
  UPD.push(paint);paint()});

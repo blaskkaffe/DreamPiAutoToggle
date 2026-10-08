@@ -2,7 +2,7 @@
 in a temp dir), with the 25 people of tests/ui/people.csv imported. Switches via environment:
 IN=n (the first n people start checked in, one of them with a status),
 FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log),
-IMGBG=1 (the Background image module on), CLOCK=1 (the clock module on; off by default so the box counts are stable), EMPTY=1 (no people imported), PEOPLE=file.csv (another roster),
+IMGBG=1 (the Background image module on), EMPTY=1 (no people imported), PEOPLE=file.csv (another roster),
 OFF=clock,... (modules switched off in the module picker; OFF=all = every module the picker can switch, only the always-on ones stay),
 PIN=1234 (a PIN for update / restart / import; restart is faked), PORT=n (default 8734)."""
 import sys, os, threading, time, json
@@ -11,7 +11,6 @@ from support import web, core, sandbox
 import contacts_web as contacts
 import checkin_web as checkin
 tmp = sandbox(contacts, checkin)
-if not os.environ.get("CLOCK"): core.save_module_enabled("clock", False)      # the checks count the dashboard boxes: the clock box is only there with CLOCK=1
 if not os.environ.get("EMPTY"):
     with open(os.environ.get("PEOPLE") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "people.csv"), encoding="utf-8") as f:
         contacts.import_csv(f.read())

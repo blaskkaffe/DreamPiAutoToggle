@@ -16,23 +16,21 @@ run() {     # run <node script> <env...>: a demo server with that environment, t
 }
 run audit.js IN=8 FAKEUPDATE=1
 run functional.js IN=0 FAKEUPDATE=1
-# the clock module has its own demo server (it is off in the one above so that the box counts stay as they are)
-run clock.js CLOCK=1
 # how the page appears (no pop-in) and the columns of Settings
-run boot.js CLOCK=1
+run boot.js
 # the update controls: Check shows the Update now row at once, a finished update reloads the page with Settings open
 run update.js FAKEUPDATE=1
 # an update from a USB stick that has an update folder
 run usb.js FAKEUPDATE=1 USB=1
 
 # the screen layout (max columns, stretch, scale), rearranging the tiles and the PIN lock on Settings
-run screen.js CLOCK=1
+run screen.js
 # the Background image module: choose a picture, fit, darken, a big one is shrunk, remove
 run imagebg.js IMGBG=1
 # a group too long for one column is split over the next ones; No scrolling; the saved order of the boxes
 run columns.js PEOPLE=$(pwd)/long.csv
 # the Colour palette module: add, edit, rearrange, delete and reset colours; the rest of the page follows at once
-run palette.js CLOCK=1
+run palette.js
 # the look: text colour and size, Classic boxes, corners and gaps, theme by the time of day, button sounds, the Snow background
 run look.js IN=6
 # a tall screen (1080 x 1920) with two columns: 20, 40, 60 and 80 people in groups of 1 to 15 (mostly 6 to 12)

@@ -35,8 +35,8 @@ class PaletteCore(unittest.TestCase):
         self.assertIsNone(core.palette_add("x", "red"))                                         # not a colour
         self.assertTrue(core.palette_edit("hot-pink", name="Hotter", ui="#aa0000"))
         self.assertEqual((core.colour("hot-pink")["name"], core.colour("hot-pink")["ui"]), ("Hotter", "#aa0000"))
-        self.assertIsNotNone(core.set_module_colour("clock", "clock", "hot-pink"))              # a module can pick it
-        self.assertEqual(core.module_colours("clock")["clock"], "hot-pink")
+        self.assertIsNotNone(core.set_module_colour("checkin", "checkin", "hot-pink"))              # a module can pick it
+        self.assertEqual(core.module_colours("checkin")["checkin"], "hot-pink")
         self.assertIn("--c-hot-pink:#aa0000", core.colours_css())
 
     def test_edit_a_shipped_colour(self):
@@ -59,15 +59,12 @@ class PaletteCore(unittest.TestCase):
         self.assertTrue(core.palette_delete("blue"))
         self.assertNotIn("blue", self.ids())
         self.assertIn(core.module_colours("checkin")["checkin"], self.ids())
-        self.assertIsNone(core.set_module_colour("clock", "clock", "blue"))                     # and it can not be picked any more
+        self.assertIsNone(core.set_module_colour("checkin", "checkin", "blue"))                     # and it can not be picked any more
         self.assertEqual(core.colour("blue")["id"], "orange")                                   # an old reference draws the fallback
-        core.set_module_colour("clock", "clock", "red")
-        core.save_highlight_style("green")
+        core.set_module_colour("checkin", "checkin", "red")
         self.assertTrue(core.palette_delete("red"))
-        self.assertNotEqual(core.module_colours("clock")["clock"], "red")
+        self.assertNotEqual(core.module_colours("checkin")["checkin"], "red")
         self.assertTrue(core.palette_delete("green"))
-        self.assertEqual(core.highlight_style(), "rainbow")
-        self.assertNotIn("green", core.highlight_styles())
 
     def test_reset(self):
         core.palette_add("Mine", "#123456")

@@ -74,15 +74,7 @@ function renderLayout(){
  (LAY.settings||[]).forEach(function(b){cols.appendChild(box("settings",b))});
  buildPicker(cols);
  AFTER.forEach(function(f){f()});AFTER=[]}
-function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});applyTheme();applyHighlight();hideEmptyBoxes();applyScreen()}
-// ---- highlight (/api "highlight": {box id: why}): those dashboard boxes get the class "hl" (page.css draws it) and the reason as a
-// tooltip; the look is global (/api theme.highlight: "rainbow" or a palette id)
-var hlKey="";
-function applyHighlight(){var hl=S.highlight||{},st=(S.theme&&S.theme.highlight)||"rainbow",key=st+JSON.stringify(hl);if(key===hlKey)return;hlKey=key;
- document.body.classList.toggle("hl-rainbow",st==="rainbow");
- document.body.style.setProperty("--hl-rgb",st==="rainbow"?"255,255,255":"var(--c-"+st+"-rgb)");
- Array.prototype.forEach.call(document.querySelectorAll("#dash [data-box]"),function(b){var why=hl[b.getAttribute("data-box")];
-  b.classList.toggle("hl",!!why);if(why)b.setAttribute("title",String(why));else b.removeAttribute("title")})}
+function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});applyTheme();hideEmptyBoxes();applyScreen()}
 // a box whose widgets are all hidden (a module's settings while it has nothing to set) is hidden too
 function hideEmptyBoxes(){var bs=document.querySelectorAll("[data-box]"),i,j;
  for(i=0;i<bs.length;i++){var b=bs[i],host=b.querySelector(":scope > .card")||b,any=false;
@@ -130,6 +122,10 @@ W.row=function(s,ctx){var title=h("span"),sub=h("span",{"class":"sub"}),left=h("
  el=h("div",{"class":"srow"+(s.below?" wrap":"")},[left]);
  bind(s.title,function(t){setText(title,t==null?"":t)});bind(s.sub,function(t){setLines(sub,t);sh(sub,!!t)});
  if(s.control)el.appendChild(build(Object.assign({mod:s.mod},s.control),ctx));
+ // what a menu shows of this row in its subtitle: a switch that is on gives its short name ("short", else the title); a module's switch says on or off
+ var tg=s.control&&s.control.type==="toggle"?s.control:null;
+ if(tg)el._sum=function(){var v=tg.module?val("@enabled."+tg.module):val(tg.bind),name=s.short||val(s.title)||"";
+  return tg.module?name+(v?" on":" off"):(v?name:(s.short_off||""))};
  if(s.below)el.appendChild(h("div",{"class":"below"},buildAll(s.below.map(function(w){return Object.assign({mod:s.mod},w)}),ctx)));return el};
 W.link=function(s){var el=h("a",{"class":"pill-s",href:s.href,target:"_blank",rel:"noopener noreferrer"});
  bind(s.label,function(t){setText(el,t)});if(s.aria)el.setAttribute("aria-label",s.aria);return el};
@@ -183,6 +179,7 @@ W.palette=function(s,ctx){var r=editRow({title:"Colour palette",button:"Edit",ar
  function byId(id){var f=null;data.forEach(function(c){if(c.id===id)f=c});return f}
  function rowOf(id){return list.querySelector('[data-id="'+id+'"]')}
  function flags(){data.forEach(function(c){var row=rowOf(c.id);if(!row)return;sh(row._back,!!c.changed);if(document.activeElement!==row._well)row._well.value=c.ui;})}      // after an edit: only what changed is touched, the field being typed in keeps its focus
+ el._sum=function(){return data.length?data.length+" colours":""};
  function take(res,rebuild){if(!res||!res.colours)return;data=res.colours;sh(addB,res.can_add!==false);r.setSub(data.length+" colours");if(rebuild)build();else flags()}
  function save(id,body){clearTimeout(timers[id]);timers[id]=setTimeout(function(){body.id=id;post("/palette/edit",body,function(res){take(res,false);ctx.saved()})},250)}
  function build(){list.innerHTML="";
@@ -220,6 +217,25 @@ W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.l
   // "ensure_pin": switching it on with no PIN set first asks for a new one on the PIN pad (the server refuses the lock without one)
   if(s.ensure_pin&&want&&!(S.settings_pin&&S.settings_pin.pin)){box.checked=false;choosePin(function(){box.checked=true;post(s.post,{value:true},function(){refresh();ctx.saved()})});return}
   post(s.post,s.body?Object.assign({value:want},s.body):{value:want},function(){refresh();ctx.saved()})};return el};
+// ---- a menu: a row (title, a subtitle that shows what is chosen in it, a button) that opens its settings under it, inside the same card, indented. "id" names it (items of other
+// boxes and modules join it with "in": "<id>"); "items" are its widgets. Each child may tell its choice for the subtitle (el._sum: a switch that is on, the texts of a form's fields).
+// It stays open or shut as the user left it (this tab).
+W.menu=function(s,ctx){var key="menu:"+(s.id||s.title),open=false,title=h("span"),sub=h("span",{"class":"sub"}),left=h("span",{},[title,sub]),
+ btn=h("button",{type:"button","class":"pill-s menubtn","aria-expanded":"false"}),head=h("div",{"class":"srow edit menuhead"},[left,btn]),
+ body=h("div",{"class":"msub"}),el=h("div",{"class":"wmenu"},[head,body]),kids=buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx);
+ try{open=sessionStorage.getItem(key)==="1"}catch(e){}
+ bind(s.title,function(t){setText(title,t==null?"":t);btn.setAttribute("aria-label",(open?"Close ":"Open ")+(t||"menu"))});
+ kids.forEach(function(k){body.appendChild(k)});
+ function paintSub(){var parts=[];kids.forEach(function(k){if(k._sum&&k.style.display!=="none"){var t=k._sum();if(t)parts.push(t)}});
+  var t=parts.join(" \u00b7 ");setText(sub,t);sh(sub,!!t);
+  var any=kids.some(function(k){return k.style.display!=="none"});sh(el,any)}
+ function paint(){sh(body,open);btn.textContent=open?"Close":"Edit";btn.setAttribute("aria-expanded",open?"true":"false");el.classList.toggle("open",open)}
+ btn.onclick=function(e){e.stopPropagation();open=!open;try{sessionStorage.setItem(key,open?"1":"0")}catch(x){}paint()};
+ head.addEventListener("click",function(e){if(e.target===btn||btn.contains(e.target))return;btn.click()});
+ head.style.cursor="pointer";UPD.push(paintSub);paint();paintSub();return el};
+W.divider=function(){return h("div",{"class":"wdiv",role:"separator"})};
+// a marker for a row that the page puts in itself (the Modules row of the System box goes where the "modules" slot is)
+W.slot=function(s){return h("div",{"data-slot":s.name,style:"display:none"})};
 // a row of widgets side by side (wraps)
 W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx))};
 // ---- the module's own colour choice: a "Colour" button in the chosen colour that opens a pop-up with the palette's colours;
@@ -923,7 +939,7 @@ W.roster=function(s,ctx){
    '</div><div class="rp-clear"><button type="button" class="pill-s rp-so" data-code="">Rensa status</button></div></div>'}
  function openPersonMenu(id){var p=person(id);if(!p)return;cur=id;modal.innerHTML=menuHtml(p);modal.style.display="";var x=modal.querySelector(".rp-x");if(x&&x.focus)x.focus()}
  // a status that needs a time, a date or a note: its own pop-up on top of the menu, with a big field (Enter sets it, Esc or a tap outside goes back)
- function openNeed(code,st){var p=person(cur),kind=st.needs,kb=!!(D&&D.keyboard),twelve=!!(S.clock&&/^12/.test(S.clock.format||"")),
+ function openNeed(code,st){var p=person(cur),kind=st.needs,kb=!!(D&&D.keyboard),twelve=false,
   what=kind==="time"?"At what time?":kind==="date"?"Until which date?":kind==="datetime"?"Until which date and time?":"What is it?",field,
   skip=kind==="date"||kind==="datetime",withCal=skip;      // a date can be left out (Skip: the status is set without it); a date has a calendar
   modal2.innerHTML='<div class="rp-sheet rp-need2'+(kb?' rp-withkb':'')+'" role="dialog" aria-modal="true" aria-label="'+esc(st.label)+'"><button type="button" class="rp-x" data-back="1" title="Back" aria-label="Back">&#10005;</button>'+
@@ -1087,6 +1103,7 @@ W.form=function(s,ctx){var el=h("div",{"class":"wform"}),F={values:{},options:{}
   subs.push(function(){r.setSub(f.sub_text?(F.texts||{})[f.sub_text]:f.sub);if(f.list)r.setList((F.lists||{})[f.list])});
   if(f.show!==undefined)bind(f.show,function(v){sh(r.el,!!v)})});
  function paint(){ctls.forEach(function(c){c._paint()});subs.forEach(function(f){f()})}
+ el._sum=function(){var out=[];(s.fields||[]).forEach(function(f){var t=f.sub_text?(F.texts||{})[f.sub_text]:f.sub;if(t&&!f.nosum)out.push((f.sum?f.sum+" ":"")+t)});return out.join(" \u00b7 ")};      // the chosen settings, for a menu's subtitle
  function take(r){F.values=r.values||F.values;F.options=r.options||F.options;F.texts=r.texts||F.texts;F.lists=r.lists||F.lists}
  function load(){xhrJson("GET",s.get,function(r){if(!r)return;take(r);paint()})}
  function save(){clearTimeout(timer);paint();timer=setTimeout(function(){post(s.post||s.get,{values:F.values},function(r){
@@ -1147,7 +1164,7 @@ function buildPicker(cols){
   pop=h("div",{},[h("div",{"class":"t",text:"Modules: tick to switch on or off, drag the handle to move inside its group. The top one has priority."}),list,h("div",{"class":"bar end"},[done])]),
   row=h("div",{"class":"srow edit","data-picker":"modules"},[h("span",{},[document.createTextNode("Modules"),h("span",{"class":"sub",text:"Switch modules on or off and set their priority"})]),btn]);
  if(!card){card=h("div",{"class":"card"});cols.appendChild(h("section",{"class":"sec","data-box":"system"},[h("h2",{text:"System"}),card]))}
- card.insertBefore(row,card.firstChild);card.appendChild(pop);
+ var slot=card.querySelector('[data-slot="modules"]');card.insertBefore(row,slot||card.firstChild);card.appendChild(pop);
  var p=ui.popup(pop),mods=[],boxes={};
  function paint(list2){mods=list2;boxes={};list.innerHTML="";var GROUPS=["On the main screen","In Settings only","Backgrounds"],shownGroup=-1;
   mods.forEach(function(m){var cb;

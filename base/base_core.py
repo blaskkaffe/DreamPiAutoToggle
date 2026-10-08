@@ -40,7 +40,6 @@ MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["clock", "pla
 DEBUG_FLAG = os.path.join(BASE_DIR, PROJECT.get("debug_flag", "debug"))     # exists = the debug timeline is recorded (a debug module switches it)
 ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for the actions a module marks PROTECTED (install.sh --pin)
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
-HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id: how a highlighted box looks (Settings > Appearance)
 SETTINGS_PIN = os.path.join(BASE_DIR, "settings_pin")   # exists = Settings asks for the PIN (when one is set) before it opens and changes anything
 SCREEN = os.path.join(BASE_DIR, "screen.json")         # how the page is laid out on a wide screen: max columns, stretch, scale (Settings > Appearance)
 TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the computer's own (Settings > About)
@@ -579,7 +578,7 @@ def palette_edit(ident, name=None, ui=None):
 
 
 def palette_delete(ident):
-    """Take a colour out of the palette. What used it falls back (a module's pick to its default, a highlight to the rainbow, another module's row to
+    """Take a colour out of the palette. What used it falls back (a module's pick to its default, another module's row to
     orange). False for one that cannot be deleted (FIXED_COLOURS) or does not exist."""
     if ident in FIXED_COLOURS or ident not in palette_ids():
         return False
@@ -607,8 +606,6 @@ def palette_delete(ident):
         with open(tmp, "w") as f:
             json.dump(picks, f, sort_keys=True)
         os.rename(tmp, MODULE_COLOURS)
-    if (read_file(HIGHLIGHT) or "").strip() == ident:
-        save_highlight_style("rainbow")
     return True
 
 
@@ -713,33 +710,6 @@ def module_colours(name):
                     out[k] = ([i for i in ids if i not in used and i not in ("global", "network")] or [DEFAULT_COLOUR])[0]
                 used.add(out[k])
     return out
-
-
-# ---- highlight: a module can ask for one of its dashboard boxes to stand out for a while (an event starts soon, say): /api
-# "highlight" {box id: why}. A grey box (a background module's) turns its own colour; a coloured box takes the highlight look
-# set here, the same for every module: an animated rainbow edge or one palette colour that glows.
-HIGHLIGHT_STYLES = ("rainbow",) + PALETTE_IDS        # as shipped; highlight_styles() is the list in use
-DEFAULT_HIGHLIGHT = "rainbow"
-
-
-def highlight_styles():
-    return ("rainbow",) + colour_ids()
-
-
-def highlight_style():
-    s = (read_file(HIGHLIGHT) or "").strip()
-    return s if s in highlight_styles() else DEFAULT_HIGHLIGHT
-
-
-def save_highlight_style(value):
-    value = str(value or "").strip()
-    if value not in highlight_styles():
-        value = DEFAULT_HIGHLIGHT
-    tmp = HIGHLIGHT + ".tmp"
-    with open(tmp, "w") as f:
-        f.write(value)
-    os.rename(tmp, HIGHLIGHT)
-    return value
 
 
 def settings_pin_on():

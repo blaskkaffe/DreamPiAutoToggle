@@ -2,7 +2,7 @@
 
 A check-in board for any Linux computer (a small, cheap one is plenty) that **several screens show in step**: who is in, who is out and why, in real time. The people come from a CSV file, and each one is a row that is grey while they are out and coloured while they are in, in the colour of their department or building. A green **INNE** / red **UTE** button on the row checks them in and out, and a tap on the row opens a status menu (sick, late, on a trip, holiday ...) whose status the row then shows in the status' own colour.
 
-The board and its features follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken) (a Node.js check-in board): same CSV columns, same statuses, same ideas (several buildings, a screen per building, kiosk screens). Everything the page shows is a module, so the rest of the base (clock, updates, reboot) is there too.
+The board and its features follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken) (a Node.js check-in board): same CSV columns, same statuses, same ideas (several buildings, a screen per building, kiosk screens). Everything the page shows is a module, so the rest of the base (updates, reboot, the System controls) is there too.
 
 <p align="center"><img src="docs/images/board.png" alt="The board: a box per department, a row per person, grey while out and coloured while in, a status shows on the row" width="420"> <img src="docs/images/status-menu.png" alt="The status menu" width="420"></p>
 
@@ -15,7 +15,7 @@ What you get:
 - **Screens with nothing installed:** a kiosk computer can boot over the network into a small Linux image that shows the board in Firefox, behind a whitelist of serial numbers / MAC addresses, with a menu, per-computer settings, an optional install to the local disk, and a loading screen with the chicken logo. Each screen keeps its **own layout and settings** on the host, so they are back after a reload or a reboot.
 - **Text and sound:** the text of the board has its own **size** (0.5 to 2 times, with presets) and **colour** (automatic: black on light boxes, white on the original dark grey ones; or black, white, any palette colour), separate from Stretch / Scale / Fit (which grow the rows and the spacing, never the text; Fit makes the text smaller only when the page is too tall); **button sounds** (a small pop; copy more `.wav` / `.mp3` / `.ogg` files into `/opt/checkin-board/sounds`); the theme can follow **the time of day** at the time zone (light by day, dark at night) for a computer without a light / dark setting of its own.
 - **Dates and notes:** a status can ask for a time, a date, or a date and a time, with a **calendar** (square buttons) next to the date field and a **Skip** button; the on-screen keyboard is laid out like the iPhone's Swedish one, with emoji and an even number pad, and a USB keyboard can be used at the same time. Pictures of people are chosen in Settings > Contacts only.
-- A **clock** (12 or 24-hour, `.beat`, world times and a time zone map), **update and reboot buttons** on the page and an optional **PIN** for them.
+- **Update and reboot buttons** on the page and an optional **PIN** for them.
 
 **Tested so far:** on a development machine only, not on a real host or kiosk screen, and **the network boot has never been run on real hardware**: unit tests (`sh tests/run.sh`) and the page driven in Chromium against a demo server (`sh tests/ui/run.sh`). See [docs/hardware-status.md](docs/hardware-status.md) for what has and has not been seen on real hardware.
 
@@ -82,8 +82,7 @@ Everything the page shows is a module, one folder in `modules/`. **Settings > Sy
 |---|---|---|
 | Check-in board | The board: a box per department, a row per person, statuses, colours | on |
 | Contacts | The people: CSV import and export | on |
-| Clock | The time on the board page: 12 / 24-hour, `.beat`, world times, time zone map | on |
-| About | Versions, the time zone, the global colours, a link to the project (always on) | on |
+| System | Versions, the time zone, PIN, Modules, updates, reboot, a link to the project (always on) | on |
 | Background image | A picture of your own as the page's background: choose it in Settings > Background image (big pictures are shrunk in the browser first), fit and darken it | **off** |
 | Reboot and Update | Update the add-on from GitHub, reboot the host | on |
 | Snow background | A snowstorm in soft fog behind everything (3D, WebGL), with a day and night that follow the time zone | **off** |
@@ -124,12 +123,12 @@ A kiosk browser (Chromium on a host screen, Firefox or Chromium on a network-boo
 
 ## Web page
 
-The main page is the board (and the clock box above it when that module is on). The cogwheel opens **Settings**:
+The main page is the board. The cogwheel opens **Settings**; rows with a ▸ **Edit** button open a menu under them and show what is chosen in it as their subtitle:
 
 - **Check-in board:** what to group by and what to colour by (department or building), a colour for every department and building (Automatic or your pick), **All out** (the start of the day) and **All in**.
-- **Appearance / Global colours:** the module's colour, the global main colour, the **Colour palette** (edit, rename, add, rearrange, delete and reset the colours every pick offers), the highlight look, **Max columns** for the dashboard and for Settings (1 to 6; as many as fit at about 430 px each), **Stretch boxes** (the columns share the whole screen width) with **Scale content**, **Rearrange the main screen** (drag the tiles; the department boxes move too and their order is kept on the host, so every screen follows), **Fit to screen** (the main screen is scaled up until its bottom reaches the bottom of the window), **Theme** (dark, light or like the device), **No scrolling** (the main screen never scrolls; Settings still does), **Hide the top bar** (the buttons, title and cogwheel come down only when you go to the top edge), and with more than one column a department with more people than fit under each other in the screen height is split into near-equal parts in the next columns, "Kök (1/2)", "Kök (2/2)", and the **PIN** with **Ask for the PIN to open Settings** (the board itself keeps working without it).
+- **Appearance:** **Theme** (dark, light, like the device, or by the time of day at the time zone); **Layout** (hide the top bar, max columns for the dashboard and for Settings, stretch boxes, scale content, fit to screen); **Rearrange the main screen** (drag the tiles; their order is kept on the host, so every screen follows); **No scrolling**; **Text** (size 0.5 to 2 times, colour); **Button sounds** (off, or a sound file and a volume); **Colours** (the colour palette, Global main colour, the check-in board's colour); **Background** (a picture, a snowstorm, each with its own settings). With more than one column a department with more people than fit under each other in the screen height is split into near-equal parts in the next columns, "Kök (1/2)", "Kök (2/2)".
 - **Contacts:** how many people, import (a file or pasted text), Export.
-- **About:** versions, the address, the time zone, GitHub. **System:** Modules, Updates, Reboot.
+- **System:** versions and the address, GitHub, the **PIN** and **Ask for the PIN to open Settings** (the board itself keeps working without it), the **time zone**, **Modules**, Updates, Update from a USB stick, Reboot.
 
 The page works on a phone as well as a wall display: the dashboard is one column by default and uses as many columns as you allow in Appearance, each department box being a tile of its own.
 
@@ -142,4 +141,4 @@ The page works on a phone as well as a wall display: the dashboard is one column
 
 ## Credits
 
-The board, the statuses and the CSV format follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken). The module base, the clock and the update / reboot controls come from an earlier add-on of the same author.
+The board, the statuses and the CSV format follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken). The module base and the update / reboot controls come from an earlier add-on of the same author.

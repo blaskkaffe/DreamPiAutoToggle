@@ -162,6 +162,11 @@ class BoardTests(Base):
         checkin.set_status(anna, "TRAVEL", "")                          # Skip: the status without its date
         self.assertEqual(self.people()["Anna Svensson"]["text"], "Tjänsteresa")
 
+    def test_the_api_carries_the_boards_colour_as_it_is_now(self):
+        d = {"primary": {}}
+        checkin.api(d, [])
+        self.assertEqual(d["primary"]["checkin"], core.module_colours("checkin")["checkin"])       # so a pick in Settings shows without a reload
+
     def test_a_tap_clears_a_status(self):
         anna = self.people()["Anna Svensson"]["id"]
         checkin.set_status(anna, "SICK")

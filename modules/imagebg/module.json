@@ -6,5 +6,7 @@
  "order": 18,
  "ui": 2,
  "web": "imagebg_web",
- "toggle_box": "appearance"
+ "toggle_box": "appearance",
+ "toggle_in": "background",
+ "short": "Image"
 }

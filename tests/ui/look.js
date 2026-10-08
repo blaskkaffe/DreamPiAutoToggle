@@ -62,7 +62,13 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   // ---- Settings: the new rows
   await load(); await page.click('#cog'); await settle(1200);
   const app = page.locator('[data-box="appearance"]');
-  for (const t of ['Text size', 'Text colour', 'Button sounds', 'Button sound', 'Theme']) ok(await app.locator('.srow', { hasText: t }).count() >= 1, 'Appearance has a "' + t + '" row');
+  ok(await app.locator('.wmenu').count() === 4, 'Appearance has four menus (Layout, Text, Colours, Background)');
+  await page.evaluate(() => document.querySelectorAll('.wmenu .menubtn[aria-expanded="false"]').forEach(b => b.click())); await settle(300);
+  for (const t of ['Theme', 'Hide the top bar', 'Max columns: dashboard', 'Stretch boxes', 'Fit to screen', 'Rearrange the main screen', 'No scrolling', 'Text size', 'Text colour', 'Button sounds', 'Colour palette', 'Global main colour', 'Check-in board colour']) ok(await app.locator('.srow', { hasText: t }).count() >= 1, 'Appearance has a "' + t + '" row');
+  ok(await page.locator('[data-box="colours"], [data-box="about"]').count() === 0, 'the Global colours and About boxes are gone');
+  ok(await page.locator('[data-box="system"] .srow', { hasText: 'Time zone' }).count() === 1 && await page.locator('[data-box="system"] .srow', { hasText: 'Ask for the PIN' }).count() === 1, 'the time zone and the PIN are in System');
+  const sub = await app.locator('.wmenu').filter({ has: page.locator('.menuhead', { hasText: /^Text/ }) }).locator('.menuhead .sub').textContent();
+  ok(/Text size 1\u00d7/.test(sub) && /Automatic/.test(sub), 'a menu shows what is chosen in it as its subtitle (' + sub + ')');
   await page.click('#close-settings'); await settle(300);
 
   // ---- the theme by the time of day
@@ -77,9 +83,12 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   const snd = await page.evaluate(() => new Promise(res => setTimeout(() => res({ keys: Object.keys(Snd.buf), on: Snd.on, vol: Snd.vol, want: Snd.want }), 1500)));
   ok(snd.on && snd.keys.indexOf('pop.wav') >= 0 && snd.want === 'pop.wav', 'the pop sound is loaded (' + JSON.stringify(snd) + ')');
   const list = await page.evaluate(() => fetch('/screen').then(r => r.json()));
-  ok(list.options.sounds.map(s => s.value).join() === 'bubble.wav,pop.wav,tick.wav', 'the sounds folder is listed in Settings (' + list.options.sounds.map(s => s.value).join() + ')');
+  ok(list.options.sounds.map(s => s.value).join() === 'off,bubble.wav,pop.wav,tick.wav', 'the sounds folder is listed in Settings, with Off (' + list.options.sounds.map(s => s.value).join() + ')');
   ok(await page.evaluate(() => fetch('/sounds/tick.wav').then(r => r.headers.get('content-type'))) === 'audio/wav', 'a sound is served as audio');
-  await post('/screen/sound', { value: false }); await post('/screen', { values: { sound_name: 'tick.wav', sound_volume: 0.3 } }); await settle(1500); await load();
+  await post('/screen', { values: { sound_name: 'off' } }); await post('/screen', { values: { sound_volume: 0.3 } }); await settle(1500); await load();
+  ok(await page.evaluate(() => fetch('/screen').then(r => r.json()).then(j => j.values.sound_name)) === 'off', 'Off in the sound list switches the button sounds off');
+  await post('/screen', { values: { sound_name: 'tick.wav' } }); await settle(1500); await load();
+  await post('/screen', { values: { sound_name: 'off' } }); await settle(1500); await load();
   ok(await page.evaluate(() => !Snd.on && Snd.want === 'tick.wav' && Math.abs(Snd.vol - 0.3) < 0.001), 'sound off, another sound and a volume are applied');
   await post('/screen/sound', { value: true }); await post('/screen', { values: { sound_name: 'pop.wav', sound_volume: 0.6 } });
 

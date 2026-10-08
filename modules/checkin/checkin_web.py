@@ -468,6 +468,7 @@ def _post_colour(h):
 def api(d, warnings):
     """Every /api answer carries the board, so each screen follows the others (it is a few kilobytes for a hundred people)."""
     d["checkin"] = snapshot()
+    d.setdefault("primary", {})["checkin"] = core.module_colours("checkin").get("checkin", "green")      # the board's colour as it is now: a pick in Settings shows at once
 
 
 OPEN = ("/checkin/toggle", "/checkin/status")       # tapping people in and out works while Settings is locked with the PIN

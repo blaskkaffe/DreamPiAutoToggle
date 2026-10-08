@@ -1,9 +1,11 @@
 {
- "background": {"type": "fullscreen"},
+ "background": {
+  "type": "fullscreen"
+ },
  "settings": [
   {
-   "box": "snow-background",
-   "title": "Snow background",
+   "box": "appearance",
+   "title": "Appearance",
    "items": [
     {
      "type": "form",
@@ -13,24 +15,57 @@
       {
        "title": "Snow",
        "sub_text": "amount",
-       "controls": [{"type": "choice", "key": "amount", "options": "amounts", "label": "Amount of snow"}]
+       "controls": [
+        {
+         "type": "choice",
+         "key": "amount",
+         "options": "amounts",
+         "label": "Amount of snow"
+        }
+       ],
+       "nosum": true
       },
       {
        "title": "Wind",
        "sub_text": "wind",
-       "controls": [{"type": "choice", "key": "wind", "options": "winds", "label": "Wind"}]
+       "controls": [
+        {
+         "type": "choice",
+         "key": "wind",
+         "options": "winds",
+         "label": "Wind"
+        }
+       ],
+       "nosum": true
       },
       {
        "title": "Fog",
        "sub_text": "fog",
-       "controls": [{"type": "choice", "key": "fog", "options": "fogs", "label": "Fog"}]
+       "controls": [
+        {
+         "type": "choice",
+         "key": "fog",
+         "options": "fogs",
+         "label": "Fog"
+        }
+       ],
+       "nosum": true
       },
       {
        "title": "Time of day",
        "sub_text": "time",
-       "controls": [{"type": "choice", "key": "time", "options": "times", "label": "Time of day"}]
+       "controls": [
+        {
+         "type": "choice",
+         "key": "time",
+         "options": "times",
+         "label": "Time of day"
+        }
+       ],
+       "nosum": true
       }
-     ]
+     ],
+     "in": "background"
     }
    ]
   }

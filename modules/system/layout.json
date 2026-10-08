@@ -1,15 +1,33 @@
 {
  "settings": [
   {
-   "box": "about",
-   "title": "About",
+   "box": "system",
+   "title": "System",
    "items": [
     {
      "type": "info",
-     "source": "/about"
+     "source": "/about",
+     "order": 10
+    },
+    {
+     "type": "row",
+     "order": 20,
+     "title": "GitHub",
+     "sub": "Source, instructions and updates",
+     "control": {
+      "type": "link",
+      "label": "Open",
+      "href": "https://github.com/blaskkaffe/DreamPiAutoToggle",
+      "aria": "Open the project on GitHub"
+     }
+    },
+    {
+     "type": "divider",
+     "order": 30
     },
     {
      "type": "form",
+     "order": 45,
      "get": "/timezone",
      "post": "/timezone",
      "fields": [
@@ -26,17 +44,6 @@
        ]
       }
      ]
-    },
-    {
-     "type": "row",
-     "title": "GitHub",
-     "sub": "Source, instructions and updates",
-     "control": {
-      "type": "link",
-      "label": "Open",
-      "href": "https://github.com/blaskkaffe/DreamPiAutoToggle",
-      "aria": "Open the project on GitHub"
-     }
     }
    ]
   }

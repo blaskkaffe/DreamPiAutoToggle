@@ -8,6 +8,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 1500, height: 900 } });
+  const openMenus = () => page.evaluate(() => document.querySelectorAll('.wmenu .menubtn[aria-expanded="false"]').forEach(b => b.click()));      // Settings has menus (Layout, Text, Colours, Background): open them all
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error' && !/status of (400|401|409)/.test(m.text())) errors.push(m.text().slice(0, 150)); });     // the refused requests of the PIN checks are expected
@@ -53,13 +54,15 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(i.cols === 0 && i.zoom === '1', 'a phone stays one column at its normal size');
   await page.setViewportSize({ width: 1500, height: 900 }); await settle(600);
   // ---- Settings in columns, and a pop-up inside a scaled box
-  await page.click('#cog'); await settle(1500);
+  await page.click('#cog'); await settle(1500); await openMenus(); await settle(300);
   const sc = await page.evaluate(() => ({ cols: document.querySelectorAll('#set-boxes > .col').length, z: getComputedStyle(document.querySelector('#set-boxes .sec')).zoom }));
   ok(sc.cols === 3 && sc.z !== '1', 'Settings: six allowed, three fit, stretched and scaled (' + JSON.stringify(sc) + ')');
   const app = page.locator('[data-box="appearance"]');
-  await app.locator('.srow', { hasText: 'Check-in board colour' }).locator('.colourpick > button').click(); await settle(500);
-  const geo = await page.evaluate(() => { const p = document.querySelector('.pop.open'), c = p.closest('.card').getBoundingClientRect(), r = p.getBoundingClientRect(), a = p.closest('.card').querySelector('.colourpick > button').getBoundingClientRect();
-    return { l: r.left - c.left, rr: c.right - r.right, below: r.top - a.bottom }; });
+  const pickBtn = app.locator('.srow', { hasText: 'Check-in board colour' }).locator('.colourpick > button'), pickBox = null;
+  await pickBtn.click(); await settle(500);
+  const pickAfter = await pickBtn.boundingBox();
+  const geo = await page.evaluate(btn => { const p = document.querySelector('.pop.open'), c = p.closest('.card').getBoundingClientRect(), r = p.getBoundingClientRect();
+    return { l: r.left - c.left, rr: c.right - r.right, below: r.top - (btn.y + btn.height) }; }, pickAfter);
   ok(Math.abs(geo.l - 16 * 1.0) < 40 && geo.rr >= -1 && geo.l >= -1 && geo.below > -4 && geo.below < 40, 'a pop-up in a scaled box sits under its button and inside the card (' + JSON.stringify(geo) + ')');
   await page.keyboard.press('Escape'); await settle(300);
   // the rows
@@ -168,11 +171,11 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok((await room()).z === 1, 'and the scale is back to 1');
   // ---- the theme
   const look = () => page.evaluate(() => ({ theme: document.documentElement.getAttribute('data-theme'), bg: getComputedStyle(document.body).backgroundColor, ink: getComputedStyle(document.body).color,
-    box: getComputedStyle(document.querySelector('.dbox .now')).backgroundColor, boxInk: getComputedStyle(document.querySelector('.dbox .now')).color }));
+    box: getComputedStyle(document.querySelector('.rp-box')).backgroundColor }));
   let t = await look();
   ok(t.theme === 'dark' && t.bg === 'rgb(17, 17, 17)', 'dark is the default (' + t.bg + ')');
   ok(await post('/screen', { values: { theme: 'light' } }) === 200, 'the theme is saved'); await load(); t = await look();
-  ok(t.theme === 'light' && t.bg === 'rgb(236, 238, 242)' && t.ink === 'rgb(27, 28, 32)' && t.box === 'rgb(255, 255, 255)' && t.boxInk === 'rgb(27, 28, 32)', 'light: a light page with dark ink, and a white box with dark text (' + JSON.stringify(t) + ')');
+  ok(t.theme === 'light' && t.bg === 'rgb(236, 238, 242)' && t.ink === 'rgb(27, 28, 32)' && t.box === 'rgb(236, 236, 236)', 'light: a light page with dark ink, and a light grey box (' + JSON.stringify(t) + ')');
   ok(await post('/screen', { values: { theme: 'auto' } }) === 200, 'auto is saved');
   await page.emulateMedia({ colorScheme: 'light' }); await load(); t = await look();
   ok(t.theme === 'light', 'auto follows a light device');
@@ -189,7 +192,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(askedApi >= 1, 'a saved setting makes the page ask /api again at once (' + askedApi + ')');
   // switching "Ask for the PIN" on with no PIN set asks for a new one on the PIN pad, then locks Settings
   await load(); await page.click('#cog'); await settle(900);
-  await page.locator('[data-box="appearance"] .srow:has-text("Ask for the PIN") input[type=checkbox]').click(); await enterPin('7315'); await enterPin('7315'); await settle(1200);
+  await page.locator('[data-box="system"] .srow:has-text("Ask for the PIN") input[type=checkbox]').click(); await enterPin('7315'); await enterPin('7315'); await settle(1200);
   ok(await page.evaluate(() => fetch('/api').then(r => r.json())).then(d => d.settings_pin.on && d.settings_pin.pin), 'switching the Settings lock on without a PIN asks for one on the PIN pad, and locks');
   ok(await post('/settings-pin', { value: false }, '7315') === 200 && await post('/pin', { pin: '' }, '7315') === 200, 'and it can be undone with that PIN');
   ok(errors.length === 0, 'no JavaScript or console errors' + (errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''));

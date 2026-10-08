@@ -15,11 +15,11 @@ from urllib.request import Request, urlopen
 from support import ROOT, web, core, sandbox, cleanup
 
 REAL_MODULES = os.path.join(ROOT, "modules")
-NAMES = ["checkin", "clock", "contacts", "imagebg", "rebootupdate", "snow"]      # the modules the picker can switch
+NAMES = ["checkin", "contacts", "imagebg", "rebootupdate", "snow"]      # the modules the picker can switch
 HIDDEN = ["system"]                                                # always on, not in the picker
 ALL = sorted(NAMES + HIDDEN)
 # a path only that module answers (GET, or POST when None)
-ENDPOINT = {"checkin": ("GET", "/checkin"), "clock": ("GET", "/clock"), "contacts": ("GET", "/contacts"), "imagebg": ("GET", "/imagebg"), "rebootupdate": ("GET", "/update"), "snow": ("GET", "/snow")}
+ENDPOINT = {"checkin": ("GET", "/checkin"), "contacts": ("GET", "/contacts"), "imagebg": ("GET", "/imagebg"), "rebootupdate": ("GET", "/update"), "snow": ("GET", "/snow")}
 HIDDEN_ENDPOINT = {"system": ("GET", "/about")}
 BASE_IDS = ('id="dash"', 'id="set-boxes"', 'id="settings"', 'id="bg"', 'id="warnings"')
 
@@ -126,7 +126,7 @@ class RepoModules(unittest.TestCase):
 
     def test_defaults(self):
         on = dict((n, json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["enabled"]) for n in ALL)
-        self.assertEqual(on, {"checkin": True, "clock": True, "contacts": True, "imagebg": False, "rebootupdate": True, "snow": False, "system": True})
+        self.assertEqual(on, {"checkin": True, "contacts": True, "imagebg": False, "rebootupdate": True, "snow": False, "system": True})
         hidden = [n for n in ALL if json.load(open(os.path.join(REAL_MODULES, n, "module.json")))["visible"] is False]
         self.assertEqual(hidden, HIDDEN)                   # the system info can't be switched off
 
@@ -149,46 +149,48 @@ class WithEverything(Base):
     def test_boxes_are_shared_by_name_between_modules(self):
         lay = layout_of(self.page())
         system = [b for b in lay["settings"] if b["id"] == "system"][0]
-        self.assertEqual(system["mods"], ["rebootupdate"])
+        self.assertEqual(system["mods"], ["base", "system", "rebootupdate"])
         self.assertEqual([w["type"] for w in system["items"] if w["mod"] == "rebootupdate"][-1], "row")      # the Reboot row ends the System box
         ids = [b["id"] for b in lay["settings"]]
         self.assertEqual(ids[-1], "system")                                                                # System is the very last box
-        self.assertLess(ids.index("about"), ids.index("background-image"))                                  # settings-only modules come before the backgrounds
-        about = [b for b in lay["settings"] if b["id"] == "about"][0]
-        self.assertEqual((about["mods"], about["title"]), (["system"], "About"))               # the versions are their own box, not part of System
-        self.assertEqual([b["id"] for b in lay["dashboard"]], ["checkin", "clock"])
-        self.assertEqual([b["id"] for b in lay["settings"]], ["appearance", "colours", "check-in", "statuses", "clock", "contacts", "about", "background-image", "snow-background", "system"])
+        self.assertEqual(ids, ["appearance", "check-in", "statuses", "contacts", "system"])             # Global colours, Clock and About are gone; the backgrounds are menus of Appearance
+        self.assertEqual([b["id"] for b in lay["dashboard"]], ["checkin"])
+        self.assertIsNone(core.save_dashboard_order("extra"))
 
-    def test_the_picker_lists_dashboard_modules_then_settings_only_then_backgrounds(self):
-        core.save_module_order(["imagebg", "rebootupdate", "contacts", "clock", "system", "checkin"])      # the user's own mix
-        names = core.module_names()
-        groups = [core.module_group(n) for n in names]
-        self.assertEqual(groups, sorted(groups))
-        self.assertEqual((core.module_group("checkin"), core.module_group("system"), core.module_group("imagebg")), (0, 1, 2))
-        self.assertLess(names.index("clock"), names.index("checkin"))                       # inside a group the user's order stays: clock was before checkin
+    def test_the_system_box_is_in_the_chosen_order(self):
+        lay = layout_of(self.page())
+        system = [b for b in lay["settings"] if b["id"] == "system"][0]
+        self.assertEqual(system["mods"], ["base", "system", "rebootupdate"])
+        kinds = [(w["type"], w.get("title") or w.get("name") or "") for w in system["items"]]
+        self.assertEqual(kinds[:8], [("info", ""), ("row", "GitHub"), ("divider", ""), ("row", "PIN"), ("row", "Ask for the PIN to open Settings"),
+                                      ("form", ""), ("slot", "modules"), ("row", "Updates")])          # info, GitHub, a line, the PIN, the time zone, the Modules row, the updates ...
+        self.assertEqual(kinds[-1], ("row", "Reboot"))
 
-    def test_moving_tiles_on_the_main_screen_reorders_those_modules_only(self):
-        core.save_module_order(["checkin", "clock", "contacts", "system", "rebootupdate", "imagebg", "snow"])
-        new = core.save_dashboard_order(["clock", "checkin"])                                # two tiles moved: they take each other's places
-        self.assertEqual(new[:2], ["clock", "checkin"])
-        self.assertEqual(new[2:], ["contacts", "system", "rebootupdate", "imagebg", "snow"])
-        self.assertEqual(core.save_dashboard_order(["nope", "checkin"])[:2], ["clock", "checkin"])      # unknown names are ignored
-        self.assertIsNone(core.save_dashboard_order("clock"))
+    def test_menus_take_items_from_other_modules_and_sort_by_order(self):
+        lay = layout_of(self.page())
+        appearance = [b for b in lay["settings"] if b["id"] == "appearance"][0]
+        menus = dict((w["id"], w) for w in appearance["items"] if w["type"] == "menu")
+        self.assertEqual([w.get("id") or w["type"] for w in appearance["items"]], ["form", "layout", "row", "row", "text", "form", "colours", "background"])      # the order of the user's list
+        self.assertEqual([w["type"] for w in menus["colours"]["items"]], ["palette", "row", "row"])                  # the palette, Global main colour (base), Check-in board colour (check-in)
+        self.assertEqual(menus["colours"]["items"][2]["mod"], "checkin")
+        bg = menus["background"]["items"]
+        self.assertEqual([w["mod"] for w in bg], ["imagebg", "imagebg", "imagebg", "snow", "snow"])                 # each background module: its switch, then its settings
+        self.assertEqual([w["type"] for w in bg], ["row", "custom", "form", "row", "form"])
+        self.assertEqual([w["title"] for w in menus["layout"]["items"] if w["type"] == "row"], ["Hide the top bar", "Stretch boxes", "Scale content", "Fit to screen"])
+        self.assertFalse(any(w.get("in") for w in appearance["items"]))                                            # nothing is left outside its menu
+
+    def test_a_menu_with_nothing_in_it_is_still_a_valid_widget(self):
+        self.assertIn("menu", __import__("base_modules").WIDGETS)
 
     def test_system_is_the_last_settings_box_whatever_the_picker_order(self):
-        core.save_module_order(["rebootupdate", "system", "contacts", "clock", "checkin"])
+        core.save_module_order(["rebootupdate", "system", "contacts", "checkin"])
         lay = layout_of(self.page())
         self.assertEqual([b["id"] for b in lay["settings"]][-1], "system")
         self.assertEqual(len([b for b in lay["settings"] if b["id"] == "system"]), 1)
 
-    def test_the_about_module_is_listed_as_about_and_moves_its_box(self):
+    def test_the_system_module_is_listed_as_system(self):
         got = {m["name"]: m["title"] for m in self.json("/modules")["modules"]}
-        self.assertEqual(got["system"], "About")                                   # the picker row says what it moves
-        core.save_module_order(["system"])                                         # the rest keeps its order after it
-        web.refresh_page(force=True)
-        ids = [b["id"] for b in layout_of(self.page())["settings"]]
-        first_settings_only = [b["id"] for b in layout_of(self.page())["settings"] if b["mods"] == ["contacts"]][0]
-        self.assertLess(ids.index("about"), ids.index(first_settings_only))        # first among the settings-only modules (the dashboard ones stay above them)
+        self.assertEqual(got["system"], "System")
 
     def test_protected_paths_are_the_modules_own_post_routes(self):
         import base_modules as mods
@@ -198,7 +200,7 @@ class WithEverything(Base):
 
     def test_modules_menu_lists_them_all(self):
         got = self.json("/modules")["modules"]
-        self.assertEqual([m["name"] for m in got], ["checkin", "clock", "contacts", "system", "rebootupdate", "imagebg", "snow"])   # picker order, the always-on modules included
+        self.assertEqual([m["name"] for m in got], ["checkin", "contacts", "system", "rebootupdate", "imagebg", "snow"])   # picker order, the always-on modules included
         self.assertEqual([m["name"] for m in got if m["visible"] is False], ["system"])                     # which the page lists without a switch
         self.assertTrue(all(m["enabled"] for m in got))
         self.assertTrue(all(m["title"] and m["description"] for m in got))
@@ -295,14 +297,14 @@ class OneModuleGone(Base):
     def test_bad_menu_requests(self):
         self.assertEqual(self.status("POST", "/modules", {"name": "nope", "enabled": True}), 404)
         self.assertEqual(self.status("POST", "/modules", {"name": "system", "enabled": False}), 404)       # not in the picker
-        self.assertEqual(self.status("POST", "/modules", {"name": "clock"}), 400)
-        self.assertEqual(self.status("POST", "/modules", {"name": "clock", "enabled": "yes"}), 400)
+        self.assertEqual(self.status("POST", "/modules", {"name": "snow"}), 400)
+        self.assertEqual(self.status("POST", "/modules", {"name": "snow", "enabled": "yes"}), 400)
         self.assertEqual(self.status("POST", "/modules", {"name": "../x", "enabled": True}), 404)
-        req = Request(self.base + "/modules", method="POST", data=b'{"name":"clock","enabled":false}')
+        req = Request(self.base + "/modules", method="POST", data=b'{"name":"snow","enabled":false}')
         with self.assertRaises(HTTPError) as cm:                  # from another site: no header, no origin
             urlopen(req, timeout=10)
         self.assertEqual(cm.exception.code, 403)
-        self.assertTrue(core.module_enabled("clock"))
+        self.assertTrue(core.module_enabled("checkin"))
 
 
 class BrokenAndNewModules(Base):
@@ -385,10 +387,10 @@ class InstallerTests(unittest.TestCase):
                 self.assertTrue(os.path.exists(os.path.join(self.dest, "modules", n, "layout.json")), n)
 
     def test_no_pycache_is_installed(self):
-        os.makedirs(os.path.join(self.src, "modules", "clock", "__pycache__"))
-        open(os.path.join(self.src, "modules", "clock", "__pycache__", "x.pyc"), "w").close()
+        os.makedirs(os.path.join(self.src, "modules", "checkin", "__pycache__"))
+        open(os.path.join(self.src, "modules", "checkin", "__pycache__", "x.pyc"), "w").close()
         self.run_sync(self.src, self.dest)
-        self.assertFalse(os.path.exists(os.path.join(self.dest, "modules", "clock", "__pycache__")))
+        self.assertFalse(os.path.exists(os.path.join(self.dest, "modules", "checkin", "__pycache__")))
 
     def test_a_module_dropped_from_the_folder_is_removed_and_cleans_up_after_itself(self):
         self.run_sync(self.src, self.dest)
@@ -400,13 +402,13 @@ class InstallerTests(unittest.TestCase):
         out = self.run_sync(self.src, self.dest)
         self.assertFalse(os.path.exists(os.path.join(self.dest, "modules", "rebootupdate")))
         self.assertFalse(os.path.exists(os.path.join(self.dest, "modules", "contacts")))
-        self.assertTrue(os.path.exists(os.path.join(self.dest, "modules", "clock")))
+        self.assertTrue(os.path.exists(os.path.join(self.dest, "modules", "checkin")))
         self.assertEqual(open(marker).read().strip(), "gone")
         self.assertIn("rebootupdate", out)
 
     def test_a_module_added_to_the_folder_is_installed_and_old_copies_are_replaced(self):
         self.run_sync(self.src, self.dest)
-        stale = os.path.join(self.dest, "modules", "clock", "old-file.py")
+        stale = os.path.join(self.dest, "modules", "checkin", "old-file.py")
         open(stale, "w").write("stale")
         extra = os.path.join(self.src, "modules", "extra")
         os.makedirs(extra)

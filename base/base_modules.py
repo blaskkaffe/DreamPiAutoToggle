@@ -27,6 +27,7 @@
 # Nothing outside this file and the web service knows which modules exist. A module whose folder is missing,
 # that is switched off, or whose Python fails to import is simply absent. Works on Python 3 and 2.7.
 import importlib
+import copy
 import io
 import json
 import os
@@ -40,7 +41,7 @@ UI_KIT = 2       # the version of the page kit (ui in page/page.js, the kit bloc
 _PAGE_FILES = ("page.css", "page.js")
 # the standard widgets the page can draw from a layout (docs/modules.md, "Layout"); "custom" hands a box to the module's own page.js
 WIDGETS = ("text", "row", "button", "toggle", "swatches", "colourpick", "link", "form", "infobox", "status", "bar", "carousel", "worldmap", "triggers",
-           "picker", "list", "links", "console", "info", "pinset", "roster", "palette", "custom")
+           "picker", "list", "links", "console", "info", "pinset", "roster", "palette", "menu", "divider", "slot", "custom")
 CONTROLS = ("select", "choice", "number", "text", "toggle", "colour", "slider", "range")      # what a form field may hold (W.form, control() in page/widgets.js)
 SECTIONS = ("dashboard", "settings")
 BACKGROUND_TYPES = ("fullscreen", "part")
@@ -145,7 +146,7 @@ def _check_widget(w, where):
     for key in ("control", "value"):
         if isinstance(w.get(key), dict):
             _check_widget(w[key], "%s.%s" % (where, key))
-    for key in (("items",) if t == "bar" else ("actions",) if t == "infobox" else ()):
+    for key in (("items",) if t in ("bar", "menu") else ("actions",) if t == "infobox" else ()):
         if key in w:
             if not isinstance(w[key], list):
                 raise ValueError("%s.%s must be a list" % (where, key))
@@ -279,6 +280,27 @@ def _launcher_of(name, manifest, lay):
             "target": str(spec.get("target") or "the device")}
 
 
+def _arrange(box):
+    """Put a box's items in order and into their menus. An item with "order" (a number; the default is 50) sorts by it, the others keep their places (a stable sort);
+    an item with "in": "<id>" goes into the "menu" widget of that id in the same box (its "items"), where the same order applies. The module that makes the menu
+    is usually the base; any module can add to it, so a module's settings can sit in a menu of the base's Appearance box."""
+    def key(w):
+        o = w.get("order", 50)
+        return o if isinstance(o, (int, float)) and not isinstance(o, bool) else 50
+    box["items"].sort(key=key)
+    menus = dict((w["id"], w) for w in box["items"] if w.get("type") == "menu" and isinstance(w.get("id"), str))
+    rest = []
+    for w in box["items"]:
+        target = menus.get(w.get("in")) if isinstance(w.get("in"), str) else None
+        if target is not None and target is not w:
+            target.setdefault("items", []).append(w)
+        else:
+            rest.append(w)
+    box["items"] = rest
+    for m in menus.values():
+        m["items"] = sorted(m.get("items", []), key=key)
+
+
 def layout():
     """What the page draws, from the enabled modules in picker order:
     {"modules": [names], "dashboard": [box], "settings": [box], "backgrounds": [{"mod", "type", ...}],
@@ -297,14 +319,19 @@ def layout():
     for sec in SECTIONS:                  # the base's own settings (base/layout.json: the palette, the screen layout, the PIN ...) come first
         for box in _base_layout().get(sec, []):
             b = _add_box(out, boxes, sec, box["box"].strip().lower(), box.get("title"), BASE)
-            b["items"].extend(dict(w, mod=BASE) for w in box.get("items", []))
+            b["items"].extend(dict(copy.deepcopy(w), mod=BASE) for w in box.get("items", []))
     for name in core.module_names():
         manifest = core.module_manifest(name) or {}
         toggle_box = manifest.get("toggle_box")
         if toggle_box and core.module_visible(name, manifest):
             b = _add_box(out, boxes, "settings", str(toggle_box).strip().lower(), str(toggle_box).strip().capitalize(), name)
-            b["items"].append({"type": "row", "title": core.module_title(name, manifest), "sub": manifest.get("description", ""), "mod": name,
-                               "control": {"type": "toggle", "module": name, "label": core.module_title(name, manifest)}})
+            row = {"type": "row", "title": core.module_title(name, manifest), "sub": manifest.get("description", ""), "mod": name,
+                   "control": {"type": "toggle", "module": name, "label": core.module_title(name, manifest)}}
+            if manifest.get("short"):
+                row["short"] = str(manifest["short"])             # what a menu's subtitle calls this switch ("Snow on")
+            if manifest.get("toggle_in"):
+                row["in"] = str(manifest["toggle_in"])           # the row goes into that menu of the box (a "menu" widget with that id)
+            b["items"].append(row)
         m = loaded.get(name)
         if m is None:
             continue
@@ -327,7 +354,7 @@ def layout():
             for box in lay.get(sec, []):
                 b = _add_box(out, boxes, sec, box["box"].strip().lower(), box.get("title"), name)
                 for w in box.get("items", []):
-                    w = dict(w, mod=name)
+                    w = dict(copy.deepcopy(w), mod=name)
                     if w.get("type") == "custom" and w.get("html_file"):         # the markup of a custom widget lives in a file of the module
                         w["html"] = _module_file(name, w.pop("html_file"))
                     b["items"].append(w)
@@ -336,6 +363,9 @@ def layout():
         launcher = _launcher_of(name, m["manifest"], lay)
         if launcher and "launcher" not in out:                    # the first module in the picker order that announces one
             out["launcher"] = launcher
+    for sec in SECTIONS:
+        for b in out[sec]:
+            _arrange(b)
     out["settings"].sort(key=lambda b: b["id"] == "system")   # System (the module picker and the modules' system controls) is always the last box of Settings, whatever the picker order (a stable sort: the others keep theirs)
     return out
 

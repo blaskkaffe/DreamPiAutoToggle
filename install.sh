@@ -5,7 +5,7 @@
 #   sudo ./install.sh 8080         use another port for the web page
 #   sudo ./install.sh --https-port=8443   HTTPS on another port (default 443)
 #   sudo ./install.sh --no-https   plain HTTP only
-#   The check-in board, the contacts, the clock and the system controls are modules, one folder each in
+#   The check-in board, the contacts and the system controls are modules, one folder each in
 #   modules/ (see docs/modules.md): a folder that is not there is not installed (and one that was installed before is
 #   removed). Which modules are on is the page's Settings > System > Modules.
 #   sudo ./install.sh --hostname=checkinchicken   give the computer that name, so the board is at http://checkinchicken.local
