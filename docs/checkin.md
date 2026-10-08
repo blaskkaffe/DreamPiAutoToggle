@@ -46,7 +46,8 @@ Read before touching `modules/checkin/`, `modules/contacts/`, the `roster` widge
 - **Calendar:** a date has a calendar button (📅) to the right of the number field (the typed field, or the number pad's display); it opens a month (Monday first, Swedish names), arrows for the month, a tap on a day fills the field (the pad keeps the year of a day picked in another year).
 - **Number pad:** three even columns, every key the same size, a blank key where there is no AM / PM; with several kinds (time, date, date and time) the display shows `tt : mm`, `dd / mm` or both.
 - **Photos** are chosen only in **Settings > Contacts** (the person's editor: Choose photo / Remove photo; `POST /contacts/photo`), never from the board.
-- Checked in Chromium (`tests/ui/functional.js`); not on a touch screen.
+- **A USB keyboard works with the on-screen one:** digits, letters (å ä ö too), Backspace and Enter (done / Set) are taken from the physical keyboard while a pad or keyboard is open (a / p switch AM / PM on a 12-hour pad); the two can be mixed.
+- Checked in Chromium (`tests/ui/functional.js`); not on a touch screen, and not with a real USB keyboard (key events are sent by the test).
 
 ## Tall screens: two columns, 20 to 80 people
 Tested at 1080 x 1920 with Stretch, two columns and Fit to screen (`tests/ui/portrait.js`, rosters from `tests/ui/make_people.py`: 20, 40, 60 and 80 people in groups of 1 to 15, mostly 6 to 12; the 40, 60 and 80 files have a group of 15 and a group of 1). Everybody is on the screen at once, in two columns of about equal height, every name whole.

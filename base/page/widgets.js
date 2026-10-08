@@ -795,6 +795,17 @@ function onScreenKeys(kind,o){
   if(a==="done"){if(el._done)el._done();return}
   if(a==="back"){typed("back")}else if(a[0]==="d"){typed(a.slice(1))}else if(a[0]==="c"){typed(a.slice(1))}
   draw()});
+ // A physical (USB) keyboard works as well as the keys on the screen: digits, letters (also \u00e5 \u00e4 \u00f6 and what the layout gives), Backspace, Enter (= done / Set),
+ // and A / P for AM / PM on a 12-hour pad. Listens on the page while this pad is on screen, so no field needs the focus.
+ function physical(e){if(!el.isConnected){document.removeEventListener("keydown",physical,true);return}
+  if(e.ctrlKey||e.metaKey||e.altKey||e.isComposing)return;var t=e.target&&e.target.tagName;if(t==="INPUT"||t==="TEXTAREA"||t==="SELECT")return;
+  var k=e.key;
+  if(k==="Backspace"){typed("back");draw();e.preventDefault();return}
+  if(k==="Enter"){if(el._done){el._done();e.preventDefault()}return}
+  if(Array.from(k).length!==1)return;
+  if(numeric){if(/\d/.test(k)){typed(k);draw();e.preventDefault()}else if(o.twelve&&kind==="time"&&/[apAP]/.test(k)){pm=/[pP]/.test(k);render();e.preventDefault()}return}
+  if(cal)return;typed(k);draw();e.preventDefault()}
+ document.addEventListener("keydown",physical,true);
  function dateOf(d){var dd=+d.slice(0,2),mo=+d.slice(2,4),now=new Date(),y=now.getFullYear(),t=new Date(y,mo-1,dd);
   if(mo<1||mo>12||dd<1||t.getMonth()!==mo-1)return null;
   if(dateIso&&dateIso.slice(8,10)===d.slice(0,2)&&dateIso.slice(5,7)===d.slice(2,4))return dateIso;     // picked in the calendar

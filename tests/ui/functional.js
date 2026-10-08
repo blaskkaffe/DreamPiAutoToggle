@@ -225,6 +225,26 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.click('.rp-need2 [data-k=back]');
   ok(Array.from((await page.locator('.rp-need2 .rp-shown').textContent()).trim()).length === 1, 'delete removes a whole emoji');
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+  // a USB keyboard works as well as the keys on the screen
+  await page.locator('.rp-t').nth(4).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code="OTHER"]').click(); await settle(300);
+  await page.keyboard.type('Hej '); for (const c of ['\u00e5', '\u00e4', '\u00f6']) await page.evaluate(k => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })), c);      // (the test driver has no key for them)
+  await page.keyboard.press('Backspace');
+  ok((await page.locator('.rp-need2 .rp-shown').textContent()).trim() === 'Hej \u00e5\u00e4', 'a physical keyboard types in the on-screen note field (' + (await page.locator('.rp-need2 .rp-shown').textContent()).trim() + ')');
+  await page.click('.rp-need2 [data-k="layeremoji"]'); await page.locator('.rp-egrid .rp-emo').first().click(); await page.keyboard.type('!');
+  ok(Array.from((await page.locator('.rp-need2 .rp-shown').textContent()).trim()).slice(-1)[0] === '!', 'and the two can be mixed');
+  await page.keyboard.press('Enter'); await settle(700);
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => /^Annat \u00b7 Hej \u00e5\u00e4.*!$/.test(p.text))), 'Enter on the physical keyboard sets the status');
+  await page.locator('.rp-t').nth(4).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code=""]').click(); await settle(500);
+  await page.locator('.rp-t').nth(4).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code="DOCTOR"]').click(); await settle(300);
+  await page.keyboard.type('0745');
+  ok((await page.locator('.rp-need2 .rp-shown').textContent()).replace(/\s/g, '') === '07:45', 'digits from a physical keyboard go on the number pad');
+  await page.keyboard.press('Enter'); await settle(700);
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'L\u00e4karbes\u00f6k \u00b7 07:45')), 'and Enter sets the time');
+  await page.locator('.rp-t').nth(4).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code=""]').click(); await settle(500);
   // a date on the number pad: the calendar button is right of the field, a day tapped there fills it, Skip leaves the date out
   await page.locator('.rp-t').nth(4).click(); await settle(300);
   await page.locator('.rp-sheet button[data-code="TRAVEL"]').click(); await settle(300);
