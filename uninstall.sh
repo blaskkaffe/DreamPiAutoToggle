@@ -9,12 +9,9 @@ for ns_dir in "$DEST"/modules/*/; do
     [ -f "$ns_dir/remove.sh" ] && . "$ns_dir/remove.sh"
 done
 
-# the services of an install under the old names (dreampi-netswitch*), if one is still there
-for SERVICE in checkin-board checkin-board-wifi dreampi-netswitch dreampi-netswitch-wifi; do
-    systemctl disable --now "$SERVICE.service" 2>/dev/null
-    rm -f "/etc/systemd/system/$SERVICE.service"
-done
+systemctl disable --now checkin-board.service 2>/dev/null
+rm -f /etc/systemd/system/checkin-board.service
 systemctl daemon-reload
 
-rm -rf "$DEST" /tmp/checkin-board.* /tmp/dreampi-netswitch.*      # and the state files in /tmp (update)
+rm -rf "$DEST" /tmp/checkin-board.*      # and the state files in /tmp (update)
 echo "Uninstalled."

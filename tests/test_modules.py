@@ -423,43 +423,6 @@ class InstallerTests(unittest.TestCase):
                 if os.path.exists(path):
                     self.assertEqual(subprocess.run(["sh", "-n", path]).returncode, 0, path)
 
-    def test_installer_cleans_up_the_removed_wifi_setup_module(self):
-        text = open(os.path.join(ROOT, "install.sh")).read()
-        self.assertIn("dreampi-netswitch-wifi", text)                        # its service is stopped and its unit deleted
-        self.assertIn('rm -rf "$DEST/modules/wifi"', text)
-        self.assertIn('rm -f "$DEST"/wifi_* /tmp/dreampi-netswitch.wifi', text)
-        self.assertFalse(os.path.exists(os.path.join(REAL_MODULES, "wifi")))
-
-    def test_an_install_under_the_old_names_moves_to_the_new_ones(self):
-        import re
-        import subprocess
-        text = open(os.path.join(ROOT, "install.sh")).read()
-        block = re.search(r"# >>> migrate_old\n(.*?)# <<< migrate_old", text, re.S).group(1)
-        tmp = tempfile.mkdtemp()
-        try:
-            bin_dir = os.path.join(tmp, "bin")
-            os.makedirs(bin_dir)
-            log = os.path.join(tmp, "systemctl.log")
-            for name, body in (("systemctl", 'echo "$@" >> %s\n' % log), ("id", "echo 0\n")):
-                with open(os.path.join(bin_dir, name), "w") as f:
-                    f.write("#!/bin/sh\n" + body)
-                os.chmod(os.path.join(bin_dir, name), 0o755)
-            old, new = os.path.join(tmp, "old"), os.path.join(tmp, "new")
-            os.makedirs(old)
-            with open(os.path.join(old, "contacts.json"), "w") as f:
-                f.write('{"people": []}')
-            env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ["PATH"], OLD_DEST=old, DEST=new)
-            out = subprocess.run(["sh", "-c", block], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout.decode()
-            self.assertTrue(os.path.exists(os.path.join(new, "contacts.json")), out)          # the data moved with the folder
-            self.assertFalse(os.path.exists(old))
-            self.assertIn("disable --now dreampi-netswitch.service", open(log).read())        # the old service is stopped and disabled
-            # nothing to move when the new folder is there already: both stay as they are
-            os.makedirs(old)
-            subprocess.run(["sh", "-c", block], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            self.assertTrue(os.path.exists(old) and os.path.exists(new))
-        finally:
-            shutil.rmtree(tmp)
-
     def test_installer_copies_the_loader_and_the_base_only(self):
         text = open(os.path.join(ROOT, "install.sh")).read()
         self.assertIn("base/base_*.py", text)

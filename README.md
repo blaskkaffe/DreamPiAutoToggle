@@ -57,7 +57,7 @@ The page can do it for you while the **Reboot and Update** module is on: **Setti
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
 ```
-Settings, people and who is in are kept. An install made under the old names (`/opt/dreampi-netswitch`, the service `dreampi-netswitch`) is moved to `/opt/checkin-board` and the service `checkin-board`; the data comes along. An install over an older version of this add-on removes the hook, buttons and LED service it left.
+Settings, people and who is in are kept.
 
 ### Safety
 

@@ -18,19 +18,6 @@
 set -e
 DEST=/opt/checkin-board
 SRC="$(cd "$(dirname "$0")" && pwd)"
-# >>> migrate_old
-# An install made under the old names (service and folder "dreampi-netswitch") moves to the new ones: the settings, the people and who is in are kept
-OLD_DEST=${OLD_DEST:-/opt/dreampi-netswitch}
-if [ "$(id -u)" = "0" ] && [ -d "$OLD_DEST" ] && [ ! -e "$DEST" ]; then
-    for ns_old in dreampi-netswitch dreampi-netswitch-led dreampi-netswitch-buttons dreampi-netswitch-wifi; do
-        systemctl disable --now "$ns_old.service" 2>/dev/null || true
-        rm -f "/etc/systemd/system/$ns_old.service"
-    done
-    mv "$OLD_DEST" "$DEST"
-    rm -f /tmp/dreampi-netswitch.*
-    echo "Moved the old install from $OLD_DEST to $DEST"
-fi
-# <<< migrate_old
 PORT=80
 HTTPS_PORT=443
 # an update keeps the ports used last time unless they are given again
@@ -62,23 +49,6 @@ mkdir -p "$DEST/page" "$DEST/kiosk"
 cp "$SRC"/base/page/index.html "$SRC"/base/page/page.css "$SRC"/base/page/page.js "$SRC"/base/page/widgets.js "$SRC"/base/page/boot.js "$DEST/page/"
 cp "$SRC"/kiosk/* "$DEST/kiosk/"
 chmod +x "$DEST/kiosk/kiosk-browser.sh"
-# Files of the DreamPi add-on this one grew out of (an install over it is cleaned up: the hook, the buttons and the LED service are gone)
-for ns_old in dreampi-netswitch-led dreampi-netswitch-buttons dreampi-netswitch-wifi checkin-board-wifi; do
-    if [ -f "/etc/systemd/system/$ns_old.service" ]; then
-        systemctl disable --now "$ns_old.service" 2>/dev/null || true
-        rm -f "/etc/systemd/system/$ns_old.service"
-    fi
-done
-rm -f "$DEST/netswitch_probes.py" "$DEST/base_probes.py" "$DEST/netswitch_core.py" "$DEST/netswitch_modules.py" "$DEST/netswitch_web.py" "$DEST/netswitch_security.py" "$DEST/netswitch_tz.py" "$DEST/netswitch_hook.py" "$DEST/netswitch_gpio.py" "$DEST/netswitch_buttons.py" "$DEST/netswitch_update.py" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" \
-      "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" "$DEST/netswitch_players.py" "$DEST/netswitch_wifi_setup.py" "$DEST/wifi_button" "$DEST/wifi_button_enabled"
-# The Wi-Fi setup module is gone: its service (removed above), module folder, state files and /tmp state
-rm -rf "$DEST/modules/wifi"
-rm -f "$DEST"/wifi_* /tmp/dreampi-netswitch.wifi /tmp/checkin-board.wifi
-rm -rf "$DEST/static"
-if [ -f "$DEST/pth_locations" ]; then       # the hook was loaded into every Python through .pth files
-    while read -r ns_pth; do rm -f "$ns_pth"; done < "$DEST/pth_locations"
-    rm -f "$DEST/pth_locations"
-fi
 
 # >>> sync_modules
 # The optional features: every folder in modules/ is copied to $DEST/modules/. A folder that was installed before but
@@ -195,7 +165,7 @@ Restart=always
 RestartSec=3
 Nice=-5
 # The page runs as root, so it is fenced in: no setuid tricks, no writes to /usr, /boot or /etc,
-# no cgroup or kernel-module changes. (The update runs in its own transient unit, see modules/rebootupdate/netswitch_update.py.)
+# no cgroup or kernel-module changes. (The update runs in its own transient unit, see modules/rebootupdate/rebootupdate_update.py.)
 NoNewPrivileges=yes
 ProtectSystem=full
 ProtectControlGroups=yes
