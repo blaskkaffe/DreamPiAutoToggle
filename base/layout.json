@@ -47,6 +47,24 @@
          "label": "Columns"
         }
        ]
+      },
+      {
+       "title": "Button sound",
+       "sub_text": "sound_name",
+       "controls": [
+        {
+         "type": "select",
+         "key": "sound_name",
+         "options": "sounds",
+         "label": "Sound (more: copy .wav, .mp3 or .ogg files into the sounds folder next to the settings)"
+        },
+        {
+         "type": "slider",
+         "key": "sound_volume",
+         "aria": "Volume",
+         "label": "Volume"
+        }
+       ]
       }
      ]
     },
@@ -82,6 +100,17 @@
       "bind": "@screen.fit",
       "post": "/screen/fit",
       "label": "Fit to screen"
+     }
+    },
+    {
+     "type": "row",
+     "title": "Button sounds",
+     "sub": "A small click when a button is pressed",
+     "control": {
+      "type": "toggle",
+      "bind": "@screen.sound",
+      "post": "/screen/sound",
+      "label": "Button sounds"
      }
     },
     {

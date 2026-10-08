@@ -107,7 +107,7 @@ window.addEventListener("resize",function(){applyScreen();if($("settings").class
 // ---- the screen layout (Settings > Appearance; S.screen from /api): how many columns the dashboard and Settings use on a wide screen and
 // whether they stretch. A column is about COLW px wide; there are as many as fit, up to the setting. Stretch: the columns share the whole width
 // (the boxes are wider). Scale content: a stretched box is drawn bigger (CSS zoom) in step with its width, so it is taller too.
-var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,fit:false,theme:"dark"},COLW=428,SGAP=20,scrKey="";
+var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,fit:false,theme:"dark",sound:true,sound_name:"pop.wav",sound_volume:.6},COLW=428,SGAP=20,scrKey="";
 function colsFor(max,W){return Math.max(1,Math.min(max,Math.floor((W+SGAP)/(COLW+SGAP))))}
 function scrZoom(n,W){return SCR.stretch&&SCR.scale?Math.max(1,((W-SGAP*(n-1))/n)/COLW):1}
 // The dashboard's boxes in dn columns: each box goes to the column that is shortest so far, in the order of the layout (so the first boxes are at
@@ -173,7 +173,20 @@ function gripEvents(tile,grip){
   grip.addEventListener("pointermove",move);grip.addEventListener("pointerup",up);grip.addEventListener("pointercancel",lost);document.addEventListener("keydown",esc,true);show(e)})}
 // the theme: "dark", "light" or "auto" (the device's own setting); the page is built with it, this follows a change made here or on another device
 var themeMedia=window.matchMedia?matchMedia("(prefers-color-scheme: light)"):null;
-function applyLook(){var pref=SCR.theme||"dark",d=document.documentElement,want=pref==="auto"?(themeMedia&&themeMedia.matches?"light":"dark"):pref;
+// ---- button sounds (Appearance > Button sound): a short click when a button is pressed (pointer down, so it is heard at once). The sound is one of the files in the
+// host's sounds folder (the sounds folder: pop.wav, tick.wav ... and any .wav / .mp3 / .ogg copied in by hand), played with the Web Audio API at the chosen volume.
+var Snd={ctx:null,buf:{},want:"",on:true,vol:.6,asked:{}};
+function sndCtx(){if(!Snd.ctx){try{var C=window.AudioContext||window.webkitAudioContext;if(C)Snd.ctx=new C()}catch(e){}}return Snd.ctx}      // made at the first press (a page may only start sound after one)
+function sndLoad(name){if(!name||Snd.buf[name]||Snd.asked[name])return;Snd.asked[name]=1;
+ var x=new XMLHttpRequest();x.open("GET","/sounds/"+encodeURIComponent(name),true);x.responseType="arraybuffer";
+ x.onload=function(){if(x.status!==200)return;try{var O=window.OfflineAudioContext||window.webkitOfflineAudioContext,d=new O(1,1,44100);      // decoded without a sound context, so nothing needs a press first
+  var ok=function(b){Snd.buf[name]=b},p=d.decodeAudioData(x.response,ok,function(){});if(p&&p.then)p.then(ok,function(){})}catch(e){}};x.send()}
+function sndPlay(){if(!Snd.on||!Snd.vol)return;var c=sndCtx(),b=Snd.buf[Snd.want];if(!c||!b)return;try{if(c.state==="suspended")c.resume();
+ var src=c.createBufferSource(),g=c.createGain();g.gain.value=Snd.vol;src.buffer=b;src.connect(g);g.connect(c.destination);src.start(0)}catch(e){}}
+function sndApply(){Snd.on=SCR.sound!==false;Snd.vol=Math.max(0,Math.min(1,+SCR.sound_volume));if(isNaN(Snd.vol))Snd.vol=.6;Snd.want=SCR.sound_name||"pop.wav";if(Snd.on)sndLoad(Snd.want)}
+document.addEventListener("pointerdown",function(e){var t=e.target&&e.target.closest&&e.target.closest('button,.pill-s,[role=button],summary,input[type=checkbox],.swatch,.tgl,select');
+ if(t&&!t.disabled&&!(t.getAttribute&&t.getAttribute("aria-disabled")==="true"))sndPlay()},true);
+function applyLook(){sndApply();var pref=SCR.theme||"dark",d=document.documentElement,want=pref==="auto"?(themeMedia&&themeMedia.matches?"light":"dark"):pref;
  if(d.getAttribute("data-pref")!==pref)d.setAttribute("data-pref",pref);if(d.getAttribute("data-theme")!==want)d.setAttribute("data-theme",want);
  var m=document.querySelector('meta[name=theme-color]'),c=getComputedStyle(document.body).backgroundColor;if(m&&c&&c.indexOf("rgba(0, 0, 0, 0)")!==0)m.setAttribute("content",c)}
 if(themeMedia&&themeMedia.addEventListener)themeMedia.addEventListener("change",function(){applyLook()});

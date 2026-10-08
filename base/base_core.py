@@ -727,8 +727,40 @@ def save_settings_pin(on):
 
 # ---- screen layout: how many columns the dashboard and Settings may use on a wide screen, and whether the boxes stretch to fill it
 THEMES = ("dark", "light", "auto")
-SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "fit": False, "theme": "dark"}
+SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "fit": False, "theme": "dark",
+                   "sound": True, "sound_name": "pop.wav", "sound_volume": 0.6}
 MAX_COLUMNS = 6
+SOUNDS_DIR = os.path.join(BASE_DIR, "sounds")   # the button sounds: the base's own (pop.wav ...) and any .wav / .mp3 / .ogg the user copies in by hand
+SOUND_TYPES = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg"}
+SOUND_MAX = 2000000                             # bytes of a sound file
+_SOUND_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,60}$")
+
+
+def list_sounds():
+    """The sound files in SOUNDS_DIR (plain names, a known ending, at most SOUND_MAX bytes), sorted."""
+    out = []
+    try:
+        for n in sorted(os.listdir(SOUNDS_DIR)):
+            if _SOUND_NAME.match(n) and os.path.splitext(n)[1].lower() in SOUND_TYPES and os.path.isfile(os.path.join(SOUNDS_DIR, n)) \
+                    and os.path.getsize(os.path.join(SOUNDS_DIR, n)) <= SOUND_MAX:
+                out.append(n)
+    except OSError:
+        pass
+    return out
+
+
+def sound_path(name):
+    """The file of a sound, or None (not a plain name, not there, not a sound)."""
+    return os.path.join(SOUNDS_DIR, name) if name in list_sounds() else None
+
+
+def _volume(v):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    return round(min(1.0, max(0.0, v)), 2) if v == v and not isinstance(v, bool) else None
+
 
 
 def screen_settings():
@@ -752,6 +784,12 @@ def screen_settings():
                 out[k] = data[k]
         if data.get("theme") in THEMES:
             out["theme"] = data["theme"]
+        if isinstance(data.get("sound"), bool):
+            out["sound"] = data["sound"]
+        if isinstance(data.get("sound_name"), _STR) and _SOUND_NAME.match(data["sound_name"]):
+            out["sound_name"] = data["sound_name"]
+        if _volume(data.get("sound_volume")) is not None:
+            out["sound_volume"] = _volume(data["sound_volume"])
     return out
 
 
@@ -770,6 +808,12 @@ def save_screen_settings(changes):
             cur[k] = v
         elif k == "theme" and v in THEMES:
             cur[k] = v
+        elif k == "sound" and isinstance(v, bool):
+            cur[k] = v
+        elif k == "sound_name" and isinstance(v, _STR) and _SOUND_NAME.match(v):
+            cur[k] = v
+        elif k == "sound_volume" and not isinstance(v, bool) and _volume(v) is not None:
+            cur[k] = _volume(v)
     tmp = SCREEN + ".tmp"
     with open(tmp, "w") as f:
         json.dump(cur, f, sort_keys=True)

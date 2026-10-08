@@ -96,6 +96,11 @@ class ConfigTests(unittest.TestCase):
         self.assertFalse(ledconfig.wb_test_active())
 
 
+def layout_of(screen):
+    """The screen settings without the button sound ones (tests/test_sounds.py has those)."""
+    return dict((k, v) for k, v in screen.items() if not k.startswith("sound"))
+
+
 class HttpTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -177,16 +182,16 @@ class HttpTests(unittest.TestCase):
 
     def test_screen_layout_settings(self):
         d = json.loads(self.get("/api")[2].decode())
-        self.assertEqual(d["screen"], {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "fit": False, "theme": "dark"})
+        self.assertEqual(layout_of(d["screen"]), {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "fit": False, "theme": "dark"})
         self.post("/screen", {"values": {"dash_cols": 3, "set_cols": 2}})
         self.post("/screen/stretch", {"value": True})
         self.post("/screen/scale", {"value": True})
         self.post("/screen/fit", {"value": True})
         d = json.loads(self.get("/api")[2].decode())
-        self.assertEqual(d["screen"], {"dash_cols": 3, "set_cols": 2, "stretch": True, "scale": True, "drag": False, "fit": True, "theme": "dark"})
+        self.assertEqual(layout_of(d["screen"]), {"dash_cols": 3, "set_cols": 2, "stretch": True, "scale": True, "drag": False, "fit": True, "theme": "dark"})
         self.post("/screen/fit", {"value": False})
         reply = json.loads(self.get("/screen")[2].decode())
-        self.assertEqual(reply["values"], {"dash_cols": 3, "set_cols": 2, "theme": "dark"})
+        self.assertEqual(layout_of(reply["values"]), {"dash_cols": 3, "set_cols": 2, "theme": "dark"})
         self.assertEqual([o["value"] for o in reply["options"]["cols"]], [1, 2, 3, 4, 5, 6])
         self.post("/screen", {"values": {"dash_cols": 9, "set_cols": "x"}})                       # out of range / not a number: kept
         self.assertEqual((core.screen_settings()["dash_cols"], core.screen_settings()["set_cols"]), (3, 2))

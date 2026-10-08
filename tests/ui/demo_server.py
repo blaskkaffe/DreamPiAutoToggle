@@ -9,6 +9,9 @@ from support import web, core, sandbox, ledconfig
 import netswitch_wifi_setup as wifi
 core.CACHE_SECONDS = 0 if os.environ.get('NOCACHE') else web.CACHE_SECONDS      # as on the Pi: the settings reads are kept for a few seconds
 tmp = sandbox(wifi)
+os.makedirs(core.SOUNDS_DIR, exist_ok=True)      # install.sh copies the base's button sounds there
+for _n in os.listdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'base', 'sounds')):
+    __import__('shutil').copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'base', 'sounds', _n), core.SOUNDS_DIR)
 with open(ledconfig.LED_COUNT, 'w') as f: f.write(os.environ.get('LEDS', '3'))
 core.save_module_enabled("debuglog", True)     # off by default; on here so the page shows it (OFF=debuglog switches it off again)
 if os.environ.get("BG"): core.save_module_enabled("background", True)

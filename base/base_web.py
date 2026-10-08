@@ -91,8 +91,11 @@ def _screen_reply():
     cur = core.screen_settings()
     opts = [{"value": n, "label": str(n)} for n in range(1, core.MAX_COLUMNS + 1)]
     themes = [{"value": "dark", "label": "Dark"}, {"value": "light", "label": "Light"}, {"value": "auto", "label": "Like the device"}]
-    return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"], "theme": cur["theme"]}, "options": {"cols": opts, "themes": themes},
+    sounds = [{"value": n, "label": os.path.splitext(n)[0]} for n in core.list_sounds()]
+    return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"], "theme": cur["theme"], "sound_name": cur["sound_name"], "sound_volume": cur["sound_volume"]},
+            "options": {"cols": opts, "themes": themes, "sounds": sounds},
             "texts": {"theme": dict((t["value"], t["label"]) for t in themes)[cur["theme"]],
+                      "sound_name": os.path.splitext(cur["sound_name"])[0] + ("" if cur["sound"] else " (off)"),
                       "dash_cols": "Up to %d" % cur["dash_cols"] + (" column" if cur["dash_cols"] == 1 else " columns"),
                       "set_cols": "Up to %d" % cur["set_cols"] + (" column" if cur["set_cols"] == 1 else " columns")}}
 
@@ -307,6 +310,14 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api":
             query = dict(p.split("=", 1) for p in (self.path.split("?", 1)[1] if "?" in self.path else "").split("&") if "=" in p)
             self.send(json.dumps(api_state(query.get("pv", "")[:16])), "application/json")
+        elif path.startswith("/sounds/"):          # a button sound of SOUNDS_DIR (copy more files in by hand)
+            from urllib.parse import unquote
+            name = unquote(path[len("/sounds/"):])
+            file = core.sound_path(name)
+            if file is None:
+                return self._refuse(404, "No such sound")
+            with open(file, "rb") as f:
+                self.send(f.read(), core.SOUND_TYPES[os.path.splitext(name)[1].lower()], cache=3600)
         elif path.startswith("/static/"):
             name = path[len("/static/"):]
             body = _static(name)
@@ -370,7 +381,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_highlight()
         if path == "/timezone":
             return self._post_timezone()
-        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/fit", "/screen/drag"):
+        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/fit", "/screen/drag", "/screen/sound"):
             return self._post_screen(path)
         if path == "/palette":
             return self._post_palette()
@@ -529,7 +540,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             data = json.loads(self._body(1024).decode("utf-8"))
             if path == "/screen":
-                core.save_screen_settings(dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols", "theme")))
+                core.save_screen_settings(dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols", "theme", "sound_name", "sound_volume") if k in (data.get("values") or {})))
                 refresh_page(force=True)                # the page is built with the theme it starts in (no flash of the other one)
             else:
                 core.save_screen_settings({path.rsplit("/", 1)[1]: data.get("value")})

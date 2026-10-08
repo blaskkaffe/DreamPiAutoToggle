@@ -11,6 +11,8 @@ Check this before saying something works. Anything not listed under Verified has
 
 ## Not yet verified
 
+- Button sounds (from the `checkin2.0` branch): the sound files, the `/sounds/` route, the settings and the form are tested off-hardware; the playback in a real browser on the user's device has not been tried here.
+
 - The settings cache (`core.cached()`): measured on a PC only (an `/api` answer 13 ms -> 3 ms, a page load and a POST similar); the Pi's own speed after it has not been measured. The lag the user saw on the Pi after the base split was the repeated palette / module lookups; whether it is gone on the Pi is for the user to say.
 
 - The base / project split, steps 3 to 5 (every module owns its state files and readers, `base/layout.json` is copied by `install.sh` and draws the base's Settings boxes, the checker's `net` file carries `dcnet_problem` / `dcnet_code` for the LED and openMenu modules, `/tag` is served by the switcher module): tested off-hardware only (617 tests, the browser audit against the demo server). Not run on a Pi: an upgrade of an existing install through the new installer, the LED service reading DCNET availability from the `net` file instead of the config files, and openMenu's DCNET line from the same file.

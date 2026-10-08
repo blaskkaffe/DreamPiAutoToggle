@@ -80,6 +80,7 @@ cp "$SRC"/base/base_*.py "$SRC/base/layout.json" "$SRC/project.json" \
 mkdir -p "$DEST/page" "$DEST/static"
 cp "$SRC"/base/page/index.html "$SRC"/base/page/page.css "$SRC"/base/page/page.js "$SRC"/base/page/widgets.js "$SRC"/base/page/boot.js "$DEST/page/"
 cp "$SRC"/static/*.png "$DEST/static/"
+mkdir -p "$DEST/sounds"; cp "$SRC"/base/sounds/* "$DEST/sounds/"      # the button sounds (copy more .wav / .mp3 / .ogg files in by hand: Settings > Appearance > Button sound lists them)
 # Files an older layout kept next to the base (the features are folders in modules/ now)
 rm -f "$DEST/netswitch_core.py" "$DEST/netswitch_modules.py" "$DEST/netswitch_web.py" "$DEST/netswitch_security.py" "$DEST/netswitch_tz.py" "$DEST/netswitch_gpio.py" \
       "$DEST/netswitch_hook.py" "$DEST/netswitch_hook.pyc" "$DEST/netswitch_probes.py" "$DEST/netswitch_buttons.py"
