@@ -1,5 +1,6 @@
 
- :root{--gap:12px;--fz:1;--rp-text:#000;--page-bg:#111;--text-hi:#fff;--box-rgb:255,255,255;--r-box:29px;--r-ctl:12px;--r-pill:999px;--h-ctl:36px;--r:var(--r-box);--bw:4px;   /* the page kit's tokens: radii (boxes / fields and checkboxes / buttons and chips; round things are 50%), one control height, three text levels, a type scale */
+ :root{--gap:12px;--fz:1;--rp-text:#000;--tone-dark-box:#1b1b1b;--tone-dark-line:#2a2a2a;--tone-dark-row:rgba(42,42,42,.82);--tone-dark-text:#ccc;--tone-dark-title:#e9e9e9;--tone-light-box:#ececec;--tone-light-line:#c8c8c8;--tone-light-row:#dcdcdc;--tone-light-row-line:#c4c4c4;   /* the two tones of the board's boxes, the same in both themes */
+         --page-bg:#111;--text-hi:#fff;--box-rgb:255,255,255;--r-box:29px;--r-ctl:12px;--r-pill:999px;--h-ctl:36px;--r:var(--r-box);--bw:4px;   /* the page kit's tokens: radii (boxes / fields and checkboxes / buttons and chips; round things are 50%), one control height, three text levels, a type scale */
          --btn-bg:rgba(42,42,42,.82);--btn-line:rgb(80,80,80);--danger-bg:rgba(160,30,30,.85);--danger-line:rgb(230,110,110);--danger-on:#d33;--danger-on-line:#f99;   /* a neutral button, a danger one and an armed one */
          --ok:#2c2;--warn:#e0b400;--bad:#d33;--call:#b04cff;--notice-bg:#7a1f1f;--notice-line:#a84a4a;--link:#8bf;   /* the fixed state colours: status dots and the warning banner, links and the focus ring */
          --text-1:#eee;--text-2:#ccc;--text-3:#999;--box-text-2:rgba(255,255,255,.8);--box-text-3:rgba(255,255,255,.65);   /* page text, and the same levels on the coloured boxes */
@@ -203,7 +204,7 @@
  .rp-r{display:flex;align-items:center;gap:8px;min-width:0;min-height:calc((8px + 2.1em) * var(--z,1));margin:0;padding:0 10px 0 0;border:0;border-top:1px solid var(--line);border-radius:0;background:var(--btn-bg);color:var(--text-2)}
  .rp-r.pri{background:rgba(var(--primary-rgb),.82);border-top-color:rgb(var(--primary-l-rgb));color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55)}
  .rp-t{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:4px 16px;background:none;text-align:left;font-size:1.75em;line-height:1.2;color:inherit;text-shadow:inherit}
- .rp-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600} .rp-s{flex:none;max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.6em;opacity:.85}
+ .rp-n{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600} .rp-s{flex:0 50 auto;min-width:0;max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.6em;opacity:.85}      /* the role gives way before the name does */
  .rp-r.out .rp-n{font-weight:500}
  .rp-s.rp-stt{max-width:60%;font-size:.8em;font-weight:600;opacity:1}
  .rp-sm{flex:0 1 auto;min-width:0;max-width:60%;overflow:hidden;font-size:.8em} .rp-sm .rp-mq{display:block;max-width:100%}   /* only the status scrolls: the name stays */
@@ -217,17 +218,23 @@
  /* the box frame and colour (the check-in settings): the frame is none / thin / thick; "the board colour" gives the frame and the title row the board colour of Appearance */
  .rp-box[data-frame=none]{border-width:0} .rp-box[data-frame=thick]{border-width:4px}
  .rp-tile.rp-col .rp-box{border-color:rgb(var(--primary-l-rgb))} .rp-tile.rp-col .rp-gh{background:rgba(var(--primary-rgb),.82);color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55)} .rp-tile.rp-col .rp-gh .sub{color:rgba(255,255,255,.85)}
- /* The board's text colour (Appearance > Text colour, black by default) is --rp-text. The page sets html[data-rows=light] when that colour is dark: the boxes, the rows and the
-    titles are then light (a light grey card, a light grey row while out, the lighter shade of the colour while in) so that the text reads; a light text colour (white ...)
-    keeps the dark card and the strong colours. Neutral boxes ("Classic") follow the tone; "Board colour" gives the frame and the title row the board colour. */
- html[data-rows=light] .rp-box{background:#ececec;border-color:#c8c8c8}
- html[data-rows=light] .rp-r{background:#dcdcdc;border-top-color:#c4c4c4;color:var(--rp-text)}
- html[data-rows=light] .rp-r.pri{background:rgba(var(--primary-l-rgb),.92);border-top-color:rgb(var(--primary-rgb));color:var(--rp-text);text-shadow:none}
- html[data-rows=light] .rp-n,html[data-rows=light] .rp-mq,html[data-rows=light] .rp-s,html[data-rows=light] .rp-s.rp-stt,html[data-rows=light] .rp-r.out .rp-n{color:var(--rp-text);opacity:1}
+ /* The tone of the boxes: html[data-rows=dark] is the original look (a dark grey card, a dark grey row while out, the strong colour while in), html[data-rows=light] a light
+    grey card with light shades of the colours. The page chooses it (fontLook() in page.js): from the check-in setting Box colour (automatic = dark in the dark theme, light in the
+    light one; or always dark grey / light grey) and, when the text colour is picked by hand, from how light that colour is. The text colour is --rp-text; with the automatic
+    one (html[data-font=auto]) the tone brings its own: black on light, the original greys and white on dark. "Board colour" gives the frame and the title row the board colour. */
+ html[data-rows=dark] .rp-box{background:var(--tone-dark-box);border-color:var(--tone-dark-line)}
+ html[data-rows=dark] .rp-gh,html[data-rows=dark] .rp-gh .sub{color:var(--tone-dark-title)}
+ html[data-rows=dark] .rp-r{background:var(--tone-dark-row);border-top-color:var(--tone-dark-line);color:var(--tone-dark-text)}
+ html[data-rows=dark] .rp-r.pri{background:rgba(var(--primary-rgb),.82);border-top-color:rgb(var(--primary-l-rgb));color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55)}
+ html[data-rows=light] .rp-box{background:var(--tone-light-box);border-color:var(--tone-light-line)}
+ html[data-rows=light] .rp-gh{color:#000}
+ html[data-rows=light] .rp-r{background:var(--tone-light-row);border-top-color:var(--tone-light-row-line);color:#000}
+ html[data-rows=light] .rp-r.pri{background:rgba(var(--primary-l-rgb),.92);border-top-color:rgb(var(--primary-rgb));color:#000;text-shadow:none}
+ html[data-rows=light] .rp-n,html[data-rows=light] .rp-mq,html[data-rows=light] .rp-s,html[data-rows=light] .rp-s.rp-stt,html[data-rows=light] .rp-r.out .rp-n{color:#000;opacity:1}
  html[data-rows=light] .rp-r .rp-s{opacity:.8}
- html[data-rows=light] .rp-gh .sub{color:var(--rp-text);opacity:.75}
- html[data-rows=light] .rp-tile.rp-col .rp-gh,html[data-rows=light] .rp-tile.rp-col .rp-gh .sub{color:#fff;opacity:1}
- html[data-rows=dark] .rp-r,html[data-rows=dark] .rp-n,html[data-rows=dark] .rp-mq,html[data-rows=dark] .rp-s{color:var(--rp-text)}
+ html[data-rows=light] .rp-gh .sub{color:#000;opacity:.75}
+ html[data-font=custom] .rp-gh,html[data-font=custom] .rp-gh .sub,html[data-font=custom] .rp-r,html[data-font=custom] .rp-r.pri,html[data-font=custom] .rp-n,html[data-font=custom] .rp-mq,html[data-font=custom] .rp-s,html[data-font=custom] .rp-s.rp-stt,html[data-font=custom] .rp-r.out .rp-n{color:var(--rp-text)}
+ html[data-rows] .rp-tile.rp-col .rp-gh,html[data-rows] .rp-tile.rp-col .rp-gh .sub{color:#fff;opacity:1}
  /* the status menu: in the middle of the screen, about 60 % of its width */
  .rp-modal{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.62)}
  .rp-sheet{position:relative;box-sizing:border-box;width:clamp(320px,60vw,900px);max-width:100%;max-height:96vh;overflow:auto;padding:20px;border-radius:var(--r-box);background:var(--pop);border:var(--bw) solid var(--ctl-line)}
@@ -246,7 +253,7 @@
  .rp-need2.rp-withkb{width:clamp(340px,88vw,1180px);padding:22px 24px 24px}
  div.rp-shown{display:flex;align-items:center;justify-content:center;box-sizing:border-box;flex:1;min-width:0;min-height:76px;margin:0;padding:8px 14px;font-size:2.4em;font-weight:600;letter-spacing:.1em;overflow-wrap:anywhere;background:var(--ctl);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl)}
  .rp-kb-text div.rp-shown{justify-content:flex-start;min-height:72px;font-size:2em;letter-spacing:0;text-align:left;white-space:pre-wrap}
- .rp-shownrow{display:flex;align-items:stretch;gap:12px;margin:8px 0 14px} .rp-shownrow .rp-calbtn{flex:none;width:76px;min-height:76px;padding:0;font-size:2em}
+ .rp-shownrow{display:flex;align-items:stretch;gap:12px;margin:8px 0 14px} .rp-shownrow .rp-calbtn{flex:none;width:76px;min-height:76px;padding:0;font-size:2em;border-radius:var(--r-ctl)}
  /* the keys: every key of a pad or a keyboard is the same size and gap (a CSS grid for the number pad, a flex row for the keyboard) */
  .rp-kb{margin-top:4px;--kh:72px;--kgap:10px} .rp-kr{display:flex;gap:var(--kgap);margin-top:var(--kgap)}
  .rp-kr.pad{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));max-width:520px;margin-left:auto;margin-right:auto}
@@ -257,12 +264,12 @@
  .rp-egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:6px;margin-top:var(--kgap);max-height:calc(var(--kh) * 3.3);overflow-y:auto;overscroll-behavior:contain}
  .rp-emo{min-height:64px;font-size:2em;padding:0;justify-content:center;background:none;border-color:transparent;font-family:"Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif}
  @media(max-width:760px){.rp-kb{--kh:56px;--kgap:6px} .rp-shownrow .rp-calbtn{width:64px;min-height:64px} div.rp-shown{min-height:64px;font-size:1.9em}}
- .rp-fieldrow{display:flex;align-items:stretch;gap:10px} .rp-fieldrow input{flex:1;min-width:0} .rp-fieldrow .rp-calbtn{flex:none;width:60px;margin-top:6px;padding:0;font-size:1.6em}
+ .rp-fieldrow{display:flex;align-items:stretch;gap:10px} .rp-fieldrow input{flex:1;min-width:0} .rp-fieldrow .rp-calbtn{flex:none;width:60px;margin-top:6px;padding:0;font-size:1.6em;border-radius:var(--r-ctl)}
  /* the calendar: the month as a grid of days (Monday first), arrows for the month */
  .rp-cal{margin-top:12px;padding:12px;border-radius:var(--r-ctl);background:var(--ctl);border:var(--bw) solid var(--ctl-line)} .rp-calh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
- .rp-calt{font-size:1.3em;font-weight:600;text-transform:capitalize} .rp-calb{width:56px;min-height:48px;padding:0;font-size:1.8em;justify-content:center}
+ .rp-calt{font-size:1.3em;font-weight:600;text-transform:capitalize} .rp-calb{width:56px;height:56px;min-height:0;padding:0;font-size:1.8em;justify-content:center;border-radius:var(--r-ctl)}
  .rp-calg{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px} .rp-cald{text-align:center;font-size:var(--fs-sm);color:var(--text-3);padding:4px 0}
- .rp-calday{min-height:52px;padding:0;justify-content:center;font-size:1.25em} .rp-calday.today{box-shadow:inset 0 0 0 3px var(--link)}
+ .rp-calday{aspect-ratio:1;width:100%;min-height:0;padding:0;justify-content:center;font-size:1.25em;border-radius:var(--r-ctl)} .rp-calday.today{box-shadow:inset 0 0 0 3px var(--link)}
  .chkbox{max-height:46vh;overflow-y:auto;margin-top:8px}
  .pinm{z-index:40} .pinsheet{width:clamp(300px,34vw,420px);text-align:center} .pinsheet .rp-wn{margin-bottom:12px}
 .pinsheet input.pininp{display:block;box-sizing:border-box;width:100%;height:auto;min-height:60px;margin:0 0 16px;text-align:center;font-size:2em;letter-spacing:.3em}

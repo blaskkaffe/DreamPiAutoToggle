@@ -14,18 +14,27 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   const post = (path, body) => page.evaluate(([p, b]) => fetch(p, { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify(b) }).then(r => r.status), [path, body]);
   const load = async () => { await page.goto(URL, { waitUntil: 'networkidle' }); await settle(1500); };
   const css = (sel, prop) => page.evaluate(([s, p]) => getComputedStyle(document.querySelector(s))[p], [sel, prop]);
+  const cfg = v => page.evaluate(x => fetch('/checkin/config', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ values: x }) }).then(r => r.status), v);
   await load();
 
-  // ---- the text: black by default, on light boxes and rows; a light colour gives the dark look
-  ok(await css('.rp-n', 'color') === 'rgb(0, 0, 0)', 'the text of the board is black by default');
-  ok(await page.evaluate(() => document.documentElement.getAttribute('data-rows')) === 'light', 'and the boxes and rows are light so that it reads');
-  const classic = await css('.rp-box', 'backgroundColor');
-  ok(classic === 'rgb(236, 236, 236)' && await css('.rp-gh', 'backgroundColor') === 'rgba(0, 0, 0, 0)', 'the boxes are Classic: a plain grey card, no coloured title row (' + classic + ')');
-  ok(await post('/screen', { values: { font_colour: 'white' } }) === 200, 'a text colour can be chosen');
+  // ---- the boxes: the original dark grey in the dark theme (the page starts dark), light grey in the light theme; the text follows (automatic: the original greys / black)
+  const rows = () => page.evaluate(() => document.documentElement.getAttribute('data-rows'));
+  ok(await rows() === 'dark' && await css('.rp-box', 'backgroundColor') === 'rgb(27, 27, 27)', 'in the dark theme the boxes are the original dark grey (' + await css('.rp-box', 'backgroundColor') + ')');
+  ok(await css('.rp-r.out .rp-n', 'color') === 'rgb(204, 204, 204)' && await css('.rp-r.out', 'backgroundColor') === 'rgba(42, 42, 42, 0.82)', 'with the original row greys and the original text colours');
+  ok(await css('.rp-gh', 'backgroundColor') === 'rgba(0, 0, 0, 0)', 'no coloured title row (that is the board colour setting)');
+  await post('/screen', { values: { theme: 'light' } }); await settle(1500);
+  ok(await rows() === 'light' && await css('.rp-n', 'color') === 'rgb(0, 0, 0)' && await css('.rp-box', 'backgroundColor') === 'rgb(236, 236, 236)', 'in the light theme: light grey boxes and black text (automatic)');
+  await cfg({ box: 'dark' }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  ok(await rows() === 'dark' && await css('.rp-box', 'backgroundColor') === 'rgb(27, 27, 27)', 'the box colour can be dark grey also in the light theme');
+  await post('/screen', { values: { theme: 'dark' } }); await cfg({ box: 'light' }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  ok(await rows() === 'light' && await css('.rp-n', 'color') === 'rgb(0, 0, 0)', 'and light grey (with black text) in the dark theme');
+  await cfg({ box: 'auto' }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  ok(await post('/screen', { values: { font_colour: 'black' } }) === 200, 'a text colour can be chosen by hand');
   await settle(1500);
-  ok(await css('.rp-n', 'color') === 'rgb(255, 255, 255)' && await page.evaluate(() => document.documentElement.getAttribute('data-rows')) === 'dark' && await css('.rp-box', 'backgroundColor') === 'rgb(27, 27, 27)', 'white text gives the dark card and the strong colours');
+  ok(await css('.rp-n', 'color') === 'rgb(0, 0, 0)' && await rows() === 'light', 'black text brings light boxes (it could not be read on dark ones)');
+  ok(await post('/screen', { values: { font_colour: 'white' } }) === 200 && (await settle(1500), await css('.rp-n', 'color')) === 'rgb(255, 255, 255)' && await rows() === 'dark', 'white text on the dark ones');
   ok(await post('/screen', { values: { font_colour: 'red' } }) === 200 && (await settle(1500), await css('.rp-n', 'color')) !== 'rgb(255, 255, 255)', 'any palette colour can be the text colour');
-  await post('/screen', { values: { font_colour: 'black' } });
+  await post('/screen', { values: { font_colour: 'auto' } });
 
   // ---- text size: its own scaler; Stretch, Scale content and Fit never change it
   await settle(1500);

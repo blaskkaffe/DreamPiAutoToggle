@@ -109,7 +109,7 @@ window.addEventListener("resize",function(){applyScreen();if($("settings").class
 // whether they stretch. A column is about COLW px wide; there are as many as fit, up to the setting. Stretch: the columns share the whole width
 // (the boxes are wider). Scale content: a stretched box grows in step with its width (--z: the rows are taller, the spacing larger) but its text keeps its size;
 // the text has its own scaler (font_scale, 0.5 to 2: --fz) and colour (font_colour: --rp-text, black by default).
-var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,noscroll:false,fit:false,autohide:false,theme:"dark",font_scale:1,font_colour:"black",sound:true,sound_name:"pop.wav",sound_volume:.6},COLW=428,SGAP=12,scrKey="";
+var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,noscroll:false,fit:false,autohide:false,theme:"dark",font_scale:1,font_colour:"auto",sound:true,sound_name:"pop.wav",sound_volume:.6},COLW=428,SGAP=12,scrKey="";
 function colsFor(max,W){return Math.max(1,Math.min(max,Math.floor((W+SGAP)/(COLW+SGAP))))}
 function scrZoom(n,W){return SCR.stretch&&SCR.scale?Math.max(1,((W-SGAP*(n-1))/n)/COLW):1}
 // The dashboard's boxes in dn columns: each box goes to the column that is shortest so far, in the order of the layout (so the first boxes are at
@@ -133,7 +133,13 @@ function layoutDash(dn){var dash=$("dash"),kids=dashTiles();dashN=dn;
   L.forEach(function(ids,ci){ids.forEach(function(id){var b=byId[id];if(b){(dn>1?cols[ci]:dash).appendChild(b);byId[id]=null}})});
   kids.forEach(function(b){if(byId[b.getAttribute("data-box")])rest.push(b)});
   rest.forEach(function(b){if(dn<2){dash.appendChild(b);return}var low=0;cols.forEach(function(c,ci){if(c.offsetHeight<cols[low].offsetHeight)low=ci});cols[low].appendChild(b)});return}
- kids.forEach(function(b){if(b.offsetHeight)cols[k++%dn].appendChild(b);else cols[0].appendChild(b)})}      // no saved places: the shown tiles go round the columns in their order
+ // no saved places: the tiles are shared out so that the columns come out equally tall. Each one, the tallest first, goes to the column that is shortest so far
+ // (heights measured with all of them in the first column, which is as wide as any); then every column keeps the tiles in their own order.
+ kids.forEach(function(b){cols[0].appendChild(b)});
+ var shown=kids.filter(function(b){return b.offsetHeight}),colH=cols.map(function(){return 0}),pick=[];
+ shown.map(function(b,i){return {i:i,h:b.offsetHeight}}).sort(function(a,c){return c.h-a.h||a.i-c.i}).forEach(function(o){
+  var low=0;colH.forEach(function(x,ci){if(x<colH[low])low=ci});colH[low]+=o.h+12;pick[o.i]=low});
+ shown.forEach(function(b,i){cols[pick[i]].appendChild(b)})}
 // ---- rearranging the main screen (Settings > Appearance): a handle on each tile, drag it before or after another; the modules follow the
 // tiles' order (POST /modules/dashboard-order). While Settings is locked with the PIN this needs the PIN to have been given.
 function tilesMovable(){return !!SCR.drag&&!(S.settings_pin&&S.settings_pin.on&&!pinValue)}
@@ -211,15 +217,21 @@ function sndPlay(){if(!Snd.on||!Snd.vol)return;var c=sndCtx(),b=Snd.buf[Snd.want
 function sndApply(){Snd.on=SCR.sound!==false;Snd.vol=Math.max(0,Math.min(1,+SCR.sound_volume));if(isNaN(Snd.vol))Snd.vol=.6;Snd.want=SCR.sound_name||"pop.wav";if(Snd.on)sndLoad(Snd.want)}
 document.addEventListener("pointerdown",function(e){var t=e.target&&e.target.closest&&e.target.closest('button,.pill-s,[role=button],summary,input[type=checkbox],.swatch,.tgl,select');
  if(t&&!t.disabled&&!(t.getAttribute&&t.getAttribute("aria-disabled")==="true"))sndPlay()},true);
-// The text colour and size of the board (Appearance > Text colour / Text size). A dark text colour gives light boxes and rows (html[data-rows=light]).
-function fontLook(){var f=SCR.font_colour||"black",hex=f==="black"?"#000000":f==="white"?"#ffffff":"",d=document.documentElement;
- if(!hex)(PAL()||[]).forEach(function(c){if(c.id===f)hex=c.ui});if(!/^#[0-9a-f]{6}$/i.test(hex||""))hex="#000000";
- var n=parseInt(hex.slice(1),16),lum=(0.299*(n>>16)+0.587*((n>>8)&255)+0.114*(n&255))/255,fz=Math.max(.5,Math.min(2,+SCR.font_scale||1));
- d.style.setProperty("--rp-text",hex);d.style.setProperty("--fz",fz);var rows=lum<0.55?"light":"dark";if(d.getAttribute("data-rows")!==rows)d.setAttribute("data-rows",rows)}
+// The text colour and size of the board (Appearance > Text colour / Text size) and the tone of its boxes (html[data-rows]: "dark" = the original dark grey boxes, "light" = light grey ones).
+// The tone is the board's Box colour setting (setRowBox(): "dark" or "light" always; "auto" = dark in the dark theme, light in the light one); with a text colour picked by hand
+// it follows that colour instead (a dark colour needs light boxes) unless the box colour is fixed. The automatic text colour is black on light and the original greys / white on dark.
+var ROWBOX="auto";
+function setRowBox(b){b=b==="dark"||b==="light"||b==="board"?b:"auto";if(b!==ROWBOX){ROWBOX=b;fontLook()}}
+function fontLook(){var f=SCR.font_colour||"auto",hex=f==="black"?"#000000":f==="white"?"#ffffff":"",d=document.documentElement,custom=f!=="auto";
+ if(custom&&!hex)(PAL()||[]).forEach(function(c){if(c.id===f)hex=c.ui});if(!/^#[0-9a-f]{6}$/i.test(hex||""))hex=custom?"#000000":"#000000";
+ var n=parseInt(hex.slice(1),16),lum=(0.299*(n>>16)+0.587*((n>>8)&255)+0.114*(n&255))/255,fz=Math.max(.5,Math.min(2,+SCR.font_scale||1)),
+  rows=ROWBOX==="dark"?"dark":ROWBOX==="light"?"light":custom?(lum<0.55?"light":"dark"):(d.getAttribute("data-theme")==="light"?"light":"dark");
+ d.style.setProperty("--rp-text",hex);d.style.setProperty("--fz",fz);if(d.getAttribute("data-rows")!==rows)d.setAttribute("data-rows",rows);
+ var fm=custom?"custom":"auto";if(d.getAttribute("data-font")!==fm)d.setAttribute("data-font",fm)}
 // Theme "time": light while the sun is up at the place of the time zone (S.daylight from /api), dark at night - for a computer whose system has no light / dark setting of its own.
-function applyLook(){fontLook();sndApply();var pref=SCR.theme||"dark",d=document.documentElement,
+function applyLook(){sndApply();var pref=SCR.theme||"dark",d=document.documentElement,
  want=pref==="auto"?(themeMedia&&themeMedia.matches?"light":"dark"):pref==="time"?((S.daylight&&S.daylight.day)?"light":"dark"):pref;
- if(d.getAttribute("data-pref")!==pref)d.setAttribute("data-pref",pref);if(d.getAttribute("data-theme")!==want)d.setAttribute("data-theme",want);
+ if(d.getAttribute("data-pref")!==pref)d.setAttribute("data-pref",pref);if(d.getAttribute("data-theme")!==want)d.setAttribute("data-theme",want);fontLook();
  var m=document.querySelector('meta[name=theme-color]'),c=getComputedStyle(document.body).backgroundColor;if(m&&c&&c.indexOf("rgba(0, 0, 0, 0)")!==0)m.setAttribute("content",c)}
 if(themeMedia&&themeMedia.addEventListener)themeMedia.addEventListener("change",function(){applyLook()});
 // Fit to screen: the main screen is drawn as big as it can be without scrolling, so there is no empty space under it. The columns fill the width
@@ -227,13 +239,18 @@ if(themeMedia&&themeMedia.addEventListener)themeMedia.addEventListener("change",
 // smaller than 1 (a screen that is too small for it scrolls as usual). Rows and spacing grow with it, not the text (that is Text size).
 var fitState={key:"",z:1};
 function pageBottom(){return $("dash").getBoundingClientRect().bottom+window.scrollY+(parseFloat(getComputedStyle(document.body).marginBottom)||0)}
-function fitZoom(dn,W){var dash=$("dash"),vh=window.innerHeight,key=[W,vh,dn,Math.round(pageBottom())].join("/");
+function fitZoom(dn,W){var dash=$("dash"),vh=window.innerHeight,key=[W,vh,dn,Math.round(pageBottom()),SCR.font_scale].join("/");
  if(key===fitState.key)return fitState.z;
  function put(z){dash.style.setProperty("--z",z)}
- var lo=1,hi=12,i;      // only rows and spacing grow, never the text, so the limit is high
- put(1);
- if(pageBottom()<=vh)for(i=0;i<10;i++){var mid=(lo+hi)/2;put(mid);if(pageBottom()<=vh)lo=mid;else hi=mid}
- put(lo);fitState={key:[W,vh,dn,Math.round(pageBottom())].join("/"),z:lo};return lo}
+ function putf(f){if(f===null)dash.style.removeProperty("--fz");else dash.style.setProperty("--fz",f)}
+ var lo=1,hi=12,i,user=Math.max(.5,Math.min(2,+SCR.font_scale||1));      // only rows and spacing grow, never the text, so the limit is high
+ putf(null);put(1);
+ if(pageBottom()>vh){      // too tall even at the normal size: the text is made smaller (never bigger), down to 0.45 times, until the page fits
+  var flo=.45,fhi=user;
+  if(flo<fhi){for(i=0;i<9;i++){var fm=(flo+fhi)/2;putf(fm);if(pageBottom()<=vh)flo=fm;else fhi=fm}putf(flo)}
+  fitState={key:[W,vh,dn,Math.round(pageBottom()),SCR.font_scale].join("/"),z:1};return 1}
+ for(i=0;i<10;i++){var mid=(lo+hi)/2;put(mid);if(pageBottom()<=vh)lo=mid;else hi=mid}
+ put(lo);fitState={key:[W,vh,dn,Math.round(pageBottom()),SCR.font_scale].join("/"),z:lo};return lo}
 function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;applyLook();
  var vw=document.documentElement.clientWidth,wide=(SCR.stretch||SCR.fit),pad=wide&&vw>=900?24:16,W=vw-2*pad,dn=colsFor(SCR.dash_cols,W),dz=scrZoom(dn,W),
   sn=colsFor(SCR.set_cols,W),key=[dn,dz,sn,pad,SCR.stretch,SCR.set_cols].join("/");
@@ -242,7 +259,7 @@ function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;applyLook();
  document.body.classList.toggle("hdr-auto",!!SCR.autohide);if(!SCR.autohide)document.body.classList.remove("hdr-show");b.style.setProperty("--pad",pad+"px");
  b.style.maxWidth=wide?"none":(dn*COLW+(dn-1)*SGAP+2*pad)+"px";b.style.paddingLeft=b.style.paddingRight=pad+"px";
  dash.style.setProperty("--z",SCR.fit?fitState.z:dz);dash.classList.toggle("multi",dn>1);layoutDash(dn);applyGrips();
- if(SCR.fit)dash.style.setProperty("--z",fitZoom(dn,W));else fitState={key:"",z:1};
+ if(SCR.fit)dash.style.setProperty("--z",fitZoom(dn,W));else{fitState={key:"",z:1};dash.style.removeProperty("--fz")}
  if(inn){inn.style.maxWidth=SCR.stretch?"none":(sn*COLW+(sn-1)*SGAP+2*pad)+"px";inn.style.paddingLeft=inn.style.paddingRight=pad+"px"}
  if(key!==scrKey){scrKey=key;if(!fromSettings&&$("settings").classList.contains("open"))layoutColumns(true)}
  fire("screen")}

@@ -351,7 +351,7 @@ class HttpTests(Base):
 
     def test_settings_and_colour_endpoints(self):
         r = self.get("/checkin/config")
-        self.assertEqual(r["values"], {"show_title": True, "group_by": "department", "colour_by": "department", "scroll": "on", "title": "", "frame": "thin", "box": "neutral", "show_roles": True, "show_buildings": False,
+        self.assertEqual(r["values"], {"show_title": True, "group_by": "department", "colour_by": "department", "scroll": "on", "title": "", "frame": "thin", "box": "auto", "show_roles": True, "show_buildings": False,
                                        "keyboard": False, "roles_shown": None, "buildings_shown": None})
         self.assertEqual([x["key"] for x in r["colours"]["department"]], ["Kök", "No department", "Servering"])
         r = self.post("/checkin/config", {"values": {"colour_by": "building", "group_by": "nonsense", "show_title": False}})

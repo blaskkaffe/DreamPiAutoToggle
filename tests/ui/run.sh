@@ -35,4 +35,10 @@ run columns.js PEOPLE=$(pwd)/long.csv
 run palette.js CLOCK=1
 # the look: text colour and size, Classic boxes, corners and gaps, theme by the time of day, button sounds, the Snow background
 run look.js IN=6
+# a tall screen (1080 x 1920) with two columns: 20, 40, 60 and 80 people in groups of 1 to 15 (mostly 6 to 12)
+for N in 20 40 60 80; do
+    python3 make_people.py $N > /tmp/dpns-people-$N.csv
+    export N
+    run portrait.js PEOPLE=/tmp/dpns-people-$N.csv
+done
 exit $RESULT

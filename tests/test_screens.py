@@ -81,13 +81,15 @@ class TextSettings(unittest.TestCase):
     def test_text_scale_and_colour_are_validated(self):
         tmp = sandbox()
         try:
-            self.assertEqual((core.screen_settings()["font_scale"], core.screen_settings()["font_colour"]), (1.0, "black"))       # black by default
+            self.assertEqual((core.screen_settings()["font_scale"], core.screen_settings()["font_colour"]), (1.0, "auto"))       # automatic: black on light boxes, white on dark ones
             self.assertEqual(core.save_screen_settings({"font_scale": 1.25, "font_colour": "white"})["font_scale"], 1.25)
             self.assertEqual(core.save_screen_settings({"font_scale": 9})["font_scale"], 2.0)             # 0.5 to 2
             self.assertEqual(core.save_screen_settings({"font_scale": 0.1})["font_scale"], 0.5)
             self.assertEqual(core.save_screen_settings({"font_scale": "x"})["font_scale"], 0.5)           # not a number: unchanged
             self.assertEqual(core.save_screen_settings({"font_scale": True})["font_scale"], 0.5)
             self.assertEqual(core.save_screen_settings({"font_colour": "nope"})["font_colour"], "white")
+            self.assertEqual(core.save_screen_settings({"font_colour": "auto"})["font_colour"], "auto")
+            core.save_screen_settings({"font_colour": "white"})
             self.assertEqual(core.save_screen_settings({"font_colour": core.palette_ids()[0]})["font_colour"], core.palette_ids()[0])
         finally:
             cleanup(tmp)

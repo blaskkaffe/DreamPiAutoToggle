@@ -90,7 +90,7 @@ def _screen_reply():
     themes = [{"value": "dark", "label": "Dark"}, {"value": "light", "label": "Light"}, {"value": "auto", "label": "Like the device"},
               {"value": "time", "label": "By the time of day"}]
     sizes = [{"value": v, "label": l} for v, l in ((0.8, "Small"), (1.0, "Normal"), (1.25, "Large"), (1.5, "Larger"), (2.0, "Largest"))]
-    colours = [{"value": "black", "label": "Black"}, {"value": "white", "label": "White"}] + \
+    colours = [{"value": "auto", "label": "Automatic (black on light boxes, white on dark)"}, {"value": "black", "label": "Black"}, {"value": "white", "label": "White"}] + \
               [{"value": c["id"], "label": c["name"]} for c in core.colours() if not c.get("token")]
     sounds = [{"value": n, "label": os.path.splitext(n)[0]} for n in core.list_sounds()]
     return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"], "theme": cur["theme"], "font_scale": cur["font_scale"], "font_colour": cur["font_colour"],
@@ -99,7 +99,7 @@ def _screen_reply():
             "texts": {"theme": dict((t["value"], t["label"]) for t in themes)[cur["theme"]],
                       "font_scale": "Text size %s\u00d7" % ("%g" % cur["font_scale"]),
                       "sound_name": os.path.splitext(cur["sound_name"])[0] + ("" if cur["sound"] else " (off)"),
-                      "font_colour": dict((c["value"], c["label"]) for c in colours).get(cur["font_colour"], "Black"),
+                      "font_colour": dict((c["value"], c["label"]) for c in colours).get(cur["font_colour"], "Automatic"),
                       "dash_cols": "Up to %d" % cur["dash_cols"] + (" column" if cur["dash_cols"] == 1 else " columns"),
                       "set_cols": "Up to %d" % cur["set_cols"] + (" column" if cur["set_cols"] == 1 else " columns")}}
 

@@ -755,7 +755,7 @@ def save_settings_pin(on):
 
 # ---- screen layout: how many columns the dashboard and Settings may use on a wide screen, and whether the boxes stretch to fill it
 THEMES = ("dark", "light", "auto", "time")      # "auto": like the device's own setting; "time": light by day, dark by night at the common time zone
-SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "theme": "dark", "font_scale": 1.0, "font_colour": "black",
+SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "theme": "dark", "font_scale": 1.0, "font_colour": "auto",
                    "sound": True, "sound_name": "pop.wav", "sound_volume": 0.6}
 MAX_COLUMNS = 6
 SOUNDS_DIR = os.path.join(BASE_DIR, "sounds")   # the button sounds: the add-on's own (pop.wav ...) and any .wav / .mp3 / .ogg the user copies in by hand
@@ -783,7 +783,7 @@ def sound_path(name):
 
 
 FONT_SCALE_MIN, FONT_SCALE_MAX = 0.5, 2.0       # the text scaler of the dashboard
-FONT_COLOURS = ("black", "white")               # and a palette colour id: the colour of the board's text (black by default)
+FONT_COLOURS = ("auto", "black", "white")        # and a palette colour id: the colour of the board's text (auto = black on light boxes, the original greys and white on dark ones)
 
 
 def _font_scale(v):

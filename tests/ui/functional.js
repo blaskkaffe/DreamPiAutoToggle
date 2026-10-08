@@ -102,6 +102,8 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   const fb = await page.locator('.rp-need2 input.rp-big').boundingBox(), fcb = await page.locator('.rp-need2 .rp-calbtn').boundingBox();
   ok(fcb.x >= fb.x + fb.width - 2, 'a date has a calendar button to the right of the field');
   await page.locator('.rp-need2 .rp-calbtn').click(); await settle(300);
+  const cd = await page.locator('.rp-need2 .rp-calday').nth(3).boundingBox(), cr = await page.locator('.rp-need2 .rp-calday').nth(3).evaluate(e => getComputedStyle(e).borderTopLeftRadius);
+  ok(Math.abs(cd.width - cd.height) < 1.5 && cr === '12px', 'the calendar buttons are squares with rounded corners (' + Math.round(cd.width) + 'x' + Math.round(cd.height) + ', radius ' + cr + ')');
   await page.locator('.rp-need2 .rp-calday').nth(14).click(); await settle(300);
   ok(/^\d{4}-\d\d-15$/.test(await page.locator('.rp-need2 input.rp-big').inputValue()), 'a day tapped in the calendar fills the field');
   await page.locator('.rp-need2 button[data-skip]').click(); await settle(600);
@@ -313,7 +315,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await page.evaluate(() => document.querySelector('body > header h1').textContent === 'Tavlan' && document.title === 'Tavlan'), 'the page title is the one chosen in Settings');
   ok(await page.evaluate(() => document.querySelector('.rp-box').getAttribute('data-frame') === 'thick' && getComputedStyle(document.querySelector('.rp-box')).borderTopWidth === '4px'), 'the frame setting is applied');
   const gh = await page.evaluate(() => getComputedStyle(document.querySelector('.rp-gh')).backgroundColor);
-  await cfg({ box: 'neutral' }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  await cfg({ box: 'auto' }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
   const gh2 = await page.evaluate(() => getComputedStyle(document.querySelector('.rp-gh')).backgroundColor);
   ok(gh !== gh2 && gh !== 'rgba(0, 0, 0, 0)' && gh2 === 'rgba(0, 0, 0, 0)', 'the board colour setting colours the title row of the boxes, Classic leaves it plain (' + gh + ' / ' + gh2 + ')');
   await cfg({ title: '', frame: 'thin', box: 'board' });

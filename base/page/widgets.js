@@ -960,7 +960,7 @@ W.roster=function(s,ctx){
 bind(s.source,function(d){if(!d)return;document.body.classList.toggle("no-title",d.show_title===false);
  var h1=document.querySelector("body > header h1");if(h1){if(h1._dflt===undefined){h1._dflt=h1.textContent;h1._dtitle=document.title}      // the page title the user chose (Settings, Page title); empty = the project's
   setText(h1,d.title||h1._dflt);var want=d.title||h1._dtitle;if(document.title!==want)document.title=want}});
- bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+d.groups.length;if(key===last)return;last=key;D=d;adopt();paint()});
+ bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+d.groups.length;if(key===last)return;last=key;D=d;adopt();setRowBox(d.box);paint()});
  return el};
 // the settings list: a department / building per row with a select of palette colours ("Automatic" = the module picks one)
 function rosterColours(s,ctx){var el=h("div",{"class":"roster-cols"}),R=null;

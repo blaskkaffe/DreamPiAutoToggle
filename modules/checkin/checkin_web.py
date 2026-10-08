@@ -36,7 +36,7 @@ DEFAULT_STATUSES = [
 ]
 GROUPS = ("department", "building")
 FRAMES = ("none", "thin", "thick")      # the frame round a department box
-BOXES = ("neutral", "board")            # its colour: classic grey (the default; light or dark with the text colour) or the board colour (Appearance > Check-in board colour)
+BOXES = ("auto", "dark", "light", "board")      # its colour: grey that follows the theme (the default: the original dark grey in the dark theme, light grey in the light one), always dark grey, always light grey, or the board colour (Appearance > Check-in board colour)
 SCROLLS = ("off", "auto", "status", "on")      # the scrolling on a row: never; only when name and status do not fit; only the status, and only when it does not fit (the name stays); always
 AUTO = ("blue", "green", "orange", "purple", "cyan", "yellow", "bright-pink", "red", "bright-blue", "bright-green", "bright-purple", "bright-cyan")
 OUT_COLOUR = "global"       # the grey of a person who is out
@@ -146,7 +146,7 @@ def config(data=None):
            "colour_by": c.get("colour_by") if c.get("colour_by") in GROUPS else "department", "colours": {},
            "scroll": c.get("scroll") if c.get("scroll") in SCROLLS else "on",
            "title": re.sub(r"\s+", " ", str(c.get("title") or "")).strip()[:40], "frame": c.get("frame") if c.get("frame") in FRAMES else "thin",
-           "box": c.get("box") if c.get("box") in BOXES else "neutral", "show_roles": c.get("show_roles") is not False, "show_buildings": c.get("show_buildings") is True, "keyboard": c.get("keyboard") is True,
+           "box": c.get("box") if c.get("box") in BOXES else "auto", "show_roles": c.get("show_roles") is not False, "show_buildings": c.get("show_buildings") is True, "keyboard": c.get("keyboard") is True,
            "roles_shown": _names(c.get("roles_shown")), "buildings_shown": _names(c.get("buildings_shown")),
            "group_order": [str(x)[:80] for x in c.get("group_order", []) if isinstance(x, str)][:200] if isinstance(c.get("group_order"), list) else []}
     for kind in GROUPS:
@@ -438,7 +438,7 @@ def _config_reply():
     return {"values": dict((k, c[k]) for k in ("show_title", "title", "group_by", "colour_by", "scroll", "frame", "box", "show_roles", "show_buildings", "keyboard", "roles_shown", "buildings_shown")),
             "options": {"groups": [{"value": "department", "label": "Department"}, {"value": "building", "label": "Building"}],
                         "frames": [{"value": "none", "label": "None"}, {"value": "thin", "label": "Thin"}, {"value": "thick", "label": "Thick"}],
-                        "boxes": [{"value": "neutral", "label": "Classic (grey)"}, {"value": "board", "label": "The board colour"}],
+                        "boxes": [{"value": "auto", "label": "Grey, like the theme (default)"}, {"value": "dark", "label": "Dark grey (the original)"}, {"value": "light", "label": "Light grey"}, {"value": "board", "label": "The board colour"}],
                         "scrolls": [{"value": "off", "label": "Off"}, {"value": "auto", "label": "Auto (when it does not fit)"}, {"value": "status", "label": "Auto, only the status"}, {"value": "on", "label": "On (always)"}],
                         "roles": [{"value": r, "label": r} for r in roles], "buildings": [{"value": b, "label": b} for b in buildings]},
             "texts": {"show_title": "Shown" if c["show_title"] else "Hidden", "group_by": c["group_by"].capitalize(), "colour_by": c["colour_by"].capitalize()},
