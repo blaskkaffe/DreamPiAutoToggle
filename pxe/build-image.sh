@@ -23,7 +23,7 @@ fi
 
 PACKAGES="linux-image-amd64,live-boot,initramfs-tools,systemd-sysv,systemd-resolved,udev,dbus,libpam-systemd,curl,ca-certificates,iproute2"
 PACKAGES="$PACKAGES,xserver-xorg-core,xserver-xorg-legacy,xserver-xorg-input-libinput,xserver-xorg-video-fbdev,xserver-xorg-video-vesa"
-PACKAGES="$PACKAGES,xinit,x11-xserver-utils,openbox,feh,firefox-esr,fonts-dejavu-core,fonts-liberation"
+PACKAGES="$PACKAGES,xinit,x11-xserver-utils,openbox,feh,firefox-esr,chromium,mpv,fonts-dejavu-core,fonts-liberation"
 PACKAGES="$PACKAGES,firmware-realtek,firmware-misc-nonfree,firmware-amd-graphics"
 # the local-install wizard (checkin-install) and a usable shell
 PACKAGES="$PACKAGES,whiptail,parted,dosfstools,e2fsprogs,rsync,grub2-common,grub-pc-bin,grub-efi-amd64-bin,nano,pciutils,iputils-ping,less,bash"

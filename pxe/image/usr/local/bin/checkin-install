@@ -74,7 +74,7 @@ LOG=/tmp/checkin-install.log
         echo "$HOSTNAME_NEW" > "$TARGET/etc/hostname"
         : > "$TARGET/etc/machine-id"                    # a new one is made at the first start (not the image's)
         mkdir -p "$TARGET/etc/default/grub.d"
-        printf 'GRUB_TIMEOUT=2\nGRUB_CMDLINE_LINUX_DEFAULT="quiet"\n' > "$TARGET/etc/default/grub.d/checkin.cfg"
+        printf 'GRUB_TIMEOUT=2\nGRUB_CMDLINE_LINUX_DEFAULT="quiet panic=10"\n' > "$TARGET/etc/default/grub.d/checkin.cfg"
         printf 'CHECKIN_URL=%s\nCHECKIN_SCREEN=%s\nCHECKIN_LOCATION=%s\n' "'$URL'" "'$SCREEN'" "'$LOCATION'" > "$TARGET/etc/checkin-kiosk.conf"
     fi
     echo "== boot loader"

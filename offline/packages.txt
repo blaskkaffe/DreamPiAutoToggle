@@ -1,0 +1,23 @@
+# Packages the offline bundle carries (Debian names; one per line, # starts a comment). prepare-offline.sh downloads them with everything
+# they depend on; install-offline.sh installs them on the computer that has no internet.
+
+# the board's host
+python3
+openssl
+git
+ca-certificates
+curl
+rsync
+
+# the browsers: Firefox ESR and Chromium (kiosk screens; both are restarted when they crash), and the mpv video player
+firefox-esr
+chromium
+mpv
+
+# the network boot server (pxe/install-pxe.sh)
+dnsmasq-base
+ipxe
+
+# only to build the network boot image on that computer (pxe/build-image.sh); not needed when the bundle carries a built image
+debootstrap
+squashfs-tools

@@ -175,6 +175,13 @@ ProtectKernelModules=yes
 WantedBy=multi-user.target
 EOF
 
+# The computer restarts by itself if the kernel panics (after 10 s) or systemd stops answering (the watchdog, where the hardware has one;
+# removed again by uninstall.sh)
+mkdir -p /etc/sysctl.d /etc/systemd/system.conf.d
+printf 'kernel.panic = 10\nkernel.panic_on_oops = 1\n' > /etc/sysctl.d/90-checkin-reboot.conf
+printf '[Manager]\nRuntimeWatchdogSec=60\nRebootWatchdogSec=10min\nShutdownWatchdogSec=5min\n' > /etc/systemd/system.conf.d/90-checkin-watchdog.conf
+sysctl -q -p /etc/sysctl.d/90-checkin-reboot.conf >/dev/null 2>&1 || true
+
 # ------------------------------------------------------------------ modules
 # Each installed module may have an install.sh, sourced here (it sees $DEST and $SRC)
 # and adds the systemd units it needs to NS_SERVICES. See docs/modules.md.

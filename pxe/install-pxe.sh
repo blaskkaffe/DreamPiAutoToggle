@@ -48,7 +48,10 @@ for f in vmlinuz initrd.img filesystem.squashfs; do
     [ -f "$IMAGE/$f" ] || { echo "$IMAGE/$f is missing. Build the image first: sudo $HERE/build-image.sh" >&2; exit 1; }
 done
 
-apt-get update && apt-get install -y dnsmasq-base ipxe
+# the two packages: from apt, unless they are there already (an offline install: offline/install-offline.sh put them there)
+if [ ! -x /usr/sbin/dnsmasq ] || [ ! -f /usr/lib/ipxe/ipxe.efi ] || [ ! -f /usr/lib/ipxe/undionly.kpxe ]; then
+    apt-get update && apt-get install -y dnsmasq-base ipxe
+fi
 
 # the network the screens are on: the interface of the default route unless one is given
 [ -n "$IFACE" ] || IFACE=$(ip -4 route show default | awk '{for (i = 1; i < NF; i++) if ($i == "dev") {print $(i + 1); exit}}')

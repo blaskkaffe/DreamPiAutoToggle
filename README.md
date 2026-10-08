@@ -85,7 +85,7 @@ Everything the page shows is a module, one folder in `modules/`. **Settings > Sy
 | Background image | A picture of your own as the page's background: choose it in Settings > Background image (big pictures are shrunk in the browser first), fit and darken it | **off** |
 | Reboot and Update | Update the add-on from GitHub, reboot the host | on |
 
-Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), [docs/checkin.md](docs/checkin.md) (the board and the contacts), [docs/web.md](docs/web.md), [docs/pxe.md](docs/pxe.md) (network boot), [docs/hardware-status.md](docs/hardware-status.md). `CLAUDE.md` is the short guide for working on the code.
+Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), [docs/checkin.md](docs/checkin.md) (the board and the contacts), [docs/web.md](docs/web.md), [docs/pxe.md](docs/pxe.md) (network boot), [docs/offline.md](docs/offline.md) (offline install), [docs/hardware-status.md](docs/hardware-status.md). `CLAUDE.md` is the short guide for working on the code.
 
 ### Screens that boot from the network
 
@@ -101,6 +101,14 @@ Then set a screen's BIOS / UEFI to boot from the network (PXE); nothing is insta
 - **Menu or straight in.** An approved computer that is not set to anything gets a menu: the available images, install an image on the local disk (when the image allows it), a Linux shell, the iPXE shell, boot the local disk. `checkin-pxe assign <serial> kiosk --location "Område A"` sets one computer's boot settings (image, buildings, board address, kernel arguments): it skips the menu and boots at once, and pressing **I** while it boots starts the install wizard for the local disk.
 - **Layout stays.** The screen opens `<host>/?screen=<its serial number>`; the host keeps that screen's columns, theme, tile places and building choice apart from the other screens.
 - **Limits.** The whitelist checks what the computer says its serial number and MAC address are, so it keeps strangers away but is not strong authentication; use it on a network you trust. See [Safety](#safety) and [docs/pxe.md](docs/pxe.md).
+
+### Offline install
+
+For a computer without internet: on an online computer with the **same distribution, release and CPU type** run `sudo ./offline/prepare-offline.sh --with-image`. It collects the packages with everything they depend on (Python 3, openssl, git, **Firefox ESR, Chromium, mpv**, dnsmasq-base, ipxe ...), a copy of this repository and the network boot image into `offline/bundle/`. Copy that folder over and run `sudo ./install-offline.sh --board --pxe` in it. Details, the package list and the limits: [docs/offline.md](docs/offline.md).
+
+### Restarts after crashes
+
+A kiosk browser (Chromium on a host screen, Firefox or Chromium on a network-booted one) is started again two seconds after it crashes; the web service and the screen's X session restart by themselves; and the computer reboots itself after a kernel panic (10 s) or when systemd hangs (watchdog, where the hardware has one; the network boot image adds a software watchdog). `uninstall.sh` removes the computer-level settings.
 
 ### Uninstall
 

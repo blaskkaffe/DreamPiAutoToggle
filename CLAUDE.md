@@ -24,6 +24,7 @@ Details and the rules for adding or changing a module: `docs/modules.md`. The ba
 | Modules: folder layout, `module.json`, `layout.json`, the standard widgets, boxes, colours, web entry, installer, adding / removing one | `docs/modules.md` |
 | Web page (`page/`), API, HTTPS, update / reboot, security of the root web service (host / origin checks, PIN, update origin, systemd sandbox) | `docs/web.md` |
 | Diskless kiosk screens booted over the network (PXE: image build, proxy DHCP / TFTP / iPXE server, Firefox kiosk) | `docs/pxe.md` |
+| Offline bundle (packages incl. Firefox / Chromium / mpv for a computer without internet), restart on crash | `docs/offline.md` |
 | What is / is not verified on real hardware | `docs/hardware-status.md` |
 
 ## Testing without a screen
