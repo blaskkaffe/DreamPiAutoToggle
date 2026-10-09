@@ -346,13 +346,13 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   // the board colour picked in Settings recolours the boxes at once, in the light theme as in the dark one (no reload)
   const boxHead = () => page.evaluate(() => getComputedStyle(document.querySelector('.rp-gh')).backgroundColor);
   const before = await boxHead();
-  await page.click('#cog'); await settle(900);
+  await openSettings(); await page.evaluate(() => document.querySelectorAll('.wmenu .menubtn[aria-expanded="false"]').forEach(b => b.click())); await settle(300);
   await page.locator('.srow', { hasText: 'Check-in board colour' }).locator('.colourpick > button').click(); await settle(400);
   await page.locator('.pop.open .swatch[aria-label="Red"]').click(); await settle(1500);
   const after = await boxHead();
   ok(before !== after && after === 'rgba(217, 54, 62, 0.82)', 'light theme: picking another board colour changes the boxes at once (' + before + ' -> ' + after + ')');
   await page.evaluate(() => fetch('/colour', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ module: 'checkin', key: 'checkin', colour: 'green' }) }));
-  await page.keyboard.press('Escape'); await page.reload({ waitUntil: 'networkidle' }); await settle(1200);
+  await page.keyboard.press('Escape'); await settle(300); await page.reload({ waitUntil: 'networkidle' }); await settle(1200);
   await page.evaluate(() => fetch('/screen', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ values: { theme: 'dark' } }) }));
   await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
   await person('Maja Berg').locator('.rp-t').click(); await settle(300);
