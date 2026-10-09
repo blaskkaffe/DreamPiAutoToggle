@@ -27,17 +27,18 @@ custom("checkin-statuses",function(host){var box=host.querySelector(".cstatuses"
    field("It asks for",'<select class="rp-big" data-f="needs">'+NEEDS.map(function(n){return '<option value="'+n[0]+'"'+(n[0]===s.needs?" selected":"")+'>'+n[1]+'</option>'}).join("")+'</select>',"needs")+
    field("Text before the date (for example: back)",'<input class="rp-big" type="text" data-f="prefix" maxlength="20" value="'+esc(s.prefix||"")+'">',"prefix")+
    field("Start time in the pop-up (for example 07:30)",'<input class="rp-big" type="text" data-f="default" maxlength="5" value="'+esc(s.default||"")+'">',"default")+
-   field("Dots next to the name",'<select class="rp-big" data-f="dots">'+[0,1,2,3].map(function(n){return '<option value="'+n+'"'+(n===(s.dots||0)?" selected":"")+'>'+(n?n:"None")+'</option>'}).join("")+'</select>',"dots")+
+   field("Dots next to the name",'<span class="optrow" role="group" aria-label="Dots next to the name" data-f="dots" data-v="'+(s.dots||0)+'">'+[0,1,2,3].map(function(n){return '<button type="button" class="pill-s'+(n===(s.dots||0)?" on":"")+'" data-dot="'+n+'" aria-pressed="'+(n===(s.dots||0))+'">'+(n?n:"None")+'</button>'}).join("")+'</span>',"dots")+
    '<label class="rp-nl rp-chk"><input type="checkbox" class="cbox neutral" data-f="out"'+(s.out?" checked":"")+'> Counts as out (the person is checked out)</label>'+
    '<label class="rp-nl rp-chk"><input type="checkbox" class="cbox neutral" data-f="sticky"'+(s.sticky?" checked":"")+'> Sticky: stays when INNE / UTE is pressed</label>'+
    '<div class="rp-cmsg sub" aria-live="polite"></div><div class="rp-nb rp-nb3">'+(i>=0?'<button type="button" class="pill-s danger rp-so" data-del="1">Delete</button>':'<span></span>')+'<button type="button" class="pill-s rp-so" data-close="1">Cancel</button><button type="button" class="pill-s pri rp-so c-green" data-save="1">Save</button></div></div>';
   modal.style.display="";shows();var f0=modal.querySelector("input");if(f0&&f0.focus)f0.focus()}
  function shows(){var n=modal.querySelector('[data-f=needs]').value;
   sh(modal.querySelector('[data-row=prefix]'),n==="date");sh(modal.querySelector('[data-row=default]'),n==="time")}
- function read(){var o={};Array.prototype.forEach.call(modal.querySelectorAll("[data-f]"),function(e){var k=e.getAttribute("data-f");o[k]=e.type==="checkbox"?e.checked:(k==="dots"?+e.value:e.value)});return o}
+ function read(){var o={};Array.prototype.forEach.call(modal.querySelectorAll("[data-f]"),function(e){var k=e.getAttribute("data-f");o[k]=e.type==="checkbox"?e.checked:(k==="dots"?+e.getAttribute("data-v"):e.value)});return o}
  function close(){modal.style.display="none";modal.innerHTML="";editing=-1}
  modal.addEventListener("change",function(e){if(e.target.getAttribute&&e.target.getAttribute("data-f")==="needs")shows()});
  modal.addEventListener("click",function(e){if(e.target===modal){close();return}var b=e.target.closest&&e.target.closest("button");if(!b)return;
+  if(b.hasAttribute("data-dot")){var grp=b.parentNode;grp.setAttribute("data-v",b.getAttribute("data-dot"));Array.prototype.forEach.call(grp.querySelectorAll("button"),function(x){var on=x===b;x.classList.toggle("on",on);x.setAttribute("aria-pressed",on)});return}
   if(b.hasAttribute("data-close")){close();return}
   var msg=modal.querySelector(".rp-cmsg");
   if(b.hasAttribute("data-save")){var o=read();if(!o.label.trim()){setText(msg,"A status needs a name");return}

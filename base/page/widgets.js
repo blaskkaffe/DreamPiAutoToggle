@@ -94,6 +94,7 @@ function hideEmptyBoxes(){var bs=document.querySelectorAll("[data-box]"),i,j;
 var themeKey="";
 function applyTheme(){var p={},pk={},k;for(k in (LAY.primary||{}))p[k]=LAY.primary[k];for(k in (S.primary||{}))p[k]=S.primary[k];
  for(k in (LAY.primary_key||{}))pk[k]=LAY.primary_key[k];for(k in (S.primary_key||{}))pk[k]=S.primary_key[k];
+ for(k in pk){var live=colourId(pk[k],k);if(live)p[k]=live}        // a module whose primary is one of its own colour keys follows that pick live (Settings > the module's colour), not only after the page is built again
  var key=JSON.stringify([p,pk,S.tints||LAY.tints||{},S.colours||LAY.colours||{},S.palette_v||""]);if(key===themeKey)return;themeKey=key;
  var els=document.querySelectorAll("[data-mod]"),i,root="";
  for(i=0;i<(LAY.modules||[]).length&&!root;i++)root=p[LAY.modules[i]]||"";

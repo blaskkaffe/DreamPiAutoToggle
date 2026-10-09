@@ -244,7 +244,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(parseFloat(await page.locator('.rp-need2 input[data-f=label]').evaluate(e => getComputedStyle(e).fontSize)) >= 18, 'the editor fields have a readable font size');
   await page.locator('.rp-need2 input[data-f=label]').fill('Testst\u00e4ll'); await page.selectOption('.rp-need2 select[data-f=needs]', 'time');
   ok(await page.locator('.rp-need2 [data-row=default]').isVisible() && !(await page.locator('.rp-need2 [data-row=prefix]').isVisible()), 'a time status asks for a start time, not a date prefix');
-  await page.selectOption('.rp-need2 select[data-f=dots]', '2'); await page.locator('.rp-need2 input[data-f=sticky]').check(); await page.locator('.rp-need2 [data-save]').click(); await settle(1200);
+  await page.click('.rp-need2 [data-dot="2"]'); await page.locator('.rp-need2 input[data-f=sticky]').check(); await page.locator('.rp-need2 [data-save]').click(); await settle(1200);
   const made = (await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.statuses.find(x => x.label === 'Testst\u00e4ll');
   ok(made && made.sticky && made.dots === 2 && made.needs === 'time', 'the new status is saved with its settings (' + JSON.stringify(made) + ')');
   await page.locator('[data-box="statuses"] .cstatuses .srow', { hasText: 'Testst\u00e4ll' }).locator('button[aria-label$="up"]').click(); await settle(1000);
@@ -274,6 +274,16 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
   const lt = await page.evaluate(() => { const out = {}; ['.rp-r.pri .rp-n,.rp-r.pri .rp-mq', '.rp-r.out .rp-n', '.rp-s'].forEach(q => { const e = document.querySelector(q); if (e) { const cs = getComputedStyle(e); out[q] = cs.color + '/' + cs.fontWeight; } }); return out; });
   ok(Object.keys(lt).length >= 2 && Object.values(lt).every(v => v === 'rgb(0, 0, 0)/400'), 'light theme: black, regular text in the rows (' + JSON.stringify(lt) + ')');
+  // the board colour picked in Settings recolours the boxes at once, in the light theme as in the dark one (no reload)
+  const boxHead = () => page.evaluate(() => getComputedStyle(document.querySelector('.rp-gh')).backgroundColor);
+  const before = await boxHead();
+  await page.click('#cog'); await settle(900);
+  await page.locator('.srow', { hasText: 'Check-in board colour' }).locator('.colourpick > button').click(); await settle(400);
+  await page.locator('.pop.open .swatch[aria-label="Red"]').click(); await settle(1500);
+  const after = await boxHead();
+  ok(before !== after && after === 'rgba(217, 54, 62, 0.82)', 'light theme: picking another board colour changes the boxes at once (' + before + ' -> ' + after + ')');
+  await page.evaluate(() => fetch('/colour', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ module: 'checkin', key: 'checkin', colour: 'green' }) }));
+  await page.keyboard.press('Escape'); await page.reload({ waitUntil: 'networkidle' }); await settle(1200);
   await page.evaluate(() => fetch('/screen', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ values: { theme: 'dark' } }) }));
   await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
   await person('Maja Berg').locator('.rp-t').click(); await settle(300);
