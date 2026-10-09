@@ -60,3 +60,5 @@ The page sends `X-Screen: <id>` (from `?screen=<id>` in its address, kept in `se
 - A screen that is told no address uses `http://checkinchicken.local/` (the image has avahi / nss-mdns; `install.sh --hostname=checkinchicken` makes the host answer to it). The address given to the screens is `--board-url` (default `http://<server ip>/`, the plain HTTP port; the kiosk does not need the self-signed HTTPS certificate).
 - A computer that gets no script boots its own disk; it is never locked out of the machine itself.
 - Firewall: UDP 67, 69 and 4011 (proxy DHCP), TCP 8069 on the server.
+
+**Build troubleshooting:** the build mounts the computer's /dev, /proc and /sys inside `/var/tmp/checkin-pxe-build.XXXXXX/root` while it works and takes them out again before the image is packed (`mksquashfs` stops with "failed to read file" if they are still there). Folders of earlier failed builds are cleaned up at the start of the next run; a folder that still has something mounted is left alone (never `rm -rf` it by hand before `sudo umount -R /var/tmp/checkin-pxe-build.*/root`).

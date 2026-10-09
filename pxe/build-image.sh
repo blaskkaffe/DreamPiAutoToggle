@@ -29,12 +29,24 @@ PACKAGES="$PACKAGES,firmware-realtek,firmware-misc-nonfree,firmware-amd-graphics
 PACKAGES="$PACKAGES,whiptail,parted,dosfstools,e2fsprogs,rsync,grub2-common,grub-pc-bin,grub-efi-amd64-bin,nano,pciutils,iputils-ping,less,bash"
 [ -z "$EXTRA_PACKAGES" ] || PACKAGES="$PACKAGES,$EXTRA_PACKAGES"
 
+# Take the system's /dev /proc /sys out of a build folder (they are mounted in it while it is built). Returns 1 while something is still mounted.
+unmount_build() {
+    umount -R "$1/root" 2>/dev/null || true
+    for m in dev/pts dev sys proc; do umount "$1/root/$m" 2>/dev/null || true; done
+    ! grep -q " $1/" /proc/mounts
+}
+# Never delete a folder that still has the computer's own /dev /proc /sys mounted in it (rm -rf would reach into them).
+remove_build() {
+    if unmount_build "$1"; then rm -rf "$1"; else echo "Left $1 alone: something is still mounted in it (reboot, then remove it)." >&2; fi
+}
+# folders of earlier builds that failed
+for old in /var/tmp/checkin-pxe-build.*; do
+    [ -d "$old" ] && remove_build "$old"
+done
+
 WORK=$(mktemp -d /var/tmp/checkin-pxe-build.XXXXXX)
 ROOT=$WORK/root
-cleanup() {
-    for m in dev/pts dev sys proc; do umount "$ROOT/$m" 2>/dev/null || true; done
-    rm -rf "$WORK"
-}
+cleanup() { remove_build "$WORK"; }
 trap cleanup EXIT
 
 # Two steps: debootstrap only builds the minimal base; the kernel, initramfs-tools and everything else are installed with apt inside the
@@ -82,6 +94,9 @@ apt-get clean
 rm -f /etc/machine-id
 rm -rf /var/lib/apt/lists/* /usr/share/doc/* /usr/share/man/* /var/cache/debconf/*-old
 CHROOT
+
+# the system's /dev /proc /sys must not be inside the image: mksquashfs would try to read them ("failed to read file")
+unmount_build "$WORK" || { echo "Could not unmount /dev /proc /sys from $ROOT" >&2; exit 1; }
 
 echo "== writing $OUT"
 mkdir -p "$OUT"
