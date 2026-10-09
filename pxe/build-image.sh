@@ -7,7 +7,7 @@
 # Run it on any Debian or Ubuntu computer with internet access (it needs debootstrap and squashfs-tools, installed if missing).
 # It takes a few minutes and produces vmlinuz, initrd.img and filesystem.squashfs (about 500-700 MB; /boot stays inside the squashfs because the
 # local install copies the system, kernel included, to the disk).
-# Then sudo ./pxe/install-pxe.sh serves them. Environment: SUITE (default bookworm), MIRROR, EXTRA_PACKAGES (e.g. more firmware).
+# Then sudo ./pxe/install-pxe.sh serves them. Environment: SUITE (default bookworm; trixie = Debian 13 also works), MIRROR, EXTRA_PACKAGES (e.g. more firmware).
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -37,14 +37,35 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "== debootstrap $SUITE (this downloads about 1 GB)"
-debootstrap --arch=amd64 --variant=minbase --components=main,non-free-firmware \
-    --include="$PACKAGES" "$SUITE" "$ROOT" "$MIRROR"
+# Two steps: debootstrap only builds the minimal base; the kernel, initramfs-tools and everything else are installed with apt inside the
+# chroot afterwards, with /proc, /sys and /dev mounted (the kernel's and live-boot's package scripts build the initramfs and fail without
+# them: "Failure while configuring base packages" after "Configuring initramfs-tools"), and with the real error shown if something fails.
+show_log() {
+    echo >&2
+    echo "The build failed. The last lines of the debootstrap log:" >&2
+    tail -n 30 "$ROOT/debootstrap/debootstrap.log" 2>/dev/null >&2 || true
+}
+trap 'show_log' ERR
+
+echo "== debootstrap $SUITE (the minimal base)"
+debootstrap --arch=amd64 --variant=minbase --components=main,non-free-firmware "$SUITE" "$ROOT" "$MIRROR"
+
+echo "== mounting /dev /proc /sys in the new system"
+mount --bind /dev "$ROOT/dev"; mount -t devpts devpts "$ROOT/dev/pts"
+mount -t proc proc "$ROOT/proc"; mount -t sysfs sysfs "$ROOT/sys"
+
+echo "== installing the packages (this downloads about 1 GB)"
+rm -f "$ROOT/etc/apt/sources.list.d/debian.sources"
+echo "deb $MIRROR $SUITE main non-free-firmware" > "$ROOT/etc/apt/sources.list"
+mkdir -p "$ROOT/etc/initramfs-tools/conf.d"
+echo "RESUME=none" > "$ROOT/etc/initramfs-tools/conf.d/resume"        # no swap partition to resume from: a diskless system
+printf '#!/bin/sh\nexit 101\n' > "$ROOT/usr/sbin/policy-rc.d"; chmod +x "$ROOT/usr/sbin/policy-rc.d"      # no services start inside the chroot
+chroot "$ROOT" /usr/bin/env DEBIAN_FRONTEND=noninteractive LC_ALL=C /bin/sh -e -c \
+    "apt-get update && apt-get install -y --no-install-recommends $(echo "$PACKAGES" | tr ',' ' ')"
+rm -f "$ROOT/usr/sbin/policy-rc.d"
 
 echo "== configuring"
 cp -a "$HERE/image/." "$ROOT/"
-mount --bind /dev "$ROOT/dev"; mount -t devpts devpts "$ROOT/dev/pts"
-mount -t proc proc "$ROOT/proc"; mount -t sysfs sysfs "$ROOT/sys"
 mkdir -p "$ROOT/usr/lib/firefox-esr/distribution"
 cp "$HERE/image/etc/firefox/policies/policies.json" "$ROOT/usr/lib/firefox-esr/distribution/policies.json"
 echo checkin-screen > "$ROOT/etc/hostname"
