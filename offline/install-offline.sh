@@ -25,8 +25,17 @@ done
 [ "$(id -u)" = 0 ] || { echo "Run as root: sudo $0" >&2; exit 1; }
 [ -f "$HERE/debs/Packages.gz" ] || { echo "$HERE/debs/Packages.gz is missing: run this inside the bundle folder" >&2; exit 1; }
 
-PKGS=$(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "$HERE/packages.txt" | tr -s ' \n' ' ')
 . /etc/os-release
+HERE_REL=$(cat "$HERE/RELEASE" 2>/dev/null || true)
+NOW_REL="${ID:-unknown} ${VERSION_ID:-unknown} $(dpkg --print-architecture)"
+if [ -n "$HERE_REL" ] && [ "$HERE_REL" != "$NOW_REL" ]; then
+    echo "This bundle was made on: $HERE_REL" >&2
+    echo "This computer is:        $NOW_REL" >&2
+    echo "The packages only fit the same distribution, release and CPU type. Make the bundle on a computer like this one." >&2
+    [ "${FORCE:-}" = 1 ] || exit 1
+fi
+
+PKGS=$(sed -e 's/#.*//' -e '/^[[:space:]]*$/d' "$HERE/packages.txt" | tr -s ' \n' ' ')
 if [ "${ID:-}" = ubuntu ]; then
     PKGS=$(echo "$PKGS" | tr ' ' '\n' | grep -vxE 'firefox-esr|chromium' | tr '\n' ' ')
 fi

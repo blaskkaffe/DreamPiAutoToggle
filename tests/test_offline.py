@@ -34,6 +34,28 @@ class OfflineBundle(unittest.TestCase):
         self.assertRegex(text, r'if \[ ! -x /usr/sbin/dnsmasq \].*\n\s+apt-get update')
 
 
+class BuildScripts(unittest.TestCase):
+    def test_the_image_build_is_safe_and_in_order(self):
+        text = read("pxe", "build-image.sh")
+        self.assertNotIn("--include", text)                                     # the kernel / initramfs packages are installed in the mounted chroot, not inside debootstrap
+        self.assertLess(text.index("debootstrap --arch"), text.index("apt-get update && apt-get install -y --no-install-recommends"))
+        self.assertIn("--make-rslave", text)                                    # what is mounted in the build folder never reaches the computer's own /dev
+        self.assertLess(text.index("unmount_build \"$WORK\" ||"), text.index("mksquashfs \"$ROOT\""))      # nothing mounted while the image is packed
+
+    def test_the_build_folder_clean_up_never_removes_a_mounted_folder(self):
+        text = read("pxe", "build-image.sh")
+        funcs = text[text.index("unmount_build()"):text.index("# folders of earlier builds")]
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "build", "root", "dev"))
+            code = funcs + "\nremove_build %s/build\n" % tmp
+            self.assertEqual(subprocess.run([shutil.which("bash"), "-c", code]).returncode, 0)
+            self.assertFalse(os.path.exists(os.path.join(tmp, "build")))      # nothing mounted: removed
+
+    def test_the_bundle_records_its_release_and_the_installer_checks_it(self):
+        self.assertIn('/RELEASE"', read("offline", "prepare-offline.sh"))
+        self.assertIn("RELEASE", read("offline", "install-offline.sh"))
+
+
 class RestartOnCrash(unittest.TestCase):
     def test_the_host_kiosk_browser_is_started_again(self):
         text = read("kiosk", "kiosk-browser.sh")

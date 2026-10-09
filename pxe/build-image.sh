@@ -21,6 +21,10 @@ if ! command -v debootstrap >/dev/null || ! command -v mksquashfs >/dev/null; th
     apt-get update && apt-get install -y debootstrap squashfs-tools
 fi
 
+# the build folder needs about 4 GB in /var/tmp (the system is unpacked there, then packed again)
+free_kb=$(df -Pk /var/tmp | awk 'NR==2 {print $4}')
+[ "${free_kb:-0}" -ge 5000000 ] || { echo "Less than 5 GB free in /var/tmp: free some space first." >&2; exit 1; }
+
 PACKAGES="linux-image-amd64,live-boot,initramfs-tools,systemd-sysv,systemd-resolved,udev,dbus,libpam-systemd,curl,ca-certificates,iproute2"
 PACKAGES="$PACKAGES,xserver-xorg-core,xserver-xorg-legacy,xserver-xorg-input-libinput,xserver-xorg-video-fbdev,xserver-xorg-video-vesa"
 PACKAGES="$PACKAGES,xinit,x11-xserver-utils,openbox,feh,firefox-esr,chromium,mpv,fonts-noto-color-emoji,avahi-daemon,libnss-mdns,fonts-dejavu-core,fonts-liberation"
@@ -54,7 +58,7 @@ trap cleanup EXIT
 # them: "Failure while configuring base packages" after "Configuring initramfs-tools"), and with the real error shown if something fails.
 show_log() {
     echo >&2
-    echo "The build failed. The last lines of the debootstrap log:" >&2
+    echo "The build failed (the message of the step that failed is above). The last lines of the debootstrap log, if it got that far:" >&2
     tail -n 30 "$ROOT/debootstrap/debootstrap.log" 2>/dev/null >&2 || true
 }
 trap 'show_log' ERR
@@ -63,12 +67,18 @@ echo "== debootstrap $SUITE (the minimal base)"
 debootstrap --arch=amd64 --variant=minbase --components=main,non-free-firmware "$SUITE" "$ROOT" "$MIRROR"
 
 echo "== mounting /dev /proc /sys in the new system"
-mount --bind /dev "$ROOT/dev"; mount -t devpts devpts "$ROOT/dev/pts"
+mount --bind /dev "$ROOT/dev"; mount --make-rslave "$ROOT/dev"      # a private copy: what is mounted or unmounted in it never reaches the computer's own /dev
+mount -t devpts devpts "$ROOT/dev/pts"
 mount -t proc proc "$ROOT/proc"; mount -t sysfs sysfs "$ROOT/sys"
 
 echo "== installing the packages (this downloads about 1 GB)"
 rm -f "$ROOT/etc/apt/sources.list.d/debian.sources"
 echo "deb $MIRROR $SUITE main non-free-firmware" > "$ROOT/etc/apt/sources.list"
+case "$SUITE" in      # the released versions also get their security fixes and updates
+    bullseye|bookworm|trixie)
+        echo "deb $MIRROR $SUITE-updates main non-free-firmware" >> "$ROOT/etc/apt/sources.list"
+        echo "deb http://security.debian.org/debian-security $SUITE-security main non-free-firmware" >> "$ROOT/etc/apt/sources.list" ;;
+esac
 mkdir -p "$ROOT/etc/initramfs-tools/conf.d"
 echo "RESUME=none" > "$ROOT/etc/initramfs-tools/conf.d/resume"        # no swap partition to resume from: a diskless system
 printf '#!/bin/sh\nexit 101\n' > "$ROOT/usr/sbin/policy-rc.d"; chmod +x "$ROOT/usr/sbin/policy-rc.d"      # no services start inside the chroot
@@ -100,8 +110,10 @@ unmount_build "$WORK" || { echo "Could not unmount /dev /proc /sys from $ROOT" >
 
 echo "== writing $OUT"
 mkdir -p "$OUT"
-cp -L "$ROOT"/boot/vmlinuz-* "$OUT/vmlinuz"
-cp -L "$ROOT"/boot/initrd.img-* "$OUT/initrd.img"
+KERNEL=$(ls -v "$ROOT"/boot/vmlinuz-* | tail -n 1)          # the newest, if the system has more than one
+INITRD=$(ls -v "$ROOT"/boot/initrd.img-* | tail -n 1)
+cp -L "$KERNEL" "$OUT/vmlinuz"
+cp -L "$INITRD" "$OUT/initrd.img"
 rm -f "$OUT/filesystem.squashfs"
 mksquashfs "$ROOT" "$OUT/filesystem.squashfs" -comp xz -noappend
 chmod 644 "$OUT"/vmlinuz "$OUT"/initrd.img "$OUT"/filesystem.squashfs

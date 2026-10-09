@@ -60,6 +60,7 @@ for p in $ALL; do
 done
 echo "(skipped $skipped virtual package names)"
 dpkg-scanpackages -m . /dev/null 2>/dev/null | gzip -9 > Packages.gz
+# (no Release file on purpose: with [trusted=yes] apt reads the Packages list directly; a Release file that does not list Packages makes it skip them)
 cd "$HERE"
 
 if [ -n "$SNAPS" ]; then
@@ -71,7 +72,7 @@ fi
 echo "== copying the repository"
 rm -rf "$OUT/repo"
 mkdir -p "$OUT/repo"
-(cd "$REPO" && tar --exclude=__pycache__ --exclude='offline/bundle' --exclude='pxe/out' -cf - .) | tar -xf - -C "$OUT/repo"
+(cd "$REPO" && tar --exclude=__pycache__ --exclude='offline/bundle' --exclude='pxe/out' --exclude=.claude -cf - .) | tar -xf - -C "$OUT/repo"
 
 if [ "$WITH_IMAGE" = yes ]; then
     echo "== building the network boot image"
@@ -79,7 +80,8 @@ if [ "$WITH_IMAGE" = yes ]; then
 fi
 
 cp "$HERE/install-offline.sh" "${PACKAGES_FILE:-$HERE/packages.txt}" "$OUT/"
-[ -z "${PACKAGES_FILE:-}" ] || mv "$OUT/$(basename "$PACKAGES_FILE")" "$OUT/packages.txt"
+[ -z "${PACKAGES_FILE:-}" ] || [ "$(basename "$PACKAGES_FILE")" = packages.txt ] || mv "$OUT/$(basename "$PACKAGES_FILE")" "$OUT/packages.txt"
+echo "${ID:-unknown} ${VERSION_ID:-unknown} $ARCH" > "$OUT/RELEASE"       # install-offline.sh checks the other computer is the same
 chmod +x "$OUT/install-offline.sh"
 {
     echo "Offline bundle for the check-in board."
