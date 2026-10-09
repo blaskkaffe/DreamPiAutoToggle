@@ -1,8 +1,8 @@
 # Base - who may talk to the web service, and the optional PIN.
 # The web service runs as root (a module can restart services, reboot the machine or run an updater), so
 # a request is checked before anything is done:
-#   - Host header: refuse names that are not this Pi's (DNS rebinding: a web page on the
-#     internet that points its own name at the Pi's address and then talks to it from the browser);
+#   - Host header: refuse names that are not this computer's (DNS rebinding: a web page on the
+#     internet that points its own name at the computer's address and then talks to it from the browser);
 #   - Origin / Referer: a browser's POST from another site is refused (CSRF);
 #   - the custom X-Requested-With header (a page of another site can't add it) for the actions
 #     a module marks PROTECTED;
@@ -56,7 +56,7 @@ def _is_ip(host):
 
 
 def extra_hosts():
-    """Names added by hand, one per line, in allowed_hosts (for a router that gives the Pi a domain)."""
+    """Names added by hand, one per line, in allowed_hosts (for a router that gives the computer a domain)."""
     text = core.read_file(core.ALLOWED_HOSTS) or ""
     return set(l.strip().lower().rstrip(".") for l in text.splitlines() if l.strip() and not l.startswith("#"))
 

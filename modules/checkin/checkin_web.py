@@ -17,7 +17,7 @@ CHECKIN = os.path.join(core.BASE_DIR, "checkin.json")       # {"rev", "config", 
 CONTACTS = os.path.join(core.BASE_DIR, "contacts.json")     # {"people": [{id, name, department, role, phone, location, restrictToLocation, active, order}]}: the contacts module's roster (imported from a CSV)
 PHOTOS_DIR = os.path.join(core.BASE_DIR, "photos")           # <person id>.jpg / .png: the small profile photos (written by the contacts module, read by the check-in board)
 
-# [code, label, palette colour, needs, checks out]; the list CheckinChicken starts with. "needs": "time", "date", "note" or "".
+# [code, label, palette colour, needs, checks out]; the list CheckinChicken starts with. "needs": "time", "date", "datetime" (a date and a time), "note" or "".
 # IN / OUT are the two fixed ones; the others can be changed in checkin.json "statuses" (a list of objects with these keys).
 IN, OUT = "IN", "OUT"
 DEFAULT_STATUSES = [
@@ -36,7 +36,7 @@ DEFAULT_STATUSES = [
 ]
 GROUPS = ("department", "building")
 FRAMES = ("none", "thin", "thick")      # the frame round a department box
-BOXES = ("neutral", "board")            # its colour: neutral (grey) or the board colour (Appearance > Check-in board colour)
+BOXES = ("auto", "dark", "light", "board")      # its colour: grey that follows the theme (the default: the original dark grey in the dark theme, light grey in the light one), always dark grey, always light grey, or the board colour (Appearance > Check-in board colour)
 SCROLLS = ("off", "auto", "status", "on")      # the scrolling on a row: never; only when name and status do not fit; only the status, and only when it does not fit (the name stays); always
 AUTO = ("blue", "green", "orange", "purple", "cyan", "yellow", "bright-pink", "red", "bright-blue", "bright-green", "bright-purple", "bright-cyan")
 OUT_COLOUR = "global"       # the grey of a person who is out
@@ -90,7 +90,7 @@ def statuses(data=None):
             continue
         seen.add(s["code"])
         out.append({"code": s["code"], "label": str(s.get("label") or s["code"])[:30], "colour": _palette_id(s.get("colour"), "white"),
-                    "needs": s.get("needs") if s.get("needs") in ("time", "date", "note") else "", "default": str(s.get("default") or "")[:5],
+                    "needs": s.get("needs") if s.get("needs") in ("time", "date", "datetime", "note") else "", "default": str(s.get("default") or "")[:5],
                     "prefix": str(s.get("prefix") or "")[:20], "out": bool(s.get("out")), "sticky": bool(s.get("sticky")),
                     "dots": s.get("dots") if s.get("dots") in (1, 2, 3) else 0})
     return out[:16]
@@ -118,7 +118,7 @@ def save_statuses(items):
                 used.add(code)
             d = str(x.get("default") or "").strip()
             out.append({"code": code, "label": label, "colour": _palette_id(x.get("colour"), "white"),
-                        "needs": x.get("needs") if x.get("needs") in ("time", "date", "note") else "",
+                        "needs": x.get("needs") if x.get("needs") in ("time", "date", "datetime", "note") else "",
                         "default": d if re.match(r"^([01]?\d|2[0-3]):[0-5]\d$", d) else "", "prefix": str(x.get("prefix") or "").strip()[:20],
                         "out": bool(x.get("out")), "sticky": bool(x.get("sticky")), "dots": x.get("dots") if x.get("dots") in (1, 2, 3) else 0})
         seen = set()
@@ -146,7 +146,7 @@ def config(data=None):
            "colour_by": c.get("colour_by") if c.get("colour_by") in GROUPS else "department", "colours": {},
            "scroll": c.get("scroll") if c.get("scroll") in SCROLLS else "on",
            "title": re.sub(r"\s+", " ", str(c.get("title") or "")).strip()[:40], "frame": c.get("frame") if c.get("frame") in FRAMES else "thin",
-           "box": c.get("box") if c.get("box") in BOXES else "board", "show_roles": c.get("show_roles") is not False, "show_buildings": c.get("show_buildings") is True, "keyboard": c.get("keyboard") is True,
+           "box": c.get("box") if c.get("box") in BOXES else "auto", "show_roles": c.get("show_roles") is not False, "show_buildings": c.get("show_buildings") is True, "keyboard": c.get("keyboard") is True,
            "roles_shown": _names(c.get("roles_shown")), "buildings_shown": _names(c.get("buildings_shown")),
            "group_order": [str(x)[:80] for x in c.get("group_order", []) if isinstance(x, str)][:200] if isinstance(c.get("group_order"), list) else []}
     for kind in GROUPS:
@@ -209,7 +209,7 @@ def group_colours(people, kind, cfg):
 def _status_text(st, detail):
     t = st["label"]
     if detail:
-        t += " \u00b7 " + ((st["prefix"] + " ") if st["prefix"] and st["needs"] == "date" else "") + detail
+        t += " \u00b7 " + ((st["prefix"] + " ") if st["prefix"] and st["needs"] in ("date", "datetime") else "") + detail
     return t
 
 
@@ -276,6 +276,9 @@ def _clean_detail(st, detail):
     if st["needs"] == "date":
         m = re.match(r"^(\d{4})-(\d\d)-(\d\d)$", detail)
         detail = "%s/%s" % (int(m.group(3)), int(m.group(2))) if m else (detail if re.match(r"^V\d{1,3}$", detail) else "")
+    if st["needs"] == "datetime":          # "2026-12-24 08:30" (or just the date: the time part is skipped) -> "24/12 08:30"
+        m = re.match(r"^(\d{4})-(\d\d)-(\d\d)(?: (([01]?\d|2[0-3]):[0-5]\d))?$", detail)
+        detail = ("%s/%s" % (int(m.group(3)), int(m.group(2))) + (" " + m.group(4) if m.group(4) else "")) if m else ""
     return detail
 
 
@@ -435,7 +438,7 @@ def _config_reply():
     return {"values": dict((k, c[k]) for k in ("show_title", "title", "group_by", "colour_by", "scroll", "frame", "box", "show_roles", "show_buildings", "keyboard", "roles_shown", "buildings_shown")),
             "options": {"groups": [{"value": "department", "label": "Department"}, {"value": "building", "label": "Building"}],
                         "frames": [{"value": "none", "label": "None"}, {"value": "thin", "label": "Thin"}, {"value": "thick", "label": "Thick"}],
-                        "boxes": [{"value": "neutral", "label": "Neutral (grey)"}, {"value": "board", "label": "The board colour"}],
+                        "boxes": [{"value": "auto", "label": "Grey, like the theme (default)"}, {"value": "dark", "label": "Dark grey (the original)"}, {"value": "light", "label": "Light grey"}, {"value": "board", "label": "The board colour"}],
                         "scrolls": [{"value": "off", "label": "Off"}, {"value": "auto", "label": "Auto (when it does not fit)"}, {"value": "status", "label": "Auto, only the status"}, {"value": "on", "label": "On (always)"}],
                         "roles": [{"value": r, "label": r} for r in roles], "buildings": [{"value": b, "label": b} for b in buildings]},
             "texts": {"show_title": "Shown" if c["show_title"] else "Hidden", "group_by": c["group_by"].capitalize(), "colour_by": c["colour_by"].capitalize()},
@@ -465,6 +468,7 @@ def _post_colour(h):
 def api(d, warnings):
     """Every /api answer carries the board, so each screen follows the others (it is a few kilobytes for a hundred people)."""
     d["checkin"] = snapshot()
+    d.setdefault("primary", {})["checkin"] = core.module_colours("checkin").get("checkin", "green")      # the board's colour as it is now: a pick in Settings shows at once
 
 
 OPEN = ("/checkin/toggle", "/checkin/status")       # tapping people in and out works while Settings is locked with the PIN

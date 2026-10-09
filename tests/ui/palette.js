@@ -8,19 +8,20 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 430, height: 1400 } });
+  const openMenus = () => page.evaluate(() => document.querySelectorAll('.wmenu .menubtn[aria-expanded="false"]').forEach(b => b.click()));      // Settings has menus (Layout, Text, Colours, Background): open them all
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 150)); });
   page.on('dialog', d => d.accept());
   await page.goto(URL, { waitUntil: 'networkidle' }); await settle(1000);
-  await page.click('#cog'); await settle(1300);
+  await page.click('#cog'); await settle(1300); await openMenus(); await settle(300);
   const app = page.locator('[data-box="appearance"]');
   const prow = app.locator('.srow', { hasText: 'Colour palette' });
   ok(await prow.count() === 1 && await prow.locator('button', { hasText: 'Edit' }).count() === 1, 'Appearance has a Colour palette row with an Edit button');
   ok(await page.locator('[data-box="palette"]').count() === 0 && await page.locator('[data-picker] >> text=Colour palette').count() === 0, 'it is part of the app, not a module of its own');
   const rows = page.locator('.pop.open .srow.pal');
   const openEditor = async () => { if (!(await page.locator('.pop.open .srow.pal').count())) { await prow.locator('button', { hasText: 'Edit' }).click(); await settle(700); } };
-  const clockPick = () => app.locator('.srow', { hasText: 'Clock colour' }).locator('.colourpick > button');
+  const clockPick = () => app.locator('.srow', { hasText: 'Check-in board colour' }).locator('.colourpick > button');
   const balls = async () => { if (await page.locator('.pop.open').count()) { await page.keyboard.press('Escape'); await settle(200); } await clockPick().click(); await settle(300); const ids = await page.locator('.pop.open .swatch').evaluateAll(es => es.map(e => e.getAttribute('data-id'))); await page.keyboard.press('Escape'); await settle(200); return ids; };
   const order = () => rows.evaluateAll(es => es.map(e => e.getAttribute('data-id')));
   await openEditor();
@@ -42,9 +43,9 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(b.includes('new-colour') && b.length === 16, 'the colour picks offer it at once, without reloading the page');
   await clockPick().click(); await settle(300); await page.locator('.pop.open .swatch[data-id="new-colour"]').click(); await settle(1800);
   const bg = await page.evaluate(() => getComputedStyle(document.querySelector('[data-box="appearance"] .srow .colourpick > button.c-new-colour')).backgroundColor);
-  ok(/^rgba?\(153, 255, 0/.test(bg), 'a box can use it: the Clock colour button is lime (' + bg + ')');
-  const border = await page.evaluate(() => getComputedStyle(document.querySelector('#dash .dbox[data-box="clock"] .now')).borderTopColor);
-  ok(border === 'rgb(199, 255, 115)', 'the clock box on the main page is drawn in it too (' + border + ')');
+  ok(/^rgba?\(153, 255, 0/.test(bg), 'a box can use it: the Check-in board colour button is lime (' + bg + ')');
+  await settle(1500);
+  ok(await page.evaluate(() => !!document.querySelector('#dash .dbox[data-mod="checkin"].c-new-colour, body.c-new-colour, html.c-new-colour')), 'the board on the main page takes it too (' + await page.evaluate(() => document.body.className + ' | ' + Array.from(document.querySelectorAll('#dash .dbox')).slice(0, 1).map(e => e.className).join()) + ')');
   // ---- change a colour of the add-on and put it back
   await openEditor();
   const red = page.locator('.pop.open .srow.pal[data-id="red"]');

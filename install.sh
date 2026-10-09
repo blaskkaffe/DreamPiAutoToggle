@@ -5,11 +5,13 @@
 #   sudo ./install.sh 8080         use another port for the web page
 #   sudo ./install.sh --https-port=8443   HTTPS on another port (default 443)
 #   sudo ./install.sh --no-https   plain HTTP only
-#   The check-in board, the contacts, the clock and the system controls are modules, one folder each in
+#   The check-in board, the contacts and the system controls are modules, one folder each in
 #   modules/ (see docs/modules.md): a folder that is not there is not installed (and one that was installed before is
 #   removed). Which modules are on is the page's Settings > System > Modules.
+#   sudo ./install.sh --hostname=checkinchicken   give the computer that name, so the board is at http://checkinchicken.local
+#                                  (the address the kiosk screens use when they are not told another one; needs avahi-daemon for the .local name)
 #   sudo ./install.sh --pin        ask for a PIN that the page then wants before it updates, restarts
-#                                  the Pi or imports contacts (--pin=1234 gives it on the command line,
+#                                  the computer or imports contacts (--pin=1234 gives it on the command line,
 #                                  which shows in the shell history); --no-pin removes it. It is kept
 #                                  across updates. Without a PIN anybody on your network can use those.
 #
@@ -18,19 +20,6 @@
 set -e
 DEST=/opt/checkin-board
 SRC="$(cd "$(dirname "$0")" && pwd)"
-# >>> migrate_old
-# An install made under the old names (service and folder "dreampi-netswitch") moves to the new ones: the settings, the people and who is in are kept
-OLD_DEST=${OLD_DEST:-/opt/dreampi-netswitch}
-if [ "$(id -u)" = "0" ] && [ -d "$OLD_DEST" ] && [ ! -e "$DEST" ]; then
-    for ns_old in dreampi-netswitch dreampi-netswitch-led dreampi-netswitch-buttons dreampi-netswitch-wifi; do
-        systemctl disable --now "$ns_old.service" 2>/dev/null || true
-        rm -f "/etc/systemd/system/$ns_old.service"
-    done
-    mv "$OLD_DEST" "$DEST"
-    rm -f /tmp/dreampi-netswitch.*
-    echo "Moved the old install from $OLD_DEST to $DEST"
-fi
-# <<< migrate_old
 PORT=80
 HTTPS_PORT=443
 # an update keeps the ports used last time unless they are given again
@@ -40,6 +29,7 @@ if [ -f "$DEST/install_ports" ]; then
     case "$OLD_HTTPS" in ''|*[!0-9]*) ;; *) HTTPS_PORT=$OLD_HTTPS ;; esac
 fi
 PIN=keep
+NEW_HOSTNAME=""
 for arg in "$@"; do
     case "$arg" in
         --pin) PIN=ask ;;
@@ -48,12 +38,21 @@ for arg in "$@"; do
         --no-pin) PIN=off ;;
         --https-port=*) HTTPS_PORT="${arg#--https-port=}" ;;
         --no-https) HTTPS_PORT=0 ;;
+        --hostname=*) NEW_HOSTNAME="${arg#--hostname=}"
+                      case "$NEW_HOSTNAME" in ''|-*|*[!A-Za-z0-9-]*) echo "The host name may only have letters, digits and dashes"; exit 1 ;; esac ;;
         [0-9]*) PORT="$arg" ;;
         *) echo "Unknown option: $arg"; exit 1 ;;
     esac
 done
 
 if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https]"; exit 1; fi
+
+if [ -n "$NEW_HOSTNAME" ] && [ "$(hostname)" != "$NEW_HOSTNAME" ]; then
+    if command -v hostnamectl >/dev/null 2>&1; then hostnamectl set-hostname "$NEW_HOSTNAME"; else echo "$NEW_HOSTNAME" > /etc/hostname; hostname "$NEW_HOSTNAME"; fi
+    # the new name must resolve on this computer (sudo and the tools that look it up complain otherwise)
+    if grep -q '^127\.0\.1\.1' /etc/hosts 2>/dev/null; then sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$NEW_HOSTNAME/" /etc/hosts; else printf '127.0.1.1\t%s\n' "$NEW_HOSTNAME" >> /etc/hosts; fi
+    echo "The computer is now called $NEW_HOSTNAME (http://$NEW_HOSTNAME.local with avahi-daemon running)"
+fi
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
@@ -62,23 +61,7 @@ mkdir -p "$DEST/page" "$DEST/kiosk"
 cp "$SRC"/base/page/index.html "$SRC"/base/page/page.css "$SRC"/base/page/page.js "$SRC"/base/page/widgets.js "$SRC"/base/page/boot.js "$DEST/page/"
 cp "$SRC"/kiosk/* "$DEST/kiosk/"
 chmod +x "$DEST/kiosk/kiosk-browser.sh"
-# Files of the DreamPi add-on this one grew out of (an install over it is cleaned up: the hook, the buttons and the LED service are gone)
-for ns_old in dreampi-netswitch-led dreampi-netswitch-buttons dreampi-netswitch-wifi checkin-board-wifi; do
-    if [ -f "/etc/systemd/system/$ns_old.service" ]; then
-        systemctl disable --now "$ns_old.service" 2>/dev/null || true
-        rm -f "/etc/systemd/system/$ns_old.service"
-    fi
-done
-rm -f "$DEST/netswitch_probes.py" "$DEST/base_probes.py" "$DEST/netswitch_core.py" "$DEST/netswitch_modules.py" "$DEST/netswitch_web.py" "$DEST/netswitch_security.py" "$DEST/netswitch_tz.py" "$DEST/netswitch_hook.py" "$DEST/netswitch_gpio.py" "$DEST/netswitch_buttons.py" "$DEST/netswitch_update.py" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" \
-      "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" "$DEST/netswitch_players.py" "$DEST/netswitch_wifi_setup.py" "$DEST/wifi_button" "$DEST/wifi_button_enabled"
-# The Wi-Fi setup module is gone: its service (removed above), module folder, state files and /tmp state
-rm -rf "$DEST/modules/wifi"
-rm -f "$DEST"/wifi_* /tmp/dreampi-netswitch.wifi /tmp/checkin-board.wifi
-rm -rf "$DEST/static"
-if [ -f "$DEST/pth_locations" ]; then       # the hook was loaded into every Python through .pth files
-    while read -r ns_pth; do rm -f "$ns_pth"; done < "$DEST/pth_locations"
-    rm -f "$DEST/pth_locations"
-fi
+mkdir -p "$DEST/sounds"; cp "$SRC"/base/sounds/* "$DEST/sounds/"      # the button sounds (copy more .wav / .mp3 / .ogg files in by hand: Settings > Appearance > Button sound lists them)
 
 # >>> sync_modules
 # The optional features: every folder in modules/ is copied to $DEST/modules/. A folder that was installed before but
@@ -188,14 +171,14 @@ After=network.target
 StartLimitIntervalSec=0
 
 [Service]
-# Wi-Fi power saving makes a Pi drop off the network now and then (see the script)
+# Wi-Fi power saving makes a computer drop off the network now and then (see the script)
 ExecStartPre=-/bin/sh $DEST/wifi-powersave-off.sh
 ExecStart=$WEBPY $DEST/base_web.py $PORT $HTTPS_PORT
 Restart=always
 RestartSec=3
 Nice=-5
 # The page runs as root, so it is fenced in: no setuid tricks, no writes to /usr, /boot or /etc,
-# no cgroup or kernel-module changes. (The update runs in its own transient unit, see modules/rebootupdate/netswitch_update.py.)
+# no cgroup or kernel-module changes. (The update runs in its own transient unit, see modules/rebootupdate/rebootupdate_update.py.)
 NoNewPrivileges=yes
 ProtectSystem=full
 ProtectControlGroups=yes
@@ -204,6 +187,13 @@ ProtectKernelModules=yes
 [Install]
 WantedBy=multi-user.target
 EOF
+
+# The computer restarts by itself if the kernel panics (after 10 s) or systemd stops answering (the watchdog, where the hardware has one;
+# removed again by uninstall.sh)
+mkdir -p /etc/sysctl.d /etc/systemd/system.conf.d
+printf 'kernel.panic = 10\nkernel.panic_on_oops = 1\n' > /etc/sysctl.d/90-checkin-reboot.conf
+printf '[Manager]\nRuntimeWatchdogSec=60\nRebootWatchdogSec=10min\nShutdownWatchdogSec=5min\n' > /etc/systemd/system.conf.d/90-checkin-watchdog.conf
+sysctl -q -p /etc/sysctl.d/90-checkin-reboot.conf >/dev/null 2>&1 || true
 
 # ------------------------------------------------------------------ modules
 # Each installed module may have an install.sh, sourced here (it sees $DEST and $SRC)

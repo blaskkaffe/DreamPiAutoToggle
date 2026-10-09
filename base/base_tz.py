@@ -3,7 +3,7 @@
 # the clock and the events modules).
 #
 # Python 3.9+ has zoneinfo, which reads the system's tz database. Older Python has nothing for "the time in New York": only the
-# Pi's own zone (time.localtime) and fixed offsets. The rules are on the Pi all the same, in /usr/share/zoneinfo (Debian's tzdata
+# computer's own zone (time.localtime) and fixed offsets. The rules are on the computer all the same, in /usr/share/zoneinfo (Debian's tzdata
 # package), as TZif files - so without zoneinfo this module reads those files itself: the list of past and planned changes, and
 # for the years after the list the POSIX TZ rule at its end ("CET-1CEST,M3.5.0,M10.5.0/3" = Central European time, summer time
 # from the last Sunday in March 02:00 to the last Sunday in October 03:00). Works on Python 3 and 2.7.
@@ -93,13 +93,13 @@ CITIES = (
 )
 
 
-def zone_options(now=None, own="This Pi's own time zone"):
-    """The form widget's options for a time zone: "" = the Pi's own, then the cities by region (with their offset now), then UTC.
+def zone_options(now=None, own="This computer's own time zone"):
+    """The form widget's options for a time zone: "" = the computer's own, then the cities by region (with their offset now), then UTC.
     Zones this system does not know are left out."""
     now = time.time() if now is None else now
     t = time.localtime(now)
-    pi = t.tm_gmtoff if hasattr(t, "tm_gmtoff") else -(time.altzone if t.tm_isdst > 0 else time.timezone)
-    opts = [{"value": "", "label": "%s (%s now)" % (own, utc_text(pi))}]
+    own_off = t.tm_gmtoff if hasattr(t, "tm_gmtoff") else -(time.altzone if t.tm_isdst > 0 else time.timezone)
+    opts = [{"value": "", "label": "%s (%s now)" % (own, utc_text(own_off))}]
     for name, zone, _lon, _lat, region in CITIES:
         off = offset(zone, now)
         if off is not None:
@@ -115,11 +115,11 @@ def zone_text(zone, now=None):
     """The grey line under the time zone setting: which zone it is and its offset now."""
     if not zone:
         t = time.localtime(time.time() if now is None else now)
-        pi = t.tm_gmtoff if hasattr(t, "tm_gmtoff") else -(time.altzone if t.tm_isdst > 0 else time.timezone)
-        return "This Pi's own time zone, %s now" % utc_text(pi)
+        own_off = t.tm_gmtoff if hasattr(t, "tm_gmtoff") else -(time.altzone if t.tm_isdst > 0 else time.timezone)
+        return "This computer's own time zone, %s now" % utc_text(own_off)
     off = offset(zone, now)
     if off is None:
-        return "%s is not known on this Pi: its own time zone is used" % zone
+        return "%s is not known on this computer: its own time zone is used" % zone
     return "%s, %s now (summer and winter time follow the zone)" % (zone_name(zone), utc_text(off))
 
 
@@ -321,3 +321,56 @@ def posix_offset(rule, now):
     if start < end:                                                     # northern hemisphere
         return dst if start <= now < end else std
     return std if end <= now < start else dst                          # southern: summer over the new year
+
+
+# ---- the sun: where it is over a time zone's place (the day / night of the page: theme by the time of day, a background that follows the day)
+import math
+
+
+def sun_elevation(lat, lon, now=None):
+    """The sun's height over the horizon in degrees (negative = below it) at latitude lat and longitude lon (degrees, east positive), at the Unix time `now`
+    (default: now). The usual low-precision formulas (about a tenth of a degree); no refraction."""
+    t = time.time() if now is None else now
+    d = t / 86400.0 + 2440587.5 - 2451545.0              # days since J2000
+    g = math.radians((357.529 + 0.98560028 * d) % 360)
+    q = (280.459 + 0.98564736 * d) % 360
+    lam = math.radians((q + 1.915 * math.sin(g) + 0.020 * math.sin(2 * g)) % 360)
+    eps = math.radians(23.439 - 0.00000036 * d)
+    ra = math.atan2(math.cos(eps) * math.sin(lam), math.cos(lam))
+    dec = math.asin(math.sin(eps) * math.sin(lam))
+    gmst = (18.697374558 + 24.06570982441908 * d) % 24
+    ha = math.radians(((gmst + lon / 15.0) % 24) * 15) - ra
+    la = math.radians(lat)
+    return math.degrees(math.asin(math.sin(la) * math.sin(dec) + math.cos(la) * math.cos(dec) * math.cos(ha)))
+
+
+def own_zone_name():
+    """The computer's own time zone name ("Europe/Stockholm") from /etc/timezone or the /etc/localtime link, or ""."""
+    try:
+        with open("/etc/timezone") as f:
+            name = f.read().strip()
+        if _NAME.match(name):
+            return name
+    except (IOError, OSError):
+        pass
+    try:
+        link = os.path.realpath("/etc/localtime")
+        for root in ZONEINFO_DIRS:
+            if link.startswith(root + "/"):
+                name = link[len(root) + 1:]
+                if name.startswith("posix/") or name.startswith("right/"):
+                    name = name.split("/", 1)[1]
+                return name if _NAME.match(name) else ""
+    except OSError:
+        pass
+    return ""
+
+
+def zone_place(zone):
+    """(latitude, longitude) of a time zone: its first city of CITIES, or - for a zone that has no city (UTC, the computer's own zone not in the list) -
+    the middle of the band of its present UTC offset at 50 degrees north."""
+    for c in CITIES:
+        if c[1] == zone:
+            return c[3], c[2]
+    return 50.0, offset(zone) / 3600.0 * 15.0
+

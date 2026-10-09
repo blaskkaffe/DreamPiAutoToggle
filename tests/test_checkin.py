@@ -149,6 +149,24 @@ class BoardTests(Base):
         checkin.set_status(anna, "OTHER", "x" * 200)
         self.assertEqual(len(self.people()["Anna Svensson"]["detail"]), checkin.DETAIL_MAX)
 
+    def test_a_status_can_ask_for_a_date_and_a_time_and_a_date_can_be_skipped(self):
+        anna = self.people()["Anna Svensson"]["id"]
+        checkin.save_statuses([{"code": "MEET", "label": "Möte", "colour": "blue", "needs": "datetime", "prefix": "till"}, {"code": "TRAVEL", "label": "Tjänsteresa", "colour": "blue", "needs": "date", "out": True}])
+        self.assertEqual([s["needs"] for s in checkin.statuses()], ["datetime", "date"])
+        checkin.set_status(anna, "MEET", "2026-12-24 08:30")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "Möte · till 24/12 08:30")
+        checkin.set_status(anna, "MEET", "2026-12-24")                  # only the date: the time is left out
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "Möte · till 24/12")
+        checkin.set_status(anna, "MEET", "2026-12-24 25:99")            # not a time: nothing is kept
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "Möte")
+        checkin.set_status(anna, "TRAVEL", "")                          # Skip: the status without its date
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "Tjänsteresa")
+
+    def test_the_api_carries_the_boards_colour_as_it_is_now(self):
+        d = {"primary": {}}
+        checkin.api(d, [])
+        self.assertEqual(d["primary"]["checkin"], core.module_colours("checkin")["checkin"])       # so a pick in Settings shows without a reload
+
     def test_a_tap_clears_a_status(self):
         anna = self.people()["Anna Svensson"]["id"]
         checkin.set_status(anna, "SICK")
@@ -338,7 +356,7 @@ class HttpTests(Base):
 
     def test_settings_and_colour_endpoints(self):
         r = self.get("/checkin/config")
-        self.assertEqual(r["values"], {"show_title": True, "group_by": "department", "colour_by": "department", "scroll": "on", "title": "", "frame": "thin", "box": "board", "show_roles": True, "show_buildings": False,
+        self.assertEqual(r["values"], {"show_title": True, "group_by": "department", "colour_by": "department", "scroll": "on", "title": "", "frame": "thin", "box": "auto", "show_roles": True, "show_buildings": False,
                                        "keyboard": False, "roles_shown": None, "buildings_shown": None})
         self.assertEqual([x["key"] for x in r["colours"]["department"]], ["Kök", "No department", "Servering"])
         r = self.post("/checkin/config", {"values": {"colour_by": "building", "group_by": "nonsense", "show_title": False}})

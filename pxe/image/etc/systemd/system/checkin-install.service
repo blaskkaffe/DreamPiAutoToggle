@@ -1,0 +1,21 @@
+[Unit]
+Description=Check-in screen - install to the local disk (wizard)
+ConditionKernelCommandLine=checkin_install
+After=systemd-user-sessions.service systemd-networkd.service
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+
+[Service]
+Type=idle
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+StandardInput=tty-force
+StandardOutput=tty
+StandardError=tty
+ExecStart=/usr/local/bin/checkin-install
+ExecStopPost=/bin/systemctl --no-block reboot
+Restart=no
+
+[Install]
+WantedBy=graphical.target

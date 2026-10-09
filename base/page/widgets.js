@@ -39,7 +39,7 @@ function colourClass(el,ref,mod){el.setAttribute("data-own-colour","1");
 var afterPostTimer=null;
 function settledSoon(){clearTimeout(afterPostTimer);afterPostTimer=setTimeout(function(){refresh();reloadData()},250)}
 function post(url,body,done){xhrJson("POST",url,function(r,st,b){if(r&&!/^\/wbtest/.test(url))settledSoon();if(done)done(r,st,b)},body)}
-// after a button's POST: "reload" the page, "wait" until the Pi is back (a reboot), or just look at the new state
+// after a button's POST: "reload" the page, "wait" until the computer is back (a reboot), or just look at the new state
 function afterPost(s,r,el){
  if(r&&r.started===false){alert(r.message||"That did not start");return}
  if(s.then==="reload"){try{sessionStorage.setItem("reopen",s.reopen?"1":"")}catch(e){}location.reload();return}
@@ -74,15 +74,7 @@ function renderLayout(){
  (LAY.settings||[]).forEach(function(b){cols.appendChild(box("settings",b))});
  buildPicker(cols);
  AFTER.forEach(function(f){f()});AFTER=[]}
-function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});applyTheme();applyHighlight();hideEmptyBoxes();applyScreen()}
-// ---- highlight (/api "highlight": {box id: why}): those dashboard boxes get the class "hl" (page.css draws it) and the reason as a
-// tooltip; the look is global (/api theme.highlight: "rainbow" or a palette id)
-var hlKey="";
-function applyHighlight(){var hl=S.highlight||{},st=(S.theme&&S.theme.highlight)||"rainbow",key=st+JSON.stringify(hl);if(key===hlKey)return;hlKey=key;
- document.body.classList.toggle("hl-rainbow",st==="rainbow");
- document.body.style.setProperty("--hl-rgb",st==="rainbow"?"255,255,255":"var(--c-"+st+"-rgb)");
- Array.prototype.forEach.call(document.querySelectorAll("#dash [data-box]"),function(b){var why=hl[b.getAttribute("data-box")];
-  b.classList.toggle("hl",!!why);if(why)b.setAttribute("title",String(why));else b.removeAttribute("title")})}
+function engineUpdate(){UPD.forEach(function(f){try{f()}catch(e){if(window.console)console.error(e)}});applyTheme();hideEmptyBoxes();applyScreen()}
 // a box whose widgets are all hidden (a module's settings while it has nothing to set) is hidden too
 function hideEmptyBoxes(){var bs=document.querySelectorAll("[data-box]"),i,j;
  for(i=0;i<bs.length;i++){var b=bs[i],host=b.querySelector(":scope > .card")||b,any=false;
@@ -131,6 +123,10 @@ W.row=function(s,ctx){var title=h("span"),sub=h("span",{"class":"sub"}),left=h("
  el=h("div",{"class":"srow"+(s.below?" wrap":"")},[left]);
  bind(s.title,function(t){setText(title,t==null?"":t)});bind(s.sub,function(t){setLines(sub,t);sh(sub,!!t)});
  if(s.control)el.appendChild(build(Object.assign({mod:s.mod},s.control),ctx));
+ // what a menu shows of this row in its subtitle: a switch that is on gives its short name ("short", else the title); a module's switch says on or off
+ var tg=s.control&&s.control.type==="toggle"?s.control:null;
+ if(tg)el._sum=function(){var v=tg.module?val("@enabled."+tg.module):val(tg.bind),name=s.short||val(s.title)||"";
+  return tg.module?name+(v?" on":" off"):(v?name:(s.short_off||""))};
  if(s.below)el.appendChild(h("div",{"class":"below"},buildAll(s.below.map(function(w){return Object.assign({mod:s.mod},w)}),ctx)));return el};
 W.link=function(s){var el=h("a",{"class":"pill-s",href:s.href,target:"_blank",rel:"noopener noreferrer"});
  bind(s.label,function(t){setText(el,t)});if(s.aria)el.setAttribute("aria-label",s.aria);return el};
@@ -184,6 +180,7 @@ W.palette=function(s,ctx){var r=editRow({title:"Colour palette",button:"Edit",ar
  function byId(id){var f=null;data.forEach(function(c){if(c.id===id)f=c});return f}
  function rowOf(id){return list.querySelector('[data-id="'+id+'"]')}
  function flags(){data.forEach(function(c){var row=rowOf(c.id);if(!row)return;sh(row._back,!!c.changed);if(document.activeElement!==row._well)row._well.value=c.ui;})}      // after an edit: only what changed is touched, the field being typed in keeps its focus
+ el._sum=function(){return data.length?data.length+" colours":""};
  function take(res,rebuild){if(!res||!res.colours)return;data=res.colours;sh(addB,res.can_add!==false);r.setSub(data.length+" colours");if(rebuild)build();else flags()}
  function save(id,body){clearTimeout(timers[id]);timers[id]=setTimeout(function(){body.id=id;post("/palette/edit",body,function(res){take(res,false);ctx.saved()})},250)}
  function build(){list.innerHTML="";
@@ -221,6 +218,25 @@ W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.l
   // "ensure_pin": switching it on with no PIN set first asks for a new one on the PIN pad (the server refuses the lock without one)
   if(s.ensure_pin&&want&&!(S.settings_pin&&S.settings_pin.pin)){box.checked=false;choosePin(function(){box.checked=true;post(s.post,{value:true},function(){refresh();ctx.saved()})});return}
   post(s.post,s.body?Object.assign({value:want},s.body):{value:want},function(){refresh();ctx.saved()})};return el};
+// ---- a menu: a row (title, a subtitle that shows what is chosen in it, a button) that opens its settings under it, inside the same card, indented. "id" names it (items of other
+// boxes and modules join it with "in": "<id>"); "items" are its widgets. Each child may tell its choice for the subtitle (el._sum: a switch that is on, the texts of a form's fields).
+// It stays open or shut as the user left it (this tab).
+W.menu=function(s,ctx){var key="menu:"+(s.id||s.title),open=false,title=h("span"),sub=h("span",{"class":"sub"}),left=h("span",{},[title,sub]),
+ btn=h("button",{type:"button","class":"pill-s menubtn","aria-expanded":"false"}),head=h("div",{"class":"srow edit menuhead"},[left,btn]),
+ body=h("div",{"class":"msub"}),el=h("div",{"class":"wmenu"},[head,body]),kids=buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx);
+ try{open=sessionStorage.getItem(key)==="1"}catch(e){}
+ bind(s.title,function(t){setText(title,t==null?"":t);btn.setAttribute("aria-label",(open?"Close ":"Open ")+(t||"menu"))});
+ kids.forEach(function(k){body.appendChild(k)});
+ function paintSub(){var parts=[];kids.forEach(function(k){if(k._sum&&k.style.display!=="none"){var t=k._sum();if(t)parts.push(t)}});
+  var t=parts.join(" \u00b7 ");setText(sub,t);sh(sub,!!t);
+  var any=kids.some(function(k){return k.style.display!=="none"});sh(el,any)}
+ function paint(){sh(body,open);btn.textContent=open?"Close":"Edit";btn.setAttribute("aria-expanded",open?"true":"false");el.classList.toggle("open",open)}
+ btn.onclick=function(e){e.stopPropagation();open=!open;try{sessionStorage.setItem(key,open?"1":"0")}catch(x){}paint()};
+ head.addEventListener("click",function(e){if(e.target===btn||btn.contains(e.target))return;btn.click()});
+ head.style.cursor="pointer";UPD.push(paintSub);paint();paintSub();return el};
+W.divider=function(){return h("div",{"class":"wdiv",role:"separator"})};
+// a marker for a row that the page puts in itself (the Modules row of the System box goes where the "modules" slot is)
+W.slot=function(s){return h("div",{"data-slot":s.name,style:"display:none"})};
 // a row of widgets side by side (wraps)
 W.bar=function(s,ctx){return h("div",{"class":"bar"},buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx))};
 // ---- the module's own colour choice: a "Colour" button in the chosen colour that opens a pop-up with the palette's colours;
@@ -701,67 +717,136 @@ W.info=function(s){var el=h("table",{"class":"about"});
 // a coloured one is in (the colour of the person's department or building), a status colours it with its own colour and puts its name on it.
 // Only the palette's ids are used for colour. With several buildings a row of chips picks which ones this screen shows (kept in this browser;
 // ?location=A,B in the address sets it). "mode": "colours": the settings list of departments / buildings with a colour pick each (GET s.get, POST s.post).
+// A screen that has an id (?screen=<id>, a kiosk computer's serial number) keeps the choice on the host too (S.screen.locations), so it survives a
+// reboot of a computer that forgets its browser: an address with ?location= is the starting choice, else the browser's own, else the host's.
+var ROSTER_FROM={url:false,local:false};
 function rosterLocations(){var sel=[],q=(window.location.search||"").match(/[?&]location=([^&]*)/),k="checkin:locations";
- try{if(q){sel=decodeURIComponent(q[1].replace(/\+/g," ")).split(",").map(function(x){return x.trim()}).filter(Boolean);localStorage.setItem(k,sel.join("|"))}
-  else sel=(localStorage.getItem(k)||"").split("|").filter(Boolean)}catch(e){}return sel}
-function rosterSaveLocations(sel){try{localStorage.setItem("checkin:locations",sel.join("|"))}catch(e){}}
+ try{if(q){ROSTER_FROM.url=true;sel=decodeURIComponent(q[1].replace(/\+/g," ")).split(",").map(function(x){return x.trim()}).filter(Boolean);localStorage.setItem(k,sel.join("|"))}
+  else{var v=localStorage.getItem(k);ROSTER_FROM.local=v!==null;sel=(v||"").split("|").filter(Boolean)}}catch(e){}return sel}
+function rosterSaveLocations(sel){try{localStorage.setItem("checkin:locations",sel.join("|"))}catch(e){}
+ if(SCREEN_ID)xhrJson("POST","/screen/locations",function(){},{value:sel})}
 var ROSTER_TONES=["blue","green","orange","purple","cyan","yellow","bright-pink","red"];
 function rosterAvatar(p,cls){var h0=0,i,n=String(p.name||"");for(i=0;i<n.length;i++)h0=(h0*31+n.charCodeAt(i))>>>0;
  var parts=n.trim().split(/\s+/).filter(Boolean),ini=parts.length>1?(parts[0][0]+parts[parts.length-1][0]):(parts[0]||"?").slice(0,2);
  if(p.photo)return '<span class="rp-av '+cls+'" role="img" aria-label="'+esc(n)+'" style="background-image:url(\''+esc(p.photo)+'\')"></span>';
  return '<span class="rp-av '+cls+' c-'+ROSTER_TONES[h0%ROSTER_TONES.length]+'" aria-hidden="true">'+esc(ini.toUpperCase())+'</span>'}
-// ---- an on-screen keyboard for the status pop-up (Settings, Touch keyboard): a number pad for a time or a date, a text keyboard
-// (letters, numbers, special characters) for a note. kind: "time" | "date" | "text"; o: {value, twelve (12-hour clock), max}. Returns {el, show, value()};
-// value() is "HH:MM" (24 h), "YYYY-MM-DD" or the text, or null (with a message in o.say) when what was typed is not a time / date.
+// ---- a calendar for the status pop-up (a date, or a date and a time): the month as a grid of days, Monday first (Swedish), with arrows for the month.
+// calendar(iso, pick): iso "YYYY-MM-DD" (or "": today's month); pick(iso) when a day is tapped. Returns the element.
+var CAL_MONTHS=["januari","februari","mars","april","maj","juni","juli","augusti","september","oktober","november","december"],CAL_DAYS=["m\u00e5","ti","on","to","fr","l\u00f6","s\u00f6"];
+function calendar(iso,pick){var m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(iso||""),now=new Date(),y=m?+m[1]:now.getFullYear(),mo=m?+m[2]-1:now.getMonth(),
+ el=h("div",{"class":"rp-cal",role:"group","aria-label":"Calendar"}),head=h("div",{"class":"rp-calh"}),grid=h("div",{"class":"rp-calg"}),
+ prev=h("button",{type:"button","class":"pill-s rp-calb","aria-label":"Previous month",text:"\u2039"}),next=h("button",{type:"button","class":"pill-s rp-calb","aria-label":"Next month",text:"\u203a"}),title=h("span",{"class":"rp-calt","aria-live":"polite"});
+ function p2(n){return (n<10?"0":"")+n}
+ function draw(){setText(title,CAL_MONTHS[mo]+" "+y);grid.innerHTML="";CAL_DAYS.forEach(function(d){grid.appendChild(h("span",{"class":"rp-cald",text:d}))});
+  var first=(new Date(y,mo,1).getDay()+6)%7,days=new Date(y,mo+1,0).getDate(),i,today=now.getFullYear()+"-"+p2(now.getMonth()+1)+"-"+p2(now.getDate());
+  for(i=0;i<first;i++)grid.appendChild(h("span",{"class":"rp-calx"}));
+  for(i=1;i<=days;i++){var v=y+"-"+p2(mo+1)+"-"+p2(i),b=h("button",{type:"button","class":"pill-s rp-calday"+(v===iso?" pri c-green":"")+(v===today?" today":""),"data-day":v,text:String(i)});
+   b.setAttribute("aria-label",i+" "+CAL_MONTHS[mo]+" "+y);if(v===iso)b.setAttribute("aria-pressed","true");grid.appendChild(b)}}
+ prev.onclick=function(e){e.stopPropagation();mo--;if(mo<0){mo=11;y--}draw()};next.onclick=function(e){e.stopPropagation();mo++;if(mo>11){mo=0;y++}draw()};
+ grid.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-day]");if(!b)return;e.stopPropagation();iso=b.getAttribute("data-day");pick(iso)});
+ head.appendChild(prev);head.appendChild(title);head.appendChild(next);el.appendChild(head);el.appendChild(grid);draw();return el}
+// ---- emoji for the on-screen keyboard: single code points (plus the variation selector) in a few groups; the keyboard's emoji layer shows one group at a time
+var EMOJI=[["\ud83d\ude00","\ud83d\ude00 \ud83d\ude03 \ud83d\ude04 \ud83d\ude01 \ud83d\ude06 \ud83d\ude05 \ud83d\ude02 \ud83e\udd23 \ud83d\ude0a \ud83d\ude07 \ud83d\ude42 \ud83d\ude09 \ud83d\ude0d \ud83d\ude18 \ud83d\ude0b \ud83d\ude1b \ud83d\ude1c \ud83e\udd2a \ud83d\ude0e \ud83e\udd29 \ud83e\udd73 \ud83d\ude0f \ud83d\ude12 \ud83d\ude1e \ud83d\ude14 \ud83d\ude1f \ud83d\ude15 \ud83d\ude41 \u2639\ufe0f \ud83d\ude23 \ud83d\ude16 \ud83d\ude2b \ud83d\ude29 \ud83e\udd7a \ud83d\ude22 \ud83d\ude2d \ud83d\ude24 \ud83d\ude20 \ud83d\ude21 \ud83e\udd2c \ud83e\udd2f \ud83d\ude33 \ud83e\udd75 \ud83e\udd76 \ud83d\ude31 \ud83d\ude28 \ud83d\ude30 \ud83d\ude25 \ud83d\ude13 \ud83e\udd17 \ud83e\udd14 \ud83e\udd2d \ud83e\udd2b \ud83d\ude36 \ud83d\ude10 \ud83d\ude11 \ud83d\ude2c \ud83d\ude44 \ud83d\ude2f \ud83d\ude26 \ud83d\ude27 \ud83d\ude2e \ud83d\ude32 \ud83e\udd71 \ud83d\ude34 \ud83e\udd24 \ud83d\ude2a \ud83d\ude35 \ud83e\udd10 \ud83e\udd22 \ud83e\udd2e \ud83e\udd27 \ud83d\ude37 \ud83e\udd12 \ud83e\udd15 \ud83e\udd11 \ud83e\udd20 \ud83d\ude08 \ud83d\udc7f \ud83d\udc80 \ud83d\udca9 \ud83e\udd21 \ud83d\udc7b \ud83d\udc7d \ud83e\udd16"],
+ ["\ud83d\udc4d","\ud83d\udc4d \ud83d\udc4e \ud83d\udc4c \u270c\ufe0f \ud83e\udd1e \ud83e\udd1f \ud83e\udd18 \ud83e\udd19 \ud83d\udc48 \ud83d\udc49 \ud83d\udc46 \ud83d\udc47 \u261d\ufe0f \u270b \ud83e\udd1a \ud83d\udd90\ufe0f \ud83d\udc4b \ud83e\udd1d \ud83d\ude4f \ud83d\udc4f \ud83d\ude4c \ud83d\udc50 \ud83e\udd32 \ud83d\udcaa \ud83e\uddb5 \ud83e\uddb6 \ud83d\udc42 \ud83d\udc43 \ud83d\udc40 \ud83d\udc41\ufe0f \ud83d\udc45 \ud83d\udc44 \ud83e\udde0 \ud83d\udc76 \ud83e\uddd2 \ud83d\udc66 \ud83d\udc67 \ud83e\uddd1 \ud83d\udc68 \ud83d\udc69 \ud83e\uddd3 \ud83d\udc74 \ud83d\udc75 \ud83d\ude47 \ud83e\udd37 \ud83e\udd26 \ud83d\udc6e \ud83d\udc77 \ud83d\udc82 \ud83d\udc83 \ud83d\udd7a \ud83d\udeb6 \ud83c\udfc3"],
+ ["\ud83d\udc36","\ud83d\udc36 \ud83d\udc31 \ud83d\udc2d \ud83d\udc39 \ud83d\udc30 \ud83e\udd8a \ud83d\udc3b \ud83d\udc3c \ud83d\udc28 \ud83d\udc2f \ud83e\udd81 \ud83d\udc2e \ud83d\udc37 \ud83d\udc38 \ud83d\udc35 \ud83d\udc12 \ud83d\udc14 \ud83d\udc27 \ud83d\udc26 \ud83d\udc24 \ud83e\udd86 \ud83e\udd89 \ud83e\udd87 \ud83d\udc3a \ud83d\udc17 \ud83d\udc34 \ud83e\udd84 \ud83d\udc1d \ud83d\udc1b \ud83e\udd8b \ud83d\udc0c \ud83d\udc1e \ud83d\udc22 \ud83d\udc0d \ud83e\udd8e \ud83d\udc19 \ud83e\udd80 \ud83d\udc20 \ud83d\udc2c \ud83d\udc33 \ud83d\udc0a \ud83e\udd93 \ud83d\udc18 \ud83d\udc2a \ud83d\udc11 \ud83d\udc10 \ud83d\udc3f\ufe0f \ud83c\udf35 \ud83c\udf32 \ud83c\udf33 \ud83c\udf34 \ud83c\udf31 \ud83c\udf3f \ud83c\udf40 \ud83c\udf41 \ud83c\udf42 \ud83c\udf3b \ud83c\udf39 \ud83c\udf37 \ud83c\udf38 \ud83c\udf44 \u2600\ufe0f \ud83c\udf24\ufe0f \u26c5 \u2601\ufe0f \ud83c\udf27\ufe0f \u26c8\ufe0f \u2744\ufe0f \u26c4 \ud83d\udca7 \ud83c\udf08 \ud83c\udf19 \u2b50"],
+ ["\ud83c\udf4e","\ud83c\udf4e \ud83c\udf4a \ud83c\udf4b \ud83c\udf4c \ud83c\udf49 \ud83c\udf47 \ud83c\udf53 \ud83c\udf52 \ud83c\udf51 \ud83c\udf4d \ud83e\udd5d \ud83c\udf45 \ud83e\udd51 \ud83e\udd55 \ud83c\udf3d \ud83c\udf36\ufe0f \ud83e\udd54 \ud83c\udf5e \ud83e\udd50 \ud83e\uddc0 \ud83c\udf73 \ud83e\udd5e \ud83e\udd53 \ud83c\udf54 \ud83c\udf5f \ud83c\udf55 \ud83c\udf2d \ud83e\udd6a \ud83c\udf2e \ud83c\udf2f \ud83e\udd57 \ud83c\udf5d \ud83c\udf5c \ud83c\udf63 \ud83c\udf70 \ud83c\udf82 \ud83e\uddc1 \ud83c\udf6b \ud83c\udf6c \ud83c\udf69 \ud83c\udf6a \ud83c\udf66 \u2615 \ud83c\udf75 \ud83e\uddc3 \ud83e\udd64 \ud83c\udf7a \ud83c\udf77 \ud83e\udd42 \ud83c\udf7d\ufe0f"],
+ ["\u26bd","\u26bd \ud83c\udfc0 \ud83c\udfc8 \u26be \ud83c\udfbe \ud83c\udfd0 \ud83c\udfd3 \ud83c\udfb1 \ud83c\udfaf \ud83c\udfb3 \u26f3 \ud83c\udfbf \u26f7\ufe0f \ud83c\udfc2 \ud83c\udfcb\ufe0f \ud83d\udeb4 \ud83c\udfca \ud83e\uddd8 \ud83c\udfc6 \ud83e\udd47 \ud83c\udfab \ud83c\udfa8 \ud83c\udfad \ud83c\udfa4 \ud83c\udfa7 \ud83c\udfb8 \ud83c\udfb9 \ud83e\udd41 \ud83c\udfae \ud83c\udfb2 \ud83e\udde9 \ud83c\udf89 \ud83c\udf8a \ud83c\udf88 \ud83c\udf81 \ud83c\udf84 \ud83c\udf83"],
+ ["\ud83d\ude97","\ud83d\ude97 \ud83d\ude95 \ud83d\ude99 \ud83d\ude8c \ud83d\ude8e \ud83c\udfce\ufe0f \ud83d\ude93 \ud83d\ude91 \ud83d\ude92 \ud83d\ude9a \ud83d\ude9c \ud83d\udeb2 \ud83d\udef5 \ud83c\udfcd\ufe0f \ud83d\ude82 \ud83d\ude86 \ud83d\ude87 \ud83d\ude8a \u2708\ufe0f \ud83d\ude81 \ud83d\ude80 \u26f5 \ud83d\udea2 \u2693 \ud83c\udfe0 \ud83c\udfe1 \ud83c\udfe2 \ud83c\udfe5 \ud83c\udfeb \ud83c\udfed \ud83c\udff0 \u26ea \ud83c\udfd6\ufe0f \ud83c\udfd5\ufe0f \u26f0\ufe0f \ud83c\udf0b \ud83d\uddfa\ufe0f \ud83e\uddf3 \u231a \u23f0 \ud83d\udcc5"],
+ ["\ud83d\udcf1","\ud83d\udcf1 \ud83d\udcbb \ud83d\udda5\ufe0f \ud83d\udda8\ufe0f \u2328\ufe0f \ud83d\udcf7 \ud83d\udcf9 \ud83d\udcde \u260e\ufe0f \ud83d\udd0b \ud83d\udd0c \ud83d\udca1 \ud83d\udd26 \ud83d\udd27 \ud83d\udd28 \ud83e\uddf0 \ud83d\udd11 \ud83d\udd12 \ud83d\udd13 \ud83d\udce6 \ud83d\udce7 \ud83d\udce8 \ud83d\udcdd \ud83d\udcc4 \ud83d\udcc1 \ud83d\udccc \ud83d\udccd \ud83d\udcce \u2702\ufe0f \ud83d\udcda \ud83d\udcd6 \ud83d\udcb0 \ud83d\udcb3 \ud83d\udecd\ufe0f \ud83d\uded2 \ud83e\ude7a \ud83d\udc8a \ud83e\ude79 \ud83e\uddf4 \ud83e\uddf9 \ud83d\udebf \ud83d\udecf\ufe0f"],
+ ["\u2764\ufe0f","\u2764\ufe0f \ud83e\udde1 \ud83d\udc9b \ud83d\udc9a \ud83d\udc99 \ud83d\udc9c \ud83d\udda4 \ud83e\udd0d \ud83d\udc94 \u2763\ufe0f \ud83d\udc95 \ud83d\udc9e \ud83d\udc96 \ud83d\udc97 \ud83d\udc98 \u2705 \u274c \u2757 \u2753 \u203c\ufe0f \u26a0\ufe0f \u26d4 \ud83d\udeab \u2714\ufe0f \u2795 \u2796 \u27a1\ufe0f \u2b05\ufe0f \u2b06\ufe0f \u2b07\ufe0f \ud83d\udd01 \ud83d\udd14 \ud83d\udd15 \ud83d\udd34 \ud83d\udfe0 \ud83d\udfe1 \ud83d\udfe2 \ud83d\udd35 \ud83d\udfe3 \u26ab \u26aa \ud83d\udcaf \ud83c\udd97 \ud83c\udd98 \ud83c\udd95 \ud83d\udd1d \u2728 \ud83d\udd25 \u2b50 \ud83c\udf1f"]];
+// ---- an on-screen keyboard for the status pop-up (Settings, Touch keyboard): an even number pad for a time, a date or a date and a time, and a text
+// keyboard laid out like the iPhone's Swedish one (letters with \u00e5 \u00e4 \u00f6, shift, 123 / #+= layers, emoji, space, done). kind: "time" | "date" | "datetime" | "text";
+// o: {value, twelve (12-hour clock, time only), max, say}. Returns the element; el.value() is "HH:MM" (24 h), "YYYY-MM-DD", "YYYY-MM-DD HH:MM" or the text, or null
+// (with a message through o.say) when what was typed is not a time / date. For a date the element has a calendar button right of the number field: a tapped
+// day fills the field (el.setDate(iso)); el._done is called by the Done key of the text keyboard.
 function onScreenKeys(kind,o){
- var el=h("div",{"class":"rp-kb"}),shown=h("div",{"class":"rp-big rp-shown",role:"textbox","aria-readonly":"true","aria-live":"polite"}),digits="",pm=false,txt=String(o.value||""),layer="abc",shift=false,fresh=true,max=o.max||60;
+ var el=h("div",{"class":"rp-kb rp-kb-"+kind}),shown=h("div",{"class":"rp-big rp-shown",role:"textbox","aria-readonly":"true","aria-live":"polite"}),digits="",pm=false,txt=String(o.value||""),layer="abc",shift=false,fresh=true,max=o.max||60,
+  dateIso="",cal=null,emojiGroup=0,numeric=kind!=="text",maxDigits=kind==="datetime"?8:4,withDate=kind==="date"||kind==="datetime";
  function key(label,act,cls,aria){var b=h("button",{type:"button","class":"pill-s rp-k"+(cls?" "+cls:""),"data-k":act,text:label});if(aria)b.setAttribute("aria-label",aria);return b}
- function row(keys,cls){var r=h("div",{"class":"rp-kr"+(cls?" "+cls:"")});keys.forEach(function(k){r.appendChild(k)});el.appendChild(r)}
+ function row(keys,cls){var r=h("div",{"class":"rp-kr"+(cls?" "+cls:"")});keys.forEach(function(k){r.appendChild(k)});el.appendChild(r);return r}
+ function dropLast(t){var a=Array.from(t),x=a.pop();if(x==="\ufe0f")a.pop();return a.join("")}
  if(kind==="time"){var m=/^(\d\d):(\d\d)$/.exec(o.value||"");if(m){var hh=+m[1];if(o.twelve){pm=hh>=12;hh=hh%12||12}digits=(hh<10?"0":"")+hh+m[2]}}
- function slots(){var d=digits;if(kind==="date")return d.slice(0,2).padEnd(2,"\u2012")+" / "+d.slice(2,4).padEnd(2,"\u2012");
+ function pad2(n){return (n<10?"0":"")+n}
+ function slots(){var d=digits,s="";
+  if(kind==="date")return d.slice(0,2).padEnd(2,"\u2012")+" / "+d.slice(2,4).padEnd(2,"\u2012");
+  if(kind==="datetime")return d.slice(0,2).padEnd(2,"\u2012")+" / "+d.slice(2,4).padEnd(2,"\u2012")+"    "+d.slice(4,6).padEnd(2,"\u2012")+" : "+d.slice(6,8).padEnd(2,"\u2012");
   var hl=d.length===3?1:2;return d.slice(0,hl).padEnd(2,"\u2012")+" : "+d.slice(hl,hl+2).padEnd(2,"\u2012")+(o.twelve?"  "+(pm?"PM":"AM"):"")}
  function draw(){shown.textContent=kind==="text"?(txt||"\u00a0"):slots()}
- function pad(){el.innerHTML="";el.appendChild(shown);
+ // the number pad: three even columns, every key the same size; the display has the calendar button at its right (dates)
+ function pad(){el.innerHTML="";var top=h("div",{"class":"rp-shownrow"});top.appendChild(shown);
+  if(withDate){var cb=key("\ud83d\udcc5","cal","rp-calbtn","Calendar");top.appendChild(cb)}
+  el.appendChild(top);
+  if(cal){el.appendChild(cal);return}
   var k=function(n){return key(String(n),"d"+n)};
   row([k(1),k(2),k(3)],"pad");row([k(4),k(5),k(6)],"pad");row([k(7),k(8),k(9)],"pad");
   row([o.twelve&&kind==="time"?key(pm?"PM":"AM","ampm","rp-kw"):key("","none","rp-kn"),k(0),key("\u232b","back","rp-kw","Backspace")],"pad")}
+ // the text keyboard: the iPhone's Swedish layout. Letters, 123 (numbers and punctuation), #+= (more symbols), emoji.
  var L={abc:[["q","w","e","r","t","y","u","i","o","p","\u00e5"],["a","s","d","f","g","h","j","k","l","\u00f6","\u00e4"],["z","x","c","v","b","n","m"]],
-  sym:[["1","2","3","4","5","6","7","8","9","0"],["-","/",":",";","(",")","\u20ac","&","@","\""],[".",",","?","!","'","#","%"]],
-  more:[["+","=","_","*","<",">","[","]","{","}"],["~","^","\\","|","$","\u00a3","\u00a7","`","\u00b0","\u00bd"],[".",",","?","!","'","\u201c","\u201d"]]};
- function text(){el.innerHTML="";el.appendChild(shown);var rows=L[layer];
-  rows.forEach(function(r,i){var keys=r.map(function(c){var ch=layer==="abc"&&shift?c.toUpperCase():c;return key(ch,"c"+ch)});
-   if(i===2){keys.unshift(layer==="abc"?key("\u21e7","shift","rp-kw"+(shift?" on":""),"Shift"):key(layer==="sym"?"#+=":"123","layer"+(layer==="sym"?"more":"sym"),"rp-kw"));keys.push(key("\u232b","back","rp-kw","Backspace"))}
-   row(keys)});
-  row([key(layer==="abc"?"123":"ABC",layer==="abc"?"layersym":"layerabc","rp-kw"),key("space","c ","rp-ksp","Space"),key("\u2713","done","rp-kw pri","Done")])}
+  sym:[["1","2","3","4","5","6","7","8","9","0"],["-","/",":",";","(",")","kr","&","@","\""],[".",",","?","!","'"]],
+  more:[["[","]","{","}","#","%","^","*","+","="],["_","\\","|","~","<",">","\u20ac","$","\u00a3","\u00a5"],[".",",","?","!","'"]]};
+ function text(){el.innerHTML="";el.appendChild(shown);
+  if(layer==="emoji"){var tabs=h("div",{"class":"rp-etabs"}),grid=h("div",{"class":"rp-egrid"});
+   EMOJI.forEach(function(g,i){var t=key(g[0],"egroup"+i,"rp-etab"+(i===emojiGroup?" on":""),"Emoji group "+(i+1));tabs.appendChild(t)});
+   EMOJI[emojiGroup][1].split(" ").forEach(function(c){grid.appendChild(key(c,"c"+c,"rp-emo"))});
+   el.appendChild(tabs);el.appendChild(grid);
+   row([key("ABC","layerabc","rp-kw rp-k2"),key("mellanslag","c ","rp-ksp","Space"),key("\u232b","back","rp-kw rp-k2","Backspace"),key("klar","done","rp-kw rp-k2 pri","Done")]);return}
+  var rows=L[layer];
+  rows.forEach(function(r,i){var keys=r.map(function(c){var ch=layer==="abc"&&shift?c.toUpperCase():c;return key(ch,"c"+ch,i===2&&layer!=="abc"?"rp-kp":"")});
+   if(i===2){keys.unshift(layer==="abc"?key(shift?"\u21ea":"\u21e7","shift","rp-kw rp-k2"+(shift?" on":""),"Shift"):key(layer==="sym"?"#+=":"123","layer"+(layer==="sym"?"more":"sym"),"rp-kw rp-k2"));keys.push(key("\u232b","back","rp-kw rp-k2","Backspace"))}
+   row(keys,"l"+i)});
+  row([key(layer==="abc"?"123":"ABC",layer==="abc"?"layersym":"layerabc","rp-kw rp-k2"),key("\ud83d\ude00","layeremoji","rp-kw rp-k2","Emoji"),key("mellanslag","c ","rp-ksp","Space"),key("klar","done","rp-kw rp-k3 pri","Done")])}
  function render(){if(kind==="text")text();else pad();draw()}
- function typed(c){if(c==="back"){if(kind==="text")txt=txt.slice(0,-1);else digits=digits.slice(0,-1);fresh=false;return}
-  if(kind==="text"){if(txt.length<max)txt+=c;if(shift){shift=false;render()}return}
-  if(fresh){digits="";fresh=false}if(digits.length<4)digits+=c}
+ function typed(c){if(c==="back"){if(kind==="text")txt=dropLast(txt);else{digits=digits.slice(0,-1);dateIso=""}fresh=false;return}
+  if(kind==="text"){if(Array.from(txt).length<max)txt+=c;if(shift){shift=false;render()}return}
+  if(fresh){digits="";fresh=false}if(digits.length<maxDigits){digits+=c;dateIso=""}}
+ // a day picked in the calendar: the day and month go in the number field (the year is kept: it can be another year than this one)
+ el.setDate=function(iso){var m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(iso);if(!m)return;dateIso=iso;fresh=false;
+  digits=m[3]+m[2]+(kind==="datetime"?digits.slice(4):"");cal=null;render()};
  el.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-k]");if(!b)return;e.stopPropagation();var a=b.getAttribute("data-k");
   if(a==="none")return;
+  if(a==="cal"){if(cal){cal=null}else{cal=calendar(dateIso,function(iso){el.setDate(iso)})}render();return}
   if(a==="ampm"){pm=!pm;render();return}
   if(a==="shift"){shift=!shift;render();return}
   if(a.indexOf("layer")===0){layer=a.slice(5);render();return}
+  if(a.indexOf("egroup")===0){emojiGroup=+a.slice(6);render();return}
   if(a==="done"){if(el._done)el._done();return}
   if(a==="back"){typed("back")}else if(a[0]==="d"){typed(a.slice(1))}else if(a[0]==="c"){typed(a.slice(1))}
   draw()});
+ // A physical (USB) keyboard works as well as the keys on the screen: digits, letters (also \u00e5 \u00e4 \u00f6 and what the layout gives), Backspace, Enter (= done / Set),
+ // and A / P for AM / PM on a 12-hour pad. Listens on the page while this pad is on screen, so no field needs the focus.
+ function physical(e){if(!el.isConnected){document.removeEventListener("keydown",physical,true);return}
+  if(e.ctrlKey||e.metaKey||e.altKey||e.isComposing)return;var t=e.target&&e.target.tagName;if(t==="INPUT"||t==="TEXTAREA"||t==="SELECT")return;
+  var k=e.key;
+  if(k==="Backspace"){typed("back");draw();e.preventDefault();return}
+  if(k==="Enter"){if(el._done){el._done();e.preventDefault()}return}
+  if(Array.from(k).length!==1)return;
+  if(numeric){if(/\d/.test(k)){typed(k);draw();e.preventDefault()}else if(o.twelve&&kind==="time"&&/[apAP]/.test(k)){pm=/[pP]/.test(k);render();e.preventDefault()}return}
+  if(cal)return;typed(k);draw();e.preventDefault()}
+ document.addEventListener("keydown",physical,true);
+ function dateOf(d){var dd=+d.slice(0,2),mo=+d.slice(2,4),now=new Date(),y=now.getFullYear(),t=new Date(y,mo-1,dd);
+  if(mo<1||mo>12||dd<1||t.getMonth()!==mo-1)return null;
+  if(dateIso&&dateIso.slice(8,10)===d.slice(0,2)&&dateIso.slice(5,7)===d.slice(2,4))return dateIso;     // picked in the calendar
+  if(t<new Date(y,now.getMonth(),now.getDate()))y++;
+  return y+"-"+pad2(mo)+"-"+pad2(dd)}
+ function timeOf(d,twelve){var hh,mm;if(d.length===4){hh=+d.slice(0,2);mm=+d.slice(2)}else if(d.length===3){hh=+d.slice(0,1);mm=+d.slice(1)}else{if(o.say)o.say("Type the time, for example 0830");return null}
+  if(twelve){if(hh<1||hh>12){if(o.say)o.say("The hour must be 1 to 12");return null}hh=hh%12+(pm?12:0)}else if(hh>23){if(o.say)o.say("The hour must be 0 to 23");return null}
+  if(mm>59){if(o.say)o.say("The minutes must be 0 to 59");return null}
+  return pad2(hh)+":"+pad2(mm)}
  el.value=function(){if(kind==="text")return txt;
   var d=digits;
-  if(kind==="time"){var hh,mm;if(d.length===4){hh=+d.slice(0,2);mm=+d.slice(2)}else if(d.length===3){hh=+d.slice(0,1);mm=+d.slice(1)}else{if(o.say)o.say("Type the time, for example "+(o.twelve?"0830":"0830"));return null}
-   if(o.twelve){if(hh<1||hh>12){if(o.say)o.say("The hour must be 1 to 12");return null}hh=hh%12+(pm?12:0)}else if(hh>23){if(o.say)o.say("The hour must be 0 to 23");return null}
-   if(mm>59){if(o.say)o.say("The minutes must be 0 to 59");return null}
-   return (hh<10?"0":"")+hh+":"+(mm<10?"0":"")+mm}
-  if(d.length!==4){if(o.say)o.say("Type the day and the month, for example 0107 for 1 July");return null}
-  var dd=+d.slice(0,2),mo=+d.slice(2),now=new Date(),y=now.getFullYear(),t=new Date(y,mo-1,dd);
-  if(mo<1||mo>12||dd<1||t.getMonth()!==mo-1){if(o.say)o.say("That date does not exist");return null}
-  if(t<new Date(y,now.getMonth(),now.getDate()))y++;
-  return y+"-"+(mo<10?"0":"")+mo+"-"+(dd<10?"0":"")+dd};
+  if(kind==="time")return timeOf(d,o.twelve);
+  if(kind==="date"){if(d.length!==4){if(o.say)o.say("Type the day and the month, for example 0107 for 1 July");return null}
+   var iso=dateOf(d);if(!iso){if(o.say)o.say("That date does not exist");return null}return iso}
+  if(d.length!==8){if(o.say)o.say("Type the day, the month and the time, for example 01071530");return null}
+  var di=dateOf(d.slice(0,4)),ti=timeOf(d.slice(4),false);if(!di){if(o.say)o.say("That date does not exist");return null}if(!ti)return null;return di+" "+ti};
  render();return el}
 W.roster=function(s,ctx){
  if(s.mode==="colours")return rosterColours(s,ctx);
  var el=h("div",{"class":"roster"}),chips=h("div",{"class":"rp-chips"}),msg=h("div"),
   modal=h("div",{"class":"rp-modal",style:"display:none"}),
-  sel=rosterLocations(),last="",D=null,cur=null,modal2;
+  sel=rosterLocations(),last="",D=null,cur=null,modal2,adopted=false;
+ function adopt(){if(adopted||!SCREEN_ID||!S.screen)return;adopted=true;var srv=S.screen.locations||[];
+  if(ROSTER_FROM.url){if(srv.join("|")!==sel.join("|"))rosterSaveLocations(sel)}else if(!ROSTER_FROM.local&&srv.length)sel=srv.slice()}
  modal2=h("div",{"class":"rp-modal rp-modal2",style:"display:none"});
  var hd=document.querySelector("body > header");if(hd){chips.classList.add("in-header");hd.appendChild(chips)}else el.appendChild(chips);      // the building buttons sit in the top row, at the left of the title
  el.appendChild(msg);document.body.appendChild(modal);document.body.appendChild(modal2);
@@ -806,9 +891,9 @@ W.roster=function(s,ctx){
  function parts(ps){if(!usedCap||ps.length<=usedCap)return [ps];var n=Math.ceil(ps.length/usedCap),per=Math.ceil(ps.length/n),out=[];for(var i=0;i<ps.length;i+=per)out.push(ps.slice(i,i+per));return out}
  function paint(){if(!D)return;paintChips();var live={},n=0,changed=false,seq=[],base=function(){return anchor&&anchor._ord!==undefined?anchor._ord:0};
   if(D.total)D.groups.forEach(function(g){var ps=g.people.filter(visible);if(!ps.length)return;
-   var chunks=parts(ps);chunks.forEach(function(cp,pi){var id="checkin-"+slug(g.id)+(pi?"-p"+(pi+1):""),fresh=!tiles[id],t=tileFor(id,g.id),k=cp.filter(function(p){return p.in}).length;
+   var chunks=parts(ps);chunks.forEach(function(cp,ci){var id="checkin-"+slug(g.id)+(ci?"-p"+(ci+1):""),fresh=!tiles[id],t=tileFor(id,g.id),k=cp.filter(function(p){return p.in}).length;
     t._want=base()+(n+1)/1000;live[id]=1;n++;if(fresh)changed=true;seq.push(t);
-    setHtml(t._body,'<div class="rp-box" data-frame="'+(D.frame||"thin")+'"><div class="rp-gh"><span class="rp-gt">'+esc(g.title)+(chunks.length>1?' ('+(pi+1)+'/'+chunks.length+')':'')+'</span><span class="sub">'+k+'/'+cp.length+'</span></div>'+cp.map(row).join("")+'</div>')})});
+    setHtml(t._body,'<div class="rp-box" data-frame="'+(D.frame||"thin")+'"><div class="rp-gh"><span class="rp-gt">'+esc(g.title)+(chunks.length>1?' ('+(ci+1)+"/"+chunks.length+')':'')+'</span><span class="sub">'+k+'/'+cp.length+'</span></div>'+cp.map(row).join("")+'</div>')})});
   Object.keys(tiles).forEach(function(id){if(!live[id]){var t=tiles[id];if(t.parentNode)t.parentNode.removeChild(t);delete tiles[id];changed=true}});
   // the tiles keep the places they have on this screen (the places are only swapped about to follow the host's order); new ones go after the board's own tile
   if(changed){seq.forEach(function(t){t._ord=t._want})}
@@ -849,28 +934,38 @@ W.roster=function(s,ctx){
  // ---- the status menu: a pop-up in the middle of the screen (about 60 % of its width): who it is, the statuses three in a row, a cross in the corner
  function menuHtml(p){var st=D.statuses||[],who=[p.department,p.building].filter(Boolean).join(" · ");
   return '<div class="rp-sheet" role="dialog" aria-modal="true" aria-label="Status for '+esc(p.name)+'"><button type="button" class="rp-x" data-close="1" title="Close" aria-label="Close">&#10005;</button>'+
-   '<div class="rp-who"><label class="rp-avl"'+((S.enabled||{}).contacts?' title="Change the photo"':'')+'>'+rosterAvatar(p,"rp-avb")+((S.enabled||{}).contacts?'<input type="file" accept="image/*" aria-label="Photo of '+esc(p.name)+'" data-photo="1">':'')+'</label>'+
+   '<div class="rp-who">'+rosterAvatar(p,"rp-avb")+
    '<div class="rp-wt"><div class="rp-wn">'+esc(p.name)+'</div>'+(who?'<div class="rp-wl">'+esc(who)+'</div>':'')+(p.role?'<div class="rp-wl">'+esc(p.role)+'</div>':'')+(p.phone?'<div class="rp-wl">'+esc(p.phone)+'</div>':'')+'</div></div>'+
    '<div class="rp-opts">'+st.map(function(x){return '<button type="button" class="pill-s pri rp-so c-'+esc(x.colour)+(p.status===x.code?" on":"")+'" data-code="'+esc(x.code)+'" aria-pressed="'+(p.status===x.code?"true":"false")+'">'+esc(x.label)+'</button>'}).join("")+
    '</div><div class="rp-clear"><button type="button" class="pill-s rp-so" data-code="">Rensa status</button></div></div>'}
  function openPersonMenu(id){var p=person(id);if(!p)return;cur=id;modal.innerHTML=menuHtml(p);modal.style.display="";var x=modal.querySelector(".rp-x");if(x&&x.focus)x.focus()}
  // a status that needs a time, a date or a note: its own pop-up on top of the menu, with a big field (Enter sets it, Esc or a tap outside goes back)
- function openNeed(code,st){var p=person(cur),kind=st.needs,kb=!!(D&&D.keyboard),twelve=!!(S.clock&&/^12/.test(S.clock.format||"")),
-  what=kind==="time"?"At what time?":kind==="date"?"Until which date?":"What is it?",field;
-  var type=kind==="time"?"time":kind==="date"?"date":"text";
+ function openNeed(code,st){var p=person(cur),kind=st.needs,kb=!!(D&&D.keyboard),twelve=false,
+  what=kind==="time"?"At what time?":kind==="date"?"Until which date?":kind==="datetime"?"Until which date and time?":"What is it?",field,
+  skip=kind==="date"||kind==="datetime",withCal=skip;      // a date can be left out (Skip: the status is set without it); a date has a calendar
   modal2.innerHTML='<div class="rp-sheet rp-need2'+(kb?' rp-withkb':'')+'" role="dialog" aria-modal="true" aria-label="'+esc(st.label)+'"><button type="button" class="rp-x" data-back="1" title="Back" aria-label="Back">&#10005;</button>'+
    '<div class="rp-wn">'+esc(st.label)+'</div><div class="rp-wl">'+esc(p?p.name:"")+'</div><div class="rp-nl">'+what+'<div class="rp-field"></div></div><div class="rp-cmsg sub" aria-live="polite"></div>'+
-   '<div class="rp-nb"><button type="button" class="pill-s rp-so" data-back="1">Cancel</button><button type="button" class="pill-s pri rp-so c-'+esc(st.colour)+'" data-set="'+esc(code)+'">Set</button></div></div>';
+   '<div class="rp-nb'+(skip?' rp-nb3':'')+'"><button type="button" class="pill-s rp-so" data-back="1">Cancel</button>'+(skip?'<button type="button" class="pill-s rp-so" data-skip="'+esc(code)+'">Skip</button>':'')+
+   '<button type="button" class="pill-s pri rp-so c-'+esc(st.colour)+'" data-set="'+esc(code)+'">Set</button></div></div>';
   var host=modal2.querySelector(".rp-field"),msg=modal2.querySelector(".rp-cmsg");
   if(kb){var keys=onScreenKeys(kind==="note"?"text":kind,{value:st.default||"",twelve:twelve,say:function(t){setText(msg,t)}});keys._done=function(){var b=modal2.querySelector("[data-set]");if(b)b.click()};host.appendChild(keys);modal2._get=function(){return keys.value()}}
-  else{var isT=kind==="time",isD=kind==="date";      // not the browser's own time / date fields (they follow the browser's language): 24 h tt:mm and åååå-mm-dd, as in Sweden
-   field=h("input",{"class":"rp-big",type:"text",inputmode:(isT||isD)?"numeric":"text",value:isT?(st.default||""):"",maxlength:isT?5:isD?10:60,placeholder:isT?"tt:mm":isD?"\u00e5\u00e5\u00e5\u00e5-mm-dd":"",autocomplete:"off","aria-label":st.label});
-   if(isT||isD)field.addEventListener("input",function(){var d=field.value.replace(/\D/g,"").slice(0,isT?4:8);
-    field.value=isT?(d.length>2?d.slice(0,2)+":"+d.slice(2):d):(d.length>6?d.slice(0,4)+"-"+d.slice(4,6)+"-"+d.slice(6):d.length>4?d.slice(0,4)+"-"+d.slice(4):d)});
-   host.appendChild(field);
+  else{var isT=kind==="time",isD=kind==="date",isDT=kind==="datetime",row=h("div",{"class":"rp-fieldrow"});      // not the browser's own time / date fields (they follow the browser's language): 24 h tt:mm and åååå-mm-dd, as in Sweden
+   field=h("input",{"class":"rp-big",type:"text",inputmode:(isT||isD||isDT)?"numeric":"text",value:isT?(st.default||""):"",maxlength:isT?5:isD?10:isDT?16:60,placeholder:isT?"tt:mm":isD?"åååå-mm-dd":isDT?"åååå-mm-dd tt:mm":"",autocomplete:"off","aria-label":st.label});
+   function mask(){var d=field.value.replace(/\D/g,"").slice(0,isT?4:isD?8:12);
+    field.value=isT?(d.length>2?d.slice(0,2)+":"+d.slice(2):d):(function(){var x=d.length>6?d.slice(0,4)+"-"+d.slice(4,6)+"-"+d.slice(6,8):d.length>4?d.slice(0,4)+"-"+d.slice(4):d;
+     return isDT&&d.length>8?x+" "+d.slice(8,10)+(d.length>10?":"+d.slice(10):""):x})()}
+   if(isT||isD||isDT)field.addEventListener("input",mask);
+   row.appendChild(field);host.appendChild(row);
+   if(withCal){var cb=h("button",{type:"button","class":"pill-s rp-calbtn","aria-label":"Calendar","aria-expanded":"false",text:"📅"}),calEl=null;
+    row.appendChild(cb);
+    cb.onclick=function(e){e.stopPropagation();if(calEl){calEl.parentNode.removeChild(calEl);calEl=null;cb.setAttribute("aria-expanded","false");return}
+     var m=/^(\d{4}-\d\d-\d\d)/.exec(field.value);calEl=calendar(m?m[1]:"",function(iso){var rest=isDT?field.value.slice(10):"";field.value=iso+rest;if(calEl&&calEl.parentNode)calEl.parentNode.removeChild(calEl);calEl=null;cb.setAttribute("aria-expanded","false");if(isDT&&!rest.trim())field.focus()});
+     host.appendChild(calEl);cb.setAttribute("aria-expanded","true")}}
    modal2._get=function(){var v=field.value.trim(),m;
     if(isT){m=/^(\d{1,2}):?(\d{2})$/.exec(v);if(!m||+m[1]>23||+m[2]>59){setText(msg,"Type the time as tt:mm, for example 08:30");return null}return (m[1].length<2?"0":"")+m[1]+":"+m[2]}
-    if(isD){m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(v);var dt=m&&new Date(+m[1],+m[2]-1,+m[3]);if(!m||dt.getMonth()!==+m[2]-1){setText(msg,"Type the date as \u00e5\u00e5\u00e5\u00e5-mm-dd, for example 2026-12-24");return null}return v}
+    if(isD||isDT){m=/^(\d{4})-(\d\d)-(\d\d)(?: (\d\d):(\d\d))?$/.exec(v);var dt=m&&new Date(+m[1],+m[2]-1,+m[3]);
+     if(!m||dt.getMonth()!==+m[2]-1||(isD&&m[4])){setText(msg,isDT?"Type the date and time as åååå-mm-dd tt:mm, for example 2026-12-24 08:30":"Type the date as åååå-mm-dd, for example 2026-12-24");return null}
+     if(m[4]&&(+m[4]>23||+m[5]>59)){setText(msg,"The time must be tt:mm, for example 08:30");return null}return v}
     return v};
    if(field.focus)setTimeout(function(){field.focus()},0)}
   modal2.style.display=""}
@@ -878,6 +973,7 @@ W.roster=function(s,ctx){
  modal2.addEventListener("click",function(e){if(e.target===modal2){closeNeed();return}
   var b=e.target.closest&&e.target.closest("button");if(!b)return;
   if(b.hasAttribute("data-back")){closeNeed();return}
+  if(b.hasAttribute("data-skip")){var sc=b.getAttribute("data-skip");closeNeed();send(sc,"");return}
   if(b.hasAttribute("data-set")){var v=modal2._get?modal2._get():"",code=b.getAttribute("data-set");if(v===null)return;closeNeed();send(code,v)}});
  modal2.addEventListener("keydown",function(e){if(e.key==="Enter"){var b=modal2.querySelector("[data-set]");if(b){e.preventDefault();b.click()}}});
  function closeMenu(){closeNeed();modal.style.display="none";modal.innerHTML="";cur=null}
@@ -888,19 +984,11 @@ W.roster=function(s,ctx){
   if(!b.hasAttribute("data-code"))return;var code=b.getAttribute("data-code"),st=null;(D.statuses||[]).forEach(function(x){if(x.code===code)st=x});
   if(!st||!st.needs){send(code);return}
   openNeed(code,st)});
- // a photo chosen in the menu: cut to a 160 px square in the browser, kept by the contacts module
- modal.addEventListener("change",function(e){var f=e.target&&e.target.getAttribute&&e.target.getAttribute("data-photo")&&e.target.files&&e.target.files[0],id=cur;if(!f||!id)return;
-  var img=new Image(),url=URL.createObjectURL(f);
-  img.onload=function(){var c=document.createElement("canvas"),n=160,m=Math.min(img.width,img.height),g=c.getContext("2d");c.width=c.height=n;
-   g.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,n,n);URL.revokeObjectURL(url);
-   post("/contacts/photo",{id:id,photo:c.toDataURL("image/jpeg",.82)},function(r,st,b){if(!r){alert((b&&b.message)||"The photo was not saved");return}
-    refresh();setTimeout(function(){if(cur===id){var p=person(id);if(p)modal.querySelector(".rp-avl").innerHTML=rosterAvatar(p,"rp-avb")+'<input type="file" accept="image/*" aria-label="Photo of '+esc(p.name)+'" data-photo="1">'}},1300)})};
-  img.onerror=function(){URL.revokeObjectURL(url);alert("That file is not a picture")};img.src=url});
  hook("escape",function(){if(modal2.style.display!=="none"){closeNeed();return true}if(cur!==null){closeMenu();return true}});
 bind(s.source,function(d){if(!d)return;document.body.classList.toggle("no-title",d.show_title===false);
  var h1=document.querySelector("body > header h1");if(h1){if(h1._dflt===undefined){h1._dflt=h1.textContent;h1._dtitle=document.title}      // the page title the user chose (Settings, Page title); empty = the project's
   setText(h1,d.title||h1._dflt);var want=d.title||h1._dtitle;if(document.title!==want)document.title=want}});
- bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+d.groups.length;if(key===last)return;last=key;D=d;paint()});
+ bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+d.groups.length;if(key===last)return;last=key;D=d;adopt();setRowBox(d.box);paint()});
  return el};
 // the settings list: a department / building per row with a select of palette colours ("Automatic" = the module picks one)
 function rosterColours(s,ctx){var el=h("div",{"class":"roster-cols"}),R=null;
@@ -951,11 +1039,13 @@ function control(spec,F,change){var key=spec.key,el,paint;
  // value shown then, "null_text" / "own_text" the grey line, "null_button" the button that goes back to it)
  if(spec.type==="slider"){el=h("div",{"class":"stackctl"});
   var sl=h("input",{type:"range",min:0,max:1000,step:1,"aria-label":spec.aria||spec.label||key}),rv=h("span",{"class":"rv"}),nt=h("span",{"class":"sub"}),nb=spec.null_button?h("button",{type:"button","class":"pill-s",text:spec.null_button}):null,
-   log=spec.scale==="log100",toS=function(b){return log?Math.round(1000*Math.log(1+b*99)/Math.log(100)):Math.round(b*1000)},fromS=function(p){return log?(Math.pow(100,p/1000)-1)/99:p/1000},
-   pct=function(b){var v=b*100;return (v<10&&v>0?String(parseFloat(v.toFixed(1))):Math.round(v))+"%"};
+   log=spec.scale==="log100",lin=spec.min!==undefined&&spec.max!==undefined,       // "min" / "max": a plain range of numbers (the unit after the value) instead of a level 0..1
+   toS=function(b){return lin?Math.round(1000*(b-spec.min)/(spec.max-spec.min)):log?Math.round(1000*Math.log(1+b*99)/Math.log(100)):Math.round(b*1000)},
+   fromS=function(p){return lin?spec.min+(spec.max-spec.min)*p/1000:log?(Math.pow(100,p/1000)-1)/99:p/1000},
+   pct=function(b){if(lin)return (Math.round(b*100)/100)+(spec.unit||"");var v=b*100;return (v<10&&v>0?String(parseFloat(v.toFixed(1))):Math.round(v))+"%"};
   el.appendChild(h("span",{"class":"rangev"},[sl,rv]));if(spec.null_text||nb)el.appendChild(h("div",{"class":"frow"},[nt,nb]));
   paint=function(){var v=F.values[key],own=v!==null&&v!==undefined,x=own?v:(spec.default||0);sl.value=toS(x);setText(rv,pct(x));setText(nt,own?(spec.own_text||""):(spec.null_text||""));if(nb)nb.disabled=!own};
-  sl.oninput=function(){F.values[key]=Math.round(fromS(+sl.value)*1000)/1000;paint();change()};
+  sl.oninput=function(){var v=fromS(+sl.value);F.values[key]=lin?Math.round(v/(spec.step||.05))*(spec.step||.05):Math.round(v*1000)/1000;if(lin)F.values[key]=Math.round(F.values[key]*100)/100;paint();change()};
   if(nb)nb.onclick=function(e){e.stopPropagation();F.values[key]=null;paint();change()};
   el._paint=paint;return el}
  // "range": which items of a strip ("max": how many; "unit": what they are called, default "Item"): all, one or a range [first, last]; null = all
@@ -1014,6 +1104,7 @@ W.form=function(s,ctx){var el=h("div",{"class":"wform"}),F={values:{},options:{}
   subs.push(function(){r.setSub(f.sub_text?(F.texts||{})[f.sub_text]:f.sub);if(f.list)r.setList((F.lists||{})[f.list])});
   if(f.show!==undefined)bind(f.show,function(v){sh(r.el,!!v)})});
  function paint(){ctls.forEach(function(c){c._paint()});subs.forEach(function(f){f()})}
+ el._sum=function(){var out=[];(s.fields||[]).forEach(function(f){var t=f.sub_text?(F.texts||{})[f.sub_text]:f.sub;if(t&&!f.nosum)out.push((f.sum?f.sum+" ":"")+t)});return out.join(" \u00b7 ")};      // the chosen settings, for a menu's subtitle
  function take(r){F.values=r.values||F.values;F.options=r.options||F.options;F.texts=r.texts||F.texts;F.lists=r.lists||F.lists}
  function load(){xhrJson("GET",s.get,function(r){if(!r)return;take(r);paint()})}
  function save(){clearTimeout(timer);paint();timer=setTimeout(function(){post(s.post||s.get,{values:F.values},function(r){
@@ -1074,7 +1165,7 @@ function buildPicker(cols){
   pop=h("div",{},[h("div",{"class":"t",text:"Modules: tick to switch on or off, drag the handle to move inside its group. The top one has priority."}),list,h("div",{"class":"bar end"},[done])]),
   row=h("div",{"class":"srow edit","data-picker":"modules"},[h("span",{},[document.createTextNode("Modules"),h("span",{"class":"sub",text:"Switch modules on or off and set their priority"})]),btn]);
  if(!card){card=h("div",{"class":"card"});cols.appendChild(h("section",{"class":"sec","data-box":"system"},[h("h2",{text:"System"}),card]))}
- card.insertBefore(row,card.firstChild);card.appendChild(pop);
+ var slot=card.querySelector('[data-slot="modules"]');card.insertBefore(row,slot||card.firstChild);card.appendChild(pop);
  var p=ui.popup(pop),mods=[],boxes={};
  function paint(list2){mods=list2;boxes={};list.innerHTML="";var GROUPS=["On the main screen","In Settings only","Backgrounds"],shownGroup=-1;
   mods.forEach(function(m){var cb;

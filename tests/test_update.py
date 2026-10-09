@@ -177,9 +177,9 @@ class UpdateRunTests(unittest.TestCase):
     def test_script_rejects_unsafe_values(self):
         for branch in ("main; rm -rf /", "a b", "$(x)", ""):
             with self.assertRaises(ValueError):
-                up.update_script("/home/pi/x", branch, 80, 443)
+                up.update_script("/home/user/x", branch, 80, 443)
         with self.assertRaises(ValueError):
-            up.update_script("/home/pi/it's", "main", 80, 443)
+            up.update_script("/home/user/it's", "main", 80, 443)
         with self.assertRaises(ValueError):
             up.update_script("relative/path", "main", 80, 443)
 
@@ -379,7 +379,7 @@ class UsbUpdateTests(unittest.TestCase):
     def test_the_page_shows_the_stick_only_while_nothing_runs(self):
         import rebootupdate_web as rw
         self.assertFalse(rw.view({"state": "idle", "usb": [], "time": 1})["show_usb"])
-        got = rw.view({"state": "idle", "usb": [{"path": "/media/pi/STICK/update", "drive": "STICK", "time": 1790000000}], "time": 1})
+        got = rw.view({"state": "idle", "usb": [{"path": "/media/user/STICK/update", "drive": "STICK", "time": 1790000000}], "time": 1})
         self.assertTrue(got["show_usb"])
         self.assertIn("STICK", got["usb_text"])
         self.assertFalse(rw.view({"state": "running", "usb": [{"path": "/x/update", "drive": "x", "time": 1}], "time": 1})["show_usb"])

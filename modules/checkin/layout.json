@@ -19,7 +19,8 @@
    "items": [
     {
      "type": "text",
-     "text": "@checkin.text"
+     "muted": true,
+     "text": "The board that every screen shows: a box per department or building, a row per person with an INNE / UTE button and a status menu. These settings change how the board looks and works on all screens; the people come from Contacts and the statuses from Statuses."
     },
     {
      "type": "form",
@@ -225,7 +226,9 @@
       "tint": true,
       "key": "checkin",
       "title": "Colour of the check-in board"
-     }
+     },
+     "in": "colours",
+     "order": 30
     }
    ]
   }

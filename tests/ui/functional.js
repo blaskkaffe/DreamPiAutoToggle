@@ -89,12 +89,27 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.keyboard.press('Escape'); await settle(200);
   ok(await page.locator('.rp-modal:visible').count() === 0, 'Escape closes the menu');
   await person('Erik Lindqvist').locator('.rp-io').click(); await settle(400);
-  // a photo
+  // the picture of a person is not chosen by tapping the board: the menu has no file field and the avatar is no control
   await person('Erik Lindqvist').locator('.rp-t').click(); await settle(300);
-  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
-  await page.locator('.rp-sheet input[type=file]').setInputFiles({ name: 'p.png', mimeType: 'image/png', buffer: png }); await settle(2500);
-  ok(await page.locator('.rp-sheet .rp-av[style*="contacts/photo"]').count() === 1, 'a photo chosen in the menu is kept and shown');
+  ok(await page.locator('.rp-sheet input[type=file]').count() === 0 && await page.locator('.rp-sheet label.rp-avl').count() === 0, 'the status menu has no photo field (photos are chosen in Settings > Contacts)');
+  await page.locator('.rp-sheet .rp-av').click({ force: true }); await settle(300);
+  ok(await page.locator('.rp-sheet input[type=file]').count() === 0, 'and tapping the picture does nothing');
   await page.keyboard.press('Escape'); await settle(200);
+
+  // a date (no touch keyboard): a calendar button right of the field, the calendar fills it, Skip leaves the date out
+  await person('Erik Lindqvist').locator('.rp-t').click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code="TRAVEL"]').click(); await settle(400);
+  const fb = await page.locator('.rp-need2 input.rp-big').boundingBox(), fcb = await page.locator('.rp-need2 .rp-calbtn').boundingBox();
+  ok(fcb.x >= fb.x + fb.width - 2, 'a date has a calendar button to the right of the field');
+  await page.locator('.rp-need2 .rp-calbtn').click(); await settle(300);
+  const cd = await page.locator('.rp-need2 .rp-calday').nth(3).boundingBox(), cr = await page.locator('.rp-need2 .rp-calday').nth(3).evaluate(e => getComputedStyle(e).borderTopLeftRadius);
+  ok(Math.abs(cd.width - cd.height) < 1.5 && cr === '12px', 'the calendar buttons are squares with rounded corners (' + Math.round(cd.width) + 'x' + Math.round(cd.height) + ', radius ' + cr + ')');
+  await page.locator('.rp-need2 .rp-calday').nth(14).click(); await settle(300);
+  ok(/^\d{4}-\d\d-15$/.test(await page.locator('.rp-need2 input.rp-big').inputValue()), 'a day tapped in the calendar fills the field');
+  await page.locator('.rp-need2 button[data-skip]').click(); await settle(600);
+  ok(/Tj\u00e4nsteresa/.test(await person('Erik Lindqvist').textContent()) && !/Tj\u00e4nsteresa \u00b7/.test(await person('Erik Lindqvist').textContent()), 'Skip sets the status without the date');
+  await person('Erik Lindqvist').locator('.rp-t').click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code=""]').click(); await settle(500);
 
   // ---- a second screen follows the first within a couple of seconds
   const second = await browser.newPage({ viewport: { width: 1280, height: 900 } });
@@ -135,6 +150,13 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('.rp-need2 input[data-f=role]').fill('Testroll'); await page.locator('.rp-need2 [data-save]').click(); await settle(1500);
   ok(await page.locator('.rp-modal:visible').count() === 0, 'saving closes the editor');
   ok((await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.some(p => p.role === 'Testroll'), 'the edit is kept on the host');
+  // the photo is chosen here: cut to a square in the browser, kept by the host, shown in the editor and on the board
+  await page.locator('[data-box="contacts"] .cpeople .srow').first().locator('span').first().click(); await settle(400);
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  await page.locator('.rp-need2 input[type=file]').setInputFiles({ name: 'p.png', mimeType: 'image/png', buffer: png }); await settle(2500);
+  ok(await page.locator('.rp-need2 .cphoto .rp-av[style*="contacts/photo"]').count() === 1, 'a photo chosen in the contacts editor is kept and shown there');
+  ok(await page.locator('.rp-need2 [data-nophoto]').isEnabled(), 'and can be removed');
+  await page.keyboard.press('Escape'); await settle(300);
   await page.locator('[data-box="contacts"] .cpeople .srow').first().locator('span').first().click(); await settle(400);
   await page.locator('.rp-need2 input[data-f=name]').fill(''); await page.locator('.rp-need2 [data-save]').click(); await settle(800);
   ok(/needs a name/.test(await page.locator('.rp-cmsg').textContent()), 'an empty name is refused with a message in the editor');
@@ -188,6 +210,53 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   for (const k of ['shift', 'cO', 'ck', 'layersym', 'c7', 'c!']) await page.click('[data-k="' + k + '"]');
   await page.click('.rp-need2 [data-k=done]'); await settle(700);
   ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'Annat \u00b7 Ok7!')), 'a note is typed on the text keyboard (letters, numbers, special characters)');
+  // the keyboard is laid out like the iPhone's Swedish one: 11 letters in the first two rows, shift and delete round the last letters, 123, emoji, space, done
+  await page.locator('.rp-t').nth(4).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code="OTHER"]').click(); await settle(300);
+  ok(await page.locator('.rp-kb .rp-kr.l0 .rp-k').count() === 11 && await page.locator('.rp-kb .rp-kr.l1 .rp-k').count() === 11 && await page.locator('.rp-kb .rp-kr.l2 .rp-k').count() === 9, 'the text keyboard has the iPhone Swedish rows (q w e r t y u i o p \u00e5 / a s d f g h j k l \u00f6 \u00e4 / shift z x c v b n m delete)');
+  ok((await page.locator('.rp-kb .rp-kr:last-child .rp-k').allTextContents()).join('|') === '123|\ud83d\ude00|mellanslag|klar', 'and the bottom row is 123, emoji, space, done');
+  const kh = await page.locator('.rp-kb [data-k=cq]').boundingBox();
+  ok(kh.height >= 60 && kh.width >= 60, 'the keys are large (' + Math.round(kh.width) + 'x' + Math.round(kh.height) + ')');
+  await page.click('[data-k="layeremoji"]'); await page.click('[data-k="egroup3"]');
+  ok(await page.locator('.rp-egrid .rp-emo').count() > 30, 'the emoji layer shows a group of emoji');
+  await page.locator('.rp-egrid .rp-emo').first().click(); await page.locator('.rp-egrid .rp-emo').nth(1).click();
+  const typedEmoji = await page.locator('.rp-need2 .rp-shown').textContent();
+  ok(Array.from(typedEmoji.trim()).length === 2, 'two emoji are typed');
+  await page.click('.rp-need2 [data-k=back]');
+  ok(Array.from((await page.locator('.rp-need2 .rp-shown').textContent()).trim()).length === 1, 'delete removes a whole emoji');
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+  // a USB keyboard works as well as the keys on the screen
+  await page.locator('.rp-t').nth(4).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code="OTHER"]').click(); await settle(300);
+  await page.keyboard.type('Hej '); for (const c of ['\u00e5', '\u00e4', '\u00f6']) await page.evaluate(k => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true })), c);      // (the test driver has no key for them)
+  await page.keyboard.press('Backspace');
+  ok((await page.locator('.rp-need2 .rp-shown').textContent()).trim() === 'Hej \u00e5\u00e4', 'a physical keyboard types in the on-screen note field (' + (await page.locator('.rp-need2 .rp-shown').textContent()).trim() + ')');
+  await page.click('.rp-need2 [data-k="layeremoji"]'); await page.locator('.rp-egrid .rp-emo').first().click(); await page.keyboard.type('!');
+  ok(Array.from((await page.locator('.rp-need2 .rp-shown').textContent()).trim()).slice(-1)[0] === '!', 'and the two can be mixed');
+  await page.keyboard.press('Enter'); await settle(700);
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => /^Annat \u00b7 Hej \u00e5\u00e4.*!$/.test(p.text))), 'Enter on the physical keyboard sets the status');
+  await page.locator('.rp-t').nth(4).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code=""]').click(); await settle(500);
+  await page.locator('.rp-t').nth(4).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code="DOCTOR"]').click(); await settle(300);
+  await page.keyboard.type('0745');
+  ok((await page.locator('.rp-need2 .rp-shown').textContent()).replace(/\s/g, '') === '07:45', 'digits from a physical keyboard go on the number pad');
+  await page.keyboard.press('Enter'); await settle(700);
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'L\u00e4karbes\u00f6k \u00b7 07:45')), 'and Enter sets the time');
+  await page.locator('.rp-t').nth(4).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code=""]').click(); await settle(500);
+  // a date on the number pad: the calendar button is right of the field, a day tapped there fills it, Skip leaves the date out
+  await page.locator('.rp-t').nth(4).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code="TRAVEL"]').click(); await settle(300);
+  const bx = await page.locator('.rp-shownrow .rp-shown').boundingBox(), cbx = await page.locator('.rp-shownrow [data-k=cal]').boundingBox();
+  ok(cbx.x > bx.x + bx.width - 2 && Math.abs(cbx.y - bx.y) < 6, 'the calendar button is to the right of the number field');
+  ok(await page.locator('.rp-need2 button[data-skip]').count() === 1, 'a date has a Skip button next to Cancel and Set');
+  await page.click('.rp-shownrow [data-k=cal]'); await page.locator('.rp-need2 .rp-calday').nth(14).click(); await settle(300);
+  ok(/^15 \/ \d\d$/.test((await page.locator('.rp-need2 .rp-shown').textContent()).trim()), 'a day tapped in the calendar fills the number field');
+  await page.click('.rp-need2 [data-skip]'); await settle(700);
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'Tj\u00e4nsteresa')), 'Skip sets the status without a date');
+  await page.locator('.rp-t').nth(4).click(); await settle(300);
+  await page.locator('.rp-sheet button[data-code=""]').click(); await settle(500);
   await page.locator('.rp-t').nth(5).click(); await settle(300);
   await page.locator('.rp-sheet button[data-code="DOCTOR"]').click(); await settle(300);
   await page.click('.rp-need2 [data-set]'); await settle(300);
@@ -211,7 +280,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('.pinm button', { hasText: 'Cancel' }).click(); await settle(300);
   ok((await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length === nBefore && await page.locator('.rp-need2 [data-del]').count() === 1, 'Cancel keeps the person');
   const order = await page.locator('.rp-need2 .rp-nb button').allTextContents();
-  ok(order.join() === 'Delete,Cancel,Save', 'Delete is to the left of Cancel (' + order.join() + ')');
+  ok(order.indexOf('Delete') >= 0 && order.indexOf('Delete') < order.indexOf('Cancel') && order.indexOf('Cancel') < order.indexOf('Save'), 'Delete is to the left of Cancel (' + order.join() + ')');
   await page.locator('.rp-need2 [data-del]').click(); await settle(300);
   await page.locator('.pinm button', { hasText: /^Delete$/ }).click(); await settle(1200);
   ok((await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length === nBefore - 1 && await page.locator('.rp-modal:visible').count() === 0, 'confirming deletes the person');
@@ -261,19 +330,19 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   const top = await page.evaluate(() => { const hd = document.querySelector('body > header'), c = hd.querySelector('.rp-chips'), h = (() => { const r = document.createRange(); r.selectNodeContents(hd.querySelector('h1')); return r.getBoundingClientRect(); })(), cog = document.getElementById('cog').getBoundingClientRect(), r = c ? c.getBoundingClientRect() : null; return { n: c ? c.querySelectorAll('button').length : 0, left: r && Math.round(r.left), right: r && Math.round(r.right), h1: Math.round(h.left), top: r && Math.round(r.top), cogTop: Math.round(cog.top), ch: r && Math.round(r.height), cogH: Math.round(cog.height) }; });
   ok(top.n >= 1 && top.right <= top.h1 + 2 && Math.abs((top.top + top.ch / 2) - (top.cogTop + top.cogH / 2)) < 12, 'the building buttons are in the top row, left of the title, in line with the cogwheel (' + JSON.stringify(top) + ')');
   const tsz = await page.evaluate(() => ({ gt: getComputedStyle(document.querySelector('.rp-gt')).fontSize, gtw: getComputedStyle(document.querySelector('.rp-gt')).fontWeight, name: getComputedStyle(document.querySelector('.rp-t')).fontSize }));
-  ok(tsz.gt === tsz.name && +tsz.gtw >= 700, 'a box title is as large as the names, and bold (' + JSON.stringify(tsz) + ')');
+  ok(tsz.gt === '16px' && +tsz.gtw >= 700 && tsz.name === '28px', 'a box title is as large as the lists of Settings (1em), and bold (' + JSON.stringify(tsz) + ')');
   await cfg({ title: 'Tavlan', frame: 'thick', box: 'board' }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
   ok(await page.evaluate(() => document.querySelector('body > header h1').textContent === 'Tavlan' && document.title === 'Tavlan'), 'the page title is the one chosen in Settings');
   ok(await page.evaluate(() => document.querySelector('.rp-box').getAttribute('data-frame') === 'thick' && getComputedStyle(document.querySelector('.rp-box')).borderTopWidth === '4px'), 'the frame setting is applied');
   const gh = await page.evaluate(() => getComputedStyle(document.querySelector('.rp-gh')).backgroundColor);
-  await cfg({ box: 'neutral' }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
+  await cfg({ box: 'auto' }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
   const gh2 = await page.evaluate(() => getComputedStyle(document.querySelector('.rp-gh')).backgroundColor);
-  ok(gh !== gh2 && gh !== 'rgba(0, 0, 0, 0)', 'the board colour setting colours the title row of the boxes (' + gh + ' / ' + gh2 + ')');
+  ok(gh !== gh2 && gh !== 'rgba(0, 0, 0, 0)' && gh2 === 'rgba(0, 0, 0, 0)', 'the board colour setting colours the title row of the boxes, Classic leaves it plain (' + gh + ' / ' + gh2 + ')');
   await cfg({ title: '', frame: 'thin', box: 'board' });
   await page.evaluate(() => fetch('/screen', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ values: { theme: 'light' } }) }));
   await page.reload({ waitUntil: 'networkidle' }); await settle(1500);
   const lt = await page.evaluate(() => { const out = {}; ['.rp-r.pri .rp-n,.rp-r.pri .rp-mq', '.rp-r.out .rp-n', '.rp-s'].forEach(q => { const e = document.querySelector(q); if (e) { const cs = getComputedStyle(e); out[q] = cs.color + '/' + cs.fontWeight; } }); return out; });
-  ok(Object.keys(lt).length >= 2 && Object.values(lt).every(v => v === 'rgb(0, 0, 0)/400'), 'light theme: black, regular text in the rows (' + JSON.stringify(lt) + ')');
+  ok(Object.keys(lt).length >= 2 && Object.values(lt).every(v => /^rgb\(0, 0, 0\)\//.test(v)), 'light theme: black text in the rows (' + JSON.stringify(lt) + ')');
   // the board colour picked in Settings recolours the boxes at once, in the light theme as in the dark one (no reload)
   const boxHead = () => page.evaluate(() => getComputedStyle(document.querySelector('.rp-gh')).backgroundColor);
   const before = await boxHead();

@@ -2,7 +2,7 @@
 in a temp dir), with the 25 people of tests/ui/people.csv imported. Switches via environment:
 IN=n (the first n people start checked in, one of them with a status),
 FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log),
-IMGBG=1 (the Background image module on), CLOCK=1 (the clock module on; off by default so the box counts are stable), EMPTY=1 (no people imported), PEOPLE=file.csv (another roster),
+IMGBG=1 (the Background image module on), EMPTY=1 (no people imported), PEOPLE=file.csv (another roster),
 OFF=clock,... (modules switched off in the module picker; OFF=all = every module the picker can switch, only the always-on ones stay),
 PIN=1234 (a PIN for update / restart / import; restart is faked), PORT=n (default 8734)."""
 import sys, os, threading, time, json
@@ -11,7 +11,6 @@ from support import web, core, sandbox
 import contacts_web as contacts
 import checkin_web as checkin
 tmp = sandbox(contacts, checkin)
-if not os.environ.get("CLOCK"): core.save_module_enabled("clock", False)      # the checks count the dashboard boxes: the clock box is only there with CLOCK=1
 if not os.environ.get("EMPTY"):
     with open(os.environ.get("PEOPLE") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "people.csv"), encoding="utf-8") as f:
         contacts.import_csv(f.read())
@@ -20,6 +19,8 @@ if not os.environ.get("EMPTY"):
         people = [p for g in checkin.snapshot()["groups"] for p in g["people"]]
         for p in people[:n]: checkin.toggle(p["id"])
         if n > 2: checkin.set_status(people[1]["id"], "LATE", "08:15"); checkin.set_status(people[2]["id"], "SICK")
+import shutil
+shutil.copytree(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "base", "sounds"), core.SOUNDS_DIR, dirs_exist_ok=True)      # the shipped button sounds
 if os.environ.get("IMGBG"): core.save_module_enabled("imagebg", True)
 if os.environ.get("FAKEUPDATE"):
     import subprocess
@@ -45,7 +46,7 @@ if os.environ.get("FAKEUPDATE"):
         up.USB_ROOTS = [os.path.join(tmp, "media", "*")]
     if os.environ.get("FAKELOG"):      # a finished update with a messy log: long lines, colour codes, progress
         open(up.UPDATE_STATUS, "w").write("failed")
-        open(up.UPDATE_LOG, "w").write("Updating /home/pi/checkout from origin/main\nFrom https://github.com/blaskkaffe/DreamPiAutoToggle\n"
+        open(up.UPDATE_LOG, "w").write("Updating /home/user/checkout from origin/main\nFrom https://github.com/blaskkaffe/DreamPiAutoToggle\n"
             " * branch            main       -> FETCH_HEAD\nReceiving objects:  10%\rReceiving objects: 100% (42/42), done.\n"
             "Updating 3baa024..21d1ad8\nFast-forward\n page/widgets.js | 84 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
             " 4 files changed, 64 insertions(+), 37 deletions(-)\n\x1b[31mERROR\x1b[0m: could not write /etc/systemd/system/checkin-board.service (Read-only file system)\n"

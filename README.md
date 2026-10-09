@@ -1,8 +1,8 @@
 # Check-in board
 
-A check-in board for any Linux computer (a Raspberry Pi is a good, cheap fit) that **several screens show in step**: who is in, who is out and why, in real time. The people come from a CSV file, and each one is a row that is grey while they are out and coloured while they are in, in the colour of their department or building. A green **INNE** / red **UTE** button on the row checks them in and out, and a tap on the row opens a status menu (sick, late, on a trip, holiday ...) whose status the row then shows in the status' own colour.
+A check-in board for any Linux computer (a small, cheap one is plenty) that **several screens show in step**: who is in, who is out and why, in real time. The people come from a CSV file, and each one is a row that is grey while they are out and coloured while they are in, in the colour of their department or building. A green **INNE** / red **UTE** button on the row checks them in and out, and a tap on the row opens a status menu (sick, late, on a trip, holiday ...) whose status the row then shows in the status' own colour.
 
-It is built on the module base of the DreamPi network switcher, and the board and its features follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken) (a Node.js check-in board): same CSV columns, same statuses, same ideas (several buildings, a screen per building, kiosk screens). Everything the page shows is a module, so the rest of the base (clock, updates, reboot) is there too.
+The board and its features follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken) (a Node.js check-in board): same CSV columns, same statuses, same ideas (several buildings, a screen per building, kiosk screens). Everything the page shows is a module, so the rest of the base (updates, reboot, the System controls) is there too.
 
 <p align="center"><img src="docs/images/board.png" alt="The board: a box per department, a row per person, grey while out and coloured while in, a status shows on the row" width="420"> <img src="docs/images/status-menu.png" alt="The status menu" width="420"></p>
 
@@ -12,22 +12,25 @@ What you get:
 - **Screens in step in real time.** The host (one Linux machine) keeps everything; every other screen is only a browser that opens the host's address, in kiosk mode if you like (`kiosk/kiosk-browser.sh`). A change on one screen is on the others within about a second.
 - **A screen per building:** with several buildings a row of chips picks what a screen shows (kept in that browser; `?location=Område A` in the address sets it).
 - **Contacts:** import a CSV (a file or pasted text), export it again, switch people off, tap a person to edit their name, department, role, phone and building (or delete them). The status menu is editable too (names, colours, time / date / note, dots, counts as out, sticky). The board can show each person's role and building (pick which ones), and has an optional on-screen number pad / keyboard for times, dates and notes.
-- A **clock** (12 or 24-hour, `.beat`, world times and a time zone map), **update and reboot buttons** on the page and an optional **PIN** for them.
+- **Screens with nothing installed:** a kiosk computer can boot over the network into a small Linux image that shows the board in Firefox, behind a whitelist of serial numbers / MAC addresses, with a menu, per-computer settings, an optional install to the local disk, and a loading screen with the chicken logo. Each screen keeps its **own layout and settings** on the host, so they are back after a reload or a reboot.
+- **Text and sound:** the text of the board has its own **size** (0.5 to 2 times, with presets) and **colour** (automatic: black on light boxes, white on the original dark grey ones; or black, white, any palette colour), separate from Stretch / Scale / Fit (which grow the rows and the spacing, never the text; Fit makes the text smaller only when the page is too tall); **button sounds** (a small pop; copy more `.wav` / `.mp3` / `.ogg` files into `/opt/checkin-board/sounds`); the theme can follow **the time of day** at the time zone (light by day, dark at night) for a computer without a light / dark setting of its own.
+- **Dates and notes:** a status can ask for a time, a date, or a date and a time, with a **calendar** (square buttons) next to the date field and a **Skip** button; the on-screen keyboard is laid out like the iPhone's Swedish one, with emoji and an even number pad, and a USB keyboard can be used at the same time. Pictures of people are chosen in Settings > Contacts only.
+- **Update and reboot buttons** on the page and an optional **PIN** for them.
 
-**Tested so far:** on a development machine only, not on a real host or kiosk screen: unit tests (`sh tests/run.sh`) and the page driven in Chromium against a demo server (`sh tests/ui/run.sh`). See [docs/hardware-status.md](docs/hardware-status.md) for what has and has not been seen on real hardware.
+**Tested so far:** on a development machine only, not on a real host or kiosk screen, and **the network boot has never been run on real hardware**: unit tests (`sh tests/run.sh`) and the page driven in Chromium against a demo server (`sh tests/ui/run.sh`). See [docs/hardware-status.md](docs/hardware-status.md) for what has and has not been seen on real hardware.
 
 ## Install
 
-On the host (any Debian-family Linux with `systemd`, such as Debian, Ubuntu or Raspberry Pi OS):
+On the host (any Debian-family Linux with `systemd`, such as Debian or Ubuntu):
 ```
 git clone https://github.com/blaskkaffe/DreamPiAutoToggle.git
 cd DreamPiAutoToggle
 git checkout checkin2.0
 sudo ./install.sh
 ```
-Then open **http://&lt;the host's name&gt;.local** or its IP address in a browser on the same network, open **Settings** (the cogwheel) > **Contacts** and import your people.
+Then open **http://&lt;the host's name&gt;.local** or its IP address in a browser (`sudo ./install.sh --hostname=checkinchicken` names the computer so that it is **http://checkinchicken.local**, the address the kiosk screens use when they are not told another one; `.local` names need avahi-daemon on the host) on the same network, open **Settings** (the cogwheel) > **Contacts** and import your people.
 
-Other screens only need a browser: open the same address, or run `kiosk/kiosk-browser.sh <host>` (Chromium full screen; `kiosk/checkin-kiosk-autostart.desktop` starts it at every login, so a power cut is no problem). `./kiosk-browser.sh 192.168.1.20 "Område A"` pins that screen to one building.
+Other screens only need a browser (or no setup at all: see [Screens that boot from the network](#screens-that-boot-from-the-network)): open the same address, or run `kiosk/kiosk-browser.sh <host>` (Chromium full screen; `kiosk/checkin-kiosk-autostart.desktop` starts it at every login, so a power cut is no problem). `./kiosk-browser.sh 192.168.1.20 "Område A"` pins that screen to one building.
 
 ### The CSV
 
@@ -57,17 +60,18 @@ The page can do it for you while the **Reboot and Update** module is on: **Setti
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
 ```
-Settings, people and who is in are kept. An install made under the old names (`/opt/dreampi-netswitch`, the service `dreampi-netswitch`) is moved to `/opt/checkin-board` and the service `checkin-board`; the data comes along. An install over the old DreamPi network switcher removes its hook, buttons and LED service; the DreamPi itself was never changed.
+Settings, people and who is in are kept.
 
 ### Safety
 
 The web page runs on the host as root, because it has to reboot the machine and run the updater. There are no user accounts: **anybody who can reach the page on your network can use it**, so only put the host on a network you trust, and don't forward its ports from the internet. What the add-on does to limit the risk:
 
-- **PIN (optional).** `sudo ./install.sh --pin` sets a PIN that the page asks for (once per page load) before **Update now**, **Reboot** and a **contacts import**. It is stored only as a salted hash, and five wrong tries lock those actions for a minute. The PIN can also be set, changed or removed in **Settings > Appearance > PIN** (changing or removing it asks for the old one; while no PIN is set anybody on your network can set one there, which is why `sudo ./install.sh --no-pin` stays as the way back). **Ask for the PIN to open Settings** (same box) locks Settings: the cogwheel asks for the PIN and every change needs it, while tapping people in and out keeps working. Use the `https://` address when you use a PIN: over plain `http://` the PIN travels unencrypted. Forgot it? `sudo ./install.sh --no-pin`. Without a PIN, anybody on your network can update or reboot the Pi.
+- **PIN (optional).** `sudo ./install.sh --pin` sets a PIN that the page asks for (once per page load) before **Update now**, **Reboot** and a **contacts import**. It is stored only as a salted hash, and five wrong tries lock those actions for a minute. The PIN can also be set, changed or removed in **Settings > Appearance > PIN** (changing or removing it asks for the old one; while no PIN is set anybody on your network can set one there, which is why `sudo ./install.sh --no-pin` stays as the way back). **Ask for the PIN to open Settings** (same box) locks Settings: the cogwheel asks for the PIN and every change needs it, while tapping people in and out keeps working. Use the `https://` address when you use a PIN: over plain `http://` the PIN travels unencrypted. Forgot it? `sudo ./install.sh --no-pin`. Without a PIN, anybody on your network can update or reboot the computer.
 - **Other websites can't use it.** Every change (all `POST`s) must come from the page itself: a request from another site (a form or script on a web page you have open in your browser) is refused, and so is a request that reaches the host under a name that isn't the host's (the trick used to attack devices on a home network from a web page). The page answers to IP addresses, `.local`-style names and the host's own name; if your router gives it another domain name and the page says "Unknown host name", list that name in `/opt/checkin-board/allowed_hosts` (one per line). The page can't be shown inside another site's frame.
 - **Update from a USB stick.** Put a folder called `update` on a USB stick (the add-on's files: a copy of the repository with `install.sh`, `base/` and `modules/`; `git clone` it or copy it) and plug the stick into the host. **Settings > System** then shows **Update from a USB stick**; **Install from USB** (it asks for the PIN when one is set, and for confirmation) copies the folder to `/opt/checkin-board/usb_src`, so the stick can be pulled out, and runs its `install.sh` as root. The settings and the people are kept. The version then reads "USB update" with the date of the files; **Update now** from GitHub still works. Only plug in sticks you trust: what is in the folder runs as root. Tested with a folder on a disk, not with a real stick.
 - **Update now is limited to GitHub.** It only pulls from the git address the checkout had when the add-on was installed (it must be a GitHub address, and a changed one is refused), fetches from exactly that address, and only fast-forwards, so it can't pull in changes that don't continue your copy.
 - **The web service is fenced in** (systemd: no new privileges, read-only `/usr`, `/boot` and `/etc`, no kernel-module or cgroup changes) and the add-on's files in `/opt/checkin-board` are root-owned.
+- **The network boot server** (if you use it) lets only whitelisted computers boot and fetch the image; a copied serial number / MAC address gets past that, and any computer on the network is offered the small iPXE program (details in [docs/pxe.md](docs/pxe.md)).
 - **Not covered:** anybody who can open the page can also tap people in and out and change the board: there is no per-person login (the PIN only guards the actions above); someone who is already logged in on the host (or can run code on it) can do more than this add-on ever could, and the status files in `/tmp` are guessable names (the update's status file is not written through a planted link).
 
 ### Modules
@@ -78,30 +82,53 @@ Everything the page shows is a module, one folder in `modules/`. **Settings > Sy
 |---|---|---|
 | Check-in board | The board: a box per department, a row per person, statuses, colours | on |
 | Contacts | The people: CSV import and export | on |
-| Clock | The time on the board page: 12 / 24-hour, `.beat`, world times, time zone map | on |
-| About | Versions, the time zone, the global colours, a link to the project (always on) | on |
+| System | Versions, the time zone, PIN, Modules, updates, reboot, a link to the project (always on) | on |
 | Background image | A picture of your own as the page's background: choose it in Settings > Background image (big pictures are shrunk in the browser first), fit and darken it | **off** |
 | Reboot and Update | Update the add-on from GitHub, reboot the host | on |
+| Snow background | A snowstorm in soft fog behind everything (3D, WebGL), with a day and night that follow the time zone | **off** |
 
-Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), [docs/checkin.md](docs/checkin.md) (the board and the contacts), [docs/web.md](docs/web.md). `CLAUDE.md` is the short guide for working on the code.
+Developers: [docs/modules.md](docs/modules.md) (how to add or remove a module), [docs/checkin.md](docs/checkin.md) (the board and the contacts), [docs/web.md](docs/web.md), [docs/pxe.md](docs/pxe.md) (network boot), [docs/offline.md](docs/offline.md) (offline install), [docs/hardware-status.md](docs/hardware-status.md). `CLAUDE.md` is the short guide for working on the code.
+
+### Screens that boot from the network
+
+Opt-in, and separate from `install.sh`. Full description: [docs/pxe.md](docs/pxe.md). **Not tested on real hardware yet.**
+
+```
+sudo ./pxe/build-image.sh        # once, on a Debian / Ubuntu computer with internet: builds the image (a few minutes, 500-700 MB)
+sudo ./pxe/install-pxe.sh        # on the host: proxy DHCP + TFTP + the boot server (your router keeps handing out addresses)
+```
+Then set a screen's BIOS / UEFI to boot from the network (PXE); nothing is installed on it (it needs about 2 GB of memory).
+
+- **Whitelist.** Only approved computers boot. A new one shows its serial number and MAC address on its screen and is listed as pending: `checkin-pxe pending`, then `checkin-pxe allow <serial or MAC>` (or `block`). `checkin-pxe mode open` turns the check off.
+- **Menu or straight in.** An approved computer that is not set to anything gets a menu: the available images, install an image on the local disk (when the image allows it), a Linux shell, the iPXE shell, boot the local disk. `checkin-pxe assign <serial> kiosk --location "Område A"` sets one computer's boot settings (image, buildings, board address, kernel arguments): it skips the menu and boots at once, and pressing **I** while it boots starts the install wizard for the local disk.
+- **Layout stays.** The screen opens `<host>/?screen=<its serial number>`; the host keeps that screen's columns, theme, tile places and building choice apart from the other screens.
+- **Limits.** The whitelist checks what the computer says its serial number and MAC address are, so it keeps strangers away but is not strong authentication; use it on a network you trust. See [Safety](#safety) and [docs/pxe.md](docs/pxe.md).
+
+### Offline install
+
+For a computer without internet: on an online computer with the **same distribution, release and CPU type** run `sudo ./offline/prepare-offline.sh --with-image`. It collects the packages with everything they depend on (Python 3, openssl, git, **Firefox ESR, Chromium, mpv**, dnsmasq-base, ipxe ...), a copy of this repository and the network boot image into `offline/bundle/`. Copy that folder over and run `sudo ./install-offline.sh --board --pxe` in it. Details, the package list and the limits: [docs/offline.md](docs/offline.md).
+
+### Restarts after crashes
+
+A kiosk browser (Chromium on a host screen, Firefox or Chromium on a network-booted one) is started again two seconds after it crashes; the web service and the screen's X session restart by themselves; and the computer reboots itself after a kernel panic (10 s) or when systemd hangs (watchdog, where the hardware has one; the network boot image adds a software watchdog). `uninstall.sh` removes the computer-level settings.
 
 ### Uninstall
 
-`sudo /opt/checkin-board/uninstall.sh` removes the services and everything under `/opt/checkin-board`, **people and who is in included**. Export the contacts first (Settings > Contacts > Download).
+`sudo /opt/checkin-board/uninstall.sh` removes the services and everything under `/opt/checkin-board`, **people and who is in included**. Export the contacts first (Settings > Contacts > Download). The network boot server is removed separately: `sudo ./pxe/install-pxe.sh --remove`.
 
 ## Requirements
 
-- A computer for the host: any Linux machine with `systemd` (a Raspberry Pi 3 or newer is plenty; Debian, Ubuntu and Raspberry Pi OS are the families it is written for), Python 3 and `git`. No Python packages and no internet are needed at run time (the update check and **Update now** need GitHub).
-- A browser on every screen; the kiosk script assumes Chromium (`chromium-browser` or `chromium`).
+- A computer for the host: any Linux machine with `systemd` (a small, cheap one is plenty; Debian and Ubuntu are the families it is written for), Python 3 and `git`. No Python packages and no internet are needed at run time (the update check and **Update now** need GitHub).
+- A browser on every screen; the kiosk script assumes Chromium (`chromium-browser` or `chromium`); the network-booted image brings its own Firefox. The network boot server needs `apt` (it installs `dnsmasq-base` and `ipxe`) and an image built with `pxe/build-image.sh` (needs `debootstrap`, internet and a few GB of disk).
 
 ## Web page
 
-The main page is the board (and the clock box above it when that module is on). The cogwheel opens **Settings**:
+The main page is the board. The cogwheel opens **Settings**; rows with a ▸ **Edit** button open a menu under them and show what is chosen in it as their subtitle:
 
 - **Check-in board:** what to group by and what to colour by (department or building), a colour for every department and building (Automatic or your pick), **All out** (the start of the day) and **All in**.
-- **Appearance / Global colours:** the module's colour, the global main colour, the **Colour palette** (edit, rename, add, rearrange, delete and reset the colours every pick offers), the highlight look, **Max columns** for the dashboard and for Settings (1 to 6; as many as fit at about 430 px each), **Stretch boxes** (the columns share the whole screen width) with **Scale content**, **Rearrange the main screen** (drag the tiles; the department boxes move too and their order is kept on the host, so every screen follows), **Fit to screen** (the main screen is scaled up until its bottom reaches the bottom of the window), **Theme** (dark, light or like the device), **No scrolling** (the main screen never scrolls; Settings still does), **Hide the top bar** (the buttons, title and cogwheel come down only when you go to the top edge), and with more than one column a department with more people than fit under each other in the screen height is split into near-equal parts in the next columns, "Kök (1/2)", "Kök (2/2)", and the **PIN** with **Ask for the PIN to open Settings** (the board itself keeps working without it).
+- **Appearance:** **Theme** (dark, light, like the device, or by the time of day at the time zone); **Layout** (hide the top bar, max columns for the dashboard and for Settings, stretch boxes, scale content, fit to screen); **Rearrange the main screen** (drag the tiles; their order is kept on the host, so every screen follows); **No scrolling**; **Text** (size 0.5 to 2 times, colour); **Button sounds** (off, or a sound file and a volume); **Colours** (the colour palette, Global main colour, the check-in board's colour); **Background** (a picture, a snowstorm, each with its own settings). With more than one column a department with more people than fit under each other in the screen height is split into near-equal parts in the next columns, "Kök (1/2)", "Kök (2/2)".
 - **Contacts:** how many people, import (a file or pasted text), Export.
-- **About:** versions, the address, the time zone, GitHub. **System:** Modules, Updates, Reboot.
+- **System:** versions and the address, GitHub, the **PIN** and **Ask for the PIN to open Settings** (the board itself keeps working without it), the **time zone**, **Modules**, Updates, Update from a USB stick, Reboot.
 
 The page works on a phone as well as a wall display: the dashboard is one column by default and uses as many columns as you allow in Appearance, each department box being a tile of its own.
 
@@ -114,4 +141,4 @@ The page works on a phone as well as a wall display: the dashboard is one column
 
 ## Credits
 
-The board, the statuses and the CSV format follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken). The module base, the clock and the update / reboot controls come from the DreamPi network switcher this add-on grew out of; the names of the service and of `/opt/checkin-board` are still its.
+The board, the statuses and the CSV format follow [CheckinChicken](https://github.com/blaskkaffe/CheckinChicken). The module base and the update / reboot controls come from an earlier add-on of the same author.

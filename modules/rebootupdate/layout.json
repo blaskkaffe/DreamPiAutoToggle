@@ -71,7 +71,7 @@
     {
      "type": "row",
      "title": "Reboot",
-     "sub": "Restarts the Raspberry Pi",
+     "sub": "Restarts the computer",
      "control": {
       "type": "button",
       "style": "danger",

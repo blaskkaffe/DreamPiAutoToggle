@@ -1,6 +1,6 @@
 // Background image module, page side. The background: a fixed picture layer (and a black layer over it that darkens it) drawn from
 // S.imagebg ({has, fit, dim, version} in /api), so a change made on another device shows here too. The widget "imagebg-pick" (Settings >
-// Background image) chooses the picture: a big one is shrunk in the browser first (at most 2560 px, JPEG) before it is sent to the Pi.
+// Background image) chooses the picture: a big one is shrunk in the browser first (at most 2560 px, JPEG) before it is sent to the computer.
 background("imagebg",function(host){
  var pic=h("div",{id:"imgbg"}),dim=h("div",{id:"imgbg-dim"}),last="";
  host.appendChild(pic);host.appendChild(dim);
@@ -33,4 +33,5 @@ custom("imagebg-pick",function(host,ctx){
  r.btn2.onclick=function(e){e.stopPropagation();if(confirm("Remove the background picture?"))post("/imagebg/remove",{},function(v){if(v){refresh();ctx.saved()}})};
  function paint(){var v=S.imagebg||{};r.setSub(v.has?"A picture is set":"No picture yet: choose one from this device");sh(r.btn2,!!v.has);sh(thumb,!!v.has);
   var u=v.has?"url(/imagebg/image?v="+v.version+")":"none";if(thumb._u!==u){thumb._u=u;thumb.style.backgroundImage=u}}
+ host._sum=function(){var v=S.imagebg||{};return v.has?"Picture set":"No picture"};
  UPD.push(paint);paint()});

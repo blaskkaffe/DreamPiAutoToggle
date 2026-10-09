@@ -1,0 +1,9 @@
+{
+ "name": "Check-in screen (Firefox kiosk)",
+ "kernel": "vmlinuz",
+ "initrd": "initrd.img",
+ "order": 1,
+ "args": "boot=live fetch={base}/filesystem.squashfs ip=dhcp quiet panic=10 checkin_url={board} checkin_server={server} checkin_screen={screen} checkin_location={location}",
+ "install_args": "boot=live fetch={base}/filesystem.squashfs ip=dhcp panic=10 checkin_install checkin_url={board} checkin_server={server} checkin_screen={screen} checkin_location={location}",
+ "shell_args": "boot=live fetch={base}/filesystem.squashfs ip=dhcp panic=10 checkin_shell checkin_url={board} checkin_server={server} checkin_screen={screen}"
+}

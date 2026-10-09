@@ -1,0 +1,54 @@
+#!/bin/sh
+# kiosk-session - runs inside X on a diskless check-in screen (started by kiosk.service through xinit).
+# Reads the board's address from the kernel command line (checkin_url=..., optional checkin_location=...; set by boot.ipxe),
+# shows the chicken logo (loading.html) in Firefox (or Chromium: checkin_browser=chromium) full screen, which opens the board when it answers. If Firefox quits it is started again.
+# KIOSK_DRY_RUN=1 only prints the address (the tests use it); CMDLINE_FILE replaces /proc/cmdline for the same reason.
+
+CMDLINE_FILE="${CMDLINE_FILE:-/proc/cmdline}"
+CONFIG_FILE="${CONFIG_FILE:-/etc/checkin-kiosk.conf}"      # written by checkin-install on a computer that has the system on its own disk
+
+param() {
+  tr ' ' '\n' < "$CMDLINE_FILE" | sed -n "s/^$1=//p" | head -n 1
+}
+
+# the kernel command line wins (a network boot), else the config file (a local install): CHECKIN_URL, CHECKIN_SCREEN, CHECKIN_LOCATION
+[ ! -r "$CONFIG_FILE" ] || . "$CONFIG_FILE"
+URL=$(param checkin_url);            [ -n "$URL" ] || URL="$CHECKIN_URL"
+SCREEN=$(param checkin_screen);      [ -n "$SCREEN" ] || SCREEN="$CHECKIN_SCREEN"
+LOCATION=$(param checkin_location);  [ -n "$LOCATION" ] || LOCATION="$CHECKIN_LOCATION"   # buildings as on the board's buttons, spaces as +, several separated by comma
+BROWSER=$(param checkin_browser);    [ -n "$BROWSER" ] || BROWSER="$CHECKIN_BROWSER"          # firefox (default) or chromium
+case "$BROWSER" in chromium) ;; *) BROWSER=firefox ;; esac
+[ -n "$URL" ] || URL="http://checkinchicken.local/"
+URL="${URL%/}/"
+# ?screen=<id> makes the board keep this computer's layout and settings apart from the other screens' (it survives a reboot: the host keeps it)
+SHOW="${URL}?screen=${SCREEN:-$(hostname)}"
+[ -z "$LOCATION" ] || SHOW="${SHOW}&location=${LOCATION}"
+
+if [ -n "$KIOSK_DRY_RUN" ]; then
+  [ "$KIOSK_DRY_RUN" = browser ] && echo "$BROWSER" || echo "$SHOW"
+  exit 0
+fi
+
+SHARE=/usr/local/share/checkin-kiosk
+xsetroot -solid '#f5f7fb'
+xset s off -dpms s noblank
+openbox --sm-disable &
+[ ! -r "$SHARE/logo.png" ] || feh --bg-max --image-bg '#f5f7fb' "$SHARE/logo.png" &     # the chicken, until Firefox has started
+
+PROFILE=/tmp/kiosk-profile
+mkdir -p "$PROFILE"
+
+# The browser opens the loading page (the chicken logo), which opens the board itself as soon as the board answers.
+# If the browser crashes or is closed it is started again two seconds later; X and this script are restarted by kiosk.service.
+PAGE="file://$SHARE/loading.html#$SHOW"
+while true; do
+  if [ "$BROWSER" = chromium ]; then
+    rm -rf "$PROFILE/chromium"          # a crash leaves "restore pages" state behind: start clean every time
+    chromium --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble --hide-crash-restore-bubble \
+      --disable-pinch --overscroll-history-navigation=0 --no-first-run --password-store=basic --incognito \
+      --user-data-dir="$PROFILE/chromium" "$PAGE"
+  else
+    firefox-esr --kiosk --no-remote --profile "$PROFILE" "$PAGE"
+  fi
+  sleep 2
+done

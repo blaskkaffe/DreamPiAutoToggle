@@ -99,7 +99,9 @@ class ImageBg(unittest.TestCase):
     def test_the_module_is_a_background_with_settings(self):
         lay = json.loads(self.call("GET", "/")[1].decode().split("window.LAYOUT=")[1].split(";\n")[0])
         self.assertEqual([b["mod"] for b in lay["backgrounds"]], ["imagebg"])
-        self.assertIn("background-image", [b["id"] for b in lay["settings"]])
+        appearance = [b for b in lay["settings"] if b["id"] == "appearance"][0]
+        menu = [w for w in appearance["items"] if w["type"] == "menu" and w["id"] == "background"][0]
+        self.assertTrue(any(w["mod"] == "imagebg" and w.get("name") == "imagebg-pick" for w in menu["items"]))      # its settings are in Appearance > Background
 
 
 if __name__ == "__main__":

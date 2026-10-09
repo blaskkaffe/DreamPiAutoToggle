@@ -1,0 +1,101 @@
+#!/bin/bash
+# checkin-install - a wizard that puts this system on the computer's own disk, so it boots the check-in kiosk without the network boot server.
+# Started on the console when the computer was booted with "install" (I at the boot message, or the menu), or run by hand from the shell.
+# It erases the disk you choose. The new system is a copy of the running image: Firefox kiosk, the board's address and this computer's name.
+# CHECKIN_INSTALL_DRY_RUN=1 only prints what it would do.
+
+set -u
+TITLE="Check-in screen - install on the local disk"
+TARGET=/mnt/target
+SOURCE=/run/live/rootfs/filesystem.squashfs         # live-boot mounts the downloaded image here
+[ -d "$SOURCE" ] || SOURCE=/
+
+param() { tr ' ' '\n' < /proc/cmdline | sed -n "s/^$1=//p" | head -n 1; }
+run() { if [ -n "${CHECKIN_INSTALL_DRY_RUN:-}" ]; then echo "+ $*"; else "$@"; fi; }
+die() { whiptail --title "$TITLE" --msgbox "$1" 12 70; exit 1; }
+
+[ "$(id -u)" = 0 ] || { echo "Run as root." >&2; exit 1; }
+command -v whiptail >/dev/null || { echo "whiptail is missing" >&2; exit 1; }
+
+SCREEN=$(param checkin_screen)
+URL=$(param checkin_url)
+SERVER=$(param checkin_server)
+LOCATION=$(param checkin_location)
+
+whiptail --title "$TITLE" --yesno "This installs the check-in kiosk on a disk of this computer. The computer then starts it by itself, without the network boot server.\n\nEverything on the disk you choose is erased.\n\nContinue?" 13 70 || exit 0
+
+# the disks: whole disks only (no partitions, loop devices, optical drives)
+DISKS=()
+while read -r name size model; do
+    DISKS+=("/dev/$name" "$size $model")
+done < <(lsblk -dno NAME,SIZE,MODEL -e 1,2,7,11 2>/dev/null | sed 's/  */ /g')
+[ "${#DISKS[@]}" -gt 0 ] || die "No disk found in this computer."
+DISK=$(whiptail --title "$TITLE" --menu "Which disk should the system be installed on?\n(it will be erased)" 18 70 8 "${DISKS[@]}" 3>&1 1>&2 2>&3) || exit 0
+
+NAME_DEFAULT=$( [ -n "$SCREEN" ] && echo "checkin-$SCREEN" || echo checkin-screen )
+HOSTNAME_NEW=$(whiptail --title "$TITLE" --inputbox "Name of this computer on the network:" 10 70 "${NAME_DEFAULT:0:40}" 3>&1 1>&2 2>&3) || exit 0
+echo "$HOSTNAME_NEW" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9-]{0,62}$' || die "That is not a usable computer name (letters, digits and dashes)."
+URL=$(whiptail --title "$TITLE" --inputbox "Address of the check-in board:" 10 70 "${URL:-http://checkinchicken.local/}" 3>&1 1>&2 2>&3) || exit 0
+echo "$URL" | grep -Eq '^https?://[A-Za-z0-9._:/-]+$' || die "That is not a usable address (http://host/)."
+LOCATION=$(whiptail --title "$TITLE" --inputbox "Buildings this screen shows (empty = everybody; spaces as +, several separated by a comma):" 11 70 "$LOCATION" 3>&1 1>&2 2>&3) || exit 0
+echo "$LOCATION" | grep -Eq '^[A-Za-z0-9+,%._-]*$' || die "Buildings: only letters, digits and + , % . _ - are allowed."
+
+whiptail --title "$TITLE" --yesno "Last chance.\n\nDisk:      $DISK\nName:      $HOSTNAME_NEW\nBoard:     $URL\nBuildings: ${LOCATION:-everybody}\n\nERASE $DISK and install?" 16 70 --defaultno || exit 0
+
+UEFI=no; [ -d /sys/firmware/efi ] && UEFI=yes
+PART=$DISK; case "$DISK" in *[0-9]) PART="${DISK}p" ;; esac          # nvme0n1 -> nvme0n1p1
+
+LOG=/tmp/checkin-install.log
+{
+    set -e
+    echo "== partitioning $DISK (UEFI: $UEFI)"
+    run umount -R "$TARGET" 2>/dev/null || true
+    run wipefs -a "$DISK"
+    run parted -s "$DISK" mklabel gpt \
+        mkpart bios 1MiB 3MiB set 1 bios_grub on \
+        mkpart esp fat32 3MiB 515MiB set 2 esp on \
+        mkpart root ext4 515MiB 100%
+    run udevadm settle
+    run mkfs.vfat -F32 -n CHECKINEFI "${PART}2"
+    run mkfs.ext4 -F -L checkin-root "${PART}3"
+    run mkdir -p "$TARGET"
+    run mount "${PART}3" "$TARGET"
+    run mkdir -p "$TARGET/boot/efi"
+    run mount "${PART}2" "$TARGET/boot/efi"
+    echo "== copying the system"
+    run rsync -aHAX --exclude=/proc/* --exclude=/sys/* --exclude=/dev/* --exclude=/run/* --exclude=/tmp/* --exclude=/mnt/* --exclude=/boot/efi/* "$SOURCE/" "$TARGET/"
+    run mkdir -p "$TARGET"/{proc,sys,dev,run,tmp,mnt}
+    run chmod 1777 "$TARGET/tmp"
+    echo "== configuring"
+    ROOT_UUID=$(blkid -s UUID -o value "${PART}3" 2>/dev/null || echo ROOT)
+    EFI_UUID=$(blkid -s UUID -o value "${PART}2" 2>/dev/null || echo EFI)
+    if [ -z "${CHECKIN_INSTALL_DRY_RUN:-}" ]; then
+        printf 'UUID=%s / ext4 errors=remount-ro 0 1\nUUID=%s /boot/efi vfat umask=0077 0 1\n' "$ROOT_UUID" "$EFI_UUID" > "$TARGET/etc/fstab"
+        echo "$HOSTNAME_NEW" > "$TARGET/etc/hostname"
+        : > "$TARGET/etc/machine-id"                    # a new one is made at the first start (not the image's)
+        mkdir -p "$TARGET/etc/default/grub.d"
+        printf 'GRUB_TIMEOUT=2\nGRUB_CMDLINE_LINUX_DEFAULT="quiet panic=10"\n' > "$TARGET/etc/default/grub.d/checkin.cfg"
+        printf 'CHECKIN_URL=%s\nCHECKIN_SCREEN=%s\nCHECKIN_LOCATION=%s\n' "'$URL'" "'$SCREEN'" "'$LOCATION'" > "$TARGET/etc/checkin-kiosk.conf"
+    fi
+    echo "== boot loader"
+    for d in dev dev/pts proc sys; do run mount --bind "/$d" "$TARGET/$d"; done
+    [ "$UEFI" = no ] || run mount --bind /sys/firmware/efi/efivars "$TARGET/sys/firmware/efi/efivars" 2>/dev/null || true
+    run chroot "$TARGET" grub-install --target=i386-pc --recheck "$DISK"
+    run chroot "$TARGET" grub-install --target=x86_64-efi --efi-directory=/boot/efi --removable --no-nvram --recheck
+    run chroot "$TARGET" update-grub
+    run umount -R "$TARGET"
+    echo "== telling the boot server"
+    if [ -n "$SERVER" ] && [ -n "$SCREEN" ]; then
+        run curl -fs --max-time 10 "$SERVER/installed?id=$SCREEN" >/dev/null || echo "(the boot server could not be told; it will offer the menu again)"
+    fi
+    echo "== done"
+} 2>&1 | tee "$LOG" | whiptail --title "$TITLE" --programbox "Installing... (log: $LOG)" 22 78
+STATUS=${PIPESTATUS[0]}
+
+if [ "$STATUS" != 0 ] || ! tail -n 1 "$LOG" | grep -q '^== done'; then
+    whiptail --title "$TITLE" --msgbox "The installation failed. The log is in $LOG (a shell is open next: type exit to restart the computer)." 10 70
+    bash -l
+    exit 1
+fi
+whiptail --title "$TITLE" --msgbox "Done. The computer restarts now and starts from its own disk. Take the network boot off its boot order, or leave it: the boot server sends it to its disk." 11 70
+exit 0

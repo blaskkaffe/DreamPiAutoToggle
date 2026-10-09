@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -39,10 +40,9 @@ MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["clock", "pla
 DEBUG_FLAG = os.path.join(BASE_DIR, PROJECT.get("debug_flag", "debug"))     # exists = the debug timeline is recorded (a debug module switches it)
 ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for the actions a module marks PROTECTED (install.sh --pin)
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
-HIGHLIGHT = os.path.join(BASE_DIR, "highlight")     # "rainbow" or a palette id: how a highlighted box looks (Settings > Appearance)
 SETTINGS_PIN = os.path.join(BASE_DIR, "settings_pin")   # exists = Settings asks for the PIN (when one is set) before it opens and changes anything
 SCREEN = os.path.join(BASE_DIR, "screen.json")         # how the page is laid out on a wide screen: max columns, stretch, scale (Settings > Appearance)
-TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the Pi's own (Settings > About)
+TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the computer's own (Settings > About)
 DEBUG_LOG = TMP_PREFIX + PROJECT.get("debug_log", "-debug.log")           # the debug timeline
 POKE_PREFIX = TMP_PREFIX + ".poke."   # poke(name): "measure it again now", see poke()
 
@@ -197,11 +197,52 @@ def save_dashboard_order(names):
 TILE_LAYOUT = os.path.join(BASE_DIR, "tile_layout.json")
 _TILE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
 
+# ---- one set of layout settings per screen: a screen that names itself (the page sends its id in the X-Screen header; a kiosk
+# computer uses its serial number) keeps its own screen settings and tile places in screens/<id>/ - they survive a reload and a reboot of that
+# screen, and what one screen changes does not move another. A screen with no file of its own starts from the shared ones.
+SCREENS_DIR = os.path.join(BASE_DIR, "screens")
+MAX_SCREENS = 200
+_SCREEN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+_here = threading.local()
+
+
+def set_screen(ident):
+    """The screen the current request comes from (the thread's context): an id, or "" for a plain browser. Returns the id used."""
+    _here.screen = ident if isinstance(ident, _STR) and _SCREEN_ID.match(ident) else ""
+    return _here.screen
+
+
+def screen_id():
+    return getattr(_here, "screen", "")
+
+
+def _screen_path(name, shared):
+    """Where to read: the screen's own file when it has one, else the shared file."""
+    sid = screen_id()
+    own = os.path.join(SCREENS_DIR, sid, name) if sid else None
+    return own if own and os.path.exists(own) else shared
+
+
+def _screen_write_path(name, shared):
+    """Where to write: the screen's own file (its folder is made; None when there are already MAX_SCREENS screens), else the shared file."""
+    sid = screen_id()
+    if not sid:
+        return shared
+    folder = os.path.join(SCREENS_DIR, sid)
+    if not os.path.isdir(folder):
+        try:
+            if len(os.listdir(SCREENS_DIR)) >= MAX_SCREENS:
+                return None
+        except OSError:
+            pass
+        os.makedirs(folder, exist_ok=True)
+    return os.path.join(folder, name)
+
 
 def tile_layout():
     """{"<columns>": [[ids] per column]}: the saved places of the tiles, only what is valid (a bad or missing file gives {})."""
     try:
-        with open(TILE_LAYOUT) as f:
+        with open(_screen_path("tile_layout.json", TILE_LAYOUT)) as f:
             data = json.load(f)
     except (IOError, OSError, ValueError):
         return {}
@@ -229,10 +270,13 @@ def save_tile_layout(count, columns):
         return None
     data = tile_layout()
     data[str(count)] = columns
-    tmp = TILE_LAYOUT + ".tmp"
+    target = _screen_write_path("tile_layout.json", TILE_LAYOUT)
+    if target is None:
+        return None
+    tmp = target + ".tmp"
     with open(tmp, "w") as f:
         json.dump(data, f, sort_keys=True)
-    os.rename(tmp, TILE_LAYOUT)
+    os.rename(tmp, target)
     return tile_layout()
 
 
@@ -534,7 +578,7 @@ def palette_edit(ident, name=None, ui=None):
 
 
 def palette_delete(ident):
-    """Take a colour out of the palette. What used it falls back (a module's pick to its default, a highlight to the rainbow, another module's row to
+    """Take a colour out of the palette. What used it falls back (a module's pick to its default, another module's row to
     orange). False for one that cannot be deleted (FIXED_COLOURS) or does not exist."""
     if ident in FIXED_COLOURS or ident not in palette_ids():
         return False
@@ -562,8 +606,6 @@ def palette_delete(ident):
         with open(tmp, "w") as f:
             json.dump(picks, f, sort_keys=True)
         os.rename(tmp, MODULE_COLOURS)
-    if (read_file(HIGHLIGHT) or "").strip() == ident:
-        save_highlight_style("rainbow")
     return True
 
 
@@ -670,33 +712,6 @@ def module_colours(name):
     return out
 
 
-# ---- highlight: a module can ask for one of its dashboard boxes to stand out for a while (an event starts soon, say): /api
-# "highlight" {box id: why}. A grey box (a background module's) turns its own colour; a coloured box takes the highlight look
-# set here, the same for every module: an animated rainbow edge or one palette colour that glows.
-HIGHLIGHT_STYLES = ("rainbow",) + PALETTE_IDS        # as shipped; highlight_styles() is the list in use
-DEFAULT_HIGHLIGHT = "rainbow"
-
-
-def highlight_styles():
-    return ("rainbow",) + colour_ids()
-
-
-def highlight_style():
-    s = (read_file(HIGHLIGHT) or "").strip()
-    return s if s in highlight_styles() else DEFAULT_HIGHLIGHT
-
-
-def save_highlight_style(value):
-    value = str(value or "").strip()
-    if value not in highlight_styles():
-        value = DEFAULT_HIGHLIGHT
-    tmp = HIGHLIGHT + ".tmp"
-    with open(tmp, "w") as f:
-        f.write(value)
-    os.rename(tmp, HIGHLIGHT)
-    return value
-
-
 def settings_pin_on():
     return os.path.exists(SETTINGS_PIN)
 
@@ -709,9 +724,63 @@ def save_settings_pin(on):
 
 
 # ---- screen layout: how many columns the dashboard and Settings may use on a wide screen, and whether the boxes stretch to fill it
-THEMES = ("dark", "light", "auto")
-SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "theme": "dark"}
+THEMES = ("dark", "light", "auto", "time")      # "auto": like the device's own setting; "time": light by day, dark by night at the common time zone
+SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "theme": "dark", "font_scale": 1.0, "font_colour": "auto",
+                   "sound": True, "sound_name": "pop.wav", "sound_volume": 0.6}
 MAX_COLUMNS = 6
+SOUNDS_DIR = os.path.join(BASE_DIR, "sounds")   # the button sounds: the add-on's own (pop.wav ...) and any .wav / .mp3 / .ogg the user copies in by hand
+SOUND_TYPES = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg"}
+SOUND_MAX = 2000000                             # bytes of a sound file
+_SOUND_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,60}$")
+
+
+def list_sounds():
+    """The sound files in SOUNDS_DIR (plain names, a known ending, at most SOUND_MAX bytes), sorted."""
+    out = []
+    try:
+        for n in sorted(os.listdir(SOUNDS_DIR)):
+            if _SOUND_NAME.match(n) and os.path.splitext(n)[1].lower() in SOUND_TYPES and os.path.isfile(os.path.join(SOUNDS_DIR, n)) \
+                    and os.path.getsize(os.path.join(SOUNDS_DIR, n)) <= SOUND_MAX:
+                out.append(n)
+    except OSError:
+        pass
+    return out
+
+
+def sound_path(name):
+    """The file of a sound, or None (not a plain name, not there, not a sound)."""
+    return os.path.join(SOUNDS_DIR, name) if name in list_sounds() else None
+
+
+FONT_SCALE_MIN, FONT_SCALE_MAX = 0.5, 2.0       # the text scaler of the dashboard
+FONT_COLOURS = ("auto", "black", "white")        # and a palette colour id: the colour of the board's text (auto = black on light boxes, the original greys and white on dark ones)
+
+
+def _font_scale(v):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    return round(min(FONT_SCALE_MAX, max(FONT_SCALE_MIN, v)), 2) if v == v else None
+
+
+def _volume(v):
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    return round(min(1.0, max(0.0, v)), 2) if v == v and not isinstance(v, bool) else None
+
+
+def _font_colour(v):
+    return v if isinstance(v, _STR) and (v in FONT_COLOURS or v in palette_ids()) else None
+
+
+def _clean_locations(v):
+    """The buildings a screen shows: a list of at most 50 short texts (the roster's filter; only kept for a screen that has an id)."""
+    if not isinstance(v, list):
+        return []
+    return [x.strip() for x in v if isinstance(x, _STR) and x.strip() and len(x) <= 80][:50]
 
 
 def screen_settings():
@@ -721,11 +790,13 @@ def screen_settings():
     with their width instead of getting more room; fit scales the main screen up until its bottom meets the bottom of the screen; drag lets the tiles of the main screen be moved (which reorders the modules); noscroll stops the main screen from scrolling; autohide hides the top bar until the pointer or a tap is at the top edge; theme is "dark", "light" or "auto" (the device's own setting)."""
     out = dict(SCREEN_DEFAULTS)
     try:
-        with open(SCREEN) as f:
+        with open(_screen_path("screen.json", SCREEN)) as f:
             data = json.load(f)
     except (IOError, OSError, ValueError):
         data = {}
     if isinstance(data, dict):
+        if screen_id():
+            out["locations"] = _clean_locations(data.get("locations"))      # only a screen that names itself has building choice kept here
         for k in ("dash_cols", "set_cols"):
             v = data.get(k)
             if isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= MAX_COLUMNS:
@@ -735,6 +806,16 @@ def screen_settings():
                 out[k] = data[k]
         if data.get("theme") in THEMES:
             out["theme"] = data["theme"]
+        if not isinstance(data.get("font_scale"), bool) and _font_scale(data.get("font_scale")) is not None:
+            out["font_scale"] = _font_scale(data["font_scale"])
+        if _font_colour(data.get("font_colour")):
+            out["font_colour"] = data["font_colour"]
+        if isinstance(data.get("sound"), bool):
+            out["sound"] = data["sound"]
+        if isinstance(data.get("sound_name"), _STR) and _SOUND_NAME.match(data["sound_name"]):
+            out["sound_name"] = data["sound_name"]
+        if _volume(data.get("sound_volume")) is not None:
+            out["sound_volume"] = _volume(data["sound_volume"])
     return out
 
 
@@ -753,10 +834,25 @@ def save_screen_settings(changes):
             cur[k] = v
         elif k == "theme" and v in THEMES:
             cur[k] = v
-    tmp = SCREEN + ".tmp"
+        elif k == "font_scale" and not isinstance(v, bool) and _font_scale(v) is not None:
+            cur[k] = _font_scale(v)
+        elif k == "font_colour" and _font_colour(v):
+            cur[k] = v
+        elif k == "sound" and isinstance(v, bool):
+            cur[k] = v
+        elif k == "sound_name" and isinstance(v, _STR) and _SOUND_NAME.match(v):
+            cur[k] = v
+        elif k == "sound_volume" and not isinstance(v, bool) and _volume(v) is not None:
+            cur[k] = _volume(v)
+        elif k == "locations" and screen_id():
+            cur[k] = _clean_locations(v)
+    target = _screen_write_path("screen.json", SCREEN)
+    if target is None:
+        return cur
+    tmp = target + ".tmp"
     with open(tmp, "w") as f:
         json.dump(cur, f, sort_keys=True)
-    os.rename(tmp, SCREEN)
+    os.rename(tmp, target)
     return cur
 
 
@@ -824,15 +920,29 @@ def set_module_tint(name, key, coloured):
 
 
 def time_zone():
-    """The common time zone setting: an IANA name from base_tz.ZONE_CHOICES, or "" = the Pi's own. Any module that shows a
+    """The common time zone setting: an IANA name from base_tz.ZONE_CHOICES, or "" = the computer's own. Any module that shows a
     time of day reads it here."""
     import base_tz as tz
     zone = read_file(TIME_ZONE)
     return zone if zone in tz.ZONE_CHOICES else ""
 
 
+def daylight(now=None):
+    """Where the sun is at the place of the common time zone (the computer's own zone when none is set): {"elev": degrees, "day": bool, "zone": name}.
+    "day" is the sun above the horizon (a little below it, for the sky's glow). The page's theme can follow it (Appearance > Theme > By the time of day)
+    and a background module draws the day and the night from "elev"."""
+    import base_tz as tz
+    zone = time_zone() or tz.own_zone_name()
+    try:
+        lat, lon = tz.zone_place(zone) if zone else (50.0, -time.timezone / 3600.0 * 15.0)
+    except Exception:
+        lat, lon = 50.0, 0.0
+    elev = tz.sun_elevation(lat, lon, now)
+    return {"elev": round(elev, 2), "day": elev > -0.8, "zone": zone}
+
+
 def save_time_zone(value):
-    """Save the common time zone ("" = the Pi's own; anything not in the list is the Pi's own too). Returns what is now set."""
+    """Save the common time zone ("" = the computer's own; anything not in the list is the computer's own too). Returns what is now set."""
     import base_tz as tz
     value = value if value in tz.ZONE_CHOICES else ""
     tmp = TIME_ZONE + ".tmp"

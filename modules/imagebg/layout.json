@@ -1,11 +1,17 @@
 {
- "background": {"type": "fullscreen"},
+ "background": {
+  "type": "fullscreen"
+ },
  "settings": [
   {
-   "box": "background-image",
-   "title": "Background image",
+   "box": "appearance",
+   "title": "Appearance",
    "items": [
-    {"type": "custom", "name": "imagebg-pick"},
+    {
+     "type": "custom",
+     "name": "imagebg-pick",
+     "in": "background"
+    },
     {
      "type": "form",
      "get": "/imagebg",
@@ -14,14 +20,31 @@
       {
        "title": "Fit",
        "sub_text": "fit",
-       "controls": [{"type": "choice", "key": "fit", "options": "fits", "label": "Fit"}]
+       "controls": [
+        {
+         "type": "choice",
+         "key": "fit",
+         "options": "fits",
+         "label": "Fit"
+        }
+       ],
+       "nosum": true
       },
       {
        "title": "Darken",
        "sub_text": "dim",
-       "controls": [{"type": "choice", "key": "dim", "options": "dims", "label": "Darken"}]
+       "controls": [
+        {
+         "type": "choice",
+         "key": "dim",
+         "options": "dims",
+         "label": "Darken"
+        }
+       ],
+       "nosum": true
       }
-     ]
+     ],
+     "in": "background"
     }
    ]
   }

@@ -53,10 +53,8 @@ def api_state(have_palette=""):
     d = {"pin": security.pin_required(),     # the page asks for it before an action a module marks PROTECTED
          "colours": modules.live_colours(), "tints": modules.live_tints(), "primary": {}, "primary_key": {}, "enabled": modules.enabled_map(),
          "warnings": warnings, "now": int(time.time()),
-         "highlight": {},       # {dashboard box id: why}: a module asks for one of its boxes to stand out for a while (an event soon, say)
          "notices": [],         # banners over the boxes that are not warnings: {"id", "text", "post" (dismiss: POST {"id"} there)}
-         "theme": {"highlight": core.highlight_style()},
-         "screen": core.screen_settings(), "tile_layout": core.tile_layout(),
+         "screen": core.screen_settings(), "tile_layout": core.tile_layout(), "daylight": core.daylight(),
          "settings_pin": {"on": security.settings_locked(), "pin": security.pin_required()}}
     modules.apply_api(d, warnings)          # what the enabled modules add: each module's data
     version = core.palette_version()
@@ -73,23 +71,23 @@ PAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "page")
 BASE_PAGE_FILES = ("index.html", "page.css", "page.js", "widgets.js", "boot.js")
 
 
-def _highlight_reply():
-    """The form widget's answer for the highlight look: rainbow or one of the palette colours."""
-    style = core.highlight_style()
-    opts = [{"value": "rainbow", "label": "Rainbow (animated)"}] + [
-        {"value": c["id"], "label": c["name"], "group": "Glow in one colour"} for c in core.colours()]
-    label = "Rainbow edge, animated" if style == "rainbow" else "Glow in %s" % core.colour(style)["name"].lower()
-    return {"values": {"style": style}, "options": {"styles": opts},
-            "texts": {"highlight": label}}
-
-
 def _screen_reply():
     """The form widget's answer for Appearance > Max columns (the two toggles under it read S.screen from /api)."""
     cur = core.screen_settings()
     opts = [{"value": n, "label": str(n)} for n in range(1, core.MAX_COLUMNS + 1)]
-    themes = [{"value": "dark", "label": "Dark"}, {"value": "light", "label": "Light"}, {"value": "auto", "label": "Like the device"}]
-    return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"], "theme": cur["theme"]}, "options": {"cols": opts, "themes": themes},
+    themes = [{"value": "dark", "label": "Dark"}, {"value": "light", "label": "Light"}, {"value": "auto", "label": "Like the device"},
+              {"value": "time", "label": "By the time of day"}]
+    sizes = [{"value": v, "label": l} for v, l in ((0.8, "Small"), (1.0, "Normal"), (1.25, "Large"), (1.5, "Larger"), (2.0, "Largest"))]
+    colours = [{"value": "auto", "label": "Automatic (black on light boxes, white on dark)"}, {"value": "black", "label": "Black"}, {"value": "white", "label": "White"}] + \
+              [{"value": c["id"], "label": c["name"]} for c in core.colours() if not c.get("token")]
+    sounds = [{"value": "off", "label": "Off"}] + [{"value": n, "label": os.path.splitext(n)[0]} for n in core.list_sounds()]
+    return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"], "theme": cur["theme"], "font_scale": cur["font_scale"], "font_colour": cur["font_colour"],
+                       "sound_name": cur["sound_name"] if cur["sound"] else "off", "sound_volume": cur["sound_volume"]},
+            "options": {"cols": opts, "themes": themes, "sizes": sizes, "font_colours": colours, "sounds": sounds},
             "texts": {"theme": dict((t["value"], t["label"]) for t in themes)[cur["theme"]],
+                      "font_scale": "Text size %s\u00d7" % ("%g" % cur["font_scale"]),
+                      "sound_name": (os.path.splitext(cur["sound_name"])[0] + " \u00b7 volume %d%%" % round(cur["sound_volume"] * 100)) if cur["sound"] else "Off",
+                      "font_colour": "Automatic" if cur["font_colour"] == "auto" else dict((c["value"], c["label"]) for c in colours).get(cur["font_colour"], "Automatic"),
                       "dash_cols": "Up to %d" % cur["dash_cols"] + (" column" if cur["dash_cols"] == 1 else " columns"),
                       "set_cols": "Up to %d" % cur["set_cols"] + (" column" if cur["set_cols"] == 1 else " columns")}}
 
@@ -133,6 +131,15 @@ def build_page():
     def part(name):
         with io.open(os.path.join(PAGE_DIR, name), encoding="utf-8", newline="") as f:
             return f.read()
+    mine = core.screen_id()
+    core.set_screen("")                    # the page is the same for every screen: it starts from the shared settings
+    try:
+        return _build_page(part)
+    finally:
+        core.set_screen(mine)
+
+
+def _build_page(part):
     extra = modules.page_parts()
     js = _layout_script() + "\n" + part("page.js") + "\n" + part("widgets.js") + "\n" + extra["js"] + "\n" + part("boot.js")
     html = part("index.html").replace("@@TITLE@@", core.PROJECT.get("title", "Dashboard")).replace("@@ICON@@", core.PROJECT.get("icon", "")).replace("@@TOUCH@@", core.PROJECT.get("touch_icon", core.PROJECT.get("icon", ""))).replace("@@THEME@@", core.screen_settings()["theme"]).replace("@@CSS@@", core.colours_css() + part("page.css") + "\n" + extra["css"]).replace("@@JS@@", js)
@@ -204,7 +211,7 @@ def _colour_reply():
 
 class Handler(BaseHTTPRequestHandler):
     timeout = 20          # a client that stops talking can't hold a thread forever
-    protocol_version = "HTTP/1.1"   # keep-alive: the page asks /api every second, a new TLS handshake each time is heavy on a Pi
+    protocol_version = "HTTP/1.1"   # keep-alive: the page asks /api every second, a new TLS handshake each time is heavy on a computer
     _body_read = 0
 
     def send(self, body, ctype, cache=None, status=200, fixed=False):
@@ -259,6 +266,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send(message + "\n", "text/plain; charset=utf-8", status=status)
 
     def do_GET(self):
+        core.set_screen(self.headers.get("X-Screen"))       # the screen this request comes from (the page sends its id), "" for a plain browser
         if self.headers.get("Content-Length") not in (None, "0"):
             self.close_connection = True      # a GET with a body: don't try to parse the body as the next request
         if not security.host_allowed(self.headers.get("Host")):
@@ -267,6 +275,7 @@ class Handler(BaseHTTPRequestHandler):
         self._safely(self._get)
 
     def do_POST(self):
+        core.set_screen(self.headers.get("X-Screen"))
         self._body_read = 0
         try:
             if not security.host_allowed(self.headers.get("Host")):
@@ -313,12 +322,18 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             self.send(body, _static_type(name), cache=86400, fixed=True)
+        elif path.startswith("/sounds/"):          # a button sound of SOUNDS_DIR (copy more files in by hand)
+            from urllib.parse import unquote
+            name = unquote(path[len("/sounds/"):])
+            file = core.sound_path(name)
+            if file is None:
+                return self._refuse(404, "No such sound")
+            with open(file, "rb") as f:
+                self.send(f.read(), core.SOUND_TYPES[os.path.splitext(name)[1].lower()], cache=3600)
         elif path == "/modules":
             self.send(json.dumps({"modules": modules.listing()}), "application/json")
         elif path == "/colours":
             self.send(json.dumps(_colour_reply()), "application/json")
-        elif path == "/highlight":
-            self.send(json.dumps(_highlight_reply()), "application/json")
         elif path == "/timezone":
             self.send(json.dumps(_timezone_reply()), "application/json")
         elif path == "/palette/list":
@@ -365,11 +380,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_dashboard_order()
         if path == "/colour":
             return self._post_colour()
-        if path == "/highlight":
-            return self._post_highlight()
         if path == "/timezone":
             return self._post_timezone()
-        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/fit", "/screen/drag", "/screen/noscroll", "/screen/autohide"):
+        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/fit", "/screen/drag", "/screen/noscroll", "/screen/autohide", "/screen/locations", "/screen/sound"):
             return self._post_screen(path)
         if path == "/palette":
             return self._post_palette()
@@ -494,15 +507,6 @@ class Handler(BaseHTTPRequestHandler):
             return self.send("Not possible (an unknown colour, not #rrggbb, one that cannot be deleted, or the palette is full)", "text/plain; charset=utf-8", status=400)
         self.send(json.dumps(_palette_reply(extra)), "application/json")
 
-    def _post_highlight(self):
-        """Settings > Appearance > Notification highlight: {"values": {"style": "rainbow" | palette id}} (the form widget's format)."""
-        try:
-            values = json.loads(self._body(1024).decode("utf-8")).get("values") or {}
-            core.save_highlight_style(values.get("style"))
-        except (ValueError, AttributeError, IOError, OSError) as e:
-            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
-        self.send(json.dumps(_highlight_reply()), "application/json")
-
     def _post_pin(self):
         """Set, change or remove the PIN: {"pin": "1234"} (4 to 64 characters) or {"pin": ""} (remove it, and with it the lock on Settings).
         The PIN in use (when there is one) was checked before this: the page sends it in X-Pin."""
@@ -539,7 +543,13 @@ class Handler(BaseHTTPRequestHandler):
         try:
             data = json.loads(self._body(1024).decode("utf-8"))
             if path == "/screen":
-                core.save_screen_settings(dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols", "theme")))
+                vals = dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols", "theme", "font_scale", "font_colour", "sound_name", "sound_volume") if k in (data.get("values") or {}))
+                if vals.get("sound_name") == "off":          # "Off" in the sound list switches the button sounds off (the file name is kept)
+                    vals.pop("sound_name")
+                    vals["sound"] = False
+                elif "sound_name" in vals:
+                    vals["sound"] = True
+                core.save_screen_settings(vals)
                 refresh_page(force=True)                # the page is built with the theme it starts in (no flash of the other one)
             else:
                 core.save_screen_settings({path.rsplit("/", 1)[1]: data.get("value")})

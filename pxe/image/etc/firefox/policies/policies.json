@@ -1,0 +1,21 @@
+{
+  "policies": {
+    "DisableAppUpdate": true,
+    "DisableTelemetry": true,
+    "DisableFirefoxStudies": true,
+    "DisablePocket": true,
+    "DisableProfileImport": true,
+    "DontCheckDefaultBrowser": true,
+    "NoDefaultBookmarks": true,
+    "OverrideFirstRunPage": "",
+    "OverridePostUpdatePage": "",
+    "PopupBlocking": { "Default": true },
+    "Preferences": {
+      "browser.sessionstore.resume_from_crash": false,
+      "browser.shell.checkDefaultBrowser": false,
+      "browser.tabs.warnOnClose": false,
+      "datareporting.policy.dataSubmissionEnabled": false,
+      "toolkit.cosmeticAnimations.enabled": false
+    }
+  }
+}

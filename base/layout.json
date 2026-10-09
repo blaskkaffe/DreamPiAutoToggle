@@ -5,9 +5,6 @@
    "title": "Appearance",
    "items": [
     {
-     "type": "palette"
-    },
-    {
      "type": "form",
      "get": "/screen",
      "post": "/screen",
@@ -23,66 +20,99 @@
          "label": "Theme"
         }
        ]
+      }
+     ],
+     "order": 10
+    },
+    {
+     "type": "menu",
+     "id": "layout",
+     "title": "Layout",
+     "order": 20,
+     "items": [
+      {
+       "type": "row",
+       "title": "Hide the top bar",
+       "sub": "The bar with the building buttons, the title and the cogwheel is out of sight, so the whole screen is for the people. Move the pointer to the top edge or tap there to bring it down; it goes up again after a few seconds.",
+       "control": {
+        "type": "toggle",
+        "bind": "@screen.autohide",
+        "post": "/screen/autohide",
+        "label": "Hide the top bar"
+       },
+       "short": "Top bar hidden"
       },
       {
-       "title": "Max columns: dashboard",
-       "sub_text": "dash_cols",
-       "controls": [
+       "type": "form",
+       "get": "/screen",
+       "post": "/screen",
+       "fields": [
         {
-         "type": "choice",
-         "key": "dash_cols",
-         "options": "cols",
-         "label": "Columns"
+         "title": "Max columns: dashboard",
+         "sub_text": "dash_cols",
+         "controls": [
+          {
+           "type": "choice",
+           "key": "dash_cols",
+           "options": "cols",
+           "label": "Columns"
+          }
+         ],
+         "sum": "Dashboard:"
+        },
+        {
+         "title": "Max columns: settings",
+         "sub_text": "set_cols",
+         "controls": [
+          {
+           "type": "choice",
+           "key": "set_cols",
+           "options": "cols",
+           "label": "Columns"
+          }
+         ],
+         "sum": "Settings:"
         }
        ]
       },
       {
-       "title": "Max columns: settings",
-       "sub_text": "set_cols",
-       "controls": [
-        {
-         "type": "choice",
-         "key": "set_cols",
-         "options": "cols",
-         "label": "Columns"
-        }
-       ]
+       "type": "row",
+       "title": "Stretch boxes",
+       "sub": "On a wide screen the columns fill the width, so the boxes are wider",
+       "control": {
+        "type": "toggle",
+        "bind": "@screen.stretch",
+        "post": "/screen/stretch",
+        "label": "Stretch boxes"
+       },
+       "short": "Stretch"
+      },
+      {
+       "type": "row",
+       "title": "Scale content",
+       "sub": "The rows and the spacing of a stretched box grow with it, so the box is taller too. The text keeps its size (see Text).",
+       "control": {
+        "type": "toggle",
+        "bind": "@screen.scale",
+        "post": "/screen/scale",
+        "label": "Scale content"
+       },
+       "short": "Scale",
+       "show": "@screen.stretch"
+      },
+      {
+       "type": "row",
+       "title": "Fit to screen",
+       "sub": "The main screen is made as tall as it can be without scrolling, so there is no empty space under it: the columns fill the width and the rows grow. If the page is too tall at the normal size the text is made smaller, never bigger.",
+       "control": {
+        "type": "toggle",
+        "bind": "@screen.fit",
+        "post": "/screen/fit",
+        "label": "Fit to screen"
+       },
+       "short": "Fit"
       }
      ]
-    },
-    {
-     "type": "row",
-     "title": "Stretch boxes",
-     "sub": "On a wide screen the columns fill the width, so the boxes are wider",
-     "control": {
-      "type": "toggle",
-      "bind": "@screen.stretch",
-      "post": "/screen/stretch",
-      "label": "Stretch boxes"
-     }
-    },
-    {
-     "type": "row",
-     "title": "Scale content",
-     "sub": "The content of a stretched box grows with it, so the box is taller too (off: the content keeps its size)",
-     "show": "@screen.stretch",
-     "control": {
-      "type": "toggle",
-      "bind": "@screen.scale",
-      "post": "/screen/scale",
-      "label": "Scale content"
-     }
-    },
-    {
-     "type": "row",
-     "title": "Fit to screen",
-     "sub": "The main screen is made as big as it can be without scrolling, so there is no empty space under it (the columns fill the width; neither Stretch nor scaling is needed)",
-     "control": {
-      "type": "toggle",
-      "bind": "@screen.fit",
-      "post": "/screen/fit",
-      "label": "Fit to screen"
-     }
     },
     {
      "type": "row",
@@ -93,7 +123,9 @@
       "bind": "@screen.drag",
       "post": "/screen/drag",
       "label": "Rearrange the main screen"
-     }
+     },
+     "short": "Rearranging",
+     "order": 30
     },
     {
      "type": "row",
@@ -104,73 +136,147 @@
       "bind": "@screen.noscroll",
       "post": "/screen/noscroll",
       "label": "No scrolling"
-     }
+     },
+     "short": "No scrolling",
+     "order": 40
     },
     {
-     "type": "row",
-     "title": "Hide the top bar",
-     "sub": "The bar with the building buttons, the title and the cogwheel is out of sight, so the whole screen is for the people. Move the pointer to the top edge or tap there to bring it down; it goes up again after a few seconds.",
-     "control": {
-      "type": "toggle",
-      "bind": "@screen.autohide",
-      "post": "/screen/autohide",
-      "label": "Hide the top bar"
-     }
+     "type": "menu",
+     "id": "text",
+     "title": "Text",
+     "order": 50,
+     "items": [
+      {
+       "type": "form",
+       "get": "/screen",
+       "post": "/screen",
+       "fields": [
+        {
+         "title": "Text size",
+         "sub_text": "font_scale",
+         "controls": [
+          {
+           "type": "choice",
+           "key": "font_scale",
+           "options": "sizes",
+           "label": "Text size"
+          },
+          {
+           "type": "slider",
+           "key": "font_scale",
+           "min": 0.5,
+           "max": 2,
+           "step": 0.05,
+           "unit": "×",
+           "aria": "Text scale",
+           "label": "Text scale"
+          }
+         ]
+        },
+        {
+         "title": "Text colour",
+         "sub_text": "font_colour",
+         "controls": [
+          {
+           "type": "select",
+           "key": "font_colour",
+           "options": "font_colours",
+           "label": "Colour of the text on the board"
+          }
+         ]
+        }
+       ]
+      }
+     ]
     },
+    {
+     "type": "form",
+     "get": "/screen",
+     "post": "/screen",
+     "fields": [
+      {
+       "title": "Button sounds",
+       "sub_text": "sound_name",
+       "controls": [
+        {
+         "type": "select",
+         "key": "sound_name",
+         "options": "sounds",
+         "label": "Sound (more: copy .wav, .mp3 or .ogg files into /opt/checkin-board/sounds)"
+        },
+        {
+         "type": "slider",
+         "key": "sound_volume",
+         "aria": "Volume",
+         "label": "Volume"
+        }
+       ]
+      }
+     ],
+     "order": 60
+    },
+    {
+     "type": "menu",
+     "id": "colours",
+     "title": "Colours",
+     "order": 70,
+     "items": [
+      {
+       "type": "palette",
+       "order": 10
+      },
+      {
+       "type": "row",
+       "order": 20,
+       "title": "Global main colour",
+       "sub": "Pick Global main for a box or a button to give it this colour",
+       "control": {
+        "type": "colourpick",
+        "id": "global",
+        "label": "Global main colour"
+       }
+      }
+     ]
+    },
+    {
+     "type": "menu",
+     "id": "background",
+     "title": "Background",
+     "order": 80,
+     "items": []
+    }
+   ]
+  },
+  {
+   "box": "system",
+   "title": "System",
+   "items": [
     {
      "type": "row",
      "title": "Ask for the PIN to open Settings",
-     "sub": "The dashboard keeps working without it; opening Settings and changing anything in it needs the PIN. Set a PIN below first.",
+     "sub": "The dashboard keeps working without it; opening Settings and changing anything in it needs the PIN. Set a PIN first.",
      "control": {
       "type": "toggle",
       "bind": "@settings_pin.on",
       "post": "/settings-pin",
       "label": "Ask for the PIN to open Settings",
       "ensure_pin": true
-     }
+     },
+     "order": 40
     },
     {
      "type": "row",
+     "order": 35,
      "title": "PIN",
      "sub": "4 to 64 characters. It is also asked for before updating, restarting and any other action that can change the machine.",
      "control": {
       "type": "pinset"
      }
-    }
-   ]
-  },
-  {
-   "box": "colours",
-   "title": "Global colours",
-   "items": [
-    {
-     "type": "row",
-     "title": "Global main colour",
-     "sub": "Pick Global main for a box or a button to give it this colour",
-     "control": {
-      "type": "colourpick",
-      "id": "global",
-      "label": "Global main colour"
-     }
     },
     {
-     "type": "form",
-     "get": "/highlight",
-     "post": "/highlight",
-     "fields": [
-      {
-       "title": "Notification highlight",
-       "sub_text": "highlight",
-       "controls": [
-        {
-         "type": "select",
-         "key": "style",
-         "options": "styles",
-         "label": "Look"
-        }
-       ]
-      }
-     ]
+     "type": "slot",
+     "name": "modules",
+     "order": 50
     }
    ]
   }

@@ -3,9 +3,9 @@
 // The whole list is POSTed to /checkin/statuses.
 custom("checkin-statuses",function(host){var box=host.querySelector(".cstatuses"),modal=h("div",{"class":"rp-modal keep-visible",style:"display:none"}),key="",items=[],editing=-1;
  document.body.appendChild(modal);
- var NEEDS=[["","Nothing"],["time","A time"],["date","A date"],["note","A note (free text)"]];
+ var NEEDS=[["","Nothing"],["time","A time"],["date","A date"],["datetime","A date and a time"],["note","A note (free text)"]];
  function colours(){return PAL()}
- function summary(s){var t=[];if(s.needs)t.push({time:"asks for a time",date:"asks for a date",note:"asks for a note"}[s.needs]);if(s.out)t.push("checks out");if(s.sticky)t.push("sticky");if(s.dots)t.push(s.dots+" dot"+(s.dots>1?"s":""));return t.join(" · ")}
+ function summary(s){var t=[];if(s.needs)t.push({time:"asks for a time",date:"asks for a date",datetime:"asks for a date and a time",note:"asks for a note"}[s.needs]);if(s.out)t.push("checks out");if(s.sticky)t.push("sticky");if(s.dots)t.push(s.dots+" dot"+(s.dots>1?"s":""));return t.join(" · ")}
  function save(list,done){post("/checkin/statuses",{statuses:list},function(r,st,b){if(r&&r.ok){refresh();if(done)done(true,b)}else if(done)done(false,b)})}
  function paint(list){items=list||[];var k=JSON.stringify(items);if(k===key)return;key=k;box.innerHTML="";
   var add=h("button",{type:"button","class":"pill-s",text:"Add status"});add.onclick=function(){edit(-1)};sh(add,items.length<16);

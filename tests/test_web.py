@@ -54,21 +54,10 @@ class HttpTests(unittest.TestCase):
             self.assertIn(key, d)
         self.assertEqual(d["checkin"]["total"], 0)      # no contacts imported yet
 
-    def test_highlight_and_notices_are_always_in_the_api(self):
+    def test_notices_are_always_in_the_api(self):
         d = json.loads(self.get("/api")[2].decode())
-        self.assertIsInstance(d["highlight"], dict)        # always sent, so a box stops standing out when a module stops asking
         self.assertIsInstance(d["notices"], list)
-        self.assertEqual(d["theme"], {"highlight": "rainbow"})
-
-    def test_the_highlight_look_is_a_global_setting(self):
-        r = json.loads(self.get("/highlight")[2].decode())
-        self.assertEqual(r["values"], {"style": "rainbow"})
-        self.assertEqual(len(r["options"]["styles"]), 1 + len(core.palette_ids()))
-        st, body = self.post("/highlight", {"values": {"style": "bright-green"}})
-        self.assertEqual(json.loads(body.decode())["values"], {"style": "bright-green"})
-        self.assertEqual(json.loads(self.get("/api")[2].decode())["theme"]["highlight"], "bright-green")
-        self.post("/highlight", {"values": {"style": "plaid"}})          # not a look: back to the rainbow
-        self.assertEqual(core.highlight_style(), "rainbow")
+        self.assertNotIn("highlight", d)                  # the notification highlight is gone
 
     def test_the_time_zone_is_a_global_setting(self):
         r = json.loads(self.get("/timezone")[2].decode())
@@ -80,21 +69,21 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(got["values"], {"zone": "Europe/Stockholm"})
         self.assertIn("Stockholm", got["texts"]["zone"])
         self.assertEqual(core.time_zone(), "Europe/Stockholm")
-        self.post("/timezone", {"values": {"zone": "Mars/Olympus"}})     # not a zone of the list: the Pi's own
+        self.post("/timezone", {"values": {"zone": "Mars/Olympus"}})     # not a zone of the list: the computer's own
         self.assertEqual(core.time_zone(), "")
 
     def test_screen_layout_settings(self):
         d = json.loads(self.get("/api")[2].decode())
-        self.assertEqual(d["screen"], {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "theme": "dark"})
+        self.assertEqual(d["screen"], {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "theme": "dark", "font_scale": 1.0, "font_colour": "auto", "sound": True, "sound_name": "pop.wav", "sound_volume": 0.6})
         self.post("/screen", {"values": {"dash_cols": 3, "set_cols": 2}})
         self.post("/screen/stretch", {"value": True})
         self.post("/screen/scale", {"value": True})
         self.post("/screen/fit", {"value": True})
         d = json.loads(self.get("/api")[2].decode())
-        self.assertEqual(d["screen"], {"dash_cols": 3, "set_cols": 2, "stretch": True, "scale": True, "drag": False, "noscroll": False, "fit": True, "autohide": False, "theme": "dark"})
+        self.assertEqual(d["screen"], {"dash_cols": 3, "set_cols": 2, "stretch": True, "scale": True, "drag": False, "noscroll": False, "fit": True, "autohide": False, "theme": "dark", "font_scale": 1.0, "font_colour": "auto", "sound": True, "sound_name": "pop.wav", "sound_volume": 0.6})
         self.post("/screen/fit", {"value": False})
         reply = json.loads(self.get("/screen")[2].decode())
-        self.assertEqual(reply["values"], {"dash_cols": 3, "set_cols": 2, "theme": "dark"})
+        self.assertEqual(reply["values"], {"dash_cols": 3, "set_cols": 2, "theme": "dark", "font_scale": 1.0, "font_colour": "auto", "sound_name": "pop.wav", "sound_volume": 0.6})
         self.assertEqual([o["value"] for o in reply["options"]["cols"]], [1, 2, 3, 4, 5, 6])
         self.post("/screen", {"values": {"dash_cols": 9, "set_cols": "x"}})                       # out of range / not a number: kept
         self.assertEqual((core.screen_settings()["dash_cols"], core.screen_settings()["set_cols"]), (3, 2))
@@ -113,35 +102,35 @@ class HttpTests(unittest.TestCase):
         self.post("/screen/drag", {"value": True})
         self.assertTrue(core.screen_settings()["drag"])
         before = core.module_names()
-        got = json.loads(self.post("/modules/dashboard-order", {"order": ["clock", "checkin"]})[1].decode())
+        got = json.loads(self.post("/modules/dashboard-order", {"order": ["checkin"]})[1].decode())
         names = [m["name"] for m in got["modules"]]
-        self.assertTrue(names.index("clock") < names.index("checkin"))
+        self.assertIn("checkin", names)
         self.assertEqual(sorted(core.module_names()), sorted(before))                           # nothing lost
         self.assertEqual([m["group"] for m in got["modules"]], sorted(m["group"] for m in got["modules"]))
         with self.assertRaises(HTTPError):
-            self.post("/modules/dashboard-order", {"order": "clock"})
+            self.post("/modules/dashboard-order", {"order": "contacts"})
         self.post("/screen/drag", {"value": False})
 
     def test_the_theme_is_in_the_page_and_in_the_api(self):
         html = self.get("/")[2].decode()
         self.assertIn('data-pref="dark" data-theme="dark"', html)
-        for theme in ("light", "auto"):
+        for theme in ("light", "auto", "time"):
             self.post("/screen", {"values": {"theme": theme}})
             self.assertEqual(json.loads(self.get("/api")[2].decode())["screen"]["theme"], theme)
             self.assertIn('data-pref="%s" data-theme="%s"' % (theme, theme), self.get("/")[2].decode())      # built in: no flash of the other theme
         self.post("/screen", {"values": {"theme": "neon"}})                                              # not a theme: kept
-        self.assertEqual(core.screen_settings()["theme"], "auto")
+        self.assertEqual(core.screen_settings()["theme"], "time")
         self.assertIn("html[data-theme=light]", html)                                                      # the light tokens are in the page, palette included
         self.assertIn("--c-orange-l:", html.split("html[data-theme=light]", 1)[1].split("}", 1)[0])
         self.post("/screen", {"values": {"theme": "dark"}})
         reply = json.loads(self.get("/screen")[2].decode())
-        self.assertEqual([o["value"] for o in reply["options"]["themes"]], ["dark", "light", "auto"])
+        self.assertEqual([o["value"] for o in reply["options"]["themes"]], ["dark", "light", "auto", "time"])
 
     def test_the_places_of_the_tiles_are_kept_per_number_of_columns(self):
         self.assertEqual(json.loads(self.get("/api")[2].decode())["tile_layout"], {})
-        r = json.loads(self.post("/modules/dashboard-layout", {"cols": 3, "columns": [["clock"], ["checkin", "checkin-kok"], []]})[1].decode())
-        self.assertEqual(r["tile_layout"]["3"], [["clock"], ["checkin", "checkin-kok"], []])
-        self.post("/modules/dashboard-layout", {"cols": 1, "columns": [["checkin", "clock"]]})
+        r = json.loads(self.post("/modules/dashboard-layout", {"cols": 3, "columns": [["contacts"], ["checkin", "checkin-kok"], []]})[1].decode())
+        self.assertEqual(r["tile_layout"]["3"], [["contacts"], ["checkin", "checkin-kok"], []])
+        self.post("/modules/dashboard-layout", {"cols": 1, "columns": [["checkin", "contacts"]]})
         got = json.loads(self.get("/api")[2].decode())["tile_layout"]
         self.assertEqual(sorted(got), ["1", "3"])                                              # each number of columns has its own
         for bad in ({"cols": 3, "columns": [["a"], ["b"]]}, {"cols": 2, "columns": "x"}, {"cols": 2, "columns": [["a"], [1]]}, {"cols": 9, "columns": []},
