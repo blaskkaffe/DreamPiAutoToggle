@@ -139,15 +139,28 @@ class BoardTests(Base):
     def test_statuses_that_need_a_time_a_date_or_a_note(self):
         anna = self.people()["Anna Svensson"]["id"]
         checkin.set_status(anna, "LATE", "8:15")
-        self.assertEqual(self.people()["Anna Svensson"]["text"], "Kommer sent · 8:15")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "Kommer sent · kl 8:15")
         checkin.set_status(anna, "LATE", "soon")             # not a time: the status' own default
-        self.assertEqual(self.people()["Anna Svensson"]["text"], "Kommer sent · 07:30")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "Kommer sent · kl 07:30")
         checkin.set_status(anna, "TRAVEL", "2026-12-24")
         self.assertEqual(self.people()["Anna Svensson"]["text"], "Tjänsteresa · tillbaka 24/12")
         checkin.set_status(anna, "OTHER", "  Dentist   at   3 ")
-        self.assertEqual(self.people()["Anna Svensson"]["text"], "Annat · Dentist at 3")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "Annat · info: Dentist at 3")
         checkin.set_status(anna, "OTHER", "x" * 200)
         self.assertEqual(len(self.people()["Anna Svensson"]["detail"]), checkin.DETAIL_MAX)
+
+    def test_every_status_that_asks_for_a_value_has_a_text_before_it(self):
+        anna = self.people()["Anna Svensson"]["id"]
+        by = dict((s["code"], s) for s in checkin.statuses())
+        for code in ("LATE", "EARLY_LEAVE", "DOCTOR", "TRAVEL", "VACATION", "OTHER"):
+            self.assertTrue(by[code]["prefix"], code)                       # the shipped menu
+        checkin.save_statuses([{"code": "T1", "label": "A", "needs": "time"}, {"code": "T2", "label": "B", "needs": "note"}, {"code": "T3", "label": "C", "needs": "date", "prefix": " back  now "}, {"code": "T4", "label": "D"}])
+        got = dict((s["code"], s["prefix"]) for s in checkin.statuses())
+        self.assertEqual(got, {"T1": "kl", "T2": "info:", "T3": "back now", "T4": ""})      # an empty one gets the default, a status that asks for nothing has none
+        checkin.set_status(anna, "T1", "08:15")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "A · kl 08:15")
+        checkin.set_status(anna, "T2", "doctor")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "B · info: doctor")
 
     def test_a_status_can_ask_for_a_date_and_a_time_and_a_date_can_be_skipped(self):
         anna = self.people()["Anna Svensson"]["id"]

@@ -25,7 +25,7 @@ custom("checkin-statuses",function(host){var box=host.querySelector(".cstatuses"
    field("Name",'<input class="rp-big" type="text" data-f="label" maxlength="30" value="'+esc(s.label)+'">',"label")+
    field("Colour",'<select class="rp-big" data-f="colour">'+colours().map(function(c){return '<option value="'+esc(c.id)+'"'+(c.id===s.colour?" selected":"")+'>'+esc(c.name)+'</option>'}).join("")+'</select>',"colour")+
    field("It asks for",'<select class="rp-big" data-f="needs">'+NEEDS.map(function(n){return '<option value="'+n[0]+'"'+(n[0]===s.needs?" selected":"")+'>'+n[1]+'</option>'}).join("")+'</select>',"needs")+
-   field("Text before the date (for example: back)",'<input class="rp-big" type="text" data-f="prefix" maxlength="20" value="'+esc(s.prefix||"")+'">',"prefix")+
+   field("Text before the value (for example: at, back, info:)",'<input class="rp-big" type="text" data-f="prefix" maxlength="20" value="'+esc(s.prefix||"")+'">',"prefix")+
    field("Start time in the pop-up (for example 07:30)",'<input class="rp-big" type="text" data-f="default" maxlength="5" value="'+esc(s.default||"")+'">',"default")+
    field("Dots next to the name",'<span class="optrow" role="group" aria-label="Dots next to the name" data-f="dots" data-v="'+(s.dots||0)+'">'+[0,1,2,3].map(function(n){return '<button type="button" class="pill-s'+(n===(s.dots||0)?" on":"")+'" data-dot="'+n+'" aria-pressed="'+(n===(s.dots||0))+'">'+(n?n:"None")+'</button>'}).join("")+'</span>',"dots")+
    '<label class="rp-nl rp-chk"><input type="checkbox" class="cbox neutral" data-f="out"'+(s.out?" checked":"")+'> Counts as out (the person is checked out)</label>'+
@@ -33,7 +33,7 @@ custom("checkin-statuses",function(host){var box=host.querySelector(".cstatuses"
    '<div class="rp-cmsg sub" aria-live="polite"></div><div class="rp-nb rp-nb3">'+(i>=0?'<button type="button" class="pill-s danger rp-so" data-del="1">Delete</button>':'<span></span>')+'<button type="button" class="pill-s rp-so" data-close="1">Cancel</button><button type="button" class="pill-s pri rp-so c-green" data-save="1">Save</button></div></div>';
   modal.style.display="";shows();var f0=modal.querySelector("input");if(f0&&f0.focus)f0.focus()}
  function shows(){var n=modal.querySelector('[data-f=needs]').value;
-  sh(modal.querySelector('[data-row=prefix]'),n==="date");sh(modal.querySelector('[data-row=default]'),n==="time")}
+  sh(modal.querySelector('[data-row=prefix]'),!!n);sh(modal.querySelector('[data-row=default]'),n==="time")}
  function read(){var o={};Array.prototype.forEach.call(modal.querySelectorAll("[data-f]"),function(e){var k=e.getAttribute("data-f");o[k]=e.type==="checkbox"?e.checked:(k==="dots"?+e.getAttribute("data-v"):e.value)});return o}
  function close(){modal.style.display="none";modal.innerHTML="";editing=-1}
  modal.addEventListener("change",function(e){if(e.target.getAttribute&&e.target.getAttribute("data-f")==="needs")shows()});

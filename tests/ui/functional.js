@@ -79,7 +79,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('.rp-sheet button[data-code="LATE"]').click(); await settle(300);
   ok(await page.locator('.rp-need2 input[placeholder="tt:mm"]').count() === 1, 'a status that needs a time asks for it');
   await page.locator('.rp-need2 input').fill('08:45'); await page.locator('.rp-need2 button[data-set]').click(); await settle(500);
-  ok(/Kommer sent \u00b7 08:45/.test(await sick.textContent()), 'the time is part of the status text');
+  ok(/Kommer sent \u00b7 kl 08:45/.test(await sick.textContent()), 'the time is part of the status text');
   await sick.locator('.rp-io').click(); await settle(500);
   ok((await sick.locator('.rp-io').textContent()) === 'INNE', 'INNE / UTE changes in / out while the status stays');
   await sick.locator('.rp-t').click(); await settle(300);
@@ -204,12 +204,12 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(await page.locator('.rp-need2 .rp-kb [data-k=d5]').count() === 1 && await page.locator('.rp-need2 input').count() === 0, 'with the touch keyboard on, a time is typed on a number pad');
   for (const k of ['d0', 'd9', 'd1', 'd5']) await page.click('[data-k="' + k + '"]');
   await page.click('.rp-need2 [data-set]'); await settle(700);
-  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'L\u00e4karbes\u00f6k \u00b7 09:15')), 'the time typed on the pad is kept (24 h clock)');
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'L\u00e4karbes\u00f6k \u00b7 kl 09:15')), 'the time typed on the pad is kept (24 h clock)');
   await page.locator('.rp-t').nth(4).click(); await settle(300);
   await page.locator('.rp-sheet button[data-code="OTHER"]').click(); await settle(300);
   for (const k of ['shift', 'cO', 'ck', 'layersym', 'c7', 'c!']) await page.click('[data-k="' + k + '"]');
   await page.click('.rp-need2 [data-k=done]'); await settle(700);
-  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'Annat \u00b7 Ok7!')), 'a note is typed on the text keyboard (letters, numbers, special characters)');
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'Annat \u00b7 info: Ok7!')), 'a note is typed on the text keyboard (letters, numbers, special characters)');
   // the keyboard is laid out like the iPhone's Swedish one: 11 letters in the first two rows, shift and delete round the last letters, 123, emoji, space, done
   await page.locator('.rp-t').nth(4).click(); await settle(300);
   await page.locator('.rp-sheet button[data-code="OTHER"]').click(); await settle(300);
@@ -234,7 +234,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.click('.rp-need2 [data-k="layeremoji"]'); await page.locator('.rp-egrid .rp-emo').first().click(); await page.keyboard.type('!');
   ok(Array.from((await page.locator('.rp-need2 .rp-shown').textContent()).trim()).slice(-1)[0] === '!', 'and the two can be mixed');
   await page.keyboard.press('Enter'); await settle(700);
-  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => /^Annat \u00b7 Hej \u00e5\u00e4.*!$/.test(p.text))), 'Enter on the physical keyboard sets the status');
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => /^Annat \u00b7 info: Hej \u00e5\u00e4.*!$/.test(p.text))), 'Enter on the physical keyboard sets the status');
   await page.locator('.rp-t').nth(4).click(); await settle(300);
   await page.locator('.rp-sheet button[data-code=""]').click(); await settle(500);
   await page.locator('.rp-t').nth(4).click(); await settle(300);
@@ -242,7 +242,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.keyboard.type('0745');
   ok((await page.locator('.rp-need2 .rp-shown').textContent()).replace(/\s/g, '') === '07:45', 'digits from a physical keyboard go on the number pad');
   await page.keyboard.press('Enter'); await settle(700);
-  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'L\u00e4karbes\u00f6k \u00b7 07:45')), 'and Enter sets the time');
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'L\u00e4karbes\u00f6k \u00b7 kl 07:45')), 'and Enter sets the time');
   await page.locator('.rp-t').nth(4).click(); await settle(300);
   await page.locator('.rp-sheet button[data-code=""]').click(); await settle(500);
   // a date on the number pad: the calendar button is right of the field, a day tapped there fills it, Skip leaves the date out
@@ -312,7 +312,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('[data-box="statuses"] button', { hasText: 'Add status' }).click(); await settle(300);
   ok(parseFloat(await page.locator('.rp-need2 input[data-f=label]').evaluate(e => getComputedStyle(e).fontSize)) >= 18, 'the editor fields have a readable font size');
   await page.locator('.rp-need2 input[data-f=label]').fill('Testst\u00e4ll'); await page.selectOption('.rp-need2 select[data-f=needs]', 'time');
-  ok(await page.locator('.rp-need2 [data-row=default]').isVisible() && !(await page.locator('.rp-need2 [data-row=prefix]').isVisible()), 'a time status asks for a start time, not a date prefix');
+  ok(await page.locator('.rp-need2 [data-row=default]').isVisible() && await page.locator('.rp-need2 [data-row=prefix]').isVisible(), 'a time status asks for a start time and has a text before the time');
   await page.click('.rp-need2 [data-dot="2"]'); await page.locator('.rp-need2 input[data-f=sticky]').check(); await page.locator('.rp-need2 [data-save]').click(); await settle(1200);
   const made = (await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.statuses.find(x => x.label === 'Testst\u00e4ll');
   ok(made && made.sticky && made.dots === 2 && made.needs === 'time', 'the new status is saved with its settings (' + JSON.stringify(made) + ')');

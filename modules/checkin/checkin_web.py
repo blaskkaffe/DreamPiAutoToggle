@@ -22,17 +22,17 @@ PHOTOS_DIR = os.path.join(core.BASE_DIR, "photos")           # <person id>.jpg /
 IN, OUT = "IN", "OUT"
 DEFAULT_STATUSES = [
     {"code": "FYS", "label": "FYS", "colour": "cyan"},
-    {"code": "LATE", "label": "Kommer sent", "colour": "orange", "needs": "time", "default": "07:30"},
-    {"code": "EARLY_LEAVE", "label": "Går tidigare", "colour": "orange", "needs": "time", "default": "16:30"},
+    {"code": "LATE", "label": "Kommer sent", "colour": "orange", "needs": "time", "default": "07:30", "prefix": "kl"},
+    {"code": "EARLY_LEAVE", "label": "Går tidigare", "colour": "orange", "needs": "time", "default": "16:30", "prefix": "kl"},
     {"code": "TRAVEL", "label": "Tjänsteresa", "colour": "blue", "needs": "date", "prefix": "tillbaka", "out": True},
     {"code": "SICK", "label": "Sjuk", "colour": "red", "out": True},
     {"code": "WFH", "label": "Jobbar hemifrån", "colour": "bright-blue", "out": True},
     {"code": "VACATION", "label": "Semester", "colour": "bright-cyan", "needs": "date", "prefix": "tillbaka", "out": True},
     {"code": "VAB", "label": "VAB", "colour": "bright-red", "out": True},
-    {"code": "DOCTOR", "label": "Läkarbesök", "colour": "yellow", "needs": "time"},
+    {"code": "DOCTOR", "label": "Läkarbesök", "colour": "yellow", "needs": "time", "prefix": "kl"},
     {"code": "PARENTAL", "label": "Föräldraledig", "colour": "purple", "out": True},
     {"code": "PERSONAL", "label": "Personlig dag", "colour": "bright-purple", "out": True},
-    {"code": "OTHER", "label": "Annat", "colour": "white", "needs": "note"},
+    {"code": "OTHER", "label": "Annat", "colour": "white", "needs": "note", "prefix": "info:"},
 ]
 GROUPS = ("department", "building")
 FRAMES = ("none", "thin", "thick")      # the frame round a department box
@@ -75,6 +75,15 @@ def _save(data):
     _cache["key"] = None
 
 
+PREFIXES = {"time": "kl", "date": "till", "datetime": "till", "note": "info:"}      # the text before the value of a status that asks for one, when none is set
+
+
+def _prefix(raw, needs):
+    """The text before the time / date / note in a status: what is set, else a default, so every status that asks for a value has one."""
+    p = re.sub(r"\s+", " ", str(raw or "")).strip()[:20]
+    return p or PREFIXES.get(needs, "")
+
+
 def _palette_id(v, default):
     v = core.LEGACY_COLOURS.get(v, v)
     return v if v in core.palette_ids() else default
@@ -91,7 +100,7 @@ def statuses(data=None):
         seen.add(s["code"])
         out.append({"code": s["code"], "label": str(s.get("label") or s["code"])[:30], "colour": _palette_id(s.get("colour"), "white"),
                     "needs": s.get("needs") if s.get("needs") in ("time", "date", "datetime", "note") else "", "default": str(s.get("default") or "")[:5],
-                    "prefix": str(s.get("prefix") or "")[:20], "out": bool(s.get("out")), "sticky": bool(s.get("sticky")),
+                    "prefix": _prefix(s.get("prefix"), s.get("needs")), "out": bool(s.get("out")), "sticky": bool(s.get("sticky")),
                     "dots": s.get("dots") if s.get("dots") in (1, 2, 3) else 0})
     return out[:16]
 
@@ -119,7 +128,7 @@ def save_statuses(items):
             d = str(x.get("default") or "").strip()
             out.append({"code": code, "label": label, "colour": _palette_id(x.get("colour"), "white"),
                         "needs": x.get("needs") if x.get("needs") in ("time", "date", "datetime", "note") else "",
-                        "default": d if re.match(r"^([01]?\d|2[0-3]):[0-5]\d$", d) else "", "prefix": str(x.get("prefix") or "").strip()[:20],
+                        "default": d if re.match(r"^([01]?\d|2[0-3]):[0-5]\d$", d) else "", "prefix": _prefix(x.get("prefix"), x.get("needs")),
                         "out": bool(x.get("out")), "sticky": bool(x.get("sticky")), "dots": x.get("dots") if x.get("dots") in (1, 2, 3) else 0})
         seen = set()
         for x in out:
@@ -209,7 +218,7 @@ def group_colours(people, kind, cfg):
 def _status_text(st, detail):
     t = st["label"]
     if detail:
-        t += " \u00b7 " + ((st["prefix"] + " ") if st["prefix"] and st["needs"] in ("date", "datetime") else "") + detail
+        t += " \u00b7 " + ((st["prefix"] + " ") if st["prefix"] and st["needs"] else "") + detail
     return t
 
 
