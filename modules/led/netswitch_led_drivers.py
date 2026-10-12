@@ -40,9 +40,9 @@ import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)                                            # this module's other files
-sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (netswitch_core ...)
+sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (base_core ...)
 from netswitch_ledconfig import GPIO_PINS, DEFAULT_GPIO  # noqa: E402  (allowed LED output pins: 10, 12, 18, 21; default 18)
-from netswitch_gpio import peripheral_base, Block  # noqa: E402  (shared with netswitch_buttons.py)
+from base_gpio import peripheral_base, Block  # noqa: E402  (shared with netswitch_buttons.py)
 
 # ---------------------------------------------------------------- registers
 GPIO_OFFSET = 0x200000

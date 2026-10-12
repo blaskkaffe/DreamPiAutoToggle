@@ -1,0 +1,10 @@
+{
+ "name": "Background image",
+ "description": "Use a picture as the page's background.",
+ "enabled": false,
+ "visible": true,
+ "order": 18,
+ "ui": 2,
+ "web": "netswitch_imagebg",
+ "toggle_box": "appearance"
+}

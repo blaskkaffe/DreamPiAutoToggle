@@ -1,0 +1,134 @@
+[
+ {
+  "title": "Game Night UK: Power Smash Tennis",
+  "allDay": false,
+  "location": null,
+  "summary": null,
+  "url": "https://dreamcastlive.net/schedule/",
+  "source": "dreamcastlive",
+  "external": true,
+  "date": "2026-10-04 20:00:00",
+  "endDate": "2026-10-04 21:30:00"
+ },
+ {
+  "title": "Game Night: Pro Yakyu Team de Asobou NET!",
+  "allDay": false,
+  "location": null,
+  "summary": null,
+  "url": "https://dreamcastlive.net/schedule/",
+  "source": "dreamcastlive",
+  "external": true,
+  "date": "2026-10-07 21:00:00",
+  "endDate": "2026-10-07 22:30:00"
+ },
+ {
+  "title": "US Game Night",
+  "date": "2026-10-08 21:00:00",
+  "endDate": null,
+  "allDay": false,
+  "location": null,
+  "summary": "Join hawkzero for Thursday night dreamcastin'",
+  "source": "discord",
+  "url": "/events/us-game-night-2026-10-08",
+  "external": false
+ },
+ {
+  "title": "Quake III Arena",
+  "date": "2026-10-09 21:00:00",
+  "endDate": null,
+  "allDay": false,
+  "location": null,
+  "summary": "Join mechanic and the gang for Fraggin' Friday!",
+  "source": "discord",
+  "url": "/events/quake-iii-arena-2026-10-09",
+  "external": false
+ },
+ {
+  "title": "Saturday Night Sportsball",
+  "allDay": false,
+  "location": null,
+  "summary": "Weekly game features all the online Dreamcast sports games.",
+  "url": "https://dreamcastlive.net/schedule/",
+  "source": "dreamcastlive",
+  "external": true,
+  "date": "2026-10-10 21:00:00",
+  "endDate": "2026-10-10 23:00:00"
+ },
+ {
+  "title": "Game Night UK: F355 Challenge",
+  "allDay": false,
+  "location": null,
+  "summary": null,
+  "url": "https://dreamcastlive.net/schedule/",
+  "source": "dreamcastlive",
+  "external": true,
+  "date": "2026-10-11 20:00:00",
+  "endDate": "2026-10-11 21:30:00"
+ },
+ {
+  "title": "Game Night: Sega Tetris",
+  "allDay": false,
+  "location": null,
+  "summary": null,
+  "url": "https://dreamcastlive.net/schedule/",
+  "source": "dreamcastlive",
+  "external": true,
+  "date": "2026-10-14 21:00:00",
+  "endDate": "2026-10-14 22:30:00"
+ },
+ {
+  "title": "US Game Night",
+  "date": "2026-10-15 21:00:00",
+  "endDate": null,
+  "allDay": false,
+  "location": null,
+  "summary": "Join hawkzero for Thursday night dreamcastin'",
+  "source": "discord",
+  "url": "/events/us-game-night-2026-10-15",
+  "external": false
+ },
+ {
+  "title": "Unreal Tournament",
+  "date": "2026-10-16 21:00:00",
+  "endDate": null,
+  "allDay": false,
+  "location": null,
+  "summary": "Join mechanic and the gang for Fraggin' Friday!",
+  "source": "discord",
+  "url": "/events/unreal-tournament-2026-10-16",
+  "external": false
+ },
+ {
+  "title": "Saturday Night Sportsball",
+  "allDay": false,
+  "location": null,
+  "summary": "Weekly game features all the online Dreamcast sports games.",
+  "url": "https://dreamcastlive.net/schedule/",
+  "source": "dreamcastlive",
+  "external": true,
+  "date": "2026-10-17 21:00:00",
+  "endDate": "2026-10-17 23:00:00"
+ },
+ {
+  "title": "Game Night UK: Starlancer",
+  "allDay": false,
+  "location": null,
+  "summary": null,
+  "url": "https://dreamcastlive.net/schedule/",
+  "source": "dreamcastlive",
+  "external": true,
+  "date": "2026-10-18 20:00:00",
+  "endDate": "2026-10-18 21:30:00"
+ },
+ {
+  "title": "Culdcept II Card Party",
+  "date": "2026-10-12 18:00:00",
+  "endDate": null,
+  "allDay": false,
+  "location": null,
+  "summary": "Join us for a game of Culdcept II on Sega Dreamcast! Build your deck, claim territory, collect tolls, and battle other players in this classic strategy/card game.",
+  "source": "manual",
+  "url": "/events/culdcept-ii-card-party",
+  "external": false
+ }
+]

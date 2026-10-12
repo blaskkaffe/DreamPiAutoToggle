@@ -47,8 +47,6 @@ LED_GPIO=
 WIFI=keep
 WIFI_DEMO=keep
 PIN=keep
-BUTTON1_GPIO_DEFAULT=17   # GPIO17 / physical pin 11; editable later from the page's Settings > GPIO
-BUTTON2_GPIO_DEFAULT=4    # GPIO4 / physical pin 7
 for arg in "$@"; do
     case "$arg" in
         --led) ;;   # old option: the LED is on by default now
@@ -77,13 +75,16 @@ if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
-cp "$SRC/netswitch_hook.py" "$SRC/netswitch_core.py" "$SRC/netswitch_modules.py" "$SRC/netswitch_update.py" "$SRC/netswitch_security.py" "$SRC/netswitch_probes.py" "$SRC/netswitch_web.py" "$SRC/netswitch_gpio.py" "$SRC/netswitch_buttons.py" \
+cp "$SRC"/base/base_*.py "$SRC/base/layout.json" "$SRC/project.json" \
    "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/static"
-cp "$SRC"/page/index.html "$SRC"/page/page.css "$SRC"/page/page.js "$DEST/page/"
+cp "$SRC"/base/page/index.html "$SRC"/base/page/page.css "$SRC"/base/page/page.js "$SRC"/base/page/widgets.js "$SRC"/base/page/boot.js "$DEST/page/"
 cp "$SRC"/static/*.png "$DEST/static/"
+mkdir -p "$DEST/sounds"; cp "$SRC"/base/sounds/* "$DEST/sounds/"      # the button sounds (copy more .wav / .mp3 / .ogg files in by hand: Settings > Appearance > Button sound lists them)
 # Files an older layout kept next to the base (the features are folders in modules/ now)
-rm -f "$DEST/static/three.min.js" "$DEST/static/dc-background.js" "$DEST/static/LICENSES.txt" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" \
+rm -f "$DEST/netswitch_core.py" "$DEST/netswitch_modules.py" "$DEST/netswitch_web.py" "$DEST/netswitch_security.py" "$DEST/netswitch_tz.py" "$DEST/netswitch_gpio.py" \
+      "$DEST/netswitch_hook.py" "$DEST/netswitch_hook.pyc" "$DEST/netswitch_probes.py" "$DEST/netswitch_buttons.py"
+rm -f "$DEST/netswitch_update.py" "$DEST/static/three.min.js" "$DEST/static/dc-background.js" "$DEST/static/LICENSES.txt" "$DEST/netswitch_led.py" "$DEST/netswitch_led_drivers.py" "$DEST/netswitch_ledconfig.py" "$DEST/netswitch_numbers.py" \
       "$DEST/netswitch_players.py" "$DEST/netswitch_wifi_setup.py" "$DEST/page/led.html" "$DEST/page/led.js" "$DEST/page/led.css" "$DEST/page/players.js"
 
 # >>> sync_modules
@@ -91,7 +92,7 @@ rm -f "$DEST/static/three.min.js" "$DEST/static/dc-background.js" "$DEST/static/
 # is gone from $SRC/modules gets its remove.sh run (if it has one) and is deleted - that is how a module is removed.
 # Switching a module on or off is done on the page (Settings > Modules), not here.
 ns_module_enable() {   # ns_module_enable <name> on|off : write the Modules menu's switch
-    (cd "$DEST" && python3 -c "import sys, netswitch_core as c; c.save_module_enabled(sys.argv[1], sys.argv[2] == 'on')" "$1" "$2")
+    (cd "$DEST" && python3 -c "import sys, base_core as c; c.save_module_enabled(sys.argv[1], sys.argv[2] == 'on')" "$1" "$2")
 }
 sync_modules() {
     mkdir -p "$DEST/modules"
@@ -142,22 +143,10 @@ if [ "$PIN" = ask ]; then
 fi
 case "$PIN" in
     keep) ;;
-    off) (cd "$DEST" && python3 netswitch_security.py clear) && echo "PIN removed" ;;
-    *) (cd "$DEST" && NS_PIN="$PIN" python3 netswitch_security.py set) && echo "PIN set: the page asks for it before an update, restart or Wi-Fi connect" ;;
+    off) (cd "$DEST" && python3 base_security.py clear) && echo "PIN removed" ;;
+    *) (cd "$DEST" && NS_PIN="$PIN" python3 base_security.py set) && echo "PIN set: the page asks for it before an update, restart or Wi-Fi connect" ;;
 esac
 PIN=
-
-# Tell every installed Python to load the hook at startup (.pth file)
-: > "$DEST/pth_locations"
-for PY in python python2 python3; do
-    command -v "$PY" >/dev/null 2>&1 || continue
-    SITE=$("$PY" -c "import site; print(site.getsitepackages()[0])" 2>/dev/null) || continue
-    [ -n "$SITE" ] || continue
-    mkdir -p "$SITE"
-    printf '%s\nimport netswitch_hook\n' "$DEST" > "$SITE/dreampi_netswitch.pth"
-    grep -qx "$SITE/dreampi_netswitch.pth" "$DEST/pth_locations" || echo "$SITE/dreampi_netswitch.pth" >> "$DEST/pth_locations"
-    echo "Hook registered for $PY ($SITE)"
-done
 
 # Self-signed certificate for the HTTPS page. Kept on updates, renewed when it
 # expires within 30 days. 820 days: Apple devices refuse certificates valid
@@ -200,12 +189,12 @@ StartLimitIntervalSec=0
 [Service]
 # Wi-Fi power saving makes a Pi drop off the network now and then (see the script)
 ExecStartPre=-/bin/sh $DEST/wifi-powersave-off.sh
-ExecStart=$WEBPY $DEST/netswitch_web.py $PORT $HTTPS_PORT
+ExecStart=$WEBPY $DEST/base_web.py $PORT $HTTPS_PORT
 Restart=always
 RestartSec=3
 Nice=-5
 # The page runs as root, so it is fenced in: no setuid tricks, no writes to /usr, /boot or /etc,
-# no cgroup or kernel-module changes. (The update runs in its own transient unit, see netswitch_update.py.)
+# no cgroup or kernel-module changes. (The update runs in its own transient unit, see modules/rebootupdate/netswitch_update.py.)
 NoNewPrivileges=yes
 ProtectSystem=full
 ProtectControlGroups=yes
@@ -215,12 +204,8 @@ ProtectKernelModules=yes
 WantedBy=multi-user.target
 EOF
 
-# ------------------------------------------------------------------ buttons
-# Always installed: two GPIO buttons with a short-press function each (pins and
-# functions editable from the page). Wi-Fi setup is not part of it: that is the Wi-Fi module's own service.
-[ -f "$DEST/button1_gpio" ] || echo "$BUTTON1_GPIO_DEFAULT" > "$DEST/button1_gpio"
-[ -f "$DEST/button2_gpio" ] || echo "$BUTTON2_GPIO_DEFAULT" > "$DEST/button2_gpio"
-echo "Buttons on GPIO$(cat "$DEST/button1_gpio") and GPIO$(cat "$DEST/button2_gpio") (pins and functions editable from the page's Settings > GPIO)"
+# ------------------------------------------------------------------ old layouts
+# (the GPIO buttons service and the DreamPi hook belong to the network switcher module now: modules/switcher/install.sh)
 # Older versions had one service for both buttons and Wi-Fi setup, enabled only
 # by --wifi (marker wifi_button_enabled): carry that over (modules/wifi/install.sh turns it into the module's switch).
 if [ -f "$DEST/wifi_button_enabled" ]; then mv "$DEST/wifi_button_enabled" "$DEST/wifi_enabled"; fi
@@ -230,20 +215,6 @@ if [ -f /etc/systemd/system/dreampi-netswitch-wifi.service ] && [ ! -d "$DEST/mo
     rm -f /etc/systemd/system/dreampi-netswitch-wifi.service
 fi
 rm -f "$DEST/netswitch_wifi.py" "$DEST/wifi_button_gpio"
-cat > /etc/systemd/system/dreampi-netswitch-buttons.service <<EOF
-[Unit]
-Description=DreamPi Netswitch buttons
-After=network.target
-StartLimitIntervalSec=0
-
-[Service]
-ExecStart=$(command -v python3) $DEST/netswitch_buttons.py
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
 
 # ------------------------------------------------------------------ modules
 # Each installed module may have an install.sh, sourced here (it sees $DEST, $SRC, $LED_COUNT, $LED_GPIO, $WIFI, $WIFI_DEMO)
@@ -262,8 +233,6 @@ fi
 systemctl daemon-reload
 systemctl enable dreampi-netswitch.service >/dev/null 2>&1
 systemctl restart dreampi-netswitch.service
-systemctl enable dreampi-netswitch-buttons.service >/dev/null 2>&1
-systemctl restart dreampi-netswitch-buttons.service
 for ns_service in $NS_SERVICES; do      # the services of the installed modules
     systemctl enable "$ns_service" >/dev/null 2>&1
     systemctl restart "$ns_service"

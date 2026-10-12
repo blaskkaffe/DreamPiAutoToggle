@@ -2,12 +2,14 @@
 # The log itself is /tmp/dreampi-netswitch-dtmf.log: DreamPi's hook (netswitch_hookdebug.py in this folder) and the
 # web service add timed lines to it while "recording" is on (the file debug_dtmf exists). This file answers the
 # page: GET /log (new text since an offset, for the live view), GET /dtmf (the log as plain text), POST /debug
-# (recording on / off) and POST /clearlog, and tells /api whether recording is on. Works on Python 3 and 2.7.
+# (recording on / off) and POST /clearlog, and tells /api whether recording is on and what the last lines are. Works on Python 3 and 2.7.
 import json
 import os
 import re
 
-import netswitch_core as core
+import base_core as core
+
+FLAG = os.path.join(core.BASE_DIR, "dcnet_mode")      # exists = DCNET is the selected network (the network switcher's)
 
 TEXT_TAIL = 256000    # "Newest 256 KB" shows this much unless ?all
 
@@ -16,7 +18,7 @@ def read_log(start):
     """New log text from byte offset start. If the log was cleared or
     restarted, everything is returned with reset=True."""
     try:
-        with open(core.DTMF_LOG, "rb") as f:
+        with open(core.DEBUG_LOG, "rb") as f:
             f.seek(0, 2)
             size = f.tell()
             reset = start > size or start < 0
@@ -35,7 +37,7 @@ def read_log(start):
 def log_text(full=False):
     """The log as bytes for the "open as text" links."""
     try:
-        with open(core.DTMF_LOG, "rb") as f:
+        with open(core.DEBUG_LOG, "rb") as f:
             f.seek(0, 2)
             size = f.tell()
             start = 0 if full or size <= TEXT_TAIL else size - TEXT_TAIL
@@ -59,20 +61,20 @@ def _get_text(h):
 
 
 def _post_debug(h):
-    if os.path.exists(core.DEBUG_DTMF):
+    if os.path.exists(core.DEBUG_FLAG):
         core.debug_log("web page: debug log stopped")
-        os.remove(core.DEBUG_DTMF)
+        os.remove(core.DEBUG_FLAG)
     else:
-        open(core.DEBUG_DTMF, "w").close()
-        if os.path.exists(core.DTMF_LOG):
-            os.remove(core.DTMF_LOG)  # start a fresh log
+        open(core.DEBUG_FLAG, "w").close()
+        if os.path.exists(core.DEBUG_LOG):
+            os.remove(core.DEBUG_LOG)  # start a fresh log
         core.debug_log("web page: debug log started (network: %s)" %
-                       ("DCNET" if os.path.exists(core.FLAG) else "DCNow!"))
+                       ("DCNET" if os.path.exists(FLAG) else "DCNow!"))
 
 
 def _post_clear(h):
-    if os.path.exists(core.DTMF_LOG):
-        os.remove(core.DTMF_LOG)
+    if os.path.exists(core.DEBUG_LOG):
+        os.remove(core.DEBUG_LOG)
     core.debug_log("web page: log cleared")
 
 
@@ -80,5 +82,22 @@ GET = {"/log": _get_log, "/dtmf": _get_text}
 POST = {"/debug": _post_debug, "/clearlog": _post_clear}
 
 
+def last_lines(n=3):
+    """The last n lines of the log, oldest first, each cut to 300 characters; [] when there are none."""
+    try:
+        with open(core.DEBUG_LOG, "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 4096))
+            lines = f.read().decode("utf-8", "replace").splitlines()
+    except IOError:
+        return []
+    return [" ".join(line.split())[:300] for line in lines if line.strip()][-n:]
+
+
 def api(d, warnings):
-    d["debug"] = os.path.exists(core.DEBUG_DTMF)
+    """"last" is what the closed box shows: the last three lines of the log (or why there are none), "button" the text of the record
+    button in the open box."""
+    on = os.path.exists(core.DEBUG_FLAG)
+    d["debug"] = on
+    d["debuglog"] = {"on": on, "button": "Stop recording" if on else "Start recording",
+                     "last": "\n".join(last_lines()) or ("Waiting for the first line" if on else "Recording off")}

@@ -2,7 +2,7 @@
 # The scene (dc-background.js) is Robert Dale Smith's, three.min.js is Three.js; licences in LICENSES.txt next to them.
 import os
 
-import netswitch_core as core
+import base_core as core
 
 _FILES = {"/background/three.min.js": ("three.min.js", "application/javascript; charset=utf-8"),
           "/background/dc-background.js": ("dc-background.js", "application/javascript; charset=utf-8"),

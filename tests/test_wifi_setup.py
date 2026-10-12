@@ -69,24 +69,24 @@ class WifiSetupTests(unittest.TestCase):
 
     def test_state_file_round_trip_through_core(self):
         w.set_state("hosting", ssid="DreamPi WiFi Config", networks=[{"ssid": "Home", "signal": -50, "secured": True}])
-        st = core.wifi_state()
+        st = w.wifi_state()
         self.assertEqual(st["state"], "hosting")
         self.assertEqual(st["networks"][0]["ssid"], "Home")
         w.set_state("idle")
-        self.assertEqual(core.wifi_state()["state"], "idle")
+        self.assertEqual(w.wifi_state()["state"], "idle")
 
     def test_stale_state_counts_as_idle(self):
-        with open(core.WIFI_STATE, "w") as f:
+        with open(w.WIFI_STATE, "w") as f:
             json.dump({"state": "hosting", "time": 1}, f)
-        self.assertEqual(core.wifi_state()["state"], "idle")
+        self.assertEqual(w.wifi_state()["state"], "idle")
 
     def test_start_stop_flags(self):
         self.assertFalse(w.start_requested())
-        open(core.WIFI_START, "w").close()
+        open(w.WIFI_START, "w").close()
         self.assertTrue(w.start_requested())
         w.clear_flags()
         self.assertFalse(w.start_requested())
-        open(core.WIFI_STOP, "w").close()
+        open(w.WIFI_STOP, "w").close()
         self.assertTrue(w.stop_requested())
 
     def test_ap_page_cannot_be_broken_out_of_by_an_ssid(self):
@@ -101,7 +101,7 @@ class DemoModeTests(unittest.TestCase):
     """Wi-Fi setup on dummy networks: no hostapd/wpa_supplicant, same states."""
     def setUp(self):
         self.tmp = sandbox(w)
-        open(core.WIFI_DEMO, "w").close()
+        open(w.WIFI_DEMO, "w").close()
         self.saved = (w.SCAN_WAIT, w.DEMO_CONNECT_SECONDS, w.RESULT_PAUSE, w.run, w.output)
         w.SCAN_WAIT = w.DEMO_CONNECT_SECONDS = w.RESULT_PAUSE = 0
 
@@ -119,7 +119,7 @@ class DemoModeTests(unittest.TestCase):
 
     def cycle(self, ssid, password):
         # the regular page's Connect button writes this file; the cycle picks it up while "hosting"
-        with open(core.WIFI_CONNECT, "w") as f:
+        with open(w.WIFI_CONNECT, "w") as f:
             json.dump({"ssid": ssid, "password": password}, f)
         w.setup_cycle(w.wifi_iface())
         return [s for s, _ in self.states]
@@ -144,7 +144,7 @@ class DemoModeTests(unittest.TestCase):
         def set_state(state, ssid=None, networks=None):
             base(state, ssid, networks)
             if state == "failed":                   # the user cancels while the red state shows
-                open(core.WIFI_STOP, "w").close()
+                open(w.WIFI_STOP, "w").close()
         w.set_state = set_state
         self.assertEqual(self.cycle("Old Router", "nope"), ["scanning", "hosting", "connecting", "failed", "scanning", "idle"])   # failed -> rescans -> sees the stop request
 

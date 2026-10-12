@@ -26,7 +26,7 @@
 # The current state is written to /tmp/dreampi-netswitch.wifi for the web
 # page (a warning banner and the Settings button) and the LED service
 # (netswitch_led.py, via netswitch_ledconfig.active_messages()) to read; see
-# LED_STATES's "wifi-setup" / "wifi-ok" / "wifi-failed" in netswitch_ledconfig.py.
+# the "wifisetup-*" messages the Wi-Fi module announces (module.json "led_messages").
 #
 # This assumes the classic Raspberry Pi OS network stack DreamPi normally
 # runs on: wpa_supplicant + dhcpcd managing the wireless interface, and
@@ -39,6 +39,7 @@ import json
 import os
 import queue
 import re
+import socket
 import subprocess
 import sys
 import threading
@@ -52,16 +53,27 @@ from urllib.parse import parse_qs
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)                                            # this module's other files
-sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (netswitch_core ...)
-import netswitch_core as core  # noqa: E402  (paths, settings, debug_log())
-import netswitch_probes as probes  # noqa: E402  (check_internet())
+sys.path.insert(0, os.path.dirname(os.path.dirname(_HERE)))          # the add-on's base files (base_core ...)
+import base_core as core  # noqa: E402  (paths, settings, debug_log())
 
 BASE_DIR = core.BASE_DIR
+
+# the module's files (the buttons service of the network switcher touches WIFI_START / WIFI_STOP and reads WIFI_STATE; the LED module reads WIFI_STATE)
+WIFI_DEMO = os.path.join(BASE_DIR, "wifi_demo")          # exists = Wi-Fi setup runs on dummy networks (install.sh --wifi-demo)
+WIFI_START = os.path.join(BASE_DIR, "wifi_start")        # touched to ask the service to start
+WIFI_STOP = os.path.join(BASE_DIR, "wifi_stop")          # touched to ask it to stop / cancel
+WIFI_CONNECT = os.path.join(BASE_DIR, "wifi_connect")    # {"ssid":..., "password":...}, an alternative to the access point's own page
+WIFI_STATE = core.TMP_PREFIX + ".wifi"                   # written by this module's service
+WIFI_STALE = 30                                          # ignore WIFI_STATE when older than this (the service is down)
+WIFI_BUTTON_FILE = os.path.join(BASE_DIR, "wifi_button")   # "1", "2" or "12": which button(s) hold-to-start Wi-Fi setup
+WIFI_BUTTON_CHOICES = (("1", "Button 1"), ("2", "Button 2"), ("12", "Button 1 + 2"))
+_WIFI_BUTTON_NAMES = tuple(c[0] for c in WIFI_BUTTON_CHOICES)
+WIFI_BUTTON_DEFAULT = "1"
 HOSTAPD_CONF = os.path.join(BASE_DIR, "wifi_hostapd.conf")
 DNSMASQ_CONF = os.path.join(BASE_DIR, "wifi_dnsmasq.conf")
 WPA_CONF = "/etc/wpa_supplicant/wpa_supplicant.conf"
 
-AP_SSID = core.WIFI_AP_SSID
+AP_SSID = "DreamPi WiFi Config"
 AP_IP = "192.168.4.1"
 AP_DHCP_FROM, AP_DHCP_TO = "192.168.4.10", "192.168.4.100"
 SCAN_WAIT = 4             # seconds to let a scan finish before reading results
@@ -107,7 +119,7 @@ DEMO_CONNECT_SECONDS = 3
 
 
 def demo():
-    return os.path.exists(core.WIFI_DEMO)
+    return os.path.exists(WIFI_DEMO)
 
 
 def wifi_iface():
@@ -130,29 +142,57 @@ def has_ip(iface):
 
 # ------------------------------------------------------------------- state
 
+def wifi_state():
+    """Latest Wi-Fi setup state: state (idle / scanning / hosting / connecting / ok / failed), ssid, networks (scan results while
+    hosting) and time. {"state": "idle"} when the service hasn't run yet, or hasn't updated the file in a while (it isn't running
+    any more, or crashed mid-setup)."""
+    try:
+        with open(WIFI_STATE) as f:
+            data = json.load(f)
+    except (IOError, OSError, ValueError):
+        return {"state": "idle"}
+    if data.get("state", "idle") != "idle" and time.time() - data.get("time", 0) > WIFI_STALE:
+        return {"state": "idle"}
+    return data
+
+
+def wifi_button():
+    v = (core.read_file(WIFI_BUTTON_FILE) or "").strip()
+    return v if v in _WIFI_BUTTON_NAMES else WIFI_BUTTON_DEFAULT
+
+
+def save_wifi_button(v):
+    if v not in _WIFI_BUTTON_NAMES:
+        return
+    tmp = WIFI_BUTTON_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(v)
+    os.rename(tmp, WIFI_BUTTON_FILE)
+
+
 def set_state(state, ssid=None, networks=None):
     data = {"state": state, "ssid": ssid, "time": time.time()}
     if networks is not None:
         data["networks"] = networks
-    tmp = core.WIFI_STATE + ".tmp"
+    tmp = WIFI_STATE + ".tmp"
     try:
         with open(tmp, "w") as f:
             json.dump(data, f)
-        os.rename(tmp, core.WIFI_STATE)
+        os.rename(tmp, WIFI_STATE)
     except (IOError, OSError):
         pass
 
 
 def stop_requested():
-    return os.path.exists(core.WIFI_STOP)
+    return os.path.exists(WIFI_STOP)
 
 
 def start_requested():
-    return os.path.exists(core.WIFI_START)
+    return os.path.exists(WIFI_START)
 
 
 def clear_flags():
-    for path in (core.WIFI_START, core.WIFI_STOP, core.WIFI_CONNECT):
+    for path in (WIFI_START, WIFI_STOP, WIFI_CONNECT):
         try:
             os.remove(path)
         except OSError:
@@ -165,9 +205,9 @@ def check_external_connect():
     the regular page is reachable some other way (e.g. Ethernet) while
     Wi-Fi is being set up. Returns (ssid, password) or None."""
     try:
-        with open(core.WIFI_CONNECT) as f:
+        with open(WIFI_CONNECT) as f:
             data = json.load(f)
-        os.remove(core.WIFI_CONNECT)
+        os.remove(WIFI_CONNECT)
     except (IOError, OSError, ValueError):
         return None
     ssid = str(data.get("ssid") or "").strip()
@@ -336,8 +376,19 @@ def try_connect(iface, ssid, password):
         if stop_requested():
             return False
         if has_ip(iface):
-            return probes.check_internet()["state"] in ("ok", "warn")
+            return internet_reachable()
         time.sleep(1)
+    return False
+
+
+def internet_reachable():
+    """Whether the new network gets to the internet: a public DNS server answers over TCP (the same idea as DreamPi's own check)."""
+    for host in ("1.1.1.1", "8.8.8.8", "208.67.222.222"):
+        try:
+            socket.create_connection((host, 53), 3).close()
+            return True
+        except Exception:
+            continue
     return False
 
 

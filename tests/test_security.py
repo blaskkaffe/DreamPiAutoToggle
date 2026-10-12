@@ -7,8 +7,10 @@ import threading
 import time
 import unittest
 
-from support import sandbox, cleanup, core, probes, web
-import netswitch_security as sec
+from support import sandbox, cleanup, core, web
+import netswitch_switcher_state as sw  # noqa: E402
+import netswitch_rebootupdate as ru
+import base_security as sec
 import netswitch_update as up
 
 
@@ -93,16 +95,17 @@ class HttpSecurityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = sandbox(up)
+        core.save_module_enabled("wifi", True)      # off by default: /wificonnect only exists (and is protected) while it is on
         cls.srv = web.Server(("127.0.0.1", 0), web.Handler)
         cls.port = cls.srv.server_address[1]
         threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
         cls.spawned = []
-        cls._spawn = probes._spawn_reboot
-        probes._spawn_reboot = lambda: cls.spawned.append(1)
+        cls._spawn = ru._spawn_reboot
+        ru._spawn_reboot = lambda: cls.spawned.append(1)
 
     @classmethod
     def tearDownClass(cls):
-        probes._spawn_reboot = cls._spawn
+        ru._spawn_reboot = cls._spawn
         cls.srv.shutdown()
         cls.srv.server_close()
         cleanup(cls.tmp)
@@ -128,23 +131,36 @@ class HttpSecurityTests(unittest.TestCase):
 
     def test_cross_site_posts_are_refused(self):
         evil = {"Host": "127.0.0.1:%d" % self.port, "Origin": "http://evil.example.com"}
-        for path in ("/dcnet", "/numbers", "/wificonnect", "/ledconfig", "/reboot", "/update/start"):
+        for path in ("/dcnet", "/numbers", "/wificonnect", "/ledconfig", "/ledrows", "/reboot", "/update/start"):
             for extra in ({}, {"X-Requested-With": "x"}, {"Content-Type": "text/plain"}):
                 status, _b, _r = self.req("POST", path, dict(evil, **extra), b"{}")
                 self.assertEqual(status, 403, (path, extra))
         self.assertEqual(self.spawned, [])
-        self.assertFalse(os.path.exists(core.FLAG))
+        self.assertFalse(os.path.exists(sw.FLAG))
 
     def test_post_without_header_or_origin_is_refused(self):
         self.assertEqual(self.req("POST", "/dcnet")[0], 403)
-        self.assertFalse(os.path.exists(core.FLAG))
+        self.assertFalse(os.path.exists(sw.FLAG))
+
+    def test_openmenu_selects_the_network_like_the_page(self):
+        """openMenu's two buttons send POST /dcnow and /dcnet over the PPP link: X-Requested-With: openMenu, no Origin, often no Host."""
+        h = {"X-Requested-With": "openMenu"}
+        open(core.DEBUG_FLAG, "w").close()                       # the debug log is on
+        core.save_module_enabled("debuglog", True)
+        self.assertEqual(self.req("POST", "/dcnet", h)[0], 204)
+        self.assertTrue(os.path.exists(sw.FLAG))
+        self.assertEqual(self.req("POST", "/dcnow", h)[0], 204)
+        self.assertFalse(os.path.exists(sw.FLAG))
+        log = open(core.DEBUG_LOG).read()
+        self.assertIn("openMenu: DCNET selected", log)
+        self.assertIn("openMenu: DCNow! selected", log)
 
     def test_same_site_form_post_still_works_without_javascript(self):
         status, _b, r = self.req("POST", "/dcnet", {"Origin": "http://127.0.0.1:%d" % self.port,
                                                     "Host": "127.0.0.1:%d" % self.port})
         self.assertEqual(status, 303)
-        self.assertTrue(os.path.exists(core.FLAG))
-        os.remove(core.FLAG)
+        self.assertTrue(os.path.exists(sw.FLAG))
+        os.remove(sw.FLAG)
 
     def test_reboot_form_post_is_never_enough(self):
         status, _b, _r = self.req("POST", "/reboot", {"Origin": "http://127.0.0.1:%d" % self.port,
@@ -158,16 +174,16 @@ class HttpSecurityTests(unittest.TestCase):
         for path in ("/reboot", "/update/start", "/wificonnect"):
             sec.reset_for_tests()
             self.assertEqual(self.req("POST", path, h, b"{}")[0], 401, path)
-            self.assertEqual(self.req("POST", path, dict(h, **{"X-Netswitch-Pin": "1111"}), b"{}")[0], 401, path)
+            self.assertEqual(self.req("POST", path, dict(h, **{"X-Pin": "1111"}), b"{}")[0], 401, path)
         self.assertEqual(self.spawned, [])
         sec.reset_for_tests()
-        status, body, _r = self.req("POST", "/reboot", dict(h, **{"X-Netswitch-Pin": "4821"}))
+        status, body, _r = self.req("POST", "/reboot", dict(h, **{"X-Pin": "4821"}))
         self.assertEqual((status, json.loads(body.decode())["started"]), (200, True))
         self.assertEqual(self.spawned, [1])
         # the check for updates and everyday switches need no PIN
         self.assertEqual(self.req("POST", "/update/check", h)[0], 200)
         self.assertEqual(self.req("POST", "/dcnet", h)[0], 204)
-        os.path.exists(core.FLAG) and os.remove(core.FLAG)
+        os.path.exists(sw.FLAG) and os.remove(sw.FLAG)
 
     def test_api_says_whether_a_pin_is_needed(self):
         self.assertFalse(json.loads(self.req("GET", "/api")[1].decode())["pin"])
@@ -176,10 +192,53 @@ class HttpSecurityTests(unittest.TestCase):
 
     def test_lockout_answers_429(self):
         sec.set_pin("4821")
-        h = {"X-Requested-With": "x", "X-Netswitch-Pin": "0000"}
+        h = {"X-Requested-With": "x", "X-Pin": "0000"}
         codes = [self.req("POST", "/reboot", h)[0] for _ in range(sec.FAIL_LIMIT + 1)]
         self.assertEqual(codes[:sec.FAIL_LIMIT], [401] * sec.FAIL_LIMIT)
         self.assertEqual(codes[-1], 429)
+
+    def test_locked_settings_need_the_pin_but_the_dashboard_does_not(self):
+        h = {"X-Requested-With": "x"}
+        self.assertEqual(self.req("POST", "/settings-pin", h, b'{"value": true}')[0], 409)         # no PIN yet: nothing to lock with
+        sec.set_pin("4821")
+        self.assertEqual(self.req("POST", "/settings-pin", h, b'{"value": true}')[0], 200)
+        api = json.loads(self.req("GET", "/api")[1].decode())
+        self.assertEqual(api["settings_pin"], {"on": True, "pin": True})
+        for path in ("/colour", "/screen", "/screen/stretch", "/modules", "/buttonconfig", "/numbers", "/clock/beat", "/highlight", "/settings-pin"):
+            sec.reset_for_tests()
+            self.assertEqual(self.req("POST", path, h, b"{}")[0], 401, path)
+        self.assertFalse(os.path.exists(core.SCREEN))
+        for path, want in (("/dcnet", 204), ("/dcnow", 204), ("/hangup", 204), ("/players/star", None), ("/events/dismiss", None)):
+            got = self.req("POST", path, h, b"{}")[0]
+            self.assertNotEqual(got, 401, path)
+            if want:
+                self.assertEqual(got, want, path)
+        self.assertEqual(self.req("POST", "/openmenu/games", {"X-Requested-With": "openMenu"}, b"#openmenu-games 1 abc 0\n")[0], 200)
+        ok = dict(h, **{"X-Pin": "4821"})
+        sec.reset_for_tests()
+        self.assertEqual(self.req("POST", "/screen/stretch", ok, b'{"value": true}')[0], 200)
+        self.assertTrue(core.screen_settings()["stretch"])
+        self.assertEqual(self.req("POST", "/pin/check", ok, b"{}")[0], 200)
+        self.assertEqual(self.req("POST", "/pin/check", dict(h, **{"X-Pin": "0000"}), b"{}")[0], 401)
+        self.assertEqual(self.req("POST", "/settings-pin", ok, b'{"value": false}')[0], 200)        # unlocked again: settings are open
+        self.assertEqual(self.req("POST", "/screen/stretch", h, b'{"value": false}')[0], 200)
+        os.path.exists(sw.FLAG) and os.remove(sw.FLAG)
+
+    def test_the_pin_can_be_set_changed_and_removed_from_the_page(self):
+        h = {"X-Requested-With": "x"}
+        self.assertEqual(self.req("POST", "/pin", h, b'{"pin": "ab"}')[0], 400)                    # too short
+        self.assertEqual(self.req("POST", "/pin", h, b'{"pin": "4821"}')[0], 200)
+        self.assertTrue(sec.pin_required())
+        self.assertEqual(self.req("POST", "/pin", h, b'{"pin": "9999"}')[0], 401)                  # changing it needs the old one
+        old = dict(h, **{"X-Pin": "4821"})
+        self.assertEqual(self.req("POST", "/pin", old, b'{"pin": "9999"}')[0], 200)
+        sec.reset_for_tests()
+        self.assertTrue(sec.check_pin("9999")[0])
+        core.save_settings_pin(True)
+        self.assertEqual(self.req("POST", "/pin", dict(h, **{"X-Pin": "9999"}), b'{"pin": ""}')[0], 200)
+        self.assertFalse(sec.pin_required())
+        self.assertFalse(core.settings_pin_on())                                                    # no PIN: the lock goes with it
+        self.assertFalse(sec.settings_locked())
 
     def test_page_cannot_be_framed(self):
         _s, _b, r = self.req("GET", "/")
@@ -195,7 +254,8 @@ class HttpSecurityTests(unittest.TestCase):
         core.save_module_enabled("wifi", True)
         body = json.dumps({"ssid": "s" * 100, "password": "p" * 200}).encode()
         self.assertEqual(self.req("POST", "/wificonnect", {"X-Requested-With": "x"}, body)[0], 204)
-        got = json.load(open(core.WIFI_CONNECT))
+        import netswitch_wifi_setup as wifi
+        got = json.load(open(wifi.WIFI_CONNECT))
         self.assertEqual((len(got["ssid"]), len(got["password"])), (32, 63))
         core.save_module_enabled("wifi", False)
 
@@ -219,7 +279,7 @@ class UpdateOriginTests(unittest.TestCase):
         open(os.path.join(self.src, "install.sh"), "w").write("#!/bin/sh\n")
         subprocess.check_call(["git", "add", "."], cwd=self.src)
         subprocess.check_call(["git", "commit", "-q", "-m", "x"], cwd=self.src, env=env)
-        open(core.ADDON_SRC, "w").write(self.src)
+        open(up.ADDON_SRC, "w").write(self.src)
         self._spawn, self.spawned = up._spawn, []
         up._spawn = self.spawned.append
 
@@ -248,7 +308,7 @@ class UpdateOriginTests(unittest.TestCase):
         self.assertEqual(self.spawned, [])
 
     def test_origin_must_match_what_was_installed(self):
-        open(core.UPDATE_ORIGIN, "w").write("https://github.com/blaskkaffe/DreamPiAutoToggle.git\n")
+        open(up.UPDATE_ORIGIN, "w").write("https://github.com/blaskkaffe/DreamPiAutoToggle.git\n")
         self.assertIsNone(up.origin_problem())
         self.set_origin("https://github.com/someone-else/Fork.git")
         self.assertIn("changed", up.origin_problem())
@@ -271,10 +331,10 @@ class UpdateOriginTests(unittest.TestCase):
 
     def test_status_file_is_not_written_through_a_link(self):
         target = os.path.join(self.tmp, "victim")
-        os.symlink(target, core.UPDATE_STATUS)
+        os.symlink(target, up.UPDATE_STATUS)
         up._write_status("running")
         self.assertFalse(os.path.exists(target))
-        self.assertEqual(open(core.UPDATE_STATUS).read(), "running")
+        self.assertEqual(open(up.UPDATE_STATUS).read(), "running")
 
 
 if __name__ == "__main__":

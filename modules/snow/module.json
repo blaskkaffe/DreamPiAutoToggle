@@ -1,0 +1,10 @@
+{
+ "name": "Snow background",
+ "description": "A snowstorm in soft fog as the page's background (3D, rendered with WebGL), with a day and night that follow the time zone.",
+ "enabled": false,
+ "visible": true,
+ "order": 19,
+ "ui": 2,
+ "web": "netswitch_snow",
+ "toggle_box": "appearance"
+}

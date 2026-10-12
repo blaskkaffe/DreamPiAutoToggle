@@ -1,6 +1,7 @@
 """Repo-level guards: the DreamPi hook must stay Python 2.7 compatible, the
 shell scripts must parse, and every Python file must compile."""
 import ast
+import json
 import glob
 import os
 import py_compile
@@ -12,11 +13,24 @@ import unittest
 from support import ROOT
 
 
-HOOK_FILES = [os.path.join(ROOT, "netswitch_hook.py"), os.path.join(ROOT, "modules", "debuglog", "netswitch_hookdebug.py")]
+def module_hook_files():
+    """Every module's "hook" file (module.json): it runs inside DreamPi like netswitch_dreampi.py."""
+    out = {}
+    for name in sorted(os.listdir(os.path.join(ROOT, "modules"))):
+        path = os.path.join(ROOT, "modules", name, "module.json")
+        if os.path.exists(path):
+            with open(path) as f:
+                hook = json.load(f).get("hook")
+            if hook:
+                out[name] = os.path.join(ROOT, "modules", name, hook + ".py")
+    return out
+
+
+HOOK_FILES = [os.path.join(ROOT, "modules", "switcher", "netswitch_dreampi.py")] + sorted(module_hook_files().values())
 
 
 class HookCompatTests(unittest.TestCase):
-    """netswitch_hook.py, and the debug log module's part that it loads, run inside DreamPi on Python 2.7."""
+    """netswitch_dreampi.py (the switcher's DreamPi integration), and the modules' hook files that it loads, run inside DreamPi on Python 2.7."""
     def test_no_python3_only_syntax(self):
         for path in HOOK_FILES:
             self.check_syntax(path)
@@ -50,16 +64,36 @@ class HookCompatTests(unittest.TestCase):
         self.assertFalse(top & {"pathlib", "typing", "asyncio", "subprocess32", "dataclasses", "enum", "secrets"}, top)
 
 
+class ActionTests(unittest.TestCase):
+    def test_every_announced_action_is_done_by_the_modules_hook_file(self):
+        import importlib
+        import support  # noqa: F401  (puts every module folder on the path)
+        files = module_hook_files()
+        for name in sorted(os.listdir(os.path.join(ROOT, "modules"))):
+            path = os.path.join(ROOT, "modules", name, "module.json")
+            if not os.path.exists(path):
+                continue
+            with open(path) as f:
+                actions = json.load(f).get("actions") or []
+            if not actions:
+                continue
+            self.assertIn(name, files, "%s announces actions but has no hook file" % name)
+            part = importlib.import_module(os.path.basename(files[name])[:-3])
+            for a in actions:
+                self.assertTrue(callable(part.ACTIONS.get(a["id"])), "%s.%s has no function in %s" % (name, a["id"], files[name]))
+                self.assertTrue(a.get("label"), "%s.%s has no label" % (name, a["id"]))
+
+
 class LayeringTests(unittest.TestCase):
     """The small services must not drag the web server in."""
     def test_led_and_buttons_do_not_import_the_web_module(self):
-        for mod in ("netswitch_led", "netswitch_led_drivers", "netswitch_buttons", "netswitch_wifi_setup", "netswitch_core", "netswitch_ledconfig", "netswitch_probes"):
-            code = ("import sys; sys.path[:0] = %r; import %s; sys.exit(1 if 'netswitch_web' in sys.modules else 0)"
-                    % ([ROOT] + [os.path.join(ROOT, "modules", m) for m in os.listdir(os.path.join(ROOT, "modules"))], mod))
+        for mod in ("netswitch_led", "netswitch_led_drivers", "netswitch_switcher_buttons", "netswitch_wifi_setup", "base_core", "netswitch_ledconfig", "netswitch_switcher_probes"):
+            code = ("import sys; sys.path[:0] = %r; import %s; sys.exit(1 if 'base_web' in sys.modules else 0)"
+                    % ([ROOT, os.path.join(ROOT, "base")] + [os.path.join(ROOT, "modules", m) for m in os.listdir(os.path.join(ROOT, "modules"))], mod))
             self.assertEqual(subprocess.call(["python3", "-c", code]), 0, mod)
 
     def test_core_does_not_import_probes(self):
-        code = "import sys; sys.path.insert(0, %r); import netswitch_core; sys.exit(1 if 'netswitch_probes' in sys.modules else 0)" % ROOT
+        code = "import sys; sys.path[:0] = %r; import base_core; sys.exit(1 if 'netswitch_switcher_probes' in sys.modules else 0)" % [ROOT, os.path.join(ROOT, "base")]
         self.assertEqual(subprocess.call(["python3", "-c", code]), 0)
 
 

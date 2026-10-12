@@ -1,13 +1,24 @@
 """The optional online-players list: tolerant parsing of status JSON, the cache
 and the HTTP endpoint (no network: fetch is faked)."""
 import json
+import os
 import threading
+import time
 import unittest
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
 from support import core, web, sandbox, cleanup
 import netswitch_players as pl
+import netswitch_led_inputs as inputs
+
+
+def wait_for_background_refresh():
+    """A page request that finds the list old starts a refresh in a thread (as it should); a test must not start while one is still
+    running, or its own refresh() returns at once (one runs at a time) and sees the thread's answer."""
+    end = time.time() + 5
+    while pl._cache["refreshing"] and time.time() < end:
+        time.sleep(0.01)
 
 
 class ParseTests(unittest.TestCase):
@@ -100,8 +111,10 @@ class ShapeTests(unittest.TestCase):
 
 class SourceTests(unittest.TestCase):
     def setUp(self):
+        wait_for_background_refresh()
         self.tmp = sandbox()
         self._fetch = pl.fetch
+        pl.fetch = lambda url: "{}"             # a refresh a page request starts in the background never reaches the network
         pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": []})
 
     def tearDown(self):
@@ -109,7 +122,7 @@ class SourceTests(unittest.TestCase):
         cleanup(self.tmp)
 
     def write_sources(self, data):
-        with open(core.PLAYERS_SOURCES, "w") as f:
+        with open(pl.PLAYERS_SOURCES, "w") as f:
             json.dump(data, f)
 
     def test_defaults_are_the_two_feeds_openmenu_uses(self):
@@ -127,9 +140,10 @@ class SourceTests(unittest.TestCase):
             return json.dumps(DC99)
         pl.fetch = fetch
         pl.refresh()
-        self.assertEqual(calls, ["https://dc99.test/p", "http://dc99.test/p"])
-        self.assertTrue(pl.status()["sources"][0]["ok"])
-        self.assertEqual(len(pl.status()["sources"][0]["sections"]), 2)
+        self.assertEqual([c for c in calls if "dc99.test" in c], ["https://dc99.test/p", "http://dc99.test/p"])
+        src = [x for x in pl.status()["sources"] if x["name"] == "DC99"][0]
+        self.assertTrue(src["ok"])
+        self.assertEqual(len(src["sections"]), 2)
 
     def test_an_empty_file_switches_the_list_off(self):
         self.write_sources([])
@@ -192,18 +206,16 @@ class IntegrationTests(unittest.TestCase):
         pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": []})
         try:
             html = urlopen(base + "/", timeout=10).read().decode()
-            self.assertIn('id="main-slot"', html)
-            self.assertIn("/players", html)
-            self.assertIn("60000", html)                       # polls at most once a minute
+            self.assertIn('"url": "/players", "every": 60', html)         # the layout's data source: asked at most once a minute
             self.assertNotIn("netswitch-players", html)        # no show/hide setting: always shown while the module is on
-            self.assertNotIn('id="pl-b"', html)
             self.assertIn("Online players:", html)
-            self.assertIn("pl-games", html)
-            self.assertIn("pl-toggle", html)
-            self.assertIn("pl-players", html)
+            self.assertIn('"@players.games"', html)
+            self.assertIn('"@players.list"', html)
             r = json.loads(urlopen(base + "/players", timeout=10).read().decode())
             self.assertTrue(r["configured"])
             self.assertIn("links", r)
+            for key in ("parts", "games", "list", "status", "retry"):          # what the widgets bind to
+                self.assertIn(key, r)
         finally:
             pl.fetch = saved_fetch
             srv.shutdown()
@@ -229,5 +241,301 @@ class IntegrationTests(unittest.TestCase):
             web.refresh_page(force=True)
 
 
+class WatcherPokeTests(unittest.TestCase):
+    """core.poke("players") (the openMenu link asks when a Dreamcast is polling) reads the list again, with no page open and no favourites."""
+    def setUp(self):
+        wait_for_background_refresh()
+        self.tmp = sandbox()
+        self.refresh = pl.refresh
+        self.calls = []
+        pl.refresh = lambda: self.calls.append(1)
+        pl._cache.update({"time": time.time() - 100, "refreshing": False})
+
+    def tearDown(self):
+        pl.refresh = self.refresh
+        cleanup(self.tmp)
+
+    def test_a_poke_reads_the_list_again_when_it_is_old(self):
+        seen, last = pl._watch_step(core.poke_stamp("players"), time.time())          # nothing asked for, and the favourites were just looked at
+        self.assertEqual(self.calls, [])
+        core.poke("players")
+        seen, last = pl._watch_step(seen, last)
+        self.assertEqual(self.calls, [1])
+        pl._watch_step(seen, last)
+        self.assertEqual(self.calls, [1])                                              # once per poke
+
+    def test_a_poke_leaves_a_recent_list_alone(self):
+        pl._cache["time"] = time.time() - 2
+        seen = core.poke_stamp("players")
+        core.poke("players")
+        pl._watch_step(seen, time.time())
+        self.assertEqual(self.calls, [])
+
+    def test_without_a_poke_only_favourites_keep_the_list_fresh(self):
+        pl._watch_step(core.poke_stamp("players"), 0.0)
+        self.assertEqual(self.calls, [])                                               # no favourites, no page: nobody needs it
+        pl.save_favorites({"games": ["Quake III Arena"], "players": []})
+        pl._watch_step(core.poke_stamp("players"), 0.0)
+        self.assertEqual(self.calls, [1])
+
+
 if __name__ == "__main__":
     unittest.main()
+
+
+class FavoritesTests(unittest.TestCase):
+    GAMES = [{"name": "Phantasy Star Online", "status": "green"}, {"name": "Quake III Arena", "status": "work in progress"},
+             {"title": "Dead Game", "colour": "red"}, {"name": "Mystery"}]
+
+    def setUp(self):
+        wait_for_background_refresh()
+        self.tmp = sandbox()
+        self._fetch = pl.fetch
+        pl.fetch = lambda url: "{}"             # a refresh a page request starts in the background never reaches the network
+        pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": [], "games": [], "games_time": 0, "games_live": False, "restored": False})
+        pl._disk["tried"] = True
+
+    def tearDown(self):
+        pl.fetch = self._fetch
+        cleanup(self.tmp)
+
+    def test_game_status_words(self):
+        for text, want in (("green", "online"), ("Fully online", "online"), (True, "online"), ("WIP", "wip"), ("Work in progress", "wip"),
+                           ("yellow", "wip"), ("red", "offline"), ("Not online", "offline"), (False, "offline"), ("", "unknown"), ("?", "unknown")):
+            self.assertEqual(pl.game_status(text), want, text)
+
+    def test_parse_games_shapes(self):
+        got = dict((g["name"], g["status"]) for g in pl.parse_games({"games": self.GAMES}))
+        self.assertEqual(got, {"Phantasy Star Online": "online", "Quake III Arena": "wip", "Dead Game": "offline", "Mystery": "unknown"})
+        self.assertEqual(pl.parse_games({"Sonic": "green", "Dee Dee": "wip"}),
+                         [{"name": "Sonic", "status": "online"}, {"name": "Dee Dee", "status": "wip"}])
+        for bad in (None, 5, "x", {}, [], [1, None]):
+            self.assertEqual(pl.parse_games(bad), [])
+
+    def test_favorites_are_cleaned_and_saved(self):
+        got = pl.save_favorites({"games": [" Sonic  Adventure ", "sonic adventure", "", 5], "players": ["Ana", "ana", "Bo"]})
+        self.assertEqual(got, {"games": ["Sonic Adventure", "5"], "players": ["Ana", "Bo"]})
+        self.assertEqual(pl.favorites(), got)
+        self.assertEqual(pl.favorites.__name__, "favorites")
+
+    def test_missing_or_broken_file_means_no_favorites(self):
+        self.assertEqual(pl.favorites(), {"games": [], "players": []})
+        with open(pl.PLAYERS_FAVORITES, "w") as f:
+            f.write("{broken")
+        self.assertEqual(pl.favorites(), {"games": [], "players": []})
+
+    def test_watch_matches_games_and_players(self):
+        online = [{"player": "Ana", "game": "Phantasy Star Online Ver.2", "network": "DCNET"}, {"player": "Bo", "game": "", "network": "DCNow!"}]
+        favs = {"games": ["Phantasy Star Online", "Quake III Arena"], "players": ["ANA", "Cy"]}
+        self.assertEqual(pl.watch_result(online, favs), {"games": ["Phantasy Star Online"], "friends": ["ANA"]})
+        self.assertFalse(pl.same_game("Sonic", "Sonic Adventure 2"))      # too short to count as "inside"
+
+    def test_refresh_writes_the_watch_file_the_leds_read(self):
+        pl.save_favorites({"games": ["Phantasy Star Online"], "players": ["Ana"]})
+        self.assertEqual(inputs.players_watch(), {"games": [], "friends": []})     # nothing loaded yet
+        pl.fetch = lambda url: json.dumps(self.GAMES if "dreamcastlive" in url else DC99)
+        pl.refresh()
+        self.assertEqual(inputs.players_watch(), {"games": ["Phantasy Star Online"], "friends": ["Ana"]})
+        pl.save_favorites({"games": ["Quake III Arena"], "players": []})
+        self.assertEqual(inputs.players_watch(), {"games": [], "friends": []})
+
+    def test_stale_watch_file_is_ignored(self):
+        with open(pl.PLAYERS_WATCH, "w") as f:
+            json.dump({"time": 1, "games": ["x"], "friends": ["y"]}, f)
+        self.assertEqual(inputs.players_watch(), {"games": [], "friends": []})
+
+    def test_choices_mark_what_is_not_fully_online(self):
+        pl._cache.update({"time": 1, "games": pl.parse_games(self.GAMES),
+                          "players": [{"player": "Ana", "game": "Outtrigger", "network": "DCNET"}]})
+        by = dict((c["value"], c) for c in pl.game_choices())
+        self.assertFalse(by["Phantasy Star Online"]["disabled"])
+        self.assertEqual(by["Phantasy Star Online"]["sub"], "")
+        self.assertFalse(by["Quake III Arena"]["disabled"])
+        self.assertEqual(by["Quake III Arena"]["sub"], "work in progress")
+        self.assertTrue(by["Dead Game"]["disabled"])
+        self.assertEqual(by["Outtrigger"]["sub"], "playing now")
+        order = [c["value"] for c in pl.game_choices()]
+        self.assertTrue(order.index("Phantasy Star Online") < order.index("Quake III Arena") < order.index("Dead Game"))
+
+    def test_games_played_now_come_first_and_are_marked_for_the_picker(self):
+        pl._cache.update({"time": 1, "games": pl.parse_games(self.GAMES),
+                          "players": [{"player": "Ana", "game": "Quake III Arena", "network": "DCNET"},
+                                      {"player": "Bo", "game": "Outtrigger", "network": "DCNow!"}]})
+        choices = pl.game_choices()
+        self.assertEqual([c["value"] for c in choices if c["now"]], ["Outtrigger", "Quake III Arena"])
+        self.assertEqual([c["value"] for c in choices[:2]], ["Outtrigger", "Quake III Arena"])
+        by = dict((c["value"], c) for c in choices)
+        self.assertEqual(by["Quake III Arena"]["sub"], "work in progress \u00b7 playing now")
+        self.assertFalse(by["Phantasy Star Online"]["now"])
+        group = pl._favorites_reply()["groups"][0]
+        self.assertTrue(group["initial"])
+        self.assertEqual(group["notes"]["Quake III Arena"], "work in progress")
+
+    def test_http_round_trip(self):
+        web.start_background = getattr(web, "start_background", None)
+        pl._cache.update({"time": 1, "games": pl.parse_games(self.GAMES), "players": []})
+        class H(object):
+            sent = None
+            def send(self, body, ctype, status=200):
+                self.sent = (json.loads(body) if ctype == "application/json" else body, status)
+            def _body(self, limit):
+                return json.dumps({"games": ["Quake III Arena"], "players": ["Ana"]}).encode()
+        h = H()
+        pl._post_favorites(h)
+        groups = dict((g["key"], g) for g in h.sent[0]["groups"])
+        self.assertEqual(groups["games"]["items"], ["Quake III Arena"])
+        self.assertEqual(groups["games"]["notes"], {"Quake III Arena": "work in progress", "Dead Game": "not online yet"})
+        self.assertEqual(groups["players"]["items"], ["Ana"])
+        self.assertTrue(groups["players"]["free"] and not groups["games"]["free"])
+
+    def test_stars_set_and_clear_the_same_favorites_as_settings(self):
+        self.assertTrue(pl.star("player", "Ana", True))
+        self.assertTrue(pl.star("game", "Quake III Arena", True))
+        self.assertEqual(pl.favorites(), {"games": ["Quake III Arena"], "players": ["Ana"]})
+        self.assertTrue(pl.star("player", " ana ", True))                      # already a favorite (same name, any case): no second one
+        self.assertEqual(pl.favorites()["players"], ["Ana"])
+        self.assertTrue(pl.star("player", "ANA", False))
+        self.assertTrue(pl.star("game", "Quake III Arena Online", False))      # the same game by its other name (same_game)
+        self.assertEqual(pl.favorites(), {"games": [], "players": []})
+        self.assertFalse(pl.star("team", "x", True))                           # not a kind
+        self.assertFalse(pl.star("player", "  ", True))
+        for i in range(pl.MAX_FAVORITES):
+            pl.star("player", "P%d" % i, True)
+        self.assertFalse(pl.star("player", "One too many", True))             # a full list says no
+
+    def test_the_view_has_the_games_list_and_what_is_starred(self):
+        pl._cache.update({"time": int(time.time()), "players": [{"player": "Ana", "game": "Quake III Arena", "network": "DCNow!"},
+                                                 {"player": "Bo", "game": "Quake III Arena", "network": "DCNow!"},
+                                                 {"player": "Cy", "game": "", "network": "DCNET"}]})
+        pl.star("player", "Bo", True)
+        pl.star("game", "Quake III Arena", True)
+        v = pl.view()
+        self.assertEqual([(x["title"], x["starred"]) for x in v["list"]], [("Ana", False), ("Bo", True), ("Cy", False)])
+        self.assertEqual(v["games_list"], [{"title": "Quake III Arena", "sub": "2 playing", "starred": True}])
+
+    def test_the_star_endpoint_answers_with_the_new_view(self):
+        pl._cache.update({"time": int(time.time()), "players": [{"player": "Ana", "game": "", "network": "DCNow!"}]})
+        class H(object):
+            body = {"kind": "player", "name": "Ana", "on": True}
+            def send(self, body, ctype, status=200):
+                self.sent = (json.loads(body) if ctype == "application/json" else body, status)
+            def _body(self, limit):
+                return json.dumps(self.body).encode()
+        h = H()
+        pl._post_star(h)
+        self.assertEqual((h.sent[1], h.sent[0]["list"][0]["starred"]), (200, True))
+        h.body = {"kind": "nope", "name": "Ana", "on": True}
+        pl._post_star(h)
+        self.assertEqual(h.sent[1], 400)
+
+    def test_the_status_is_about_the_player_feeds_not_the_game_list(self):
+        pl._cache.update({"time": int(time.time()), "players": [], "sources": [{"name": "Dreamcast Live", "ok": False, "count": 0, "error": "no games found", "kind": "games"},
+                                                                  {"name": "DC99", "ok": True, "count": 0, "error": None, "sections": []}]})
+        self.assertNotIn("Dreamcast Live", pl.view()["status"])
+        self.assertNotIn("DreamPi on GitHub", [x[0] for x in pl.LINKS])
+
+    def test_the_list_on_the_page_stays_when_no_feed_answers(self):
+        pl.fetch = lambda url: json.dumps(self.GAMES if "dreamcastlive" in url else DC99)
+        pl.refresh()
+        before = list(pl.status()["players"])
+        self.assertTrue(before)
+        def broken(url):
+            raise IOError("offline")
+        pl.fetch = broken
+        pl.refresh()
+        got = pl.status()
+        self.assertEqual(got["players"], before)                                # not replaced by an empty list
+        self.assertFalse(got["refreshing"])
+        self.assertTrue(any(not x["ok"] for x in got["sources"]))               # the report says what went wrong
+
+    def test_the_last_list_is_kept_on_disk_and_shown_again_after_a_restart(self):
+        pl.fetch = lambda url: json.dumps(self.GAMES if "dreamcastlive" in url else DC99)
+        pl.refresh()
+        before = list(pl.status()["players"])
+        self.assertTrue(before)
+        self.assertTrue(os.path.exists(pl.PLAYERS_CACHE))
+        pl._cache.update({"time": 0, "players": [], "sources": [], "games": [], "restored": False})      # what a restarted service has
+        pl._disk["tried"] = False
+        pl.fetch = lambda url: (_ for _ in ()).throw(IOError("slow"))                                      # and the feeds are not answering yet
+        pl._cache["refreshing"] = True                                                                     # (a refresh is running, so status() starts none)
+        got = pl.view()
+        self.assertEqual(got["players"], before)                                                           # the old list is there at once ...
+        self.assertTrue(got["restored"] and got["list"] and got["busy"])                                   # ... and the rows say they are being refreshed
+        pl.save_favorites({"games": [], "players": [before[0]["player"]]})
+        self.assertEqual(inputs.players_watch(), {"games": [], "friends": []})                               # a list from disk does not light the LEDs
+
+    def test_nothing_is_said_about_a_list_that_is_not_known_yet(self):
+        pl._cache.update({"time": 0, "refreshing": True, "players": [], "sources": []})
+        pl._disk["tried"] = True
+        v = pl.view()
+        self.assertEqual((v["list"], v["games_list"], v["games"]), (None, None, ["Loading..."]))          # null, not []: the page shows no "Nobody is online" yet
+
+    def test_remove_all_asks_first(self):
+        self.assertTrue(pl._favorites_reply()["rules"]["restore_confirm"])
+
+
+def _row(name, icon, link=True):
+    cell = '<a href="https://dreamcastlive.net/x/">%s</a>' % name if link else name
+    return ('<tr><td class="c"><img src="https://dreamcastlive.net/wp-content/uploads/a-cover.jpg" alt=""></td><td>%s</td>'
+            '<td>4</td><td>Modem</td><td>Multiplayer</td><td><img src="https://dreamcastlive.net/wp-content/uploads/us-flag-rnd.png" alt=""></td>'
+            '<td class="c"><img src="https://dreamcastlive.net/wp-content/uploads/2023/03/%s.png" alt=""></td><td>N/A</td></tr>' % (cell, icon))
+
+
+HTML = ('<table><thead><tr><th>Game</th><th></th><th>Players</th><th>Status</th></tr></thead><tbody>'
+        + _row("4&times;4 Evolution", "online-icon") + _row("Capcom &amp; Psikyo All Stars", "wip-icon-v2", False)
+        + _row("Gundam Battle Online", "offline-icon") + _row("JoJo\u2019s Matching Service", "wip-icon-v2") + '</tbody></table>')
+
+
+class GameTableTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = sandbox()
+        self._fetch = pl.fetch
+        pl.fetch = lambda url: "{}"             # a refresh a page request starts in the background never reaches the network
+        pl._cache.update({"time": 0, "refreshing": False, "players": [], "sources": [], "games": [], "games_time": 0, "games_live": False})
+
+    def tearDown(self):
+        pl.fetch = self._fetch
+        cleanup(self.tmp)
+
+    def test_the_html_table_gives_names_and_status_from_the_icon(self):
+        got = [(g["name"], g["status"]) for g in pl.parse_games_html(HTML)]
+        self.assertEqual(got, [("4\u00d74 Evolution", "online"), ("Capcom & Psikyo All Stars", "wip"),
+                               ("Gundam Battle Online", "offline"), ("JoJo\u2019s Matching Service", "wip")])
+
+    def test_text_is_json_or_html(self):
+        self.assertEqual(pl.parse_games_text('{"Sonic": "green"}'), [{"name": "Sonic", "status": "online"}])
+        self.assertEqual(len(pl.parse_games_text(HTML)), 4)
+        self.assertEqual(pl.parse_games_text("<html>nothing</html>"), [])
+
+    def test_the_snapshot_holds_the_whole_list(self):
+        games = dict((g["name"], g["status"]) for g in pl.snapshot_games())
+        self.assertGreater(len(games), 90)
+        self.assertEqual((games["Quake III Arena"], games["QuakeWorld"], games["Net Versus: Chess"]), ("online", "wip", "offline"))
+
+    def test_the_addresses_are_tried_in_turn(self):
+        calls = []
+        def fetch(url):
+            calls.append(url)
+            if url.endswith("/online-games/"):
+                return HTML
+            raise IOError("404")
+        pl.fetch = fetch
+        pl.refresh()
+        self.assertEqual(len(pl._cache["games"]), 4)
+        self.assertTrue(pl._cache["games_live"])
+        self.assertIn("https://dreamcastlive.net/online-games/", calls)
+        before = len(calls)
+        pl.refresh()                                                  # the list is kept for hours: not fetched again
+        self.assertEqual([c for c in calls[before:] if "dreamcastlive" in c], [])
+
+    def test_when_nothing_can_be_read_the_snapshot_fills_the_picker(self):
+        def fetch(url):
+            raise IOError("blocked")
+        pl.fetch = fetch
+        pl.refresh()
+        self.assertFalse(pl._cache["games_live"])
+        self.assertGreater(len(pl._cache["games"]), 90)
+        by = dict((c["value"], c) for c in pl.game_choices())
+        self.assertFalse(by["Quake III Arena"]["disabled"])
+        self.assertTrue(by["Net Versus: Chess"]["disabled"])
+        self.assertEqual(by["QuakeWorld"]["sub"], "work in progress")

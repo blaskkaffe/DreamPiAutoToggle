@@ -1,0 +1,29 @@
+{
+ "background": {"type": "fullscreen"},
+ "settings": [
+  {
+   "box": "background-image",
+   "title": "Background image",
+   "items": [
+    {"type": "custom", "name": "imagebg-pick"},
+    {
+     "type": "form",
+     "get": "/imagebg",
+     "post": "/imagebg",
+     "fields": [
+      {
+       "title": "Fit",
+       "sub_text": "fit",
+       "controls": [{"type": "choice", "key": "fit", "options": "fits", "label": "Fit"}]
+      },
+      {
+       "title": "Darken",
+       "sub_text": "dim",
+       "controls": [{"type": "choice", "key": "dim", "options": "dims", "label": "Darken"}]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
