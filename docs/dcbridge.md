@@ -197,6 +197,14 @@ which slot to copy the physical VMU back into. Each slot file is exactly 128 KB.
 Install on the Pi: Settings > DC Bridge > Install, or `sudo ./install.sh --dcbridge` (the add-on's installer; both run `dcbridge-setup`, which installs `mtools`, `dosfstools`, `ppp`, `dnsmasq` and `iptables`,
 the udev rules and the service, and switches the module on).
 
+### The dashboard says the board is not connected
+
+The Dreamcast row tells which step is missing (the service adds `usb` and `devices` to `GET /api/bridge` while it has no status line):
+- **Board not on USB**: `lsusb | grep 1209:0001` shows nothing: cable (data, not charge-only), firmware not flashed, or the board is in BOOTSEL.
+- **Board on USB, but no udev names**: `ls -l /dev/dcbridge-*` is empty although `lsusb` lists it. Check `udevadm info -a -n /dev/ttyACM0 | grep -E 'manufacturer|idVendor|ID_USB_INTERFACE_NUM'`
+  (the rules need manufacturer `dcbridge`) and run `sudo udevadm control --reload && sudo udevadm trigger`.
+- **Board found, no status from it**: `/dev/dcbridge-ctl` exists but sends nothing: `sudo systemctl stop dcbridge-saves; cat /dev/dcbridge-ctl` should print one JSON line a second.
+
 ## Networking (`modules/dcbridge/system`, installed by the module's `install.sh`)
 
 Both Dreamcast links get their own small NAT'd subnet on the Pi. Nothing on

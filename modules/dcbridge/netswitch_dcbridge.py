@@ -173,6 +173,18 @@ def start_setup(action):
         return True, "Installing the bridge..." if action == "install" else "Removing the bridge..."
 
 
+def _no_board(bridge):
+    """Why the service has no status line from the board (it adds what it could find out)."""
+    if bridge.get("usb") is False:
+        return "Board not on USB (check cable / firmware)"
+    devices = bridge.get("devices") or {}
+    if bridge.get("usb") and not devices.get("ctl"):
+        return "Board on USB, but no udev names"
+    if devices.get("ctl"):
+        return "Board found, no status from it"
+    return "Bridge board not connected"
+
+
 def view(now=None):
     """What /api carries (the texts and dots the layout shows): {"up", "dreamcast": {state, text}, "card": {state, text, sub}, "net": {state, text}}."""
     now = time.time() if now is None else now
@@ -186,7 +198,7 @@ def view(now=None):
         return {"up": False, "dreamcast": gone, "card": {"state": "unknown", "text": "-", "sub": ""}, "net": {"state": "unknown", "text": "-"}}
     fw = (bridge or {}).get("firmware")
     if not fw:
-        dreamcast = {"state": "warn", "text": "The bridge board (RP2040) is not connected"}
+        dreamcast = {"state": "warn", "text": _no_board((bridge or {}))}
     else:
         text = (bridge or {}).get("summary") or "idle"
         under = fw.get("underruns") or 0

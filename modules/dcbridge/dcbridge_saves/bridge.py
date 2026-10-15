@@ -75,6 +75,35 @@ def link_status(conf, run_dir="/run/dcbridge"):
     return out
 
 
+USB_ID = ("1209", "0001")        # firmware/dcbridge/src/config.h USB_VID / USB_PID
+
+
+def usb_seen(sys_usb="/sys/bus/usb/devices"):
+    """The RP2040 board is on the Pi's USB bus (looks for its vendor / product id), whatever the udev rules did with it."""
+    try:
+        names = os.listdir(sys_usb)
+    except OSError:
+        return None
+    for name in names:
+        try:
+            with open(os.path.join(sys_usb, name, "idVendor")) as f:
+                vid = f.read().strip()
+            with open(os.path.join(sys_usb, name, "idProduct")) as f:
+                pid = f.read().strip()
+        except IOError:
+            continue
+        if (vid, pid) == USB_ID:
+            return True
+    return False
+
+
+def device_nodes(ctl_path):
+    """Which of the udev names the rules should have made exist: {"uart", "ctl", "disk"} -> bool."""
+    d = os.path.dirname(ctl_path or "/dev/dcbridge-ctl")
+    return {"uart": os.path.exists(os.path.join(d, "dcbridge-uart")), "ctl": os.path.exists(ctl_path or os.path.join(d, "dcbridge-ctl")),
+            "disk": os.path.exists(os.path.join(d, "dcbridge-disk"))}
+
+
 class BridgeStatus(object):
     """Follows /dev/dcbridge-ctl (one JSON object per line, about every second)."""
 
@@ -142,4 +171,8 @@ class BridgeStatus(object):
                 summary = "W5500 network"
             else:
                 summary = "idle"
-        return {"summary": summary, "firmware": fw, "links": link_status(conf)}
+        out = {"summary": summary, "firmware": fw, "links": link_status(conf)}
+        if not fw:                      # why there is no status: the board is not on USB / has no udev names / says nothing
+            out["usb"] = usb_seen()
+            out["devices"] = device_nodes(self.ctl_path)
+        return out

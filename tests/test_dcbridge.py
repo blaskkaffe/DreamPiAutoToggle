@@ -118,6 +118,16 @@ class Bridge(unittest.TestCase):
         dcb.api(d, warnings)
         self.assertTrue(any("not running" in w for w in warnings))
 
+    def test_the_reason_there_is_no_board_status_is_told(self):
+        def text(**extra):
+            with dcb._lock:
+                dcb._seen["bridge"] = dict(BRIDGE, firmware=None, **extra)
+            return dcb.view()["dreamcast"]["text"]
+        self.assertIn("not on USB", text(usb=False, devices={"ctl": False}))
+        self.assertIn("no udev names", text(usb=True, devices={"ctl": False}))
+        self.assertIn("no status", text(usb=True, devices={"ctl": True}))
+        self.assertIn("not connected", text())
+
     def test_a_missing_service_is_only_a_warning_when_the_bridge_is_installed(self):
         with dcb._lock:
             dcb._seen["time"] = 0

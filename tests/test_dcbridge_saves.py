@@ -193,6 +193,31 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(snap["links"]["ppp"]["interface"], "ppp10")
         b.stop()
 
+    def test_why_there_is_no_status(self):
+        import tempfile, shutil
+        from dcbridge_saves import bridge
+        tmp = tempfile.mkdtemp()
+        try:
+            usb = os.path.join(tmp, "usb")
+            os.makedirs(os.path.join(usb, "1-1"))
+            for name, val in (("idVendor", "1209"), ("idProduct", "0001")):
+                with open(os.path.join(usb, "1-1", name), "w") as f:
+                    f.write(val + "\n")
+            os.makedirs(os.path.join(usb, "1-2"))
+            self.assertTrue(bridge.usb_seen(usb))
+            os.remove(os.path.join(usb, "1-1", "idProduct"))
+            self.assertFalse(bridge.usb_seen(usb))                       # another device: not the board
+            self.assertIsNone(bridge.usb_seen(os.path.join(tmp, "none")))
+            ctl = os.path.join(tmp, "dcbridge-ctl")
+            self.assertEqual(bridge.device_nodes(ctl), {"uart": False, "ctl": False, "disk": False})
+            open(ctl, "w").close()
+            self.assertTrue(bridge.device_nodes(ctl)["ctl"])
+            snap = bridge.BridgeStatus(ctl, conf_path="/nonexistent").snapshot()      # no status line yet: it says what it found
+            self.assertIn("usb", snap)
+            self.assertTrue(snap["devices"]["ctl"])
+        finally:
+            shutil.rmtree(tmp)
+
 
 if __name__ == "__main__":
     unittest.main()
