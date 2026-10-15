@@ -23,7 +23,7 @@ installed (the unit `/etc/systemd/system/dcbridge-saves.service` exists); a modu
   so the page sends PUT and DELETE as `POST ...?_method=PUT|DELETE` (the module turns them back), says it comes from a page (`X-Requested-With`) and,
   while Settings is locked with the PIN, asks for the PIN once (`X-Pin`). Another site's form is refused like everywhere else.
 - `layout.json`: the dashboard box **Dreamcast bridge** (the Dreamcast, the SD card and the network as status rows, a link to the save manager) and
-  Settings > **DC Bridge** (links to the save manager and to the zip of all saves) and the box colour in Appearance.
+  Settings > **DC Bridge** (links to the save manager, to the zip of all saves and to the SD card trace) and the box colour in Appearance.
 - **Bridge mode** (Settings > DC Bridge > Bridge mode, `GET`/`POST /dcbridge-mode`, PIN when one is set): Auto / Serial cable (PPP) / SD card only / W5500 only.
   The module posts it to the service's `POST /api/bridge/mode` (`{"mode", "save": true}`), which writes `mode <name> save` to the RP2040's control port; the
   board keeps it as its power-on mode. The dashboard box shows it in a **Mode** row ("set by hand" when it is not Auto). `uart` (fixed `--baud`) and

@@ -158,6 +158,18 @@
      "show": "@dcbridge.installed"
     },
     {
+     "type": "row",
+     "title": "SD card trace",
+     "sub": "What the virtual SD card last saw from the Dreamcast: commands, answers, raw bytes (for diagnosing openMenu)",
+     "show": "@dcbridge.installed",
+     "control": {
+      "type": "link",
+      "label": "Open",
+      "href": "/dcbridge/api/bridge/trace",
+      "aria": "Open the SD card trace"
+     }
+    },
+    {
      "type": "console",
      "lines": "@dcbridge.setup.log",
      "hide_empty": true,
