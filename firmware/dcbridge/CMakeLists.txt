@@ -15,6 +15,7 @@ add_executable(dcbridge
     src/w5500_emu.c
     src/sd_emu.c
     src/sd_link.c
+    src/settings.c
 )
 
 pico_generate_pio_header(dcbridge ${CMAKE_CURRENT_LIST_DIR}/src/dcbus.pio)
@@ -29,6 +30,7 @@ target_link_libraries(dcbridge PRIVATE
     pico_multicore
     pico_unique_id
     hardware_pio
+    hardware_flash
     hardware_vreg
     hardware_watchdog
     tinyusb_device

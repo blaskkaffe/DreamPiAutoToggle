@@ -1,7 +1,11 @@
 # DC Bridge: the Dreamcast serial-port bridge
 
 Read before touching `modules/dcbridge/`, `firmware/dcbridge/` or the bridge's part of `install.sh`. Back to [CLAUDE.md](../CLAUDE.md).
-Brought in from the `dcbridge-stage4` package (firmware, the Pi's save manager and the routing scripts) and made a module of the dashboard.
+Brought in from the `dcbridge-stage4` package (firmware, the Pi's save manager and the routing scripts) and made a module of the dashboard. Updated to
+the **`dcbridge-0.3-cable`** package: firmware 0.3 (bridge modes incl. a serial coders-cable mode, an SD trace, `noflow`, the power-on mode kept in the board's
+flash; `dcbridge.uf2` in `firmware/dcbridge/` is the prebuilt 0.3) and the matching Pi side (`mode` / `trace` in the service, `PPP_BAUD` in
+`/etc/default/dcbridge`). **Reflash the board with the new `dcbridge.uf2` for the modes**: the Pi side still works with 0.2 firmware but the mode form then
+says the board did not confirm the change.
 
 ## In the dashboard (the module)
 
@@ -20,6 +24,10 @@ installed (the unit `/etc/systemd/system/dcbridge-saves.service` exists); a modu
   while Settings is locked with the PIN, asks for the PIN once (`X-Pin`). Another site's form is refused like everywhere else.
 - `layout.json`: the dashboard box **Dreamcast bridge** (the Dreamcast, the SD card and the network as status rows, a link to the save manager) and
   Settings > **DC Bridge** (links to the save manager and to the zip of all saves) and the box colour in Appearance.
+- **Bridge mode** (Settings > DC Bridge > Bridge mode, `GET`/`POST /dcbridge-mode`, PIN when one is set): Auto / Serial cable (PPP) / SD card only / W5500 only.
+  The module posts it to the service's `POST /api/bridge/mode` (`{"mode", "save": true}`), which writes `mode <name> save` to the RP2040's control port; the
+  board keeps it as its power-on mode. The dashboard box shows it in a **Mode** row ("set by hand" when it is not Auto). `uart` (fixed `--baud`) and
+  `--noflow` are only on the command line: `python3 -m dcbridge_saves mode ...` (see Bridge modes below).
 - **Install / Uninstall:** `POST /dcbridge-setup/install` and `/remove` (PIN-protected) start `system/dcbridge-setup install|remove` as root with
   `systemd-run` (outside the web service, which is sandboxed and may not write to `/etc` or `/usr`; a transient unit survives the restart that the
   service's own units get). One at a time; the script writes `running` / `ok` / `failed` to `/tmp/dreampi-netswitch.dcbridge` and its output to
@@ -254,7 +262,7 @@ your LAN changes, and DreamPi's modem link keeps `ppp0` and its LAN address.
 | Interface | Linux | Purpose |
 |---|---|---|
 | CDC 0 "dcbridge UART" | `/dev/dcbridge-uart` | Dreamcast SCIF bytes. Pi→DC data is only forwarded while the DC is in UART mode, so DreamPi's `wvdialconf` modem probe (it sends AT commands to every ttyACM) can't leak onto the Dreamcast. |
-| CDC 1 "dcbridge control" | `/dev/dcbridge-ctl` | One JSON status line per second and on every mode change. Commands: `status`, `reboot`, `bootsel` (reflash from the Pi without touching the board). |
+| CDC 1 "dcbridge control" | `/dev/dcbridge-ctl` | One JSON status line per second and on every mode change. Commands: `status`, `reboot`, `bootsel` (reflash from the Pi without touching the board), `mode <auto\|cable\|uart\|sd\|w5500> [baud] [noflow] [save]`, `sdtrace`. The service has the port open read-write, so use `python3 -m dcbridge_saves mode` rather than writing to it while the service runs. |
 | CDC-ECM "dcbridge net" | `dcnet0` | Ethernet wire of the virtual W5500. ECM, not RNDIS: Linux's `cdc_ether` binds it natively. |
 | CDC 2 "dcbridge disk" | `/dev/dcbridge-disk` | Virtual SD card sectors. A framed protocol, documented in `sd_link.h`. |
 
@@ -288,6 +296,7 @@ cc -O2 -I../src test_baud.c  ../src/baud.c      -o t_baud  && ./t_baud
 cc -O2 -I../src test_sd.c ../src/sd_emu.c ../src/sd_link.c -o t_sd && ./t_sd
 cc -O2 -I../src test_e2e.c ../src/sd_emu.c ../src/sd_link.c -o t_e2e && python3 e2e.py ./t_e2e
 python3 sim_spi_pio.py ../build/dcbus.pio.h             # needs the generated header: build first (pioasm comes with the Pico SDK)
+                                                        # (e2e.py finds the Pi side in modules/dcbridge; the firmware needs hardware_flash for settings.c)
 cd ../../.. && sh tests/run.sh                          # the Pi's side is part of the add-on's tests (tests/test_dcbridge_saves.py)
 sudo tests/dcbridge/test_net.sh                         # namespaces: DHCP, DNS, NAT, port forward, clean removal
 ```
@@ -298,6 +307,36 @@ size, random single and multi-block reads and writes, busy back-pressure, a Pi
 too slow for one read (KOS re-inits and recovers), and an edit applied at a
 cold start. `e2e.py` does the same through a pty and the real Python daemon:
 reads run at about 880 KB/s at Dreamcast bus speed.
+
+## Bridge modes (for testing one thing at a time; firmware 0.3)
+
+The RP2040 normally works out by itself what the Dreamcast is doing (`auto`). For bring-up you can pin it to a single function. The choice is stored in
+the RP2040's flash and survives power cycles (a `save` flag on the command; the dashboard always saves).
+
+| Mode | What it does |
+|---|---|
+| `auto` | Detects serial, SD card and W5500 by itself (the default). |
+| `cable` | A plain USB serial coders cable on `/dev/dcbridge-uart`. The Dreamcast-side baud rate follows whatever the program on the Pi opens the port with (pppd, picocom, dc-tool), converted the way KallistiOS computes it ("115200" really runs at 120192, "1500000" at 1562500). |
+| `uart` | Serial only, at a fixed `--baud`, or measured from the Dreamcast's traffic if none is given. |
+| `sd` | Virtual SD card only. |
+| `w5500` | Virtual W5500 only. |
+
+Switch from the dashboard (Settings > DC Bridge > Bridge mode), the save manager page's buttons, `python3 -m dcbridge_saves mode cable` (plus `--baud N`,
+`--noflow`, `--no-save`) or `POST api/bridge/mode {"mode": "cable"}`. A pinned mode also fixes the "stuck latch": in `auto` the board remembers whether the
+last SPI traffic was SD or W5500 until it is reset; pinning `w5500` (or `sd`) removes the guessing. `--noflow` makes the bridge ignore the Dreamcast's RTS
+(KOS always uses RTS/CTS, dcload-serial and other programs that drive the port without flow control need `noflow`).
+
+**Serial coders cable, step by step:** (1) `python3 -m dcbridge_saves mode cable`; (2) `sudo systemctl stop dcbridge-ppp` to free the port; (3)
+`picocom -b 115200 /dev/dcbridge-uart`, boot a KOS program: its banner should appear and `api/bridge` should show `"forced":"cable"`, `"mode":"uart"`,
+`"baud":120192`, `uart.rx` counting (if nothing arrives check `"cts_line"`: in serial mode it must be 0, which the 1 kΩ from GP6 to the CLK line gives); (4) for
+PPP quit picocom, set `PPP_BAUD` in `/etc/default/dcbridge` to the rate the program passes to `ppp_scif_init()`, `sudo systemctl start dcbridge-ppp`, and
+watch `journalctl -fu dcbridge-ppp`.
+
+### The SD trace
+
+If the virtual SD card misbehaves press **SD trace** on the save manager page, or run `python3 -m dcbridge_saves trace`. It shows every SD command the
+Dreamcast sent with the bridge's reply, cache misses, served sectors, writes, aborts and the last 64 raw bytes from the Dreamcast. All-`ff` raw bytes and no
+commands point at the CMD wire (microSD pad 3); commands answered `01` forever mean the Pi side never said ready (check `"daemon"` and `dcbridge-saves`).
 
 ## First bring-up checklist
 

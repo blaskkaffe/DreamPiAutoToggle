@@ -10,7 +10,7 @@ import tempfile
 import time
 
 here = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(here, "..", "..", "..", "modules", "dcbridge"))      # the Pi side lives in the dcbridge module
+sys.path.insert(0, os.path.join(here, "..", "..", "..", "modules", "dcbridge"))
 
 from dcbridge_saves import VMU_SIZE                      # noqa: E402
 from dcbridge_saves.fatimage import create_image          # noqa: E402

@@ -32,6 +32,12 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(done, 'when it has finished there is an Uninstall button');
   ok(await vis(box.locator('.srow', { hasText: 'Save manager' })), 'and the save manager row');
   ok(/Done\./.test(await box.innerText()), 'the setup log is shown');
+  const modeRow = box.locator('.srow', { hasText: 'Bridge mode' });
+  ok(await vis(modeRow), 'the Bridge mode row shows once it is installed');
+  await modeRow.first().locator('button').first().click(); await settle(500);
+  await page.locator('button', { hasText: 'W5500 only' }).first().click(); await settle(2500);
+  ok(await page.evaluate(() => S.dcbridge && S.dcbridge.mode && S.dcbridge.mode.id === 'w5500'), 'choosing W5500 only reaches the service and the dashboard shows it');
+  ok(/set by hand/.test(await page.evaluate(() => S.dcbridge.mode.text)), 'as set by hand');
   await box.locator('button', { hasText: 'Uninstall' }).first().click();
   let gone = false;
   for (let i = 0; i < 20 && !gone; i++) { await settle(500); gone = await vis(box.locator('button', { hasText: 'Install' })) && !(await vis(box.locator('button', { hasText: 'Uninstall' }))); }

@@ -26,6 +26,31 @@
 #define SD_LBA_NONE    0xFFFFFFFFu
 #define SD_OUT_MAX     32u          // small prefix queue: R1/R3/R7, gaps, tokens, CSD/CID
 
+// Protocol states (public so the core1 glue can take the write-response fast path)
+enum {
+    SD_S_IDLE = 0,     // between commands (MOSI 0xFF polls)
+    SD_S_CMD,          // collecting a 6-byte command
+    SD_S_READ,         // CMD17/18/9: waiting for data or streaming blocks
+    SD_S_W_TOKEN,      // CMD24/25: waiting for the data token
+    SD_S_W_DATA,
+    SD_S_W_CRC1,
+    SD_S_W_CRC2,
+};
+
+// Diagnostic trace (ctl command "sdtrace"): last SD_TRACE_N events.
+#define SD_TRACE_N 64u
+enum {
+    SD_EV_CMD = 1,     // a = cmd index, b = R1 sent, arg = argument
+    SD_EV_READY,       // ACMD41 answered "ready" (card initialised)
+    SD_EV_MISS,        // sector not cached, asked the Pi (arg = lba)
+    SD_EV_SERVED,      // data block started (arg = lba)
+    SD_EV_WRITE_OK,    // arg = lba
+    SD_EV_WRITE_CRC,   // CRC mismatch on a written block (arg = lba)
+    SD_EV_ABORT,       // /CS rose mid-transaction (a = state)
+    SD_EV_BUSY,        // token arrived with no free write slot
+};
+typedef struct { uint32_t t_ms; uint32_t arg; uint8_t type, a, b, pad; } sd_trace_t;
+
 typedef struct {
     volatile uint32_t seq;          // odd while core0 is rewriting the entry
     volatile uint32_t lba;
@@ -57,6 +82,12 @@ typedef struct {
 
     // ---------------- statistics ----------------
     volatile uint32_t st_cmds, st_reads, st_writes, st_misses, st_crc_err, st_busy, st_sessions, st_torn;
+    sd_trace_t trace[SD_TRACE_N];
+    volatile uint32_t trace_n;          // total events written (index = n % N)
+    // write-response fast path (filled at CRC1, used by the glue at CRC2)
+    uint8_t  expect_lo;
+    bool     hi_ok;
+    bool     dr_sent;
 
     // ---------------- core1 private ----------------
     uint8_t  state;

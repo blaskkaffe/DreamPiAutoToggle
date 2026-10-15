@@ -7,6 +7,8 @@
 #   api()            /api "dcbridge": the Dreamcast's link mode, the virtual card and the network links (read from the service by start()'s thread,
 #                    so a slow or missing service never slows /api down)
 #   GET  /dcbridge-view  the same as JSON
+#   GET/POST /dcbridge-mode  the bridge mode form in Settings (auto / serial cable / SD card / W5500: sent to the service, which tells the RP2040,
+#                    and saved in the board's flash as its power-on mode; PIN when one is set)
 #   GET  /dcbridge/  the save manager page, and GET /dcbridge/api/... its JSON API and downloads
 #   POST /dcbridge/api/...   its changes (uploads, labels, deletes, restores: PUT and DELETE come as POST with ?_method=, the page's own header is
 #                    needed and, while Settings is locked with the PIN, the PIN)
@@ -34,7 +36,9 @@ INSTALLED = "/etc/systemd/system/dcbridge-saves.service"      # written by dcbri
 SETUP_STATUS = core.TMP_PREFIX + ".dcbridge"                  # running / ok / failed, written by dcbridge-setup
 SETUP_LOG = core.TMP_PREFIX + ".dcbridge.log"
 SETUP_TIMEOUT = 1800                                          # a "running" older than this (the script never started or died) is shown as failed
-PROTECTED = ("/dcbridge-setup/install", "/dcbridge-setup/remove")      # run as root: the PIN is asked for when one is set
+MODES = [("auto", "Auto"), ("cable", "Serial cable (PPP)"), ("sd", "SD card only"), ("w5500", "W5500 only")]      # firmware 0.3 "mode" command (uart: CLI only)
+MODE_LABELS = dict(MODES)
+PROTECTED = ("/dcbridge-setup/install", "/dcbridge-setup/remove", "/dcbridge-mode")      # run as root: the PIN is asked for when one is set
 
 _seen = {"time": 0.0, "bridge": None, "status": None, "up": False}
 _lock = threading.Lock()
@@ -173,6 +177,12 @@ def start_setup(action):
         return True, "Installing the bridge..." if action == "install" else "Removing the bridge..."
 
 
+def mode_view(bridge):
+    """The bridge mode the board is in: {"id", "text"} ("auto" when the firmware does not say: 0.2 has no modes)."""
+    mode = (bridge or {}).get("mode") or "auto"
+    return {"id": mode, "text": MODE_LABELS.get(mode, mode)}
+
+
 def _no_board(bridge):
     """Why the service has no status line from the board (it adds what it could find out)."""
     if bridge.get("usb") is False:
@@ -195,7 +205,8 @@ def view(now=None):
     status, bridge = (seen["status"], seen["bridge"]) if fresh and here else (None, None)
     if status is None:
         gone = {"state": "bad", "text": "The bridge service is not running"} if here else {"state": "unknown", "text": "Not installed (Settings > DC Bridge > Install)"}
-        return {"up": False, "dreamcast": gone, "card": {"state": "unknown", "text": "-", "sub": ""}, "net": {"state": "unknown", "text": "-"}}
+        return {"up": False, "dreamcast": gone, "card": {"state": "unknown", "text": "-", "sub": ""}, "net": {"state": "unknown", "text": "-"},
+                "mode": {"state": "unknown", "text": "-", "id": "auto"}}
     fw = (bridge or {}).get("firmware")
     if not fw:
         dreamcast = {"state": "warn", "text": _no_board((bridge or {}))}
@@ -218,7 +229,9 @@ def view(now=None):
         if dc:
             parts.append("%s %s" % (label, dc))
     net = {"state": "ok" if parts else "unknown", "text": ", ".join(parts) if parts else "No Dreamcast on the network links"}
-    return {"up": True, "dreamcast": dreamcast, "card": card, "net": net}
+    mv = mode_view(bridge)
+    return {"up": True, "dreamcast": dreamcast, "card": card, "net": net,
+            "mode": {"state": "ok", "text": mv["text"] if mv["id"] == "auto" else mv["text"] + " (set by hand)", "id": mv["id"]}}
 
 
 def api(d, warnings):
@@ -292,6 +305,46 @@ def _get_view(h):
     h.send(json.dumps(out), "application/json")
 
 
+def _mode_reply(message=None):
+    with _lock:
+        bridge = _seen["bridge"]
+    mv = mode_view(bridge)
+    text = "Now: %s" % mv["text"] if bridge else "The bridge service is not answering"
+    return {"values": {"mode": mv["id"]}, "options": {"modes": [{"value": k, "label": v} for k, v in MODES]},
+            "texts": {"mode": message or text}}
+
+
+def _get_mode(h):
+    h.send(json.dumps(_mode_reply()), "application/json")
+
+
+def _post_mode(h):
+    """POST /dcbridge-mode {"values": {"mode"}}: the service tells the RP2040 (and it keeps the choice as its power-on mode)."""
+    try:
+        body = json.loads(h._body(4096).decode("utf-8"))
+        mode = (body.get("values") or {}).get("mode")
+    except (ValueError, IOError, OSError, AttributeError):
+        mode = None
+    message = None
+    if mode not in MODE_LABELS:
+        message = "Unknown mode"
+    else:
+        got = _call("POST", "/api/bridge/mode", json.dumps({"mode": mode, "save": True}).encode(),
+                    {"Content-Type": "application/json"}, timeout=6.0)
+        if got is None:
+            message = "The bridge service is not running"
+        elif got[0] != 200:
+            try:
+                message = json.loads(got[2].decode("utf-8")).get("error") or "The board did not accept it"
+            except ValueError:
+                message = "The board did not accept it"
+        else:
+            core.debug_log("web page: DC Bridge mode %s" % mode)
+            poll()
+    h.send(json.dumps(_mode_reply(message)), "application/json")
+    return True
+
+
 def _post_setup(h):
     """POST /dcbridge-setup/install and /remove: {"started": bool, "message": text, "setup": {...}} like the update."""
     started, message = start_setup("install" if h.path.split("?")[0].endswith("/install") else "remove")
@@ -299,7 +352,7 @@ def _post_setup(h):
     return True
 
 
-GET = {"/dcbridge/": _get, "/dcbridge-view": _get_view}
+GET = {"/dcbridge/": _get, "/dcbridge-view": _get_view, "/dcbridge-mode": _get_mode}
 GET_PREFIX = {"/dcbridge/": _get}
-POST = {"/dcbridge-setup/install": _post_setup, "/dcbridge-setup/remove": _post_setup}
+POST = {"/dcbridge-setup/install": _post_setup, "/dcbridge-setup/remove": _post_setup, "/dcbridge-mode": _post_mode}
 POST_PREFIX = {"/dcbridge/": _post}

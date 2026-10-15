@@ -36,6 +36,11 @@ dcb_status_t dcb_status;
 ring_t dcb_uart_rx, dcb_uart_tx;
 w5500_t dcb_w5500;
 sd_emu_t dcb_sd;
+uint8_t dcb_sd_raw[DCB_SD_RAW_N];
+volatile uint32_t dcb_sd_raw_n;
+static uint32_t force_seen;
+#define FORCED(f) (dcb_status.force == (f))
+#define AUTO      (dcb_status.force == DCB_FORCE_AUTO)
 static uint8_t uart_rx_buf[16384], uart_tx_buf[4096];
 
 // PIO resources
@@ -135,6 +140,8 @@ static void enter_sense(void) {
 
 static void enter_uart(uint32_t baud) {
     pio_sm_set_enabled(PIO_SPI, SM_SPI, false);
+    // TX waits for the Dreamcast's RTS before each byte, unless flow control is off
+    PIO_UART->instr_mem[off_utx + 1] = dcb_status.no_flow ? pio_encode_nop() : pio_encode_wait_pin(false, 0);
     dc_uart_rx_program_init(PIO_UART, SM_URX, off_urx, PIN_DC_MOSI, baud);
     dc_uart_tx_program_init(PIO_UART, SM_UTX, off_utx, PIN_DC_MISO, PIN_DC_CS, baud);
     gpio_set_function(PIN_DC_MISO, GPIO_FUNC_PIO1);
@@ -163,7 +170,10 @@ void dcbus_init(void) {
     gpio_put(PIN_DC_CTS_DRIVE, 0);
 #endif
     // Schmitt triggers are on by default; keep slew slow on MISO (long cable)
-    gpio_set_slew_rate(PIN_DC_MISO, GPIO_SLEW_RATE_SLOW);
+    // MISO must settle within one SCLK half period (~60 ns at KOS fast speed)
+    // through the SD adapters and wires: fast slew, 8 mA.
+    gpio_set_slew_rate(PIN_DC_MISO, GPIO_SLEW_RATE_FAST);
+    gpio_set_drive_strength(PIN_DC_MISO, GPIO_DRIVE_STRENGTH_8MA);
 
     off_spi   = pio_add_program(PIO_SPI, &dc_spi_slave_program);
     off_urx   = pio_add_program(PIO_UART, &dc_uart_rx_program);
@@ -203,17 +213,24 @@ static uint8_t  sniff[4];         // first bytes of the frame, for target detect
 
 static void __not_in_flash_func(on_spi_byte)(uint8_t b) {
     uint8_t out[2];
+    // KOS reads the write data-response with a single read right after the
+    // CRC: answer it before anything else.
+    if (dcb_sd.state == SD_S_W_CRC2 && dcb_status.spi_target == DCB_SPI_SD) {
+        spi_tx_put((b == dcb_sd.expect_lo && dcb_sd.hi_ok) ? 0xE5 : 0xEB);
+        dcb_sd.dr_sent = true;
+    }
     dcb_status.spi_bytes++;
     if (frame_bytes < 4) sniff[frame_bytes] = b;
     frame_bytes++;
 
     switch (dcb_status.spi_target) {
     case DCB_SPI_SD:
+        dcb_sd_raw[dcb_sd_raw_n++ % DCB_SD_RAW_N] = b;
         sd_emu_on_byte(&dcb_sd, b);
-        sd_top_up();                    // the data response after a write is due NOW
+        sd_top_up();
         // A W5500 program started after an SD session: switch over and replay
         // its soft-reset frame into the emulator.
-        if (frame_bytes == 4 && sniff[0] == 0 && sniff[1] == 0 && sniff[2] == 0x04 && (sniff[3] & 0x80)) {
+        if (AUTO && frame_bytes == 4 && sniff[0] == 0 && sniff[1] == 0 && sniff[2] == 0x04 && (sniff[3] & 0x80)) {
             dcb_status.spi_target = DCB_SPI_W5500;
             set_filler(0x00);
             w5500_frame_start(&dcb_w5500);
@@ -229,7 +246,7 @@ static void __not_in_flash_func(on_spi_byte)(uint8_t b) {
             if (n > 1) { spi_tx_put(out[1]); PIO_SPI->irq = 1u; }  // read starts: arm underrun check
         }
         // Latch W5500 on the KOS soft reset: 00 00 04 80
-        if (frame_bytes == 4 && dcb_status.spi_target != DCB_SPI_W5500 &&
+        if (AUTO && frame_bytes == 4 && dcb_status.spi_target != DCB_SPI_W5500 &&
             sniff[0] == 0 && sniff[1] == 0 && sniff[2] == 0x04 && (sniff[3] & 0x80)) {
             dcb_status.spi_target = DCB_SPI_W5500;
             set_filler(0x00);
@@ -308,7 +325,8 @@ static void __not_in_flash_func(sense_loop)(void) {
         while (!spi_rx_empty()) {
             on_spi_byte(spi_rx_get());
             uint32_t spin = 2000;
-            while (dcb_w5500.state && dcb_w5500.state < 3 && spi_rx_empty() && --spin) {}
+            while (((dcb_w5500.state && dcb_w5500.state < 3) || dcb_sd.state == SD_S_W_CRC2) &&
+                   spi_rx_empty() && --spin) {}
         }
         // 2. /CS rose: frame boundary
         if (rose(PIN_DC_CS)) on_frame_end();
@@ -320,7 +338,7 @@ static void __not_in_flash_func(sense_loop)(void) {
             last_sclk_ms = fast_ms();
             dcb_status.last_activity_ms = last_sclk_ms;
             if (gpio_get(PIN_DC_CS)) {
-                if (++sclk_cs_high >= 8 && dcb_status.spi_target != DCB_SPI_SD) {
+                if (++sclk_cs_high >= 8 && dcb_status.spi_target != DCB_SPI_SD && AUTO) {
                     dcb_status.spi_target = DCB_SPI_SD;     // KOS sd_init() dummy clocks
                     dcb_status.spi_sd_sessions++;
                     set_filler(0xFF);
@@ -347,10 +365,14 @@ static void __not_in_flash_func(sense_loop)(void) {
         if (dcb_status.spi_target != DCB_SPI_SD && cur_filler != 0xFF && ms - last_sclk_ms > 20)
             set_filler(0xFF);
 
-        // 5. UART detection
+        // 5. Manual override changed?
+        if (dcb_status.force_seq != force_seen) return;
+
+        // 6. UART detection (not when forced to SD or W5500)
         uint32_t t = time_us_32();
         if (t - win_start >= SENSE_WINDOW_US) {
-            pulses_drain(!spi_seen_in_window);
+            bool uart_ok = AUTO || FORCED(DCB_FORCE_UART);
+            pulses_drain(!spi_seen_in_window && uart_ok);
             if (spi_seen_in_window) pulse_n = 0;        // MOSI pulses were SPI data
             if (pulse_n >= SENSE_MIN_UART_PULSES) {
                 uint32_t baud = pulses_evaluate();
@@ -403,8 +425,15 @@ static void __not_in_flash_func(uart_loop)(void) {
             sclk_edges++;
 
         uint32_t t = time_us_32();
+        if (dcb_status.force_seq != force_seen) return;
+        bool fixed_baud = FORCED(DCB_FORCE_UART) && dcb_status.force_baud;
         if (t - win_start >= SENSE_WINDOW_US) {
-            if (sclk_edges >= SENSE_SCLK_EDGES_FOR_SPI) { enter_sense(); return; }
+            if (fixed_baud) {                        // forced: never leave UART
+                pulses_drain(false);
+                win_start = t; sclk_edges = 0; ferr_window = 0;
+                continue;
+            }
+            if (sclk_edges >= SENSE_SCLK_EDGES_FOR_SPI && AUTO) { enter_sense(); return; }
             // Baud went up: pulses clearly shorter than our bit time
             pulses_drain(true);
             for (int i = 0; i < pulse_n; i++)
@@ -419,8 +448,36 @@ static void __not_in_flash_func(uart_loop)(void) {
     }
 }
 
+// Apply a manual override requested over the control port.
+static void apply_force(void) {
+    force_seen = dcb_status.force_seq;
+    switch (dcb_status.force) {
+    case DCB_FORCE_SD:
+        dcb_status.spi_target = DCB_SPI_SD;
+        enter_sense();
+        set_filler(0xFF);
+        break;
+    case DCB_FORCE_W5500:
+        dcb_status.spi_target = DCB_SPI_W5500;
+        enter_sense();
+        set_filler(0x00);
+        break;
+    case DCB_FORCE_UART:
+        if (dcb_status.force_baud) {
+            if (dcb_status.mode == DCB_MODE_UART) enter_sense();   // re-init at the new rate
+            enter_uart(dcb_status.force_baud);
+        } else if (dcb_status.mode != DCB_MODE_UART) {
+            enter_sense();                       // wait for traffic, measure the rate
+        }
+        break;
+    default:
+        break;                                   // auto: carry on from the current state
+    }
+}
+
 void __not_in_flash_func(dcbus_core1_main)(void) {
     for (;;) {
+        if (dcb_status.force_seq != force_seen) apply_force();
         if (dcb_status.mode == DCB_MODE_UART) uart_loop();
         else sense_loop();
     }

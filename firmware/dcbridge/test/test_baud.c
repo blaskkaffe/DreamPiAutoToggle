@@ -22,6 +22,12 @@ int main(void) {
         printf("KOS %-7u -> SCIF really runs at %-7u : snapped OK\n", req[i], real);
     }
     assert(dcbus_snap_baud(100, NULL) == 0);       // SPI-speed pulses rejected
+    // Host-requested rates (cable mode) map to what KOS really programs
+    for (unsigned i = 0; i < sizeof req / sizeof req[0]; i++)
+        assert(dcbus_kos_baud(req[i]) == kos_actual(req[i]) || req[i] <= 9600);
+    assert(dcbus_kos_baud(9600) == 9765);           // CKS=1 tier, like scif_init()
+    assert(dcbus_kos_baud(1500000) == 1562500);     // dcload-serial's "1.5M"
+    puts("host baud -> SCIF rate mapping OK");
     puts("ALL BAUD TESTS PASSED");
     return 0;
 }

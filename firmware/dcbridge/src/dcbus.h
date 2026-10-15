@@ -16,6 +16,14 @@ typedef enum {
     DCB_SPI_SD,           // KOS sd.c / DreamShell (latched on clocks with /CS high)
 } dcb_spi_target_t;
 
+// Manual override (ctl command "mode ..."), for testing one function at a time
+typedef enum {
+    DCB_FORCE_AUTO = 0,   // detect everything (default)
+    DCB_FORCE_SD,         // virtual SD card only
+    DCB_FORCE_W5500,      // virtual W5500 only
+    DCB_FORCE_UART,       // serial (PPP/console) only; force_baud 0 = auto-detect the rate
+} dcb_force_t;
+
 typedef struct {
     volatile dcb_mode_t       mode;
     volatile dcb_spi_target_t spi_target;
@@ -25,7 +33,18 @@ typedef struct {
     volatile uint32_t spi_bytes, spi_frames, spi_underruns, spi_sd_sessions;
     volatile uint32_t cts_holds;         // times we told the DC to stop sending
     volatile uint32_t last_activity_ms;
+    // override: core0 writes force/force_baud, then bumps force_seq
+    volatile uint8_t  force;
+    volatile bool     force_cable;  // UART baud follows the USB host's setting, like a coders cable
+    volatile bool     no_flow;      // ignore the Dreamcast's RTS (programs that do not use RTS/CTS)
+    volatile uint32_t force_baud;
+    volatile uint32_t force_seq;
 } dcb_status_t;
+
+// Last MOSI bytes seen by the virtual SD card (diagnostics, "sdtrace")
+#define DCB_SD_RAW_N 64u
+extern uint8_t dcb_sd_raw[DCB_SD_RAW_N];
+extern volatile uint32_t dcb_sd_raw_n;
 
 extern dcb_status_t dcb_status;
 extern ring_t   dcb_uart_rx;   // Dreamcast -> Pi   (core1 produces)
@@ -38,3 +57,4 @@ void dcbus_core1_main(void);   // never returns
 
 // Exposed for host testing of the baud snapper.
 uint32_t dcbus_snap_baud(uint32_t min_low_ns, uint32_t *bit_ns_out);
+uint32_t dcbus_kos_baud(uint32_t nominal);   // the real SCIF rate KOS uses for a nominal baud

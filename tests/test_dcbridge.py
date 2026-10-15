@@ -45,6 +45,11 @@ class Fake(BaseHTTPRequestHandler):
     def _change(self):
         n = int(self.headers.get("Content-Length") or 0)
         Fake.seen.append((self.command, self.path, self.rfile.read(n), self.headers.get("Content-Type")))
+        if self.path == "/api/bridge/mode":
+            body = Fake.seen[-1][2]
+            if b"bogus" in body:
+                return self._answer(400, b'{"error": "mode must be one of auto, cable, uart, sd, w5500"}')
+            return self._answer(200, b'{"mode": "cable"}')
         self._answer(202, b'{"queued": "x"}')
 
     do_POST = do_PUT = do_DELETE = _change
@@ -117,6 +122,25 @@ class Bridge(unittest.TestCase):
         d = {}
         dcb.api(d, warnings)
         self.assertTrue(any("not running" in w for w in warnings))
+
+    def test_the_bridge_mode_form(self):
+        got = json.loads(urlopen(self.base + "/dcbridge-mode", timeout=10).read().decode())
+        self.assertEqual(got["values"], {"mode": "auto"})                              # BRIDGE has no "mode": firmware 0.2 = auto
+        self.assertEqual([o["value"] for o in got["options"]["modes"]], ["auto", "cable", "sd", "w5500"])
+        r = self.post("/dcbridge-mode", json.dumps({"values": {"mode": "cable"}}).encode(), {"Content-Type": "application/json"})
+        self.assertEqual(r.status, 200)
+        sent = [s for s in Fake.seen if s[1] == "/api/bridge/mode"][-1]
+        self.assertEqual(json.loads(sent[2].decode()), {"mode": "cable", "save": True})      # kept as the power-on mode
+        reply = json.loads(self.post("/dcbridge-mode", json.dumps({"values": {"mode": "nonsense"}}).encode()).read().decode())
+        self.assertEqual(reply["texts"]["mode"], "Unknown mode")
+        self.assertEqual(len([s for s in Fake.seen if s[1] == "/api/bridge/mode"]), 1)       # not passed on
+        with dcb._lock:
+            dcb._seen["bridge"] = dict(BRIDGE, mode="sd")
+        self.assertEqual(dcb.view()["mode"]["id"], "sd")
+        self.assertIn("set by hand", dcb.view()["mode"]["text"])
+        with dcb._lock:
+            dcb._seen["bridge"] = dict(BRIDGE, mode="auto")
+        self.assertNotIn("by hand", dcb.view()["mode"]["text"])
 
     def test_the_reason_there_is_no_board_status_is_told(self):
         def text(**extra):
@@ -257,7 +281,7 @@ class Setup(unittest.TestCase):
     def test_both_routes_need_the_pin(self):
         for path in dcb.PROTECTED:
             self.assertIn(path, dcb.POST)
-        self.assertEqual(sorted(dcb.PROTECTED), ["/dcbridge-setup/install", "/dcbridge-setup/remove"])
+        self.assertEqual(sorted(dcb.PROTECTED), ["/dcbridge-mode", "/dcbridge-setup/install", "/dcbridge-setup/remove"])
 
     def test_the_script_is_valid_and_what_install_and_remove_do_is_in_it(self):
         import subprocess

@@ -19,3 +19,20 @@ uint32_t dcbus_snap_baud(uint32_t min_low_ns, uint32_t *bit_ns_out) {
     if (bit_ns_out) *bit_ns_out = bit_ns;
     return 50000000u / (32u * n1);
 }
+
+// What the SCIF really runs at when KOS is asked for `nominal` baud
+// (kernel/arch/dreamcast/hardware/scif.c, scif_init(): integer maths, CKS tiers).
+// A host that opens the serial port at "115200" gets 120192 on the wire, which
+// a fixed-rate USB-serial chip only approximates (4 % off); we match it exactly.
+uint32_t dcbus_kos_baud(uint32_t nominal) {
+    uint32_t div, n1;
+    if (nominal == 0) return 0;
+    if (nominal > 9600)      div = 32;
+    else if (nominal > 4800) div = 128;
+    else if (nominal > 600)  div = 512;
+    else                     div = 2048;
+    n1 = 50000000u / (div * nominal);          // = SCBRR2 + 1
+    if (n1 < 1) n1 = 1;
+    if (n1 > 256) n1 = 256;
+    return 50000000u / (div * n1);
+}

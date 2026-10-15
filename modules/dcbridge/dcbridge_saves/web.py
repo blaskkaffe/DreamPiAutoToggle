@@ -10,6 +10,9 @@ relative), e.g. in a Flask dashboard:
 API (all JSON unless noted)
   GET    api/status
   GET    api/bridge                                  RP2040 mode + W5500/PPP link state
+  POST   api/bridge/mode                             {"mode": "auto|cable|uart|sd|w5500",
+                                                      "baud": optional, "noflow": false, "save": true}
+  GET    api/bridge/trace                            virtual SD card trace (diagnostics)
   GET    api/saves                                   games, slots, pending
   GET    api/saves/<serial>/<slot>                   current file (application/octet-stream)
   PUT    api/saves/<serial>/<slot>[?title=..]        body = 131072-byte VMU image -> queued
@@ -107,10 +110,23 @@ def make_app(service, bridge=None):
                        "pending": len(store.pending_list()), "now": time.time()})
             return send(start, 200, st)
 
-        if path == "/api/bridge":
+        if path.startswith("/api/bridge"):
             if bridge is None:
                 raise HTTPError(404, "bridge status not enabled")
-            return send(start, 200, bridge.snapshot())
+            from .bridge import BridgeError
+            try:
+                if path == "/api/bridge":
+                    return send(start, 200, bridge.snapshot())
+                if path == "/api/bridge/mode" and method == "POST":
+                    j = json_body(env)
+                    fw = bridge.set_mode(j.get("mode", ""), j.get("baud"), bool(j.get("noflow")),
+                                         j.get("save", True) is not False)
+                    return send(start, 200, {"mode": fw.get("forced"), "firmware": fw})
+                if path == "/api/bridge/trace":
+                    return send(start, 200, bridge.trace())
+            except BridgeError as e:
+                raise HTTPError(400, str(e))
+            raise HTTPError(404, "not found")
 
         if path == "/api/saves" and method == "GET":
             return send(start, 200, store.summary())
@@ -212,6 +228,9 @@ button:hover,.btn:hover{border-color:var(--acc)}button.pri{background:var(--acc)
 .hist{grid-column:1/-1;font-size:13px;margin:4px 0 2px;padding:8px 10px;border-radius:8px;background:var(--bg)}
 .hist div{display:flex;justify-content:space-between;gap:8px;padding:3px 0}
 .empty{color:var(--mute);padding:30px 0;text-align:center}
+.modebar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 10px;font-size:13px;color:var(--mute)}
+.modebar span{margin-right:4px}.modebar button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#tracebtn{margin-left:auto}pre.trace{max-height:60vh;overflow:auto;font:12px ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all}
 #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:9px;font-size:13px;max-width:92vw;display:none}
 dialog{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);max-width:420px;width:92vw}
 dialog input{width:100%;font:inherit;padding:6px 8px;margin:4px 0 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)}
@@ -219,6 +238,10 @@ dialog input{width:100%;font:inherit;padding:6px 8px;margin:4px 0 10px;border:1p
 </style></head><body>
 <header><h1>Dreamcast <span>saves</span></h1><div class="status" id="st">…</div></header>
 <main>
+<div class="modebar" id="modebar"><span>Bridge mode</span>
+<button data-mode="auto">Auto</button><button data-mode="cable">Serial cable (PPP)</button>
+<button data-mode="sd">SD card</button><button data-mode="w5500">W5500</button>
+<button id="tracebtn" title="What the virtual SD card saw (diagnostics)">SD trace</button></div>
 <div class="bar"><button class="pri" onclick="newSave()">Upload save for a game…</button>
 <a class="btn" href="api/export.zip">Download all (zip)</a><button onclick="load()">Refresh</button></div>
 <div id="list"><div class="empty">Loading…</div></div>
@@ -231,6 +254,8 @@ dialog input{width:100%;font:inherit;padding:6px 8px;margin:4px 0 10px;border:1p
 <label>Title (optional)<input id="d_title"></label>
 <label>Slot (1-5)<input id="d_slot" type="number" min="1" max="5" value="1"></label>
 <div class="acts"><button value="cancel">Cancel</button><button class="pri" value="ok">Choose file…</button></div></form></dialog>
+<dialog id="tdlg"><h3 style="margin-top:0">Virtual SD card trace</h3><pre class="trace" id="tout"></pre>
+<form method="dialog" class="acts"><button>Close</button></form></dialog>
 <div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s);let DATA=null;
@@ -249,6 +274,7 @@ async function api(m,u,b,h){h=Object.assign({'X-Requested-With':'page'},h||{});l
 async function load(){
   try{const [s,st]=await Promise.all([api('GET','api/saves'),api('GET','api/status')]);DATA=s;render(s);
     let br=null;try{br=await api('GET','api/bridge')}catch(e){}
+    document.querySelectorAll('#modebar [data-mode]').forEach(b=>b.classList.toggle('on',!!br&&br.mode===b.dataset.mode));
     let net='';if(br){const L=br.links;net=' · Dreamcast: '+esc(br.summary)+
       (L.w5500.dreamcast?' · W5500 '+esc(L.w5500.dreamcast):'')+(L.ppp.present?' · PPP '+esc(L.ppp.dreamcast||'up'):'')}
     $('#st').innerHTML='<span class="dot '+(st.connected?'on':'')+'"></span>'+(st.connected?'card online':'card offline')+
@@ -290,6 +316,14 @@ document.addEventListener('click',async ev=>{const t=ev.target.closest('[data-ac
     d.innerHTML=h.length?h.map(v=>'<div><span>'+new Date(v.time*1000).toLocaleString()+' · '+esc(v.reason)+' · '+esc(v.sha1)+'</span><span class="acts">'+
       '<a class="btn" href="'+U(s,n)+'/history/'+encodeURIComponent(v.id)+'">Download</a>'+B('restore',s,n,'Restore',' data-id="'+esc(v.id)+'"')+'</span></div>').join(''):'No versions yet.';
     row.appendChild(d)}});
+document.querySelectorAll('#modebar [data-mode]').forEach(b=>b.onclick=()=>run(async()=>{
+  const j=await api('POST','api/bridge/mode',JSON.stringify({mode:b.dataset.mode}),{'Content-Type':'application/json'});
+  toast('Bridge mode: '+j.mode+' (saved as power-on mode)');return null}));
+$('#tracebtn').onclick=async()=>{const o=$('#tout');o.textContent='Asking the RP2040…';$('#tdlg').showModal();
+  try{const t=await api('GET','api/bridge/trace');
+    o.textContent=JSON.stringify(t.state,null,1)+'\n\n'+t.events.map(e=>e.t_ms+' ms  '+e.event.padEnd(13)+
+      (e.event==='cmd'?'CMD'+e.a+' arg='+e.arg.toString(16)+' -> '+e.b.toString(16):'a='+e.a+' b='+e.b+' arg='+e.arg)).join('\n')+
+      '\n\nlast MOSI bytes: '+(t.raw||'')}catch(e){o.textContent=e.message}};
 load();setInterval(load,15000);
 </script></body></html>
 """

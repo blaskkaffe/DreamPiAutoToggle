@@ -11,6 +11,9 @@
   restore SERIAL SLOT ID     queue an old version
   pending                    queued edits
   bridge                     RP2040 mode and network link state
+  mode MODE [--baud N] [--noflow] [--no-save]
+                             auto | cable | uart | sd | w5500 (power-on default unless --no-save)
+  trace                      virtual SD card trace (diagnostics)
   cancel ID                  drop a queued edit
 """
 import argparse
@@ -83,6 +86,15 @@ def main(argv=None):
     p = sub.add_parser("history"); p.add_argument("serial"); p.add_argument("slot", type=int)
     p = sub.add_parser("restore"); p.add_argument("serial"); p.add_argument("slot", type=int); p.add_argument("id")
     sub.add_parser("pending")
+    p = sub.add_parser("mode", help="set the RP2040 mode")
+    p.add_argument("mode", choices=["auto", "cable", "uart", "sd", "w5500"])
+    p.add_argument("--baud", type=int)
+    p.add_argument("--noflow", action="store_true", help="ignore the Dreamcast's RTS")
+    p.add_argument("--no-save", action="store_true", help="do not make it the power-on mode")
+    p.add_argument("--port", type=int, default=int(os.environ.get("DCB_PORT", "8085")))
+    p.add_argument("--ctl", default="/dev/dcbridge-ctl")
+    p = sub.add_parser("trace", help="virtual SD card trace")
+    p.add_argument("--port", type=int, default=int(os.environ.get("DCB_PORT", "8085")))
     p = sub.add_parser("bridge", help="RP2040 mode and network link state (JSON)")
     p.add_argument("--ctl", default="", help="read one status line from this port too")
     p = sub.add_parser("cancel"); p.add_argument("id")
@@ -129,6 +141,8 @@ def main(argv=None):
                 time.sleep(2.5)
             print(json.dumps(b.snapshot(), indent=2))
             return 0
+        if a.cmd in ("mode", "trace"):
+            return _bridge_cmd(a)
         if a.cmd == "pending":
             for e in store.pending_list():
                 print("%s  %-6s %s slot %s %s" % (e["id"], e["action"], e["serial"], e["slot"],
@@ -178,6 +192,46 @@ def main(argv=None):
         print("error: %s" % e, file=sys.stderr)
         return 1
     return 2
+
+
+def _bridge_cmd(a):
+    """mode/trace go through the running service (it owns the control port);
+    if it is not running, mode is written straight to the port."""
+    try:
+        from urllib.request import urlopen, Request
+        from urllib.error import URLError, HTTPError
+    except ImportError:                                   # pragma: no cover
+        print("needs Python 3", file=sys.stderr)
+        return 1
+    base = "http://127.0.0.1:%d/api/bridge" % a.port
+    try:
+        if a.cmd == "trace":
+            t = json.loads(urlopen(base + "/trace", timeout=6).read().decode())
+            print(json.dumps(t["state"], indent=1))
+            for e in t["events"]:
+                if e["event"] == "cmd":
+                    print("%8d ms  CMD%-3d arg=%08x -> %02x" % (e["t_ms"], e["a"], e["arg"], e["b"]))
+                else:
+                    print("%8d ms  %-13s a=%d b=%d arg=%d" % (e["t_ms"], e["event"], e["a"], e["b"], e["arg"]))
+            print("last MOSI bytes:", t["raw"])
+            return 0
+        body = json.dumps({"mode": a.mode, "baud": a.baud, "noflow": a.noflow,
+                           "save": not a.no_save}).encode()
+        r = urlopen(Request(base + "/mode", body, {"Content-Type": "application/json"}), timeout=6)
+        print("mode:", json.loads(r.read().decode())["mode"])
+        return 0
+    except HTTPError as e:
+        print("error:", json.loads(e.read().decode()).get("error"), file=sys.stderr)
+        return 1
+    except (URLError, OSError):
+        if a.cmd == "trace":
+            print("the dcbridge-saves service is not running", file=sys.stderr)
+            return 1
+        from .bridge import mode_command
+        with open(a.ctl, "w") as f:                       # service not running: direct
+            f.write(mode_command(a.mode, a.baud, a.noflow, not a.no_save) + "\n")
+        print("sent to %s" % a.ctl)
+        return 0
 
 
 if __name__ == "__main__":

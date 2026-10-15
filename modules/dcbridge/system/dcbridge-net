@@ -25,6 +25,7 @@ DCNET_PREFIX=${DCNET_PREFIX:-24}
 DCNET_DHCP_FIRST=${DCNET_DHCP_FIRST:-192.168.170.2}
 DCNET_DHCP_LAST=${DCNET_DHCP_LAST:-192.168.170.20}
 PPP_UNIT=${PPP_UNIT:-10}
+PPP_BAUD=${PPP_BAUD:-115200}
 PPP_LOCAL=${PPP_LOCAL:-192.168.171.1}
 PPP_REMOTE=${PPP_REMOTE:-192.168.171.2}
 DNS_SERVER=${DNS_SERVER:-}
@@ -189,9 +190,9 @@ status() {
 run_ppp() {
     dns=${DNS_SERVER:-$PPP_LOCAL}
     firewall_up
-    # The USB serial speed is irrelevant (the RP2040 matches the Dreamcast's
-    # real SCIF rate itself); pppd just needs a number.
-    exec pppd "$PPP_TTY" 115200 file "$PPP_OPTIONS" unit "$PPP_UNIT" nodetach \
+    # In "cable" mode the RP2040 runs the Dreamcast UART at this rate (as KOS
+    # computes it); in "auto"/"uart" mode it measures the rate itself.
+    exec pppd "$PPP_TTY" "$PPP_BAUD" file "$PPP_OPTIONS" unit "$PPP_UNIT" nodetach \
         "$PPP_LOCAL:$PPP_REMOTE" ms-dns "$dns" "$@"
 }
 

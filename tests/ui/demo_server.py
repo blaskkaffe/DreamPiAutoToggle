@@ -85,11 +85,17 @@ if os.environ.get("DCBRIDGE"):          # the DC Bridge module on, with a stand-
     from http.server import BaseHTTPRequestHandler, HTTPServer
     class FakeBridge(BaseHTTPRequestHandler):
         def do_GET(self):
-            data = {"/api/bridge": {"summary": "serial 120192 baud", "firmware": {"mode": "uart", "baud": 120192, "underruns": 0},
+            data = {"/api/bridge": {"summary": "serial 120192 baud", "mode": getattr(FakeBridge, "mode", "auto"), "firmware": {"mode": "uart", "baud": 120192, "underruns": 0},
                                     "links": {"w5500": {"dreamcast": "192.168.170.2"}, "ppp": {"dreamcast": None}}},
                     "/api/status": {"connected": True, "pending": 2, "last_session": time.time() - 300}}.get(self.path.split("?")[0])
             body = json.dumps(data).encode() if data is not None else b"<h1>Dreamcast saves (stand-in)</h1>"
             self.send_response(200); self.send_header("Content-Type", "application/json" if data is not None else "text/html"); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+        def do_POST(self):
+            n = int(self.headers.get("Content-Length") or 0); body = self.rfile.read(n)
+            if self.path.split("?")[0] == "/api/bridge/mode":
+                FakeBridge.mode = json.loads(body.decode()).get("mode", "auto")
+            out = json.dumps({"mode": getattr(FakeBridge, "mode", "auto")}).encode()
+            self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(out))); self.end_headers(); self.wfile.write(out)
         def log_message(self, *a): pass
     _fb = HTTPServer(("127.0.0.1", 0), FakeBridge); dcb.PORT = _fb.server_address[1]
     threading.Thread(target=_fb.serve_forever, daemon=True).start()

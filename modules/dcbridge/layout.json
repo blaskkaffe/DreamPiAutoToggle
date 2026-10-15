@@ -34,6 +34,14 @@
        }
       },
       {
+       "label": "Mode",
+       "value": {
+        "type": "status",
+        "dot": "@dcbridge.mode.state",
+        "text": "@dcbridge.mode.text"
+       }
+      },
+      {
        "label": "",
        "value": {
         "type": "bar",
@@ -104,6 +112,26 @@
       "disabled": "@dcbridge.setup.running",
       "confirm": "Uninstall the DC Bridge from this Pi? Its services, udev rules, firewall chains and DHCP / DNS file are removed. The saves in /var/lib/dcbridge and the settings in /etc/default/dcbridge are kept."
      }
+    },
+    {
+     "type": "form",
+     "get": "/dcbridge-mode",
+     "post": "/dcbridge-mode",
+     "show": "@dcbridge.installed",
+     "fields": [
+      {
+       "title": "Bridge mode",
+       "sub_text": "mode",
+       "controls": [
+        {
+         "type": "choice",
+         "key": "mode",
+         "options": "modes",
+         "label": "Mode"
+        }
+       ]
+      }
+     ]
     },
     {
      "type": "row",

@@ -12,6 +12,10 @@ DCNET_DHCP_LAST=192.168.170.20
 # PPP over the Dreamcast serial port (KOS libppp, ppp_scif_init()).
 # unit 10 => interface ppp10, so DreamPi's modem link keeps ppp0.
 PPP_UNIT=10
+# Serial speed. With the bridge in "cable" mode the Dreamcast-side UART follows
+# this number exactly as KOS computes it ("115200" really runs at 120192), so
+# set it to what the Dreamcast program passes to ppp_scif_init().
+PPP_BAUD=115200
 PPP_LOCAL=192.168.171.1
 PPP_REMOTE=192.168.171.2
 

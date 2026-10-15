@@ -75,6 +75,32 @@ def link_status(conf, run_dir="/run/dcbridge"):
     return out
 
 
+MODES = ("auto", "cable", "uart", "sd", "w5500")
+
+
+class BridgeError(Exception):
+    pass
+
+
+def mode_command(mode, baud=None, noflow=False, save=True):
+    """Build the RP2040 'mode' command (see firmware main.c set_force())."""
+    if mode not in MODES:
+        raise BridgeError("mode must be one of %s" % ", ".join(MODES))
+    cmd = "mode " + mode
+    if baud:
+        baud = int(baud)
+        if not 300 <= baud <= 1562500:
+            raise BridgeError("baud must be 300-1562500")
+        if mode not in ("uart", "cable"):
+            raise BridgeError("a baud rate only applies to uart/cable")
+        cmd += " %d" % baud
+    if noflow:
+        cmd += " noflow"
+    if save:
+        cmd += " save"
+    return cmd
+
+
 USB_ID = ("1209", "0001")        # firmware/dcbridge/src/config.h USB_VID / USB_PID
 
 
@@ -105,14 +131,72 @@ def device_nodes(ctl_path):
 
 
 class BridgeStatus(object):
-    """Follows /dev/dcbridge-ctl (one JSON object per line, about every second)."""
+    """Follows /dev/dcbridge-ctl (one JSON object per line, about every second)
+    and sends commands to it (mode changes, SD trace requests)."""
 
     def __init__(self, ctl_path, conf_path="/etc/default/dcbridge"):
         self.ctl_path = ctl_path
         self.conf_path = conf_path
         self.firmware = None
         self.firmware_at = None
+        self.last_error = None
+        self._fd = None
+        self._wlock = threading.Lock()
+        self._trace = None                 # list while a trace is being collected
+        self._trace_done = threading.Event()
         self._stop = threading.Event()
+
+    def send(self, command):
+        with self._wlock:
+            if self._fd is None:
+                raise BridgeError("RP2040 control port %s is not open" % self.ctl_path)
+            os.write(self._fd, (command.strip() + "\n").encode())
+
+    def set_mode(self, mode, baud=None, noflow=False, save=True):
+        self.last_error = None
+        self.send(mode_command(mode, baud, noflow, save))
+        deadline = time.time() + 2
+        while time.time() < deadline:                # wait for the status echo
+            fw = self.firmware or {}
+            if self.last_error:
+                raise BridgeError(self.last_error)
+            if fw.get("forced") == mode and (not baud or mode == "cable" or fw.get("forced_baud")):
+                return fw
+            time.sleep(0.05)
+        raise BridgeError("the RP2040 did not confirm the mode change (old firmware?)")
+
+    def trace(self, timeout=3.0):
+        """Ask the firmware for its SD trace; returns {state, events, raw}."""
+        self._trace = []
+        self._trace_done.clear()
+        self.send("sdtrace")
+        self._trace_done.wait(timeout)
+        lines, self._trace = self._trace, None
+        out = {"state": None, "events": [], "raw": None}
+        for obj in lines or []:
+            if "sdstate" in obj:
+                out["state"] = obj["sdstate"]
+            elif "sdtrace" in obj:
+                out["events"].extend(
+                    {"t_ms": e[0], "event": e[1], "a": e[2], "b": e[3], "arg": e[4]} for e in obj["sdtrace"])
+            elif "sdraw" in obj:
+                out["raw"] = obj["sdraw"]
+        if out["state"] is None:
+            raise BridgeError("no trace received (old firmware?)")
+        return out
+
+    def _on_line(self, obj):
+        if self._trace is not None and ("sdstate" in obj or "sdtrace" in obj or "sdraw" in obj):
+            self._trace.append(obj)
+            if "sdraw" in obj:
+                self._trace_done.set()
+            return
+        if "error" in obj and len(obj) == 1:
+            self.last_error = obj["error"]
+            return
+        if "fw" in obj:
+            self.firmware = obj
+            self.firmware_at = time.time()
 
     def start(self):
         if self.ctl_path:
@@ -124,7 +208,7 @@ class BridgeStatus(object):
     def _loop(self):
         while not self._stop.is_set():
             try:
-                fd = os.open(self.ctl_path, os.O_RDONLY | os.O_NOCTTY)
+                fd = os.open(self.ctl_path, os.O_RDWR | os.O_NOCTTY)
             except OSError as e:
                 if e.errno not in (errno.ENOENT, errno.ENODEV, errno.EACCES):
                     log.warning("open %s: %s", self.ctl_path, e)
@@ -135,6 +219,8 @@ class BridgeStatus(object):
                     tty.setraw(fd)
                 except Exception:
                     pass
+                with self._wlock:
+                    self._fd = fd
                 buf = b""
                 while not self._stop.is_set():
                     chunk = os.read(fd, 4096)
@@ -146,14 +232,15 @@ class BridgeStatus(object):
                         line = line.strip()
                         if line.startswith(b"{"):
                             try:
-                                self.firmware = json.loads(line.decode("utf-8", "replace"))
-                                self.firmware_at = time.time()
+                                self._on_line(json.loads(line.decode("utf-8", "replace")))
                             except ValueError:
                                 pass
                     buf = buf[-4096:]
             except OSError:
                 pass
             finally:
+                with self._wlock:
+                    self._fd = None
                 os.close(fd)
             time.sleep(1)
 
@@ -165,13 +252,16 @@ class BridgeStatus(object):
         if fw:
             if fw.get("mode") == "uart":
                 summary = "serial %d baud" % fw.get("baud", 0)
+            elif fw.get("forced") == "cable":
+                summary = "serial cable, waiting for a baud rate"
             elif fw.get("spi") == "sd":
                 summary = "SD card"
             elif fw.get("spi") == "w5500":
                 summary = "W5500 network"
             else:
                 summary = "idle"
-        out = {"summary": summary, "firmware": fw, "links": link_status(conf)}
+        mode = fw.get("forced", "auto") if fw else None
+        out = {"summary": summary, "mode": mode, "firmware": fw, "links": link_status(conf)}
         if not fw:                      # why there is no status: the board is not on USB / has no udev names / says nothing
             out["usb"] = usb_seen()
             out["devices"] = device_nodes(self.ctl_path)

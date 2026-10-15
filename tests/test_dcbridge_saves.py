@@ -202,6 +202,51 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(snap["links"]["ppp"]["interface"], "ppp10")
         b.stop()
 
+    def test_mode_and_trace_roundtrip(self):
+        """Fake RP2040 on a pty: answers 'mode' and 'sdtrace' like main.c does."""
+        import json as J, threading, time
+        from dcbridge_saves.bridge import BridgeStatus, BridgeError
+        m, sl = os.openpty()
+        got = []
+
+        def fake_fw():
+            buf = b""
+            forced = "auto"
+            while True:
+                try:
+                    buf += os.read(m, 256)
+                except OSError:
+                    return
+                while b"\n" in buf:
+                    line, buf = buf.split(b"\n", 1)
+                    cmd = line.decode().strip()
+                    got.append(cmd)
+                    if cmd.startswith("mode "):
+                        forced = cmd.split()[1]
+                        os.write(m, (J.dumps({"fw": "x", "forced": forced, "forced_baud": 0,
+                                              "mode": "sense", "spi": "none"}) + "\r\n").encode())
+                    elif cmd == "sdtrace":
+                        os.write(m, b'{"sdstate":{"initialized":false}}\r\n'
+                                    b'{"sdtrace":[[10,"cmd",0,1,0],[12,"cmd",8,1,426]]}\r\n'
+                                    b'{"sdraw":"ff40000000009501"}\r\n')
+        threading.Thread(target=fake_fw, daemon=True).start()
+        b = BridgeStatus(os.ttyname(sl), conf_path="/nonexistent")
+        b.start()
+        for _ in range(30):
+            if b._fd is not None:
+                break
+            time.sleep(0.1)
+        fw = b.set_mode("cable", save=True)
+        self.assertEqual(fw["forced"], "cable")
+        self.assertEqual(got[-1], "mode cable save")
+        self.assertEqual(b.snapshot()["mode"], "cable")
+        t = b.trace()
+        self.assertEqual([e["a"] for e in t["events"]], [0, 8])
+        self.assertEqual(t["raw"], "ff40000000009501")
+        with self.assertRaises(BridgeError):
+            b.set_mode("sd", baud=115200)
+        b.stop()
+
     def test_a_client_that_hangs_up_leaves_no_traceback(self):
         import contextlib, io, socket, threading, time
         from dcbridge_saves import __main__ as m

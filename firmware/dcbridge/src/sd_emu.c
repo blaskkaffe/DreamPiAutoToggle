@@ -2,15 +2,19 @@
 #include "sd_emu.h"
 #include "ring.h"      // DCB_BARRIER
 
-enum {
-    S_IDLE = 0,     // between commands (MOSI 0xFF polls)
-    S_CMD,          // collecting a 6-byte command
-    S_READ,         // CMD17/18/9: waiting for data or streaming blocks
-    S_W_TOKEN,      // CMD24/25: waiting for the data token
-    S_W_DATA,
-    S_W_CRC1,
-    S_W_CRC2,
-};
+#define S_IDLE    SD_S_IDLE
+#define S_CMD     SD_S_CMD
+#define S_READ    SD_S_READ
+#define S_W_TOKEN SD_S_W_TOKEN
+#define S_W_DATA  SD_S_W_DATA
+#define S_W_CRC1  SD_S_W_CRC1
+#define S_W_CRC2  SD_S_W_CRC2
+
+static inline void ev(sd_emu_t *e, uint8_t type, uint8_t a, uint8_t b, uint32_t arg) {
+    sd_trace_t *t = &e->trace[e->trace_n % SD_TRACE_N];
+    t->t_ms = e->now_ms; t->arg = arg; t->type = type; t->a = a; t->b = b;
+    e->trace_n++;
+}
 
 #define R1_IDLE     0x01
 #define R1_ILLEGAL  0x04
@@ -157,9 +161,11 @@ static void DCB_RAMFUNC(try_fill)(sd_emu_t *e) {
             post_request(e, e->rd_lba);
             e->req_ms = e->now_ms;
             e->st_misses++;
+            ev(e, SD_EV_MISS, 0, 0, e->rd_lba);
         }
         return;
     }
+    ev(e, SD_EV_SERVED, 0, 0, e->rd_lba);
     if (!e->first_block) { put(e, 0xFF); put(e, 0xFF); }   // gap: lets CMD12's wait_ready see 0xFF
     put(e, 0xFE);
     e->src_left = SD_SECTOR;
@@ -223,8 +229,10 @@ static void DCB_RAMFUNC(exec_cmd)(sd_emu_t *e) {
         return;
     case 1:
     init_poll:                                        // ACMD41 / CMD1: ready once the Pi is
-        if (!e->initialized && e->session_ready == e->session_req && e->sectors)
+        if (!e->initialized && e->session_ready == e->session_req && e->sectors) {
             e->initialized = true;
+            ev(e, SD_EV_READY, 0, 0, e->sectors);
+        }
         put(e, e->initialized ? 0x00 : R1_IDLE);
         return;
     case 8:                                           // SEND_IF_COND: echo pattern
@@ -274,14 +282,23 @@ void DCB_RAMFUNC(sd_emu_on_byte)(sd_emu_t *e, uint8_t in) {
     switch (e->state) {
     case S_CMD:
         e->cmd[e->cmd_n++] = in;
-        if (e->cmd_n == 6) exec_cmd(e);
+        if (e->cmd_n == 6) {
+            exec_cmd(e);
+            ev(e, SD_EV_CMD, e->cmd[0] & 0x3F, e->out_rd != e->out_wr ? e->out[e->out_rd] : 0xFF,
+               (uint32_t)e->cmd[1] << 24 | (uint32_t)e->cmd[2] << 16 | (uint32_t)e->cmd[3] << 8 | e->cmd[4]);
+        }
         return;
 
     case S_W_TOKEN:
         if (in == 0xFF) return;                       // wait_ready polling
         if (e->multi && in == 0xFD) { e->state = S_IDLE; return; }   // stop tran
         if (in == (e->multi ? 0xFC : 0xFE)) {
-            if (e->w_head - e->w_tail >= SD_WSLOTS) { e->st_busy++; e->state = S_IDLE; return; }
+            if (e->w_head - e->w_tail >= SD_WSLOTS) {
+                e->st_busy++;
+                ev(e, SD_EV_BUSY, 0, 0, e->wr_lba);
+                e->state = S_IDLE;
+                return;
+            }
             e->wpos = 0;
             e->wcrc = 0;
             e->state = S_W_DATA;
@@ -298,6 +315,9 @@ void DCB_RAMFUNC(sd_emu_on_byte)(sd_emu_t *e, uint8_t in) {
     }
     case S_W_CRC1:
         e->crc_hi = in;
+        e->hi_ok = in == (uint8_t)(e->wcrc >> 8);
+        e->expect_lo = (uint8_t)e->wcrc;
+        e->dr_sent = false;           // the glue may answer the next byte itself
         e->state = S_W_CRC2;
         return;
 
@@ -305,7 +325,8 @@ void DCB_RAMFUNC(sd_emu_on_byte)(sd_emu_t *e, uint8_t in) {
         // KOS reads the data response with a single read right after the CRC,
         // so this byte must be queued immediately (same deadline as a W5500 read).
         if ((uint16_t)(e->crc_hi << 8 | in) == e->wcrc) {
-            put(e, DR_ACCEPTED);
+            if (!e->dr_sent) put(e, DR_ACCEPTED);
+            ev(e, SD_EV_WRITE_OK, 0, 0, e->wr_lba);
             sd_wslot_t *s = &e->wslot[e->w_head & (SD_WSLOTS - 1)];
             s->lba = e->wr_lba++;
             s->crc = e->wcrc;
@@ -313,7 +334,8 @@ void DCB_RAMFUNC(sd_emu_on_byte)(sd_emu_t *e, uint8_t in) {
             e->w_head++;
             e->st_writes++;
         } else {
-            put(e, DR_CRC_ERR);
+            if (!e->dr_sent) put(e, DR_CRC_ERR);
+            ev(e, SD_EV_WRITE_CRC, 0, 0, e->wr_lba);
             e->st_crc_err++;
         }
         e->state = e->multi ? S_W_TOKEN : S_IDLE;
@@ -339,6 +361,8 @@ void DCB_RAMFUNC(sd_emu_poll)(sd_emu_t *e) {
 }
 
 void sd_emu_frame_end(sd_emu_t *e) {
+    if (e->state != S_IDLE && !(e->state == S_READ && e->out_rd == e->out_wr && !e->src_left))
+        ev(e, SD_EV_ABORT, e->state, (uint8_t)e->cmd_n, 0);
     if (e->state != S_IDLE) e->state = S_IDLE;     // abandons partial commands/blocks
     e->cmd_n = 0;
     out_clear(e);

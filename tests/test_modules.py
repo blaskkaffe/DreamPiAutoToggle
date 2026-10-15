@@ -214,7 +214,7 @@ class WithEverything(Base):
 
     def test_protected_paths_are_the_modules_own_post_routes(self):
         import base_modules as mods
-        self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/autoupdates/allow", "/autoupdates/restore", "/wificonnect", "/dcbridge-setup/install", "/dcbridge-setup/remove"})
+        self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/autoupdates/allow", "/autoupdates/restore", "/wificonnect", "/dcbridge-setup/install", "/dcbridge-setup/remove", "/dcbridge-mode"})
         for path in mods._state["protected"]:
             self.assertTrue(mods.route("POST", path), path)
 
