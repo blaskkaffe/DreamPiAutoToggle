@@ -21,6 +21,40 @@ What you get:
 
 ## Install
 
+### Step by step: a fresh Debian 13 ("trixie")
+
+For a computer that will be the host (the one that keeps the board). Any small PC will do. Not yet verified on real hardware (see [docs/hardware-status.md](docs/hardware-status.md)).
+
+1. **Install Debian 13.** Use the "netinst" image. In the installer choose *SSH server* and *standard system utilities*; you do not need a desktop on the host. Give the computer a fixed address (a reservation in the router is the easiest) so the screens always find it.
+2. **Log in** (or `ssh` in) and become root: `su -` (or put `sudo` in front of each command below).
+3. **Install what the add-on needs:**
+   ```
+   apt update
+   apt install -y git python3 openssl avahi-daemon
+   ```
+   (`git` fetches the code and the updates, `openssl` makes the HTTPS certificate, `avahi-daemon` makes the `.local` name work.)
+4. **Get the code:**
+   ```
+   git clone https://github.com/blaskkaffe/DreamPiAutoToggle.git
+   cd DreamPiAutoToggle
+   git checkout checkin2.0
+   ```
+5. **Install it.** The `--hostname` makes the board answer at `http://checkinchicken.local`; the `--pin` asks you for a PIN that guards update, reboot and import (leave it out for none):
+   ```
+   ./install.sh --hostname=checkinchicken --pin
+   ```
+   It copies the files to `/opt/checkin-board` and starts the `checkin-board` service, which also starts at every boot.
+6. **Open the board** from any computer or phone on the same network: `http://checkinchicken.local` or `http://<the host's IP address>` (find it with `ip -4 addr`). The first time you open the `https://` address the browser warns about the certificate; that is expected (see [HTTPS](#https)).
+7. **Add your people:** the cogwheel > **Contacts** > import your CSV (the format is [below](#the-csv)). Then pick colours, the time zone and the look under **Settings > Appearance** and **Settings > System**.
+8. **Check that it runs:** `systemctl status checkin-board` shows `active (running)`; `journalctl -u checkin-board -n 50` shows the log. If the page does not open, a firewall on the host may block ports 80 / 443 (`ufw allow 80,443/tcp` if you use `ufw`).
+9. **More screens:** just open the same address in a browser on any other computer or tablet. For a wall screen on a Debian computer: `apt install -y chromium xorg openbox`, copy the `kiosk/` folder to it and run `kiosk/kiosk-browser.sh <the host's address>` (details above under *Other screens*). Screens with no installation at all: [Screens that boot from the network](#screens-that-boot-from-the-network).
+10. **Update later:** in the page (**Settings > System > Update now**) or by hand:
+    ```
+    cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
+    ```
+
+### The short version
+
 On the host (any Debian-family Linux with `systemd`, such as Debian or Ubuntu):
 ```
 git clone https://github.com/blaskkaffe/DreamPiAutoToggle.git
