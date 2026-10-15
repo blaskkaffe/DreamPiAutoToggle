@@ -1,0 +1,13 @@
+# /etc/systemd/system/dcbridge-saves.service (@MODULE@ is the module folder: install.sh fills it in)
+[Unit]
+Description=dcbridge virtual SD card and Dreamcast save manager
+After=local-fs.target network.target
+
+[Service]
+Environment=PYTHONPATH=@MODULE@
+ExecStart=/usr/bin/python3 -m dcbridge_saves serve --host 127.0.0.1 --port 8085
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

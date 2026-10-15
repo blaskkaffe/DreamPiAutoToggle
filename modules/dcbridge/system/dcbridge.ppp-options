@@ -1,0 +1,21 @@
+# /etc/ppp/dcbridge.options -- pppd options for the Dreamcast serial PPP link.
+# pppd reads /etc/ppp/options first (dreampi.py rewrites that file for its
+# modem link); everything here is passed afterwards and wins where it matters.
+# Addresses, unit and DNS come from /etc/default/dcbridge via dcbridge-net.
+
+# A cable, not a phone line: no login, no modem control lines
+noauth
+local
+nocrtscts
+# Wait for the Dreamcast's LCP request instead of shouting at a console
+silent
+# Keep listening forever; a Dreamcast reboot simply starts a new session
+persist
+maxfail 0
+holdoff 1
+lcp-echo-interval 10
+lcp-echo-failure 3
+# DreamPi's options turn proxyarp on for its LAN-addressed modem link; this
+# link is NATed instead
+noproxyarp
+nodefaultroute

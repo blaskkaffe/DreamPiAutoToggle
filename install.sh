@@ -19,6 +19,10 @@
 #   sudo ./install.sh --no-wifi    remove Wi-Fi setup again
 #   sudo ./install.sh --wifi-demo  try Wi-Fi setup on dummy networks (no hostapd, nothing is changed on the
 #                                  Pi's network; password "demo" connects); --no-wifi-demo ends it
+#   sudo ./install.sh --dcbridge   install the DC Bridge module: the Pi's side of the RP2040 board on the Dreamcast's
+#                                  serial port (a virtual SD card with a save manager, serial PPP, a virtual W5500 link);
+#                                  it changes how the Pi routes those links, so it is only set up on request and kept
+#                                  on updates; --no-dcbridge removes it again (the saves stay). See docs/dcbridge.md.
 #   sudo ./install.sh --pin        ask for a PIN that the page then wants before it updates, restarts
 #                                  the Pi or connects Wi-Fi (--pin=1234 gives it on the command line,
 #                                  which shows in the shell history); --no-pin removes it. It is kept
@@ -46,6 +50,7 @@ LED_COUNT=
 LED_GPIO=
 WIFI=keep
 WIFI_DEMO=keep
+DCBRIDGE=keep
 PIN=keep
 for arg in "$@"; do
     case "$arg" in
@@ -58,6 +63,8 @@ for arg in "$@"; do
         --no-led) LED_COUNT=0 ;;
         --wifi) WIFI=on ;;
         --no-wifi) WIFI=off ;;
+        --dcbridge) DCBRIDGE=on ;;
+        --no-dcbridge) DCBRIDGE=off ;;
         --pin) PIN=ask ;;
         --pin=*) PIN="${arg#--pin=}"
                   if [ "${#PIN}" -lt 4 ] || [ "${#PIN}" -gt 64 ]; then echo "The PIN must be 4 to 64 characters"; exit 1; fi ;;
@@ -71,7 +78,7 @@ for arg in "$@"; do
     esac
 done
 
-if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--leds=N|--led-gpio=N] [--wifi|--no-wifi|--wifi-demo|--no-wifi-demo]"; exit 1; fi
+if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https] [--leds=N|--led-gpio=N] [--wifi|--no-wifi|--wifi-demo|--no-wifi-demo] [--dcbridge|--no-dcbridge]"; exit 1; fi
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it

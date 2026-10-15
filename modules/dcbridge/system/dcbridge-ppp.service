@@ -1,0 +1,14 @@
+# /etc/systemd/system/dcbridge-ppp.service
+# pppd on the Dreamcast serial port, started by udev when /dev/dcbridge-uart
+# appears. It stays silent until the Dreamcast starts PPP.
+# Need the raw serial console instead (dcload, picocom)?
+#   sudo systemctl stop dcbridge-ppp     (or "mask" it to keep it off)
+[Unit]
+Description=dcbridge serial PPP for the Dreamcast
+BindsTo=dev-dcbridge\x2duart.device
+After=dev-dcbridge\x2duart.device
+
+[Service]
+ExecStart=@MODULE@/system/dcbridge-net ppp
+Restart=always
+RestartSec=2

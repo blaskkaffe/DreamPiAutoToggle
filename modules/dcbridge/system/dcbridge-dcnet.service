@@ -1,0 +1,12 @@
+# /etc/systemd/system/dcbridge-dcnet.service
+# Started by udev when the RP2040's virtual W5500 link (dcnet0) appears.
+[Unit]
+Description=dcbridge virtual W5500 link (dcnet0)
+BindsTo=sys-subsystem-net-devices-dcnet0.device
+After=sys-subsystem-net-devices-dcnet0.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=@MODULE@/system/dcbridge-net dcnet-up
+ExecStop=@MODULE@/system/dcbridge-net dcnet-down

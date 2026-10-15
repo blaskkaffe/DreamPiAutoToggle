@@ -1,0 +1,181 @@
+; dcbridge PIO programs for the Dreamcast serial port.
+;
+; Pins (see config.h; they need not be contiguous):
+;   in_base           = MOSI / DC TXD   (input)
+;   out/set/sideset   = MISO / DC RXD   (output)
+;   jmp_pin           = SCLK / DC CTS   (input; weak pulls only)
+; In dc_spi_slave, "wait x pin 2" means SCLK and "wait x pin 3" means /CS:
+; these are placeholders that dc_spi_slave_program_init() rewrites to
+; "wait x gpio <n>" when the program is loaded.
+
+; ===========================================================================
+; SPI slave, mode 0, MSB first, matching KOS scif-spi.c bit-banging:
+;   master sets MOSI with SCLK low, raises SCLK, then reads MISO.
+; So we change MISO only while SCLK is low and sample MOSI on the rising edge.
+;
+; The first bit of every byte is the critical one: core1 decides what to send
+; only after it has seen the previous byte (e.g. the W5500 control byte). So
+; instead of pulling early we spin until EITHER the TX FIFO has data OR the
+; master raises SCLK. If SCLK wins we send a filler byte and raise IRQ 0 so
+; firmware can count "underruns".
+;
+; Config: in_base=MOSI, out_base=set_base=MISO, jmp_pin=SCLK,
+;         OUT shift left (MSB first), IN shift left with autopush @ 8,
+;         mov-status = TX FIFO level < 1  (all ones when TX FIFO empty).
+; The filler (0x00 or 0xFF) is patched at run time at the two public labels.
+; ===========================================================================
+.program dc_spi_slave
+.wrap_target
+byte_start:
+    wait 0 pin 3                ; /CS asserted
+    set y, 7
+    wait 0 pin 2                ; SCLK low: safe to drive MISO
+public filler_msb:
+    set pins, 0                 ; present filler MSB while we wait   [patched]
+first_wait:
+    mov x, status               ; x = ~0 if TX FIFO empty
+    jmp !x have_data
+    jmp pin underrun            ; SCLK went high before data arrived
+    jmp first_wait
+underrun:
+public filler_byte:
+    mov osr, null               ; filler byte                        [patched]
+    irq nowait 0                ; tell firmware we were late
+    out null, 1                 ; MSB is already on the wire
+    jmp sample
+have_data:
+    pull block
+bit:
+    out pins, 1                 ; drive bit while SCLK is low
+    wait 1 pin 2                ; rising edge: master samples MISO
+sample:
+    in pins, 1                  ; we sample MOSI (autopush every 8 bits)
+    jmp y-- next_bit
+    jmp byte_start
+next_bit:
+    wait 0 pin 2                ; falling edge
+    jmp bit
+.wrap
+
+; ===========================================================================
+; UART RX, 8N1, 8 cycles per bit (from pico-examples uart_rx, with framing check)
+; Config: in_base=jmp_pin=DC TXD, IN shift right, no autopush.
+; ===========================================================================
+.program dc_uart_rx
+start:
+    wait 0 pin 0                ; start bit
+    set x, 7    [10]            ; to the middle of data bit 0
+bitloop:
+    in pins, 1
+    jmp x-- bitloop [6]
+    jmp pin good_stop
+    irq 4 rel                   ; framing error / break: sticky flag
+    wait 1 pin 0
+    jmp start
+good_stop:
+    push
+
+; ===========================================================================
+; UART TX, 8N1, 8 cycles per bit, with RTS/CTS flow control:
+; the Dreamcast pulls its RTS low when it can accept data, so each byte
+; waits for RTS low before the start bit. SH4 SCIF has a 16-byte RX FIFO, so
+; finishing the byte in flight after RTS rises is fine.
+; Config: out_base=sideset_base=DC RXD pin, in_base=DC RTS pin,
+;         OUT shift right, no autopull.
+; ===========================================================================
+.program dc_uart_tx
+.side_set 1 opt
+    pull            side 1 [7]  ; idle / stop bit
+    wait 0 pin 0                ; DC RTS asserted? (in_base = DC RTS pin)
+    set x, 7        side 0 [7]  ; start bit
+bitloop:
+    out pins, 1
+    jmp x-- bitloop [6]
+
+; ===========================================================================
+; Low-pulse width meter for auto-baud on DC TXD.
+; Pushes the number of 2-cycle loop iterations each low pulse lasted.
+; The shortest pulse over a few dozen samples is one bit time.
+; Config: in_base=jmp_pin=DC TXD.
+; ===========================================================================
+.program dc_pulse_low
+.wrap_target
+    wait 1 pin 0
+    wait 0 pin 0
+    mov x, ~null
+count:
+    jmp pin done
+    jmp x-- count
+done:
+    mov isr, ~x
+    push noblock
+.wrap
+
+% c-sdk {
+#include "hardware/clocks.h"
+#include "hardware/gpio.h"
+
+// Rewrite the SCLK/CS placeholder waits (logical pin 2/3) to absolute GPIOs.
+static inline void dc_spi_slave_patch_pins(PIO pio, uint offset, uint sclk, uint cs) {
+    for (uint i = 0; i < dc_spi_slave_program.length; i++) {
+        uint16_t ins = dc_spi_slave_program_instructions[i];
+        if ((ins & 0xE060) != 0x2020) continue;            // WAIT with source = PIN
+        bool pol = (ins >> 7) & 1;
+        uint idx = ins & 0x1F;
+        if (idx == 2) pio->instr_mem[offset + i] = pio_encode_wait_gpio(pol, sclk);
+        else if (idx == 3) pio->instr_mem[offset + i] = pio_encode_wait_gpio(pol, cs);
+    }
+}
+
+static inline void dc_spi_slave_program_init(PIO pio, uint sm, uint offset,
+                                             uint mosi, uint miso, uint sclk, uint cs) {
+    dc_spi_slave_patch_pins(pio, offset, sclk, cs);
+    pio_sm_config c = dc_spi_slave_program_get_default_config(offset);
+    sm_config_set_in_pins(&c, mosi);
+    sm_config_set_out_pins(&c, miso, 1);
+    sm_config_set_set_pins(&c, miso, 1);
+    sm_config_set_jmp_pin(&c, sclk);
+    sm_config_set_out_shift(&c, false, false, 32);   // left = MSB first; byte goes in bits 31..24
+    sm_config_set_in_shift(&c, false, true, 8);      // left, autopush 8
+    sm_config_set_mov_status(&c, STATUS_TX_LESSTHAN, 1);
+    sm_config_set_clkdiv(&c, 1.0f);
+    pio_sm_set_pins_with_mask(pio, sm, 1u << miso, 1u << miso);   // MISO idle high
+    pio_sm_set_pindirs_with_mask(pio, sm, 1u << miso,
+                                 (1u << mosi) | (1u << miso) | (1u << sclk) | (1u << cs));
+    pio_sm_init(pio, sm, offset, &c);
+}
+
+static inline void dc_uart_rx_program_init(PIO pio, uint sm, uint offset, uint pin, uint baud) {
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, false);
+    pio_sm_config c = dc_uart_rx_program_get_default_config(offset);
+    sm_config_set_in_pins(&c, pin);
+    sm_config_set_jmp_pin(&c, pin);
+    sm_config_set_in_shift(&c, true, false, 32);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);
+    sm_config_set_clkdiv(&c, (float)clock_get_hz(clk_sys) / (8.0f * baud));
+    pio_sm_init(pio, sm, offset, &c);
+}
+
+static inline void dc_uart_tx_program_init(PIO pio, uint sm, uint offset, uint pin, uint rts_pin, uint baud) {
+    pio_sm_set_pins_with_mask(pio, sm, 1u << pin, 1u << pin);
+    pio_sm_set_pindirs_with_mask(pio, sm, 1u << pin, 1u << pin);
+    pio_sm_config c = dc_uart_tx_program_get_default_config(offset);
+    sm_config_set_out_shift(&c, true, false, 32);
+    sm_config_set_out_pins(&c, pin, 1);
+    sm_config_set_sideset_pins(&c, pin);
+    sm_config_set_in_pins(&c, rts_pin);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+    sm_config_set_clkdiv(&c, (float)clock_get_hz(clk_sys) / (8.0f * baud));
+    pio_sm_init(pio, sm, offset, &c);
+}
+
+static inline void dc_pulse_low_program_init(PIO pio, uint sm, uint offset, uint pin) {
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, false);
+    pio_sm_config c = dc_pulse_low_program_get_default_config(offset);
+    sm_config_set_in_pins(&c, pin);
+    sm_config_set_jmp_pin(&c, pin);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);
+    sm_config_set_clkdiv(&c, 1.0f);
+    pio_sm_init(pio, sm, offset, &c);
+}
+%}

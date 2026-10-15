@@ -1,0 +1,223 @@
+#!/bin/sh
+# dcbridge-net: routing for the Dreamcast links that come in over the RP2040.
+#
+#   dcnet-up        address dcnet0 (virtual W5500 wire) and apply the firewall
+#   firewall-up     NAT + forwarding rules (idempotent: safe to run any time)
+#   firewall-down   remove everything this script added
+#   dnsmasq-conf    (re)write /etc/dnsmasq.d/dcbridge.conf and restart dnsmasq
+#   reload          dnsmasq-conf + firewall-up + dcnet-up if dcnet0 exists
+#   status          what is up, and the Dreamcast's addresses
+#   ppp             run pppd on /dev/dcbridge-uart (used by dcbridge-ppp.service)
+#   add|old|del MAC IP   dnsmasq dhcp-script hook: track the W5500 Dreamcast's
+#                   address so inbound port forwards follow it
+#
+# All rules live in our own chains (DCB-*), so DreamPi's rules, its
+# dcnatrules redirects and its ppp0 modem link are left alone. dreampi.py's
+# server redirects in PREROUTING apply to our traffic too, as they should.
+set -eu
+
+CONF=${DCBRIDGE_CONF:-/etc/default/dcbridge}
+# shellcheck disable=SC1090
+[ -r "$CONF" ] && . "$CONF"
+DCNET_IF=${DCNET_IF:-dcnet0}
+DCNET_ADDR=${DCNET_ADDR:-192.168.170.1}
+DCNET_PREFIX=${DCNET_PREFIX:-24}
+DCNET_DHCP_FIRST=${DCNET_DHCP_FIRST:-192.168.170.2}
+DCNET_DHCP_LAST=${DCNET_DHCP_LAST:-192.168.170.20}
+PPP_UNIT=${PPP_UNIT:-10}
+PPP_LOCAL=${PPP_LOCAL:-192.168.171.1}
+PPP_REMOTE=${PPP_REMOTE:-192.168.171.2}
+DNS_SERVER=${DNS_SERVER:-}
+SET_TTL=${SET_TTL:-yes}
+FORWARD_PORTS=${FORWARD_PORTS:-}
+PPP_IF="ppp${PPP_UNIT}"
+PPP_TTY=${PPP_TTY:-/dev/dcbridge-uart}
+PPP_OPTIONS=${PPP_OPTIONS:-/etc/ppp/dcbridge.options}
+DNSMASQ_CONF=${DNSMASQ_CONF:-/etc/dnsmasq.d/dcbridge.conf}
+IPT=${IPT:-iptables}
+RUN_DIR=${DCBRIDGE_RUN:-/run/dcbridge}
+SELF=$(readlink -f "$0" 2>/dev/null || echo "$0")
+
+log() { echo "dcbridge-net: $*" >&2; }
+
+# network address of DCNET_ADDR/DCNET_PREFIX, e.g. 192.168.170.0/24
+dcnet_cidr() {
+    python3 -c "import ipaddress,sys; print(ipaddress.ip_interface(sys.argv[1]).network)" \
+        "$DCNET_ADDR/$DCNET_PREFIX"
+}
+
+dcnet_netmask() {
+    python3 -c "import ipaddress,sys; print(ipaddress.ip_interface(sys.argv[1]).netmask)" \
+        "$DCNET_ADDR/$DCNET_PREFIX"
+}
+
+# create chain if missing, then empty it
+chain() { # table chain
+    $IPT -t "$1" -N "$2" 2>/dev/null || true
+    $IPT -t "$1" -F "$2"
+}
+
+# make sure "-j chain" is the first rule of a built-in chain
+hook() { # table builtin chain
+    while $IPT -t "$1" -D "$2" -j "$3" 2>/dev/null; do :; done
+    $IPT -t "$1" -I "$2" 1 -j "$3"
+}
+
+unhook() { # table builtin chain
+    while $IPT -t "$1" -D "$2" -j "$3" 2>/dev/null; do :; done
+    $IPT -t "$1" -F "$3" 2>/dev/null || true
+    $IPT -t "$1" -X "$3" 2>/dev/null || true
+}
+
+firewall_up() {
+    net=$(dcnet_cidr)
+    if [ -w /proc/sys/net/ipv4/ip_forward ]; then
+        echo 1 > /proc/sys/net/ipv4/ip_forward
+    fi
+
+    # Outbound NAT for both Dreamcast subnets, out of whatever interface the
+    # route says (eth0, wlan0, DreamPi's tun0 VPN...).
+    chain nat DCB-POST
+    $IPT -t nat -A DCB-POST -s "$net" ! -d "$net" -j MASQUERADE
+    $IPT -t nat -A DCB-POST -s "$PPP_REMOTE/32" ! -d "$PPP_REMOTE/32" -j MASQUERADE
+    hook nat POSTROUTING DCB-POST
+
+    # Inbound port forwards (optional)
+    chain nat DCB-PRE
+    chain filter DCB-FWD
+    for spec in $FORWARD_PORTS; do
+        proto=${spec%%:*}; rest=${spec#*:}; ports=${rest%%:*}; target=${rest#*:}
+        case "$target" in
+            ppp) to=$PPP_REMOTE; via=$PPP_IF ;;
+            dcnet) to=$(cat "$RUN_DIR/dcnet-ip" 2>/dev/null || echo "$DCNET_DHCP_FIRST"); via=$DCNET_IF ;;
+            *) log "ignoring FORWARD_PORTS entry '$spec'"; continue ;;
+        esac
+        dport=$(echo "$ports" | tr '-' ':')
+        $IPT -t nat -A DCB-PRE ! -i "$via" -p "$proto" --dport "$dport" -m addrtype --dst-type LOCAL \
+            -j DNAT --to-destination "$to"
+        $IPT -A DCB-FWD -o "$via" -p "$proto" -d "$to" --dport "$dport" -j ACCEPT
+    done
+    hook nat PREROUTING DCB-PRE
+
+    # Forwarding
+    for ifc in "$DCNET_IF" "$PPP_IF"; do
+        $IPT -A DCB-FWD -i "$ifc" -j ACCEPT
+        $IPT -A DCB-FWD -o "$ifc" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+    done
+    hook filter FORWARD DCB-FWD
+
+    # The Pi itself: DHCP + DNS from the Dreamcast links
+    chain filter DCB-IN
+    for ifc in "$DCNET_IF" "$PPP_IF"; do
+        $IPT -A DCB-IN -i "$ifc" -p udp -m multiport --dports 53,67 -j ACCEPT
+        $IPT -A DCB-IN -i "$ifc" -p tcp --dport 53 -j ACCEPT
+        $IPT -A DCB-IN -i "$ifc" -p icmp -j ACCEPT
+    done
+    hook filter INPUT DCB-IN
+
+    # TTL like dreampi.py's add_increased_ttl()
+    chain mangle DCB-TTL
+    if [ "$SET_TTL" = "yes" ]; then
+        for ifc in "$DCNET_IF" "$PPP_IF"; do
+            $IPT -t mangle -A DCB-TTL -i "$ifc" -j TTL --ttl-set 64 2>/dev/null || \
+                log "TTL target not available, skipping"
+        done
+    fi
+    hook mangle FORWARD DCB-TTL
+    log "firewall up (dcnet $net, ppp $PPP_LOCAL <-> $PPP_REMOTE)"
+}
+
+firewall_down() {
+    unhook nat POSTROUTING DCB-POST
+    unhook nat PREROUTING DCB-PRE
+    unhook filter FORWARD DCB-FWD
+    unhook filter INPUT DCB-IN
+    unhook mangle FORWARD DCB-TTL
+    log "firewall down"
+}
+
+dcnet_up() {
+    if ! ip link show "$DCNET_IF" >/dev/null 2>&1; then
+        log "$DCNET_IF not present (is the RP2040 plugged in?)"
+        return 0
+    fi
+    ip link set "$DCNET_IF" up
+    ip addr replace "$DCNET_ADDR/$DCNET_PREFIX" dev "$DCNET_IF"
+    firewall_up
+    log "$DCNET_IF up at $DCNET_ADDR/$DCNET_PREFIX"
+}
+
+dnsmasq_conf() {
+    dns=${DNS_SERVER:-$DCNET_ADDR}
+    mkdir -p "$(dirname "$DNSMASQ_CONF")"
+    cat > "$DNSMASQ_CONF.tmp" <<EOF
+# Written by dcbridge-net from $CONF -- edit that file instead.
+# DHCP for the Dreamcast on the virtual W5500 link. DNS queries from both
+# Dreamcast links are answered by this dnsmasq with DreamPi's settings.
+dhcp-range=set:dcbridge,$DCNET_DHCP_FIRST,$DCNET_DHCP_LAST,$(dcnet_netmask),1h
+dhcp-option=tag:dcbridge,option:router,$DCNET_ADDR
+dhcp-option=tag:dcbridge,option:dns-server,$dns
+dhcp-authoritative
+dhcp-sequential-ip
+dhcp-leasefile=/var/lib/misc/dnsmasq.leases
+# keep inbound port forwards pointed at the Dreamcast's current address
+dhcp-script=$SELF
+dhcp-scriptuser=root
+EOF
+    mv "$DNSMASQ_CONF.tmp" "$DNSMASQ_CONF"
+    if command -v systemctl >/dev/null 2>&1 && systemctl is-enabled dnsmasq >/dev/null 2>&1; then
+        systemctl restart dnsmasq || log "dnsmasq restart failed: check 'dnsmasq --test'"
+    elif [ -x /etc/init.d/dnsmasq ]; then
+        /etc/init.d/dnsmasq restart || true
+    fi
+    log "wrote $DNSMASQ_CONF"
+}
+
+status() {
+    echo "== $DCNET_IF (virtual W5500)"
+    ip -br addr show "$DCNET_IF" 2>/dev/null || echo "   not present"
+    if [ -r /var/lib/misc/dnsmasq.leases ]; then
+        awk -v a="$DCNET_DHCP_FIRST" 'BEGIN{split(a,p,".")} {split($3,q,"."); if (q[1]==p[1]&&q[2]==p[2]&&q[3]==p[3]) print "   lease:", $3, $2, $4}' \
+            /var/lib/misc/dnsmasq.leases
+    fi
+    echo "== $PPP_IF (serial PPP)"
+    ip -br addr show "$PPP_IF" 2>/dev/null || echo "   down"
+    echo "== NAT"
+    $IPT -t nat -S DCB-POST 2>/dev/null | sed 's/^/   /' || echo "   not installed"
+}
+
+run_ppp() {
+    dns=${DNS_SERVER:-$PPP_LOCAL}
+    firewall_up
+    # The USB serial speed is irrelevant (the RP2040 matches the Dreamcast's
+    # real SCIF rate itself); pppd just needs a number.
+    exec pppd "$PPP_TTY" 115200 file "$PPP_OPTIONS" unit "$PPP_UNIT" nodetach \
+        "$PPP_LOCAL:$PPP_REMOTE" ms-dns "$dns" "$@"
+}
+
+lease_hook() { # action mac ip
+    case "$3" in
+        "$(dcnet_cidr | cut -d. -f1-3)".*) ;;
+        *) return 0 ;;                      # some other DHCP range
+    esac
+    mkdir -p "$RUN_DIR"
+    if [ "$1" = del ]; then
+        if [ "$(cat "$RUN_DIR/dcnet-ip" 2>/dev/null)" = "$3" ]; then rm -f "$RUN_DIR/dcnet-ip"; fi
+    else
+        echo "$3" > "$RUN_DIR/dcnet-ip"
+    fi
+    if [ -n "$FORWARD_PORTS" ]; then firewall_up 2>/dev/null; fi
+}
+
+case "${1:-}" in
+    add|old|del) lease_hook "$1" "${2:-}" "${3:-}" ;;
+    dcnet-up) dcnet_up ;;
+    dcnet-down) log "$DCNET_IF gone" ;;
+    firewall-up) firewall_up ;;
+    firewall-down) firewall_down ;;
+    dnsmasq-conf) dnsmasq_conf ;;
+    reload) dnsmasq_conf; firewall_up; dcnet_up ;;
+    status) status ;;
+    ppp) shift; run_ppp "$@" ;;
+    *) sed -n '2,12p' "$0"; exit 2 ;;
+esac

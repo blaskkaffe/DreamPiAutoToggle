@@ -1,0 +1,103 @@
+{
+ "dashboard": [
+  {
+   "box": "dc bridge",
+   "items": [
+    {
+     "type": "infobox",
+     "label": "Dreamcast bridge:",
+     "rows": [
+      {
+       "label": "Dreamcast",
+       "main": true,
+       "value": {
+        "type": "status",
+        "dot": "@dcbridge.dreamcast.state",
+        "text": "@dcbridge.dreamcast.text"
+       }
+      },
+      {
+       "label": "SD card",
+       "value": {
+        "type": "status",
+        "dot": "@dcbridge.card.state",
+        "text": "@dcbridge.card.text",
+        "sub": "@dcbridge.card.sub"
+       }
+      },
+      {
+       "label": "Network",
+       "value": {
+        "type": "status",
+        "dot": "@dcbridge.net.state",
+        "text": "@dcbridge.net.text"
+       }
+      },
+      {
+       "label": "",
+       "value": {
+        "type": "bar",
+        "items": [
+         {
+          "type": "link",
+          "label": "Save manager",
+          "href": "/dcbridge/"
+         }
+        ]
+       },
+       "full": true,
+       "tight": true
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "settings": [
+  {
+   "box": "appearance",
+   "title": "Appearance",
+   "items": [
+    {
+     "type": "row",
+     "title": "DC Bridge colour",
+     "sub": "Module",
+     "control": {
+      "type": "swatches",
+      "key": "dcbridge",
+      "tint": true,
+      "title": "Colour of the DC Bridge box"
+     }
+    }
+   ]
+  },
+  {
+   "box": "dc bridge",
+   "title": "DC Bridge",
+   "items": [
+    {
+     "type": "row",
+     "title": "Save manager",
+     "sub": "Download, upload, label and restore the Dreamcast's saves on the virtual SD card (openMenu's serial VMU)",
+     "control": {
+      "type": "link",
+      "label": "Open",
+      "href": "/dcbridge/",
+      "aria": "Open the save manager"
+     }
+    },
+    {
+     "type": "row",
+     "title": "All saves",
+     "sub": "A zip of every save on the virtual card, with titles and labels",
+     "control": {
+      "type": "link",
+      "label": "Download",
+      "href": "/dcbridge/api/export.zip",
+      "aria": "Download all saves as a zip"
+     }
+    }
+   ]
+  }
+ ]
+}
