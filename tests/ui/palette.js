@@ -65,7 +65,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(b.slice(0, after.length).join() === after.join(), 'and the colour picks follow the new order');
   // ---- delete
   await openEditor();
-  ok(!(await page.locator('.pop.open .srow.pal[data-id="orange"] button[title^="Delete"]').isVisible()) && !(await page.locator('.pop.open .srow.pal[data-id="global"] button[title^="Delete"]').isVisible()), 'Orange and Global main have no Delete button');
+  ok((await page.locator('.pop.open .srow.pal[data-id="orange"] button[title^="Delete"]').isVisible()) && !(await page.locator('.pop.open .srow.pal[data-id="global"] button[title^="Delete"]').isVisible()), 'Orange can be deleted, Global main has no Delete button');
   await page.locator('.pop.open .srow.pal[data-id="new-colour"] button[title^="Delete"]').click(); await settle(1800);
   ok(await rows.count() === 15, 'a colour of your own can be deleted');
   await page.locator('.pop.open button', { hasText: 'Done' }).click(); await settle(300);
