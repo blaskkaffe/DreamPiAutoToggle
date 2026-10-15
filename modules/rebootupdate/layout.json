@@ -24,6 +24,34 @@
     },
     {
      "type": "row",
+     "title": "DreamPi self-updates are off",
+     "sub": "/boot/noautoupdates.txt exists, so DreamPi neither updates its own scripts nor writes netlink_config.ini (DCNET stays off). Allowing it backs the file up and removes it; it takes effect when DreamPi restarts.",
+     "show": "@update.auto.off",
+     "control": {
+      "type": "button",
+      "label": "Allow",
+      "post": "/autoupdates/allow",
+      "reload": "update",
+      "pin": true,
+      "confirm": "Back up and remove /boot/noautoupdates.txt? DreamPi then updates its scripts and writes netlink_config.ini the next time it starts."
+     }
+    },
+    {
+     "type": "row",
+     "title": "Restore noautoupdates.txt",
+     "sub": "It was backed up and removed here, so DreamPi updates itself the next time it starts (restart DreamPi or reboot). Put the file back and it stops updating itself again.",
+     "show": "@update.auto.backup",
+     "control": {
+      "type": "button",
+      "label": "Restore",
+      "post": "/autoupdates/restore",
+      "reload": "update",
+      "pin": true,
+      "confirm": "Put /boot/noautoupdates.txt back? DreamPi then stops updating itself and leaves netlink_config.ini alone."
+     }
+    },
+    {
+     "type": "row",
      "title": "Update the add-on",
      "sub": "@update.do_sub",
      "show": "@update.show_update",

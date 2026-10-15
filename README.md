@@ -57,7 +57,7 @@ The page can do it for you while the **Reboot and Update** module is on (see [Mo
 ```
 cd ~/DreamPiAutoToggle && git pull && sudo ./install.sh
 ```
-DreamPi itself needs no manual update: it updates its own scripts when the Pi starts and has internet (restart the Pi to get a newer version). If `/boot/noautoupdates.txt` exists it does not update itself; remove that file first.
+DreamPi itself needs no manual update: it updates its own scripts when the Pi starts and has internet (restart the Pi to get a newer version). If `/boot/noautoupdates.txt` exists it does not update itself and does not write `netlink_config.ini` (DCNET stays off); while it exists, Settings > System shows **Allow** (backs the file up to `/opt/dreampi-netswitch/noautoupdates.backup` and removes it, effective when DreamPi restarts) and, after that, **Restore** (puts the backed-up file back). The change to `/boot` is made by a separate systemd job, as the web service itself may not write there; nothing of DreamPi's own scripts is touched.
 
 Your settings are kept: which modules are on, the LED setup and its colours, and the HTTPS certificate. An install from before the modules were folders is converted by the update: its old flat files are removed and the modules are installed from `modules/` (an old Wi-Fi setup install stays on). You don't need to repeat `--leds=N`, `--wifi` or the port options; the installer remembers them (`--leds=0` / `--no-wifi` switch them off, `--https-port=443` turns HTTPS back on after `--no-https`). If the page still looks old afterwards, reload it in the browser.
 
