@@ -53,6 +53,21 @@ def render(ip, interface, network, board_url, http_port, dest):
             BOOT_IPXE.format(ip=ip, http_port=int(http_port), board_url=board_url))
 
 
+BOOT_FILES = ("undionly.kpxe", "ipxe.efi", "boot.ipxe")
+
+
+def alias_zero(tftp_root):
+    """dnsmasq answers a PXE boot-service request with the name given in pxe-service and, depending on its version and the client's boot layer,
+    may ask the client for "<name>.0". A link under both names means the client gets its file either way instead of a TFTP "not found"
+    (the screen then waits at its PXE menu and never reaches the boot server, so it is never listed)."""
+    for name in BOOT_FILES:
+        link = os.path.join(tftp_root, name + ".0")
+        if os.path.exists(os.path.join(tftp_root, name)):
+            if os.path.lexists(link):
+                os.remove(link)
+            os.symlink(name, link)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--ip", required=True, help="this server's address on the screens' network")
@@ -68,6 +83,7 @@ def main():
         f.write(conf)
     with open(os.path.join(a.dest, "tftp", "boot.ipxe"), "w") as f:
         f.write(boot)
+    alias_zero(os.path.join(a.dest, "tftp"))
 
 
 if __name__ == "__main__":

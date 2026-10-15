@@ -74,6 +74,26 @@ class ConfigFiles(unittest.TestCase):
         finally:
             shutil.rmtree(d)
 
+    def test_the_boot_files_are_also_served_under_name_dot_zero(self):
+        """A client asking TFTP for "<name>.0" must get its file too, else it waits at the PXE menu and never reaches the boot server."""
+        d = tempfile.mkdtemp()
+        try:
+            os.makedirs(os.path.join(d, "tftp"))
+            for n in ("undionly.kpxe", "ipxe.efi"):
+                open(os.path.join(d, "tftp", n), "w").write("x")
+            for _ in range(2):                                               # again: an existing link is replaced
+                subprocess.check_call([sys.executable, os.path.join(PXE, "pxe_config.py"), "--ip", "10.0.0.2", "--interface", "eth1",
+                                       "--network", "10.0.0.0", "--board-url", "http://10.0.0.2/", "--dest", d])
+            for n in ("undionly.kpxe", "ipxe.efi", "boot.ipxe"):
+                self.assertEqual(open(os.path.join(d, "tftp", n + ".0")).read(), open(os.path.join(d, "tftp", n)).read())
+        finally:
+            shutil.rmtree(d)
+
+    def test_the_installer_opens_the_firewall_and_checks_itself(self):
+        text = open(os.path.join(PXE, "install-pxe.sh")).read()
+        for word in ("ufw allow", "firewall-cmd", "dnsmasq --test", "4011", "PROBLEM"):
+            self.assertIn(word, text)
+
 
 class KioskSession(unittest.TestCase):
     def test_address_and_screen_id_from_the_kernel_command_line(self):

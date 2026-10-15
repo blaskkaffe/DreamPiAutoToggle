@@ -116,14 +116,37 @@ PrivateTmp=yes
 [Install]
 WantedBy=multi-user.target
 UNIT
+# a firewall on this computer would block the screens before they reach anything (they then only wait at their PXE menu and are never listed)
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "^Status: active"; then
+    for p in 67/udp 69/udp 4011/udp "$HTTP_PORT/tcp"; do ufw allow in on "$IFACE" to any port "${p%/*}" proto "${p#*/}" >/dev/null || true; done
+    echo "ufw: opened UDP 67, 69, 4011 and TCP $HTTP_PORT on $IFACE"
+fi
+if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+    for p in 67/udp 69/udp 4011/udp "$HTTP_PORT/tcp"; do firewall-cmd --permanent --add-port="$p" >/dev/null || true; done
+    firewall-cmd --reload >/dev/null || true
+    echo "firewalld: opened UDP 67, 69, 4011 and TCP $HTTP_PORT"
+fi
+/usr/sbin/dnsmasq --test --conf-file="$DEST/dnsmasq.conf" || { echo "dnsmasq does not accept $DEST/dnsmasq.conf" >&2; exit 1; }
+
 systemctl daemon-reload
 for s in $SERVICES; do
     systemctl enable "$s.service"
     systemctl restart "$s.service"
 done
 
+sleep 2
+PROBLEM=0
+for s in $SERVICES; do
+    systemctl is-active --quiet "$s.service" || { echo "PROBLEM: $s is not running. See: journalctl -u $s -n 30" >&2; PROBLEM=1; }
+done
+(exec 3<>"/dev/tcp/$IP/$HTTP_PORT") 2>/dev/null || { echo "PROBLEM: the boot server does not answer on $IP:$HTTP_PORT. See: journalctl -u checkin-board-pxe-http -n 30" >&2; PROBLEM=1; }
+ss -lun 2>/dev/null | grep -q ':4011 ' || { echo "PROBLEM: nothing listens on UDP 4011 (proxy DHCP). Another DHCP / PXE server on this computer? See: journalctl -u checkin-board-pxe -n 30" >&2; PROBLEM=1; }
+[ "$PROBLEM" = 0 ] || echo "Fix the above, then run this script again."
 echo "The network boot server is running on $IFACE ($IP). Screens show $BOARD_URL"
 echo "Set a screen to boot from the network (PXE) in its BIOS/UEFI setup; nothing is installed on it."
 echo "Only whitelisted computers boot. A new one shows its serial number and MAC address on its screen and appears in: checkin-pxe pending"
 echo "Approve it with: checkin-pxe allow <serial or MAC>   (checkin-pxe assign <id> kiosk sends it straight to the board)."
 echo "Do not run a second DHCP server for this."
+echo "If a screen waits at its PXE menu and is never listed: watch  journalctl -fu checkin-board-pxe  while it boots. A line"
+echo "'file ... not found' or no 'sent ...' line = TFTP; no line at all = the DHCP packets or a firewall; then 'checkin-pxe pending' shows it once"
+echo "iPXE has started (the boot server log is: journalctl -fu checkin-board-pxe-http)."
