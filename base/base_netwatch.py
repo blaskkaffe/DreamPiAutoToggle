@@ -98,8 +98,16 @@ def watch(every=10, log=None):
     last = snapshot()
     log("watching %s; gateway %s" % (", ".join("%s %s %s %s" % (n, v["state"] or "?", "/".join(v["addrs"]) or "no address", v.get("link", "")) for n, v in sorted(last["nets"].items())) or "no interface", last["gateway"] or "none"))
     gw_ok = None
+    wall, mono = time.time(), time.monotonic()
     while True:
         time.sleep(every)
+        w, m = time.time(), time.monotonic()
+        slept = (w - wall) - (m - mono)           # the monotonic clock stands still while the computer is suspended, the wall clock does not
+        if slept > 5:
+            log("the computer was ASLEEP (suspended) for about %d s: it did not answer anybody meanwhile. Stop it from sleeping (install.sh does, unless --allow-sleep); check the BIOS / desktop power settings" % slept)
+        elif m - mono > every * 4:
+            log("this service was not running for %d s (the computer was stalled)" % (m - mono))
+        wall, mono = w, m
         now = snapshot()
         for line in changes(last, now):
             log(line)

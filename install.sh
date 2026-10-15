@@ -10,6 +10,7 @@
 #   removed). Which modules are on is the page's Settings > System > Modules.
 #   sudo ./install.sh --hostname=checkinchicken   give the computer that name, so the board is at http://checkinchicken.local
 #                                  (the address the kiosk screens use when they are not told another one; needs avahi-daemon for the .local name)
+#   sudo ./install.sh --allow-sleep  do not stop the computer from sleeping (by default the host never sleeps, see below)
 #   sudo ./install.sh --pin        ask for a PIN that the page then wants before it updates, restarts
 #                                  the computer or imports contacts (--pin=1234 gives it on the command line,
 #                                  which shows in the shell history); --no-pin removes it. It is kept
@@ -30,12 +31,14 @@ if [ -f "$DEST/install_ports" ]; then
 fi
 PIN=keep
 NEW_HOSTNAME=""
+ALLOW_SLEEP=0
 for arg in "$@"; do
     case "$arg" in
         --pin) PIN=ask ;;
         --pin=*) PIN="${arg#--pin=}"
                   if [ "${#PIN}" -lt 4 ] || [ "${#PIN}" -gt 64 ]; then echo "The PIN must be 4 to 64 characters"; exit 1; fi ;;
         --no-pin) PIN=off ;;
+        --allow-sleep) ALLOW_SLEEP=1 ;;
         --https-port=*) HTTPS_PORT="${arg#--https-port=}" ;;
         --no-https) HTTPS_PORT=0 ;;
         --hostname=*) NEW_HOSTNAME="${arg#--hostname=}"
@@ -194,6 +197,24 @@ mkdir -p /etc/sysctl.d /etc/systemd/system.conf.d
 printf 'kernel.panic = 10\nkernel.panic_on_oops = 1\n' > /etc/sysctl.d/90-checkin-reboot.conf
 printf '[Manager]\nRuntimeWatchdogSec=60\nRebootWatchdogSec=10min\nShutdownWatchdogSec=5min\n' > /etc/systemd/system.conf.d/90-checkin-watchdog.conf
 sysctl -q -p /etc/sysctl.d/90-checkin-reboot.conf >/dev/null 2>&1 || true
+
+# The host must never sleep: a suspended computer does not answer the screens (no ping, no page) until somebody uses it, which is what an idle
+# desktop does after about 20 minutes, and nobody touches a computer that only serves a board. The sleep targets are masked (what the desktop,
+# the lid and the power button ask for is then refused) and logind is told to ignore idleness, the lid and the keys. Undone by uninstall.sh.
+if [ "$ALLOW_SLEEP" = 1 ]; then
+    rm -f /etc/systemd/logind.conf.d/90-checkin-no-sleep.conf
+    if [ -f "$DEST/sleep_masked" ]; then systemctl unmask $(cat "$DEST/sleep_masked") >/dev/null 2>&1 || true; rm -f "$DEST/sleep_masked"; fi
+    echo "Sleep is allowed (--allow-sleep): a sleeping host does not answer the screens."
+else
+    mkdir -p /etc/systemd/logind.conf.d
+    printf '[Login]\nIdleAction=ignore\nHandleSuspendKey=ignore\nHandleHibernateKey=ignore\nHandleLidSwitch=ignore\nHandleLidSwitchExternalPower=ignore\nHandleLidSwitchDocked=ignore\nHandlePowerKey=ignore\n' > /etc/systemd/logind.conf.d/90-checkin-no-sleep.conf
+    MASKED=""
+    for t in sleep.target suspend.target hibernate.target hybrid-sleep.target; do
+        if [ "$(systemctl is-enabled "$t" 2>/dev/null)" != masked ]; then systemctl mask "$t" >/dev/null 2>&1 && MASKED="$MASKED $t"; fi
+    done
+    [ -z "$MASKED" ] || { OLD=$(cat "$DEST/sleep_masked" 2>/dev/null || true); echo "$OLD$MASKED" | tr -s ' ' '\n' | grep . | sort -u | tr '\n' ' ' > "$DEST/sleep_masked"; }
+    systemctl kill -s HUP systemd-logind >/dev/null 2>&1 || true
+fi
 
 # ------------------------------------------------------------------ modules
 # Each installed module may have an install.sh, sourced here (it sees $DEST and $SRC)

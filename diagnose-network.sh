@@ -7,6 +7,10 @@ HOST="$1"
 sec() { printf '\n===== %s =====\n' "$1"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 sec "time, kernel"; date; uname -r; uptime
+sec "sleep / suspend (a sleeping host does not answer ping until somebody uses it)"
+have systemctl && for t in sleep suspend hibernate; do echo "$t.target: $(systemctl is-enabled $t.target 2>/dev/null)"; done
+have journalctl && journalctl -b --no-pager 2>/dev/null | grep -iE "PM: suspend|Suspending system|System is suspend|Lid closed|Reached target.*sleep|idle.*suspend|powering off|PM: resume" | tail -15
+ls /etc/systemd/logind.conf.d/ 2>/dev/null
 sec "interfaces (state, addresses)"; if have ip; then ip -br addr; elif have ifconfig; then ifconfig -a; fi
 sec "routes"; have ip && ip route
 sec "link details (errors, drops)"; have ip && ip -s link | head -60
