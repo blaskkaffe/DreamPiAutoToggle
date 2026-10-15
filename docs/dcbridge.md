@@ -205,6 +205,13 @@ The Dreamcast row tells which step is missing (the service adds `usb` and `devic
   (the rules need manufacturer `dcbridge`) and run `sudo udevadm control --reload && sudo udevadm trigger`.
 - **Board found, no status from it**: `/dev/dcbridge-ctl` exists but sends nothing: `sudo systemctl stop dcbridge-saves; cat /dev/dcbridge-ctl` should print one JSON line a second.
 
+### openMenu does not see the card / saves do not arrive
+
+`curl -s localhost:8085/api/status` has `recent`: the last 16 requests the Dreamcast made that the RP2040 could not answer from its own cache
+(`read <lba> x<count>`, `write <lba> x1`), and the journal (`sudo journalctl -u dcbridge-saves -f`) logs the first 12 after each card start. Together with
+`curl -s localhost:8085/api/bridge` (`sd.sessions` = card starts, `sd.reads` / `sd.writes` = what the Dreamcast did, `crc_err`, `misses`) they show how
+far openMenu gets: no session = the SD wires; sessions but no reads = it gave up at card init; reads but no writes = it never saved.
+
 ## Networking (`modules/dcbridge/system`, installed by the module's `install.sh`)
 
 Both Dreamcast links get their own small NAT'd subnet on the Pi. Nothing on

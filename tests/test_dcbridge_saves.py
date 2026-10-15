@@ -137,6 +137,15 @@ class DiskTests(Base):
         self.assertEqual(P.FrameReader().feed(r), [(P.WACK, struct.pack("<I", 4000))])
         self.assertEqual(os.pread(self.fd, 512, 4000 * 512), sec)
 
+    def test_the_last_requests_are_kept_for_diagnosis(self):
+        self.svc.handle(P.SESSION, struct.pack("<II", 1, 99999), self.fd)
+        self.svc.handle(P.READ, struct.pack("<IH", 2048, 1), self.fd)
+        self.svc.handle(P.WRITE, struct.pack("<I", 4000) + bytes(512), self.fd)
+        self.assertEqual(self.svc.status["recent"][-2:], ["read 2048 x1", "write 4000 x1"])
+        for i in range(40):
+            self.svc.handle(P.READ, struct.pack("<IH", i, 1), self.fd)
+        self.assertEqual(len(self.svc.status["recent"]), 16)
+
     def test_frame_resync(self):
         rd = P.FrameReader()
         junk = b"\x00\xD5\x11" + P.frame(P.HELLO, b"\x01\x00") + b"\xD5"

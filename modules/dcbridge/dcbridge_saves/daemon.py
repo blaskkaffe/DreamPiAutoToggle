@@ -35,8 +35,9 @@ class Service(object):
             "connected": False, "daemon_started": time.time(), "last_session": None,
             "last_session_cold": None, "last_write": None, "last_read": None,
             "sessions": 0, "reads": 0, "writes": 0, "edits_applied": 0, "last_scan": None,
-            "scan_running": False,
+            "scan_running": False, "recent": [],
         }
+        self._session_reads = 0
         self._dirty = False
         self._scan_now = threading.Event()
         self._stop = threading.Event()
@@ -131,12 +132,23 @@ class Service(object):
             if out:
                 self._send(fd, b"".join(x for x in out if x))
 
+    def _note(self, kind, lba, count):
+        """What the Dreamcast asked the Pi for (reads the RP2040 could answer from its own cache never get here): the last few in
+        /api/status "recent", and the first ones after each card start in the log, to see how far openMenu gets."""
+        recent = self.status["recent"]
+        recent.append("%s %d x%d" % (kind, lba, count))
+        del recent[:-16]
+        self._session_reads += 1
+        if self._session_reads <= 12:
+            log.info("%s lba %d x%d", kind, lba, count)
+
     def handle(self, ftype, payload, img_fd):
         """One request from the RP2040 -> reply bytes. Separate for testing."""
         if ftype == P.READ and len(payload) >= 6:
             lba, count = struct.unpack_from("<IH", payload)
             self.status["reads"] += 1
             self.status["last_read"] = time.time()
+            self._note("read", lba, count)
             parts = []
             for i in range(min(count, 64)):
                 n = lba + i
@@ -148,6 +160,7 @@ class Service(object):
 
         if ftype == P.WRITE and len(payload) == 4 + P.SECTOR:
             lba = struct.unpack_from("<I", payload)[0]
+            self._note("write", lba, 1)
             if lba < self.sectors:
                 os.pwrite(img_fd, payload[4:], lba * P.SECTOR)
             self.status["writes"] += 1
@@ -160,6 +173,7 @@ class Service(object):
             cold = idle_ms >= COLD_SESSION_MS
             flags = 0
             self.status["sessions"] += 1
+            self._session_reads = 0
             self.status["last_session"] = time.time()
             self.status["last_session_cold"] = cold
             if cold and self.store.pending_list():
