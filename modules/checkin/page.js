@@ -32,10 +32,12 @@ custom("checkin-statuses",function(host){var box=host.querySelector(".cstatuses"
    '<label class="rp-nl rp-chk"><input type="checkbox" class="cbox neutral" data-f="sticky"'+(s.sticky?" checked":"")+'> Sticky: stays when INNE / UTE is pressed</label>'+
    '<div class="rp-cmsg sub" aria-live="polite"></div><div class="rp-nb rp-nb3">'+(i>=0?'<button type="button" class="pill-s danger rp-so" data-del="1">Delete</button>':'<span></span>')+'<button type="button" class="pill-s rp-so" data-close="1">Cancel</button><button type="button" class="pill-s pri rp-so c-green" data-save="1">Save</button></div></div>';
   modal.style.display="";shows();var f0=modal.querySelector("input");if(f0&&f0.focus)f0.focus()}
- function shows(){var n=modal.querySelector('[data-f=needs]').value;
+ function shows(){var n=modal.querySelector('[data-f=needs]').value,pf=modal.querySelector('[data-f=prefix]'),dflt={time:"kl",date:"till",datetime:"till",note:"info:"};
+  if(editing<0&&pf&&!pf._typed)pf.value=dflt[n]||"";      // a new status starts with the usual text before the value; what is typed (even nothing) is kept as it is
   sh(modal.querySelector('[data-row=prefix]'),!!n);sh(modal.querySelector('[data-row=default]'),n==="time")}
  function read(){var o={};Array.prototype.forEach.call(modal.querySelectorAll("[data-f]"),function(e){var k=e.getAttribute("data-f");o[k]=e.type==="checkbox"?e.checked:(k==="dots"?+e.getAttribute("data-v"):e.value)});return o}
  function close(){modal.style.display="none";modal.innerHTML="";editing=-1}
+ modal.addEventListener("input",function(e){if(e.target.getAttribute&&e.target.getAttribute("data-f")==="prefix")e.target._typed=true});
  modal.addEventListener("change",function(e){if(e.target.getAttribute&&e.target.getAttribute("data-f")==="needs")shows()});
  modal.addEventListener("click",function(e){if(e.target===modal){close();return}var b=e.target.closest&&e.target.closest("button");if(!b)return;
   if(b.hasAttribute("data-dot")){var grp=b.parentNode;grp.setAttribute("data-v",b.getAttribute("data-dot"));Array.prototype.forEach.call(grp.querySelectorAll("button"),function(x){var on=x===b;x.classList.toggle("on",on);x.setAttribute("aria-pressed",on)});return}

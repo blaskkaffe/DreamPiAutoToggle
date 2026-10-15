@@ -149,6 +149,28 @@ class BoardTests(Base):
         checkin.set_status(anna, "OTHER", "x" * 200)
         self.assertEqual(len(self.people()["Anna Svensson"]["detail"]), checkin.DETAIL_MAX)
 
+    def test_odd_dots_and_damaged_state_never_break_the_board(self):
+        """/api must always carry the board: odd values in a saved status (dots, needs, colour, default as lists, floats, booleans) and a damaged
+        checkin.json (a person's state that is not a dict, a status that is a list) once made the board vanish from /api or answered 500."""
+        for dots, want in ((2, 2), (3, 3), (True, 0), (2.5, 0), ("3", 0), ([1], 0), ({}, 0), (-1, 0), (10 ** 30, 0)):
+            got = checkin.save_statuses([{"code": "D1", "label": "Dots", "colour": "blue", "dots": dots, "needs": ["x"], "default": [1], "prefix": {"a": 1}}])
+            self.assertIsNotNone(got, dots)
+            self.assertEqual(got[0]["dots"], want, dots)
+            self.assertEqual(got[0]["needs"], "")
+        checkin.save_statuses([{"code": "D1", "label": "Dots", "colour": ["red"], "dots": 3}])
+        self.assertEqual(checkin.statuses()[0]["colour"], "white")
+        anna = self.people()["Anna Svensson"]["id"]
+        checkin.set_status(anna, "D1")
+        self.assertEqual(self.people()["Anna Svensson"]["dots"], 3)
+        import io, json
+        for bad in ({"people": {anna: "x"}}, {"people": {anna: {"status": ["x"], "detail": 5, "in": 1, "at": "late"}}},
+                    {"people": {anna: {"status": {"a": 1}}}}, {"statuses": "x"}, {"statuses": [1, None, {"code": ["A"]}]}, {"config": {"scroll": ["x"], "group_order": [1]}}):
+            with io.open(checkin.CHECKIN, "w", encoding="utf-8") as f:
+                f.write(json.dumps(bad))
+            checkin._cache["key"] = None
+            self.assertTrue(checkin.snapshot()["groups"], bad)
+            self.assertIsNotNone(checkin.toggle(anna), bad)
+
     def test_every_status_that_asks_for_a_value_has_a_text_before_it(self):
         anna = self.people()["Anna Svensson"]["id"]
         by = dict((s["code"], s) for s in checkin.statuses())

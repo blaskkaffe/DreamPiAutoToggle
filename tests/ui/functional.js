@@ -318,6 +318,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(parseFloat(await page.locator('.rp-need2 input[data-f=label]').evaluate(e => getComputedStyle(e).fontSize)) >= 18, 'the editor fields have a readable font size');
   await page.locator('.rp-need2 input[data-f=label]').fill('Testst\u00e4ll'); await page.selectOption('.rp-need2 select[data-f=needs]', 'time');
   ok(await page.locator('.rp-need2 [data-row=default]').isVisible() && await page.locator('.rp-need2 [data-row=prefix]').isVisible(), 'a time status asks for a start time and has a text before the time');
+  ok(await page.locator('.rp-need2 input[data-f=prefix]').inputValue() === 'kl', 'a new time status starts with the usual text before the time');
   await page.click('.rp-need2 [data-dot="2"]'); await page.locator('.rp-need2 input[data-f=sticky]').check(); await page.locator('.rp-need2 [data-save]').click(); await settle(1200);
   const made = (await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.statuses.find(x => x.label === 'Testst\u00e4ll');
   ok(made && made.sticky && made.dots === 2 && made.needs === 'time', 'the new status is saved with its settings (' + JSON.stringify(made) + ')');

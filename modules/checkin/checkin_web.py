@@ -61,6 +61,15 @@ def _load():
     data.setdefault("people", {})
     if not isinstance(data["people"], dict):
         data["people"] = {}
+    # a hand-edited or damaged file must never take the board down: every person's state is a dict with plain values
+    data["people"] = dict((k, v) for k, v in data["people"].items() if isinstance(k, str) and isinstance(v, dict))
+    for v in data["people"].values():
+        if not isinstance(v.get("status"), str):
+            v["status"] = ""
+        if not isinstance(v.get("detail"), str):
+            v["detail"] = ""
+        if not isinstance(v.get("at"), int) or isinstance(v.get("at"), bool):
+            v["at"] = 0
     if not isinstance(data.get("config"), dict):
         data["config"] = {}
     return data
@@ -78,6 +87,15 @@ def _save(data):
 PREFIXES = {"time": "kl", "date": "till", "datetime": "till", "note": "info:"}      # the text before the value of a status that has none saved yet
 
 
+def _needs(v):
+    return v if isinstance(v, str) and v in ("time", "date", "datetime", "note") else ""
+
+
+def _dots(v):
+    """0 to 3 dots next to the name: a whole number only (not True, not 2.5, not text)."""
+    return v if isinstance(v, int) and not isinstance(v, bool) and v in (1, 2, 3) else 0
+
+
 def _prefix(raw, needs):
     """The text before the time / date / note in a status. A status saved before the text existed (None) gets the default; one saved with
     an empty text keeps it empty (the user may want only the value), so what is typed in the editor is what comes back."""
@@ -87,6 +105,8 @@ def _prefix(raw, needs):
 
 
 def _palette_id(v, default):
+    if not isinstance(v, str):
+        return default
     v = core.LEGACY_COLOURS.get(v, v)
     return v if v in core.palette_ids() else default
 
@@ -101,9 +121,9 @@ def statuses(data=None):
             continue
         seen.add(s["code"])
         out.append({"code": s["code"], "label": str(s.get("label") or s["code"])[:30], "colour": _palette_id(s.get("colour"), "white"),
-                    "needs": s.get("needs") if s.get("needs") in ("time", "date", "datetime", "note") else "", "default": str(s.get("default") or "")[:5],
-                    "prefix": _prefix(s.get("prefix"), s.get("needs")), "out": bool(s.get("out")), "sticky": bool(s.get("sticky")),
-                    "dots": s.get("dots") if s.get("dots") in (1, 2, 3) else 0})
+                    "needs": _needs(s.get("needs")), "default": str(s.get("default") or "")[:5],
+                    "prefix": _prefix(s.get("prefix"), _needs(s.get("needs"))), "out": bool(s.get("out")), "sticky": bool(s.get("sticky")),
+                    "dots": _dots(s.get("dots"))})
     return out[:16]
 
 
@@ -127,11 +147,11 @@ def save_statuses(items):
                 while not code or code in used:
                     code = "S" + os.urandom(4).hex().upper()
                 used.add(code)
-            d = str(x.get("default") or "").strip()
+            d = str(x.get("default") or "").strip() if isinstance(x.get("default"), (str, int, float)) else ""
             out.append({"code": code, "label": label, "colour": _palette_id(x.get("colour"), "white"),
-                        "needs": x.get("needs") if x.get("needs") in ("time", "date", "datetime", "note") else "",
-                        "default": d if re.match(r"^([01]?\d|2[0-3]):[0-5]\d$", d) else "", "prefix": _prefix(x.get("prefix"), x.get("needs")),
-                        "out": bool(x.get("out")), "sticky": bool(x.get("sticky")), "dots": x.get("dots") if x.get("dots") in (1, 2, 3) else 0})
+                        "needs": _needs(x.get("needs")),
+                        "default": d if re.match(r"^([01]?\d|2[0-3]):[0-5]\d$", d) else "", "prefix": _prefix(x.get("prefix"), _needs(x.get("needs"))),
+                        "out": bool(x.get("out")), "sticky": bool(x.get("sticky")), "dots": _dots(x.get("dots"))})
         seen = set()
         for x in out:
             if x["code"] in seen:
