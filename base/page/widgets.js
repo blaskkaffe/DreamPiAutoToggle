@@ -837,7 +837,8 @@ W.roster=function(s,ctx){
  function menuHtml(p){var st=D.statuses||[],who=[p.department,p.building].filter(Boolean).join(" · ");
   return '<div class="rp-sheet" role="dialog" aria-modal="true" aria-label="Status for '+esc(p.name)+'"><button type="button" class="rp-x" data-close="1" title="Close" aria-label="Close">&#10005;</button>'+
    '<div class="rp-who">'+rosterAvatar(p,"rp-avb")+
-   '<div class="rp-wt"><div class="rp-wn">'+esc(p.name)+'</div>'+(who?'<div class="rp-wl">'+esc(who)+'</div>':'')+(p.role?'<div class="rp-wl">'+esc(p.role)+'</div>':'')+(p.phone?'<div class="rp-wl">'+esc(p.phone)+'</div>':'')+'</div></div>'+
+   '<div class="rp-wt"><div class="rp-wn">'+esc(p.name)+'</div>'+(who?'<div class="rp-wl">'+esc(who)+'</div>':'')+(p.role?'<div class="rp-wl">'+esc(p.role)+'</div>':'')+(p.phone?'<div class="rp-wl">'+esc(p.phone)+'</div>':'')+
+    '<div class="rp-cur"><span class="rp-curl">Current status</span>'+(p.status&&p.text?'<span class="rp-curv'+colourCls(p)+'">'+esc(p.text)+'</span>':'<span class="rp-curv none">None</span>')+'</div></div></div>'+
    '<div class="rp-opts">'+st.map(function(x){return '<button type="button" class="pill-s pri rp-so c-'+esc(x.colour)+(p.status===x.code?" on":"")+'" data-code="'+esc(x.code)+'" aria-pressed="'+(p.status===x.code?"true":"false")+'">'+esc(x.label)+'</button>'}).join("")+
    '</div><div class="rp-clear"><button type="button" class="pill-s rp-so" data-code="">Rensa status</button></div></div>'}
  function openPersonMenu(id){var p=person(id);if(!p)return;cur=id;modal.innerHTML=menuHtml(p);modal.style.display="";var x=modal.querySelector(".rp-x");if(x&&x.focus)x.focus()}

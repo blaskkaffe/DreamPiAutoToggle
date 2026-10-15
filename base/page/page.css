@@ -1,6 +1,6 @@
 
  :root{--gap:12px;--fz:1;--rp-text:#000;--tone-dark-box:#1b1b1b;--tone-dark-line:#2a2a2a;--tone-dark-row:rgba(42,42,42,.82);--tone-dark-text:#ccc;--tone-dark-title:#e9e9e9;--tone-light-box:#ececec;--tone-light-line:#c8c8c8;--tone-light-row:#dcdcdc;--tone-light-row-line:#c4c4c4;   /* the two tones of the board's boxes, the same in both themes */
-         --page-bg:#111;--text-hi:#fff;--box-rgb:255,255,255;--r-box:29px;--r-ctl:12px;--r-pill:999px;--h-ctl:36px;--r:var(--r-box);--bw:4px;   /* the page kit's tokens: radii (boxes / fields and checkboxes / buttons and chips; round things are 50%), one control height, three text levels, a type scale */
+         --page-bg:#111;--text-hi:#fff;--box-rgb:255,255,255;--r-box:29px;--r-ctl:12px;--r-pill:999px;--r-io:18px;--h-ctl:36px;--r:var(--r-box);--bw:4px;   /* the page kit's tokens: radii (boxes / fields and checkboxes / buttons and chips; round things are 50%), one control height, three text levels, a type scale */
          --btn-bg:rgba(42,42,42,.82);--btn-line:rgb(80,80,80);--danger-bg:rgba(160,30,30,.85);--danger-line:rgb(230,110,110);--danger-on:#d33;--danger-on-line:#f99;   /* a neutral button, a danger one and an armed one */
          --ok:#2c2;--warn:#e0b400;--bad:#d33;--call:#b04cff;--notice-bg:#7a1f1f;--notice-line:#a84a4a;--link:#8bf;   /* the fixed state colours: status dots and the warning banner, links and the focus ring */
          --text-1:#eee;--text-2:#ccc;--text-3:#999;--box-text-2:rgba(255,255,255,.8);--box-text-3:rgba(255,255,255,.65);   /* page text, and the same levels on the coloured boxes */
@@ -187,17 +187,17 @@
  html.noscroll:has(body:not(.settings-open)){overflow:hidden;height:100%} html.noscroll body:not(.settings-open){overflow:hidden;height:100vh;height:100dvh}   /* Settings > Appearance > No scrolling: the main screen stays put */
  .rp-tile{margin:0}  .rp-box{margin:0 0 var(--gap);padding:0;overflow:hidden;isolation:isolate;border-radius:var(--r-box);background:var(--card);background-clip:padding-box;border:var(--bw) solid var(--line)}   /* the radius is never scaled; isolation + padding-box keep the rows' colours from bleeding over the rounded corners */
  .rp-gh{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0;padding:calc(10px * var(--z,1)) 16px calc(8px * var(--z,1));font-size:var(--fs-md);line-height:1.2;color:var(--rp-text)} .rp-gt{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
- .rp-r{display:flex;align-items:center;gap:8px;min-width:0;min-height:calc((8px + 2.1em) * var(--z,1));margin:0;padding:0 10px 0 0;border:0;border-top:1px solid var(--line);border-radius:0;background:var(--btn-bg);color:var(--text-2)}
+ .rp-r{display:flex;align-items:center;gap:4px;min-width:0;min-height:calc((8px + 2.1em) * var(--z,1));margin:0;padding:0 8px 0 0;border:0;border-top:1px solid var(--line);border-radius:0;background:var(--btn-bg);color:var(--text-2)}
  .rp-r.pri{background:rgba(var(--primary-rgb),.82);border-top-color:rgb(var(--primary-l-rgb));color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55)}
- .rp-t{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:4px 16px;background:none;text-align:left;font-size:1.75em;line-height:1.2;color:inherit;text-shadow:inherit}
- .rp-n{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600} .rp-s{flex:0 50 auto;min-width:0;max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.6em;opacity:.85}      /* the role gives way before the name does */
+ .rp-t{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:4px 4px 4px 16px;background:none;text-align:left;font-size:1.75em;line-height:1.2;color:inherit;text-shadow:inherit}
+ .rp-n{flex:0 0 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600} .rp-s{flex:0 1 auto;min-width:0;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.6em;opacity:.85}      /* the role gives way before the name does */
  .rp-r.out .rp-n{font-weight:500}
- .rp-s.rp-stt{max-width:60%;font-size:.8em;font-weight:600;opacity:1}
- .rp-sm{flex:0 1 auto;min-width:0;max-width:60%;overflow:hidden;font-size:.8em} .rp-sm .rp-mq{display:block;max-width:100%}   /* only the status scrolls: the name stays */
+ .rp-s.rp-stt{font-size:.8em;font-weight:600;opacity:1}
+ .rp-sm{flex:0 1 auto;min-width:0;margin-left:auto;overflow:hidden;font-size:.8em} .rp-sm .rp-mq{display:block;max-width:100%}   /* only the status scrolls: the name stays */
  .rp-mq.still .rp-trk{animation:none} .rp-mq.still .rp-trk > span + span{display:none} .rp-mq.still .rp-trk > span{padding-right:0}
  .rp-mq{flex:1;min-width:0;overflow:hidden;white-space:nowrap;font-weight:600} .rp-trk{display:inline-block;animation:marquee var(--d,12s) linear infinite} .rp-trk > span{display:inline-block;padding-right:3em}   /* name and status scroll round like the carousel */
  @media(prefers-reduced-motion:reduce){.rp-trk{animation:none}.rp-trk > span + span{display:none}}
- .rp-io{flex:none;min-width:5.2em;min-height:calc(34px * var(--z,1));padding:0 14px;font-weight:700;font-size:var(--fs-md);letter-spacing:.04em}   /* INNE (green) / UTE (red) */
+ .rp-io{flex:none;min-width:5.2em;min-height:calc(34px * var(--z,1));padding:0 14px;border-radius:var(--r-io);font-weight:700;font-size:var(--fs-md);letter-spacing:.04em}   /* INNE (green) / UTE (red) */
  /* the building buttons: the top row, at the left of the title, as tall as the cogwheel */
  header > .rp-chips.in-header{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:2;margin:0;flex-wrap:nowrap;max-width:calc(50% - 84px);overflow:hidden;gap:6px}
  .rp-chipmenu{position:fixed;z-index:25;display:flex;flex-direction:column;gap:6px;padding:10px;background:var(--pop);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl);box-shadow:0 6px 24px rgba(0,0,0,.4)} .rp-chipmenu .pill-s{justify-content:center} header > .rp-chips.in-header .pill-s{flex:none;min-height:40px;padding:0 12px;font-size:var(--fs-sm)}
@@ -226,6 +226,7 @@
  .rp-sheet{position:relative;box-sizing:border-box;width:clamp(320px,60vw,900px);max-width:100%;max-height:96vh;overflow:auto;padding:20px;border-radius:var(--r-box);background:var(--pop);border:var(--bw) solid var(--ctl-line)}
  .rp-x{position:absolute;top:10px;right:10px;width:40px;height:40px;padding:0;border-radius:50%;background:rgba(255,255,255,.12);font-size:1.2em;line-height:1}
  .rp-who{display:flex;align-items:center;gap:18px;margin:0 48px 16px 0} .rp-wt{min-width:0}
+ .rp-cur{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;margin-top:8px} .rp-curl{font-size:1.05em;color:var(--text-2)} .rp-curv{display:inline-block;max-width:100%;padding:4px 12px;border-radius:var(--r-ctl);font-size:1.1em;font-weight:600;overflow-wrap:break-word;background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb));color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55)} .rp-curv.none{background:var(--btn-bg);border-color:var(--btn-line);color:var(--text-2);text-shadow:none;font-weight:500}
  .rp-wn{font-size:1.6em;font-weight:600;line-height:1.2;overflow-wrap:break-word} .rp-wl{font-size:1.05em;color:var(--text-2);margin-top:2px;overflow-wrap:break-word}
  .cphoto{flex:none}
  /* a menu (a row that opens its settings under it) and a divider line */

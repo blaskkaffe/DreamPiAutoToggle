@@ -210,6 +210,11 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   for (const k of ['shift', 'cO', 'ck', 'layersym', 'c7', 'c!']) await page.click('[data-k="' + k + '"]');
   await page.click('.rp-need2 [data-k=done]'); await settle(700);
   ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'info: Ok7!')), 'a note is typed on the text keyboard (letters, numbers, special characters)');
+  // the status menu shows the person's current status, and INNE / UTE keep the same corner radius at any scale
+  await page.locator('.rp-t').nth(4).click(); await settle(300);
+  ok((await page.locator('.rp-sheet .rp-curv').first().textContent()) === 'info: Ok7!', 'the status menu shows the current status');
+  await page.keyboard.press('Escape'); await settle(300);
+  ok((await page.locator('.rp-io').first().evaluate(e => getComputedStyle(e).borderTopLeftRadius)) === '18px', 'INNE / UTE have a constant corner radius');
   // the keyboard is laid out like the iPhone's Swedish one: 11 letters in the first two rows, shift and delete round the last letters, 123, emoji, space, done
   await page.locator('.rp-t').nth(4).click(); await settle(300);
   await page.locator('.rp-sheet button[data-code="OTHER"]').click(); await settle(300);
