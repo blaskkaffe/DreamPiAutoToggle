@@ -55,7 +55,7 @@ def _call(method, path, body=None, headers=None, timeout=3.0):
 
 
 def _json(path):
-    got = _call("GET", path, timeout=1.5)
+    got = _call("GET", path, timeout=3.0)
     if got is None or got[0] != 200:
         return None
     try:

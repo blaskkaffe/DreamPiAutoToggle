@@ -35,6 +35,14 @@ DEFAULT_TTY = "/dev/dcbridge-disk"
 class ThreadingWSGIServer(socketserver.ThreadingMixIn, WSGIServer):
     daemon_threads = True
 
+    def handle_error(self, request, client_address):
+        """A client that hangs up before the answer is out (a closed browser tab, the dashboard's poll timing out) is not an error: the default
+        prints a long traceback into the journal for it, which buries the lines that matter."""
+        if isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError)):
+            logging.getLogger("dcbridge-saves.http").debug("client %s hung up", client_address[0])
+            return
+        WSGIServer.handle_error(self, request, client_address)
+
 
 class QuietHandler(WSGIRequestHandler):
     def log_message(self, fmt, *args):

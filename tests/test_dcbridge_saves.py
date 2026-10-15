@@ -202,6 +202,29 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(snap["links"]["ppp"]["interface"], "ppp10")
         b.stop()
 
+    def test_a_client_that_hangs_up_leaves_no_traceback(self):
+        import contextlib, io, socket, threading, time
+        from dcbridge_saves import __main__ as m
+        srv = m.ThreadingWSGIServer(("127.0.0.1", 0), m.QuietHandler)
+
+        def app(env, start):
+            time.sleep(0.4)
+            start("200 OK", [])
+            return [b"x"]
+        srv.set_app(app)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        err = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(err):
+                c = socket.create_connection(("127.0.0.1", srv.server_address[1]))
+                c.sendall(b"GET / HTTP/1.0\r\n\r\n")
+                c.close()
+                time.sleep(1.0)
+        finally:
+            srv.shutdown()
+            srv.server_close()
+        self.assertNotIn("Traceback", err.getvalue())
+
     def test_why_there_is_no_status(self):
         import tempfile, shutil
         from dcbridge_saves import bridge
