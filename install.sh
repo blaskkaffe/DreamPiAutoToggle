@@ -22,7 +22,9 @@
 #   sudo ./install.sh --dcbridge   install the DC Bridge module: the Pi's side of the RP2040 board on the Dreamcast's
 #                                  serial port (a virtual SD card with a save manager, serial PPP, a virtual W5500 link);
 #                                  it changes how the Pi routes those links, so it is only set up on request and kept
-#                                  on updates; --no-dcbridge removes it again (the saves stay). See docs/dcbridge.md.
+#                                  on updates; --no-dcbridge removes it again (the saves stay). The same can be done from
+#                                  the dashboard: switch the module on, then Settings > DC Bridge > Install / Uninstall.
+#                                  See docs/dcbridge.md.
 #   sudo ./install.sh --pin        ask for a PIN that the page then wants before it updates, restarts
 #                                  the Pi or connects Wi-Fi (--pin=1234 gives it on the command line,
 #                                  which shows in the shell history); --no-pin removes it. It is kept

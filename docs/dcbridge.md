@@ -5,8 +5,11 @@ Brought in from the `dcbridge-stage4` package (firmware, the Pi's save manager a
 
 ## In the dashboard (the module)
 
-`modules/dcbridge/` (off by default; install it with `sudo ./install.sh --dcbridge`, remove it with `--no-dcbridge`; after that an update keeps it
-while the module is on in Settings > Modules):
+`modules/dcbridge/` (off by default). **Install and uninstall from the module itself:** switch the module on (Settings > System > Modules), then in
+Settings > **DC Bridge** press **Install** (the box also shows the state, and the setup's log while it runs); **Uninstall** takes the Pi's side out again.
+Both ask first and ask for the PIN when one is set. The same can be done from the command line with `sudo ./install.sh --dcbridge` / `--no-dcbridge`
+(which also switch the module on / off). Either way the work is `system/dcbridge-setup`. An update of the add-on re-installs the bridge only if it is
+installed (the unit `/etc/systemd/system/dcbridge-saves.service` exists); a module that is on but not installed is left alone.
 
 - `netswitch_dcbridge.py` = the dashboard's side. `start()` looks at the bridge service every 2 s (a thread, so `/api` never waits for it) and
   `api()` puts `dcbridge` into `/api` (`view()`: the Dreamcast's link mode, the virtual SD card, the Dreamcast's addresses on the two network
@@ -17,9 +20,17 @@ while the module is on in Settings > Modules):
   while Settings is locked with the PIN, asks for the PIN once (`X-Pin`). Another site's form is refused like everywhere else.
 - `layout.json`: the dashboard box **Dreamcast bridge** (the Dreamcast, the SD card and the network as status rows, a link to the save manager) and
   Settings > **DC Bridge** (links to the save manager and to the zip of all saves) and the box colour in Appearance.
+- **Install / Uninstall:** `POST /dcbridge-setup/install` and `/remove` (PIN-protected) start `system/dcbridge-setup install|remove` as root with
+  `systemd-run` (outside the web service, which is sandboxed and may not write to `/etc` or `/usr`; a transient unit survives the restart that the
+  service's own units get). One at a time; the script writes `running` / `ok` / `failed` to `/tmp/dreampi-netswitch.dcbridge` and its output to
+  `.dcbridge.log`, which the box shows (`dcbridge.setup`: `installed`, `state`, `text`, `log`; a `running` older than 30 minutes counts as failed).
+  Install = apt packages (a second try after `apt-get update`), `/var/lib/dcbridge`, pppd options, `/etc/default/dcbridge` (only if missing), dhcpcd /
+  NetworkManager entries, the sysctl file, udev rules, the three units, dnsmasq file and `DCB-*` firewall chains, then it enables and starts
+  `dcbridge-saves`. Uninstall = the reverse; **`/var/lib/dcbridge` (the saves) and `/etc/default/dcbridge` stay**. While it is not installed the
+  dashboard box says so and has no save manager link, and no "service is not running" warning is raised.
 - `dcbridge_saves/` = the Pi's service (below), `system/` = what the installer puts into the Pi (units, udev rules, `dcbridge-net`, the pppd options
-  and the settings file), `install.sh` / `remove.sh` = this module's installer (`install.sh --dcbridge`).
-- Switching the module off in the picker only hides the box and the save manager; the services keep running until `--no-dcbridge`.
+  and the settings file) and `dcbridge-setup` (install / remove, below), `install.sh` / `remove.sh` = this module's installer (they call `dcbridge-setup`).
+- Switching the module off in the picker only hides the box and the save manager; the services keep running until Uninstall / `--no-dcbridge`.
 - Files: `/var/lib/dcbridge/` (the card image `sdcard.img`, `saves/` with the history and the queued edits; kept when the module is removed),
   `/etc/default/dcbridge` (the network settings, also kept), `/run/dcbridge/dcnet-ip`.
 - Tests: `tests/test_dcbridge.py` (the dashboard's side with a stand-in service), `tests/test_dcbridge_saves.py` (the Pi's side: image, store, disk
@@ -183,7 +194,7 @@ which slot to copy the physical VMU back into. Each slot file is exactly 128 KB.
   history | restore | pending | cancel` (works while the service runs).
 - In the dashboard: the module passes the page and the API on under `/dcbridge/` (all URLs in the page are relative).
 
-Install on the Pi: `sudo ./install.sh --dcbridge` (the add-on's installer; it installs `mtools`, `dosfstools`, `ppp`, `dnsmasq` and `iptables`,
+Install on the Pi: Settings > DC Bridge > Install, or `sudo ./install.sh --dcbridge` (the add-on's installer; both run `dcbridge-setup`, which installs `mtools`, `dosfstools`, `ppp`, `dnsmasq` and `iptables`,
 the udev rules and the service, and switches the module on).
 
 ## Networking (`modules/dcbridge/system`, installed by the module's `install.sh`)
@@ -275,7 +286,7 @@ reads run at about 880 KB/s at Dreamcast bus speed.
 
 ## First bring-up checklist
 
-1. Flash the board, plug it into the Pi and run `sudo ./install.sh --dcbridge`. Check
+1. Flash the board, plug it into the Pi and install the bridge (Settings > DC Bridge > Install, or `sudo ./install.sh --dcbridge`). Check
    that `ls -l /dev/dcbridge-*` and `ip link show dcnet0` both exist.
 2. Run `watch -n1 'curl -s localhost:8085/api/bridge'` (or `cat /dev/dcbridge-ctl`
    with the service stopped). With the Dreamcast off it should show

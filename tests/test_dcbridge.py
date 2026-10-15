@@ -1,6 +1,7 @@
 """The DC Bridge module's dashboard side (modules/dcbridge/netswitch_dcbridge.py): what it shows of the bridge service, and the save manager
 that it passes on from /dcbridge/ to the service on 127.0.0.1."""
 import json
+import os
 import threading
 import time
 import unittest
@@ -58,6 +59,12 @@ class Bridge(unittest.TestCase):
         cls.tmp = sandbox()
         cls.fake = HTTPServer(("127.0.0.1", 0), Fake)
         dcb.PORT = cls.fake.server_address[1]
+        cls.installed_before = dcb.INSTALLED
+        dcb.INSTALLED = os.path.join(cls.tmp, "dcbridge-saves.service")          # the unit file that says the Pi's side is set up
+        open(dcb.INSTALLED, "w").close()
+        cls.spawned = []
+        cls.spawn_before = dcb._spawn
+        dcb._spawn = cls.spawned.append
         threading.Thread(target=cls.fake.serve_forever, daemon=True).start()
         core.save_module_enabled("dcbridge", True)
         cls.srv = web.Server(("127.0.0.1", 0), web.Handler)
@@ -67,6 +74,7 @@ class Bridge(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        dcb.INSTALLED, dcb._spawn = cls.installed_before, cls.spawn_before
         cls.srv.shutdown()
         cls.srv.server_close()
         cls.fake.shutdown()
@@ -109,6 +117,23 @@ class Bridge(unittest.TestCase):
         d = {}
         dcb.api(d, warnings)
         self.assertTrue(any("not running" in w for w in warnings))
+
+    def test_a_missing_service_is_only_a_warning_when_the_bridge_is_installed(self):
+        with dcb._lock:
+            dcb._seen["time"] = 0
+        d, warnings = {}, []
+        dcb.api(d, warnings)
+        self.assertEqual(d["dcbridge"]["dreamcast"]["state"], "bad")
+        self.assertTrue(d["dcbridge"]["installed"] and len(warnings) == 1)
+        os.remove(dcb.INSTALLED)
+        try:
+            d, warnings = {}, []
+            dcb.api(d, warnings)
+            self.assertEqual((d["dcbridge"]["installed"], warnings), (False, []))
+            self.assertIn("Not installed", d["dcbridge"]["dreamcast"]["text"])
+            self.assertTrue(d["dcbridge"]["setup"]["not_installed"])
+        finally:
+            open(dcb.INSTALLED, "w").close()
 
     def test_the_save_manager_is_passed_on(self):
         page = urlopen(self.base + "/dcbridge/", timeout=10)
@@ -168,6 +193,76 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class Setup(unittest.TestCase):
+    """Install / Uninstall from Settings > DC Bridge: the script is started as root outside the web service, one at a time."""
+    def setUp(self):
+        self.tmp = sandbox()
+        self.saved = (dcb.INSTALLED, dcb._spawn, dcb.SETUP_STATUS, dcb.SETUP_LOG)
+        dcb.INSTALLED = os.path.join(self.tmp, "dcbridge-saves.service")
+        dcb.SETUP_STATUS, dcb.SETUP_LOG = os.path.join(self.tmp, "st"), os.path.join(self.tmp, "log")
+        self.spawned = []
+        dcb._spawn = self.spawned.append
+
+    def tearDown(self):
+        dcb.INSTALLED, dcb._spawn, dcb.SETUP_STATUS, dcb.SETUP_LOG = self.saved
+        cleanup(self.tmp)
+
+    def test_install_starts_the_script_and_shows_that_it_works(self):
+        self.assertEqual(dcb.setup_view()["state"], "idle")
+        self.assertTrue(dcb.setup_view()["not_installed"])
+        ok, msg = dcb.start_setup("install")
+        self.assertTrue(ok, msg)
+        self.assertEqual(self.spawned, [["sh", dcb.SETUP, "install", dcb.SETUP_STATUS, dcb.SETUP_LOG]])
+        v = dcb.setup_view()
+        self.assertEqual((v["state"], v["running"]), ("running", True))
+        self.assertFalse(dcb.start_setup("install")[0])                                  # one at a time
+        self.assertFalse(dcb.start_setup("remove")[0])
+        self.assertEqual(len(self.spawned), 1)
+
+    def test_finished_and_failed(self):
+        dcb.start_setup("install")
+        with open(dcb.SETUP_LOG, "w") as f:
+            f.write("Installing packages\nFailed: could not install ppp\n")
+        with open(dcb.SETUP_STATUS, "w") as f:
+            f.write("failed\n")
+        v = dcb.setup_view()
+        self.assertEqual(v["state"], "failed")
+        self.assertEqual(v["log"][-1], "Failed: could not install ppp")
+        self.assertTrue(dcb.start_setup("install")[0])                                   # try again
+        old = time.time() - dcb.SETUP_TIMEOUT - 5                                        # the script never reported back
+        os.utime(dcb.SETUP_STATUS, (old, old))
+        with open(dcb.SETUP_STATUS, "w") as f:
+            f.write("running\n")
+        os.utime(dcb.SETUP_STATUS, (old, old))
+        self.assertEqual(dcb.setup_state(), "failed")
+
+    def test_remove_needs_it_installed_and_install_needs_it_not(self):
+        self.assertFalse(dcb.start_setup("remove")[0])
+        open(dcb.INSTALLED, "w").close()
+        self.assertFalse(dcb.start_setup("install")[0])
+        self.assertEqual(dcb.setup_view()["text"], "Installed.")
+        self.assertTrue(dcb.start_setup("remove")[0])
+        self.assertEqual(self.spawned[-1][2], "remove")
+
+    def test_both_routes_need_the_pin(self):
+        for path in dcb.PROTECTED:
+            self.assertIn(path, dcb.POST)
+        self.assertEqual(sorted(dcb.PROTECTED), ["/dcbridge-setup/install", "/dcbridge-setup/remove"])
+
+    def test_the_script_is_valid_and_what_install_and_remove_do_is_in_it(self):
+        import subprocess
+        from support import ROOT
+        script = os.path.join(ROOT, "modules", "dcbridge", "system", "dcbridge-setup")
+        self.assertEqual(subprocess.call(["sh", "-n", script]), 0)
+        self.assertEqual(subprocess.call(["sh", script, "nonsense"], stderr=subprocess.DEVNULL), 2)
+        text = open(script).read()
+        for needle in ("apt-get install", "firewall-up", "99-dcbridge.rules", "systemctl enable dcbridge-saves", "firewall-down", "dnsmasq.d/dcbridge.conf"):
+            self.assertIn(needle, text)
+        self.assertNotIn("rm -rf /var/lib/dcbridge", text)
+        for forbidden in ("/home/pi/dreampi", "dreampi.py", "netlink.py"):
+            self.assertNotIn(forbidden, text)
+
+
 class Installer(unittest.TestCase):
     """The module's installer pieces (they only run on a Pi; here they are read and parsed)."""
     def read(self, *p):
@@ -184,10 +279,11 @@ class Installer(unittest.TestCase):
 
     def test_install_is_only_done_on_request_and_remove_keeps_the_users_saves(self):
         inst, rem = self.read("install.sh"), self.read("remove.sh")
-        self.assertIn('"$DCBRIDGE" = on ] || dcb_is_on', inst)                                         # --dcbridge, or an update while the module is on
+        self.assertIn('"$DCBRIDGE" = on ] || [ -f /etc/systemd/system/dcbridge-saves.service ]', inst)   # --dcbridge, or an update while it is installed
         self.assertIn('NS_SERVICES="$NS_SERVICES dcbridge-saves.service"', inst)
         self.assertNotIn("rm -rf /var/lib/dcbridge", rem)
-        self.assertNotIn("/etc/default/dcbridge", rem.replace("# The saves (/var/lib/dcbridge) and the settings file /etc/default/dcbridge are kept: they are the user's.", ""))
+        self.assertIn("dcbridge-setup", inst)
+        self.assertIn("dcbridge-setup", rem)                                                           # the same script as the Settings buttons
         main = self.read("..", "..", "install.sh")
         for needle in ("--dcbridge) DCBRIDGE=on", "--no-dcbridge) DCBRIDGE=off", "DCBRIDGE=keep"):
             self.assertIn(needle, main)

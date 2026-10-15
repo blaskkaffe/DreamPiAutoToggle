@@ -10,10 +10,14 @@
 #   GET  /dcbridge/  the save manager page, and GET /dcbridge/api/... its JSON API and downloads
 #   POST /dcbridge/api/...   its changes (uploads, labels, deletes, restores: PUT and DELETE come as POST with ?_method=, the page's own header is
 #                    needed and, while Settings is locked with the PIN, the PIN)
+#   POST /dcbridge-setup/install | /remove   the Install / Uninstall buttons of Settings > DC Bridge: they run system/dcbridge-setup as root in a
+#                    transient systemd unit (this service may not write to /etc or /usr); its state and log are shown in the box (PIN when one is set)
 # They are passed on to the service on 127.0.0.1, so the saves need no port of their own on the LAN. Works on Python 3.
 import http.client
 import json
+import os
 import re
+import subprocess
 import threading
 import time
 
@@ -24,6 +28,13 @@ POLL = 2.0                           # seconds between looks at the service
 STALE = 8.0                          # a look older than this is not shown as current
 MAX_BODY = 131072 + 4096             # a VMU save is 128 KB
 ALLOWED = re.compile(r"^/(api/(?!.*\.\.)[A-Za-z0-9._/%+-]*)?$")
+
+SETUP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "system", "dcbridge-setup")
+INSTALLED = "/etc/systemd/system/dcbridge-saves.service"      # written by dcbridge-setup install, removed by remove: exists = the Pi's side is set up
+SETUP_STATUS = core.TMP_PREFIX + ".dcbridge"                  # running / ok / failed, written by dcbridge-setup
+SETUP_LOG = core.TMP_PREFIX + ".dcbridge.log"
+SETUP_TIMEOUT = 1800                                          # a "running" older than this (the script never started or died) is shown as failed
+PROTECTED = ("/dcbridge-setup/install", "/dcbridge-setup/remove")      # run as root: the PIN is asked for when one is set
 
 _seen = {"time": 0.0, "bridge": None, "status": None, "up": False}
 _lock = threading.Lock()
@@ -83,15 +94,95 @@ def _ago(t, now):
     return "%ds ago" % s if s < 60 else "%d min ago" % (s // 60) if s < 3600 else "%d h ago" % (s // 3600)
 
 
+def installed():
+    return os.path.exists(INSTALLED)
+
+
+def setup_state():
+    """idle / running / ok / failed: what dcbridge-setup last did (its status file, which only exists until the next reboot)."""
+    text = (core.read_file(SETUP_STATUS) or "").strip()
+    if text not in ("running", "ok", "failed"):
+        return "idle"
+    try:
+        if text == "running" and time.time() - os.path.getmtime(SETUP_STATUS) > SETUP_TIMEOUT:
+            return "failed"
+    except OSError:
+        pass
+    return text
+
+
+def setup_log(limit=40):
+    """The last lines of the setup's output."""
+    text = core.read_file(SETUP_LOG) or ""
+    return text.splitlines()[-limit:]
+
+
+def setup_view():
+    """What the Settings box shows: installed, state, text (one line), log (lines)."""
+    here, state = installed(), setup_state()
+    if state == "running":
+        text = "Working... this takes a few minutes (packages are downloaded)."
+    elif state == "failed":
+        text = "The last install or removal failed. Details below."
+    elif here:
+        text = "Installed."
+    else:
+        text = "Not installed: the Pi has no bridge services yet."
+    return {"installed": here, "not_installed": not here, "state": state, "running": state == "running", "text": text, "log": setup_log() if state != "idle" else []}
+
+
+def _spawn(cmd):
+    """Run cmd as root outside this service. Replaced by the tests."""
+    if os.path.exists("/run/systemd/system"):
+        subprocess.Popen(["systemd-run", "--unit=dcbridge-setup-%d" % int(time.time()), "--no-block", "--collect"] + cmd,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    else:
+        subprocess.Popen(["setsid"] + cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+_setup_lock = threading.Lock()
+
+
+def start_setup(action):
+    """Begin 'install' or 'remove'; returns (started, message). One at a time."""
+    with _setup_lock:
+        if setup_state() == "running":
+            return False, "The bridge setup is already running."
+        if action == "install" and installed():
+            return False, "The bridge is already installed."
+        if action == "remove" and not installed():
+            return False, "The bridge is not installed."
+        if not os.path.exists(SETUP):
+            return False, "The setup script is missing (%s)." % SETUP
+        try:
+            for path in (SETUP_STATUS, SETUP_LOG):
+                if os.path.islink(path):
+                    os.remove(path)
+            with open(SETUP_STATUS, "w") as f:
+                f.write("running\n")                  # the page shows it at once; the script rewrites it when it is done
+            with open(SETUP_LOG, "w") as f:
+                f.write("")
+            _spawn(["sh", SETUP, action, SETUP_STATUS, SETUP_LOG])
+        except (OSError, ValueError) as e:
+            try:
+                os.remove(SETUP_STATUS)
+            except OSError:
+                pass
+            return False, "Could not start the setup (%s)." % e
+        core.debug_log("web page: DC Bridge %s started" % action)
+        return True, "Installing the bridge..." if action == "install" else "Removing the bridge..."
+
+
 def view(now=None):
     """What /api carries (the texts and dots the layout shows): {"up", "dreamcast": {state, text}, "card": {state, text, sub}, "net": {state, text}}."""
     now = time.time() if now is None else now
     with _lock:
         seen = dict(_seen)
     fresh = seen["time"] and now - seen["time"] < STALE
-    status, bridge = (seen["status"], seen["bridge"]) if fresh else (None, None)
+    here = installed()
+    status, bridge = (seen["status"], seen["bridge"]) if fresh and here else (None, None)
     if status is None:
-        gone = {"state": "bad", "text": "The bridge service is not running"}
+        gone = {"state": "bad", "text": "The bridge service is not running"} if here else {"state": "unknown", "text": "Not installed (Settings > DC Bridge > Install)"}
         return {"up": False, "dreamcast": gone, "card": {"state": "unknown", "text": "-", "sub": ""}, "net": {"state": "unknown", "text": "-"}}
     fw = (bridge or {}).get("firmware")
     if not fw:
@@ -120,8 +211,10 @@ def view(now=None):
 
 def api(d, warnings):
     v = view()
+    v["setup"] = setup_view()
+    v["installed"] = v["setup"]["installed"]
     d["dcbridge"] = v
-    if not v["up"]:
+    if not v["up"] and v["installed"] and not v["setup"]["running"]:
         warnings.append("DC Bridge: its service is not running (sudo systemctl status dcbridge-saves).")
 
 
@@ -181,9 +274,20 @@ def _post(h):
 
 
 def _get_view(h):
-    h.send(json.dumps(view()), "application/json")
+    out = view()
+    out["setup"] = setup_view()
+    out["installed"] = out["setup"]["installed"]
+    h.send(json.dumps(out), "application/json")
+
+
+def _post_setup(h):
+    """POST /dcbridge-setup/install and /remove: {"started": bool, "message": text, "setup": {...}} like the update."""
+    started, message = start_setup("install" if h.path.split("?")[0].endswith("/install") else "remove")
+    h.send(json.dumps({"started": started, "message": message, "setup": setup_view()}), "application/json")
+    return True
 
 
 GET = {"/dcbridge/": _get, "/dcbridge-view": _get_view}
 GET_PREFIX = {"/dcbridge/": _get}
+POST = {"/dcbridge-setup/install": _post_setup, "/dcbridge-setup/remove": _post_setup}
 POST_PREFIX = {"/dcbridge/": _post}

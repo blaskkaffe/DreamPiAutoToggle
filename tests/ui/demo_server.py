@@ -3,7 +3,7 @@ service on a sandbox (all paths in a temp dir). Switches via environment:
 LEDS=n (default 3), WIFI=1, WIFIDEMO=1 (dummy Wi-Fi networks + the setup loop),
 BG=1 (the Dreamcast background module on), SNOW=1 (the Snow background module on), DCBRIDGE=1 (the DC Bridge module on, with a stand-in for its service), IMGBG=1 (the Background image module on), CLOCK=1 (the clock module on; off by default so the box counts are stable), EVENTS=1 (the DC99 events module on, with its sample events; EVENTSOON=1 adds a reminded event 5 minutes ahead), OPENMENU=1 (the openMenu link module on, with a made-up SD card of 72 games and a Dreamcast that polls every 3 s; OPENMENU=quiet: the Dreamcast never polls), FAKEUPDATE=1 (fake GitHub: an update is available; FAKELOG=1 adds a failed update with a messy log), FAKEPLAYERS=1 (made-up
 players; PLAYERSFAST=1 makes the downloads slow and the list stale after 3 s), OFF=led,wifi,... (modules switched off in the module picker; OFF=all = every module the picker can switch, only the always-on ones stay), PIN=1234 (a PIN for update/restart/Wi-Fi; restart is faked), PORT=n (default 8734)."""
-import sys, os, threading, time, json
+import sys, os, threading, time, json, tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from support import web, core, sandbox, ledconfig
 import netswitch_wifi_setup as wifi
@@ -95,6 +95,17 @@ if os.environ.get("DCBRIDGE"):          # the DC Bridge module on, with a stand-
     threading.Thread(target=_fb.serve_forever, daemon=True).start()
     threading.Thread(target=dcb._loop, daemon=True).start()
     core.save_module_enabled("dcbridge", True); web.refresh_page(force=True)
+    # DCBRIDGE=new: not installed yet; the Install button then "runs" a stand-in that finishes after 3 s (and Uninstall the other way round)
+    _unit = os.path.join(tempfile.mkdtemp(prefix="dpns-dcb-"), "dcbridge-saves.service"); dcb.INSTALLED = _unit
+    if os.environ["DCBRIDGE"] != "new": open(_unit, "w").close()
+    def _fake_setup(cmd):
+        def run():
+            time.sleep(0.5); open(dcb.SETUP_LOG, "a").write("Installing packages\nSetting the bridge up...\n"); time.sleep(2.5)
+            if cmd[2] == "install": open(_unit, "w").close()
+            elif os.path.exists(_unit): os.remove(_unit)
+            open(dcb.SETUP_LOG, "a").write("Done.\n"); open(dcb.SETUP_STATUS, "w").write("ok\n")
+        threading.Thread(target=run, daemon=True).start()
+    dcb._spawn = _fake_setup
 if os.environ.get("SNOW"): core.save_module_enabled("snow", True); web.refresh_page(force=True)      # the Snow background (SNOW=1)
 if os.environ.get("OFF"):         # modules switched off, as from the module picker (the always-on ones can't be)
     for name in (core.module_names() if os.environ["OFF"] == "all" else os.environ["OFF"].split(",")):
