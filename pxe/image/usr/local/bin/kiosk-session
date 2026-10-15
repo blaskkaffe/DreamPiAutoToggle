@@ -41,7 +41,9 @@ mkdir -p "$PROFILE"
 # The browser opens the loading page (the chicken logo), which opens the board itself as soon as the board answers.
 # If the browser crashes or is closed it is started again two seconds later; X and this script are restarted by kiosk.service.
 PAGE="file://$SHARE/loading.html#$SHOW"
+FAST=0
 while true; do
+  START=$(date +%s)
   if [ "$BROWSER" = chromium ]; then
     rm -rf "$PROFILE/chromium"          # a crash leaves "restore pages" state behind: start clean every time
     chromium --kiosk --noerrdialogs --disable-infobars --disable-session-crashed-bubble --hide-crash-restore-bubble \
@@ -50,5 +52,10 @@ while true; do
   else
     firefox-esr --kiosk --no-remote --profile "$PROFILE" "$PAGE"
   fi
-  sleep 2
+  CODE=$?
+  UP=$(( $(date +%s) - START ))
+  echo "kiosk-session: $BROWSER ended with code $CODE after ${UP}s; starting it again (journalctl -u kiosk shows this)" >&2
+  # a browser that ends at once, again and again (not enough memory, a broken profile) is not started in a hot loop
+  if [ "$UP" -lt 15 ]; then FAST=$((FAST + 1)); else FAST=0; fi
+  if [ "$FAST" -ge 5 ]; then sleep 30; else sleep 2; fi
 done

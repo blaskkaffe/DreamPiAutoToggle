@@ -323,8 +323,20 @@ function applyPalette(d){PV=d.palette_v;S.palette=d.palette;
  st.textContent=d.palette_css;
  var inl=document.documentElement.style,i,drop=[];for(i=0;i<inl.length;i++)if(inl[i].indexOf("--c-")===0)drop.push(inl[i]);drop.forEach(function(k){inl.removeProperty(k)});      // a colour changed on this page (the Global main picker) is the server's now
  fontLook();if(window.engineUpdate)engineUpdate()}
-function refresh(){var x=new XMLHttpRequest();x.open("GET","/api?pv="+PV,true);if(SCREEN_ID)x.setRequestHeader("X-Screen",SCREEN_ID);
- x.onload=function(){if(x.status==200){var r=JSON.parse(x.responseText);render(r);if(r.palette)applyPalette(r)}bootDone("api")};x.onerror=function(){bootDone("api")};x.send()}
+// One question to /api at a time, with a time limit: a request that hangs (a network blip, the host restarting) is given up after 8 s instead of piling
+// new ones up behind it (a browser only has a few connections per host, so the page looked dead for minutes). When the host answers again after contact
+// was lost for 10 s or more, the page reloads: it comes back clean, with the page files of the host's current version.
+var apiBusy=null,apiDownAt=0;
+function apiLost(){if(!apiDownAt)apiDownAt=Date.now()}
+function refresh(){if(apiBusy){if(Date.now()-apiBusy.t<5000)return;try{apiBusy.x.abort()}catch(e){}apiBusy=null;apiLost()}
+ var x=new XMLHttpRequest(),rec={x:x,t:Date.now()};apiBusy=rec;x.open("GET","/api?pv="+PV,true);x.timeout=8000;if(SCREEN_ID)x.setRequestHeader("X-Screen",SCREEN_ID);
+ function lost(){if(apiBusy===rec){apiBusy=null;apiLost()}bootDone("api")}
+ x.onload=function(){if(apiBusy===rec)apiBusy=null;
+  var r=null;if(x.status==200){try{r=JSON.parse(x.responseText)}catch(e){}}
+  if(!r){apiLost();bootDone("api");return}
+  if(apiDownAt&&Date.now()-apiDownAt>=10000){location.reload();return}
+  apiDownAt=0;render(r);if(r.palette)applyPalette(r);bootDone("api")};
+ x.onerror=x.ontimeout=lost;x.send()}
 // The first draw waits for /api and for the data sources that have no kept answer from an earlier visit (at most BOOT_LIMIT ms), then every
 // box is shown at once: nothing pops in one box after the other
 var BOOT_LIMIT=1500,bootPending={api:1};

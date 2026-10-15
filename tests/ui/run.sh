@@ -18,6 +18,7 @@ run audit.js IN=8 FAKEUPDATE=1
 run functional.js IN=0 FAKEUPDATE=1
 # how the page appears (no pop-in) and the columns of Settings
 run boot.js
+run outage.js IN=3
 # the update controls: Check shows the Update now row at once, a finished update reloads the page with Settings open
 run update.js FAKEUPDATE=1
 # an update from a USB stick that has an update folder

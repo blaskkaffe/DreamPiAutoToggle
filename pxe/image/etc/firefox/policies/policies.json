@@ -11,7 +11,12 @@
     "OverridePostUpdatePage": "",
     "PopupBlocking": { "Default": true },
     "Preferences": {
+      "browser.cache.disk.enable": false,
+      "browser.cache.memory.capacity": 65536,
+      "dom.ipc.processCount": 2,
       "browser.sessionstore.resume_from_crash": false,
+      "browser.sessionstore.max_tabs_undo": 0,
+      "browser.tabs.unloadOnLowMemory": true,
       "browser.shell.checkDefaultBrowser": false,
       "browser.tabs.warnOnClose": false,
       "datareporting.policy.dataSubmissionEnabled": false,
