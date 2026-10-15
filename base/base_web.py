@@ -21,6 +21,7 @@ except ImportError:
 
 import base_core as core
 import base_modules as modules
+import base_netwatch as netwatch
 import base_security as security
 
 STATIC_DIR = core.project_path("static")          # the project's pictures: served from /static/ (a plain file name with one of these endings)
@@ -673,7 +674,7 @@ if __name__ == "__main__":
         PORT = int(sys.argv[1])
     if len(sys.argv) > 2:
         HTTPS_PORT = int(sys.argv[2])
-    for target in (watchdog,):
+    for target in (watchdog, netwatch.watch):
         t = threading.Thread(target=target)
         t.daemon = True
         t.start()

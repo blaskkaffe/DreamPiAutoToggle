@@ -10,6 +10,8 @@ for dev in /sys/class/net/*; do
         iw dev "$name" set power_save off 2>/dev/null
     elif command -v iwconfig >/dev/null 2>&1; then
         iwconfig "$name" power off 2>/dev/null
+    else
+        echo "$name is wireless but neither iw nor iwconfig is installed, so its power saving is left as it is (apt install iw; a cable is better for the host)"
     fi
 done
 exit 0
