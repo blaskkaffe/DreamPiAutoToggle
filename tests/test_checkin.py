@@ -145,7 +145,7 @@ class BoardTests(Base):
         checkin.set_status(anna, "TRAVEL", "2026-12-24")
         self.assertEqual(self.people()["Anna Svensson"]["text"], "Tjänsteresa · tillbaka 24/12")
         checkin.set_status(anna, "OTHER", "  Dentist   at   3 ")
-        self.assertEqual(self.people()["Anna Svensson"]["text"], "Annat · info: Dentist at 3")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "info: Dentist at 3")        # a free-text status shows only the text before and what was typed
         checkin.set_status(anna, "OTHER", "x" * 200)
         self.assertEqual(len(self.people()["Anna Svensson"]["detail"]), checkin.DETAIL_MAX)
 
@@ -154,13 +154,19 @@ class BoardTests(Base):
         by = dict((s["code"], s) for s in checkin.statuses())
         for code in ("LATE", "EARLY_LEAVE", "DOCTOR", "TRAVEL", "VACATION", "OTHER"):
             self.assertTrue(by[code]["prefix"], code)                       # the shipped menu
-        checkin.save_statuses([{"code": "T1", "label": "A", "needs": "time"}, {"code": "T2", "label": "B", "needs": "note"}, {"code": "T3", "label": "C", "needs": "date", "prefix": " back  now "}, {"code": "T4", "label": "D"}])
+        checkin.save_statuses([{"code": "T1", "label": "A", "needs": "time"}, {"code": "T2", "label": "B", "needs": "note"}, {"code": "T3", "label": "C", "needs": "date", "prefix": " back  now "}, {"code": "T4", "label": "D"}, {"code": "T5", "label": "E", "needs": "note", "prefix": ""}])
         got = dict((s["code"], s["prefix"]) for s in checkin.statuses())
-        self.assertEqual(got, {"T1": "kl", "T2": "info:", "T3": "back now", "T4": ""})      # an empty one gets the default, a status that asks for nothing has none
+        self.assertEqual(got, {"T1": "kl", "T2": "info:", "T3": "back now", "T4": "", "T5": ""})      # none sent = the default, a status that asks for nothing has none, an empty one stays empty
         checkin.set_status(anna, "T1", "08:15")
         self.assertEqual(self.people()["Anna Svensson"]["text"], "A · kl 08:15")
         checkin.set_status(anna, "T2", "doctor")
-        self.assertEqual(self.people()["Anna Svensson"]["text"], "B · info: doctor")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "info: doctor")
+        checkin.set_status(anna, "T3", "2026-12-24")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "C · back now 24/12")      # the others keep the name
+        checkin.set_status(anna, "T5", "plain")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "plain")                  # no text before: only what was typed
+        checkin.set_status(anna, "T2", "")
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "B")                      # nothing typed: the name
 
     def test_a_status_can_ask_for_a_date_and_a_time_and_a_date_can_be_skipped(self):
         anna = self.people()["Anna Svensson"]["id"]

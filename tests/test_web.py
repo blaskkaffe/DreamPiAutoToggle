@@ -48,6 +48,12 @@ class HttpTests(unittest.TestCase):
         self.assertIn("text/html", hdr["Content-Type"])
         self.assertIn(b"<title>Check-in</title>", body)
 
+    def test_the_watchdog_accepts_the_answer_of_the_real_handler(self):
+        """The handler speaks HTTP/1.1; a watchdog that wanted "HTTP/1.0 200" killed the service every 90 s and every LAN screen lost contact."""
+        port = self.srv.server_address[1]
+        self.assertTrue(web.ping_ok(port))
+        self.assertFalse(web.ping_ok(1, 1))
+
     def test_api_shape(self):
         d = json.loads(self.get("/api")[2].decode())
         for key in ("pin", "warnings", "now", "enabled", "colours", "checkin"):

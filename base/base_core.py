@@ -333,10 +333,18 @@ PALETTE = (
     ("bright-pink", "Bright pink", "pink", "#ff6ab8", "#ffaad6"),
 )
 PALETTE_IDS = tuple(c[0] for c in PALETTE)       # the ones the add-on ships; palette_ids() is the list in use (the colour palette editor can delete and add colours)
-FIXED_COLOURS = ("global", "orange")   # never deleted: "Global main" is not a colour of its own, orange is the one everything falls back to
+FIXED_COLOURS = ("global",)   # never deleted: "Global main" is not a colour of its own
 # colours that were in the palette once: what a saved choice of them becomes
 LEGACY_COLOURS = {"bright-orange": "orange", "bright-yellow": "yellow", "pink": "bright-pink", "teal": "cyan"}
-DEFAULT_COLOUR = "orange"
+DEFAULT_COLOUR = "orange"       # the one that ships as the fallback; default_colour() is the one in use (orange can be deleted like any other)
+
+
+def default_colour():
+    """What a deleted or unknown colour falls back to: orange, or the first colour left when orange was deleted."""
+    ids = palette_ids()
+    if DEFAULT_COLOUR in ids:
+        return DEFAULT_COLOUR
+    return ([i for i in ids if i not in FIXED_COLOURS] or ["global"])[0]
 # A module's colour keys listed in its module.json "colours_real" only hold real palette colours (never a module's colour token such as
 # "Selected network", which would be a circle) and, with "colours_unique", never the same one; its other colour keys are free.
 
@@ -473,7 +481,7 @@ def colours():
     # "colour:<id>", see service()), e.g. "Selected network" is the colour of the network that is selected
     for t in colour_tokens():
         pick = service("colour:" + t["id"])
-        base = ([c for c in out if c["id"] == pick] or [c for c in out if c["id"] == DEFAULT_COLOUR] or out)[0]
+        base = ([c for c in out if c["id"] == pick] or [c for c in out if c["id"] == default_colour()] or out)[0]
         out.append(dict(base, id=t["id"], name=t["name"], group="token", ui_default=base["ui"], token=True, follows=base["id"]))
     return out
 
@@ -579,9 +587,11 @@ def palette_edit(ident, name=None, ui=None):
 
 def palette_delete(ident):
     """Take a colour out of the palette. What used it falls back (a module's pick to its default, another module's row to
-    orange). False for one that cannot be deleted (FIXED_COLOURS) or does not exist."""
+    default_colour()). False for one that cannot be deleted (FIXED_COLOURS, the last real colour) or does not exist."""
     if ident in FIXED_COLOURS or ident not in palette_ids():
         return False
+    if not [i for i in palette_ids() if i not in FIXED_COLOURS and i != ident]:
+        return False                            # the last real colour stays: everything falls back to one
     over = palette_overrides()                  # read while the colour is still in the palette: its changes go with it
     data = _raw_layout()
     if ident in PALETTE_IDS:
@@ -653,7 +663,7 @@ def colour(ident):
         if c["id"] == ident:
             return c
     for c in every:
-        if c["id"] == DEFAULT_COLOUR:
+        if c["id"] == default_colour():
             return c
     return every[0]
 
@@ -693,7 +703,7 @@ def module_colours(name):
     def ok(k, v):       # the network colours cannot be "the selected network's" (that would be a circle)
         v = LEGACY_COLOURS.get(v, v)
         return v in ids and not (k in (manifest.get("colours_real") or []) and v not in palette_ids())
-    out = dict((k, LEGACY_COLOURS.get(v, v) if ok(k, v) else DEFAULT_COLOUR) for k, v in wanted.items())
+    out = dict((k, LEGACY_COLOURS.get(v, v) if ok(k, v) else default_colour()) for k, v in wanted.items())
     mine = _saved_module_colours().get(name)
     if isinstance(mine, dict):
         for k in out:
@@ -703,11 +713,11 @@ def module_colours(name):
         uniq = [k for k in out if k in (manifest.get("colours_real") or [])] or list(out)
         if len(set(out[k] for k in uniq)) < len(uniq):
             for k in uniq:
-                out[k] = LEGACY_COLOURS.get(wanted[k], wanted[k]) if ok(k, wanted[k]) else DEFAULT_COLOUR
+                out[k] = LEGACY_COLOURS.get(wanted[k], wanted[k]) if ok(k, wanted[k]) else default_colour()
             used = set()
             for k in uniq:                       # still the same colour twice (a default was deleted from the palette): the first ones that are free
                 if out[k] in used:
-                    out[k] = ([i for i in ids if i not in used and i not in ("global", "network")] or [DEFAULT_COLOUR])[0]
+                    out[k] = ([i for i in ids if i not in used and i not in ("global", "network")] or [default_colour()])[0]
                 used.add(out[k])
     return out
 

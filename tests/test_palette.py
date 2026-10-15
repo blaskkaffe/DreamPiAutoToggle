@@ -53,6 +53,18 @@ class PaletteCore(unittest.TestCase):
         self.assertEqual(sorted(self.ids()), sorted(core.PALETTE_IDS))
         self.assertFalse(core.palette_order("blue"))
 
+    def test_orange_can_be_deleted_and_the_fallback_moves_on(self):
+        self.assertEqual(core.default_colour(), "orange")
+        self.assertTrue(core.palette_delete("orange"))
+        self.assertNotIn("orange", self.ids())
+        fb = core.default_colour()
+        self.assertIn(fb, self.ids())
+        self.assertNotEqual(fb, "global")
+        self.assertEqual(core.colour("orange")["id"], fb)
+        for i in [i for i in self.ids() if i not in ("global", fb)]:
+            self.assertTrue(core.palette_delete(i))
+        self.assertFalse(core.palette_delete(fb))                                 # the last real colour stays
+
     def test_delete_and_what_used_it(self):
         for fixed in core.FIXED_COLOURS + ("network",):
             self.assertFalse(core.palette_delete(fixed), fixed)
@@ -120,7 +132,7 @@ class PaletteHttp(unittest.TestCase):
         st, got = self.call("GET", "/palette/list")
         self.assertEqual(st, 200)
         self.assertEqual([c["id"] for c in got["colours"]], list(core.PALETTE_IDS))
-        self.assertTrue(all(c["fixed"] for c in got["colours"] if c["id"] in ("global", "orange")))
+        self.assertTrue(all(c["fixed"] for c in got["colours"] if c["id"] == "global"))
         self.assertTrue(all("led" not in c for c in got["colours"]))
         st, got = self.call("POST", "/palette/add", {"name": "Lime", "ui": "#99ff00"})
         self.assertEqual((st, got["id"]), (200, "lime"))
@@ -131,7 +143,7 @@ class PaletteHttp(unittest.TestCase):
         self.assertEqual([c["id"] for c in got["colours"]][:2], ["lime", "red"])
         red = [c for c in got["colours"] if c["id"] == "red"][0]
         self.assertTrue(red["changed"])
-        self.assertEqual(self.call("POST", "/palette/delete", {"id": "orange"})[0], 400)
+        self.assertEqual(self.call("POST", "/palette/delete", {"id": "global"})[0], 400)
         self.assertEqual(self.call("POST", "/palette/delete", {"id": "lime"})[0], 200)
         self.assertEqual(self.call("POST", "/palette/edit", {"id": "red", "ui": "nope"})[0], 400)
         self.assertEqual(self.call("POST", "/palette/reset", {})[0], 200)

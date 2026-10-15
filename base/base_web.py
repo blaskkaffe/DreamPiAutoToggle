@@ -641,20 +641,27 @@ def start_https():
     t.start()
 
 
+def ping_ok(port, timeout=10):
+    """True when the page on this machine answers /ping with a 200 (any HTTP version: the handler speaks HTTP/1.1)."""
+    try:
+        s = socket.create_connection(("127.0.0.1", port), timeout)
+        try:
+            s.sendall(b"GET /ping HTTP/1.0\r\n\r\n")
+            head = s.recv(64)
+        finally:
+            s.close()
+    except (socket.error, OSError):
+        return False
+    return head.startswith((b"HTTP/1.0 200", b"HTTP/1.1 200"))
+
+
 def watchdog():
     """If the page stops answering (should never happen), exit so systemd
     restarts the service within seconds instead of leaving it dead."""
     failures = 0
     time.sleep(30)
     while True:
-        try:
-            s = socket.create_connection(("127.0.0.1", PORT), 10)
-            s.sendall(b"GET /ping HTTP/1.0\r\n\r\n")
-            ok = s.recv(64).startswith(b"HTTP/1.0 200")
-            s.close()
-        except (socket.error, OSError):
-            ok = False
-        failures = 0 if ok else failures + 1
+        failures = 0 if ping_ok(PORT) else failures + 1
         if failures >= 3:
             sys.stderr.write("page not answering, restarting the service\n")
             os._exit(1)

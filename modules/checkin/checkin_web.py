@@ -75,13 +75,15 @@ def _save(data):
     _cache["key"] = None
 
 
-PREFIXES = {"time": "kl", "date": "till", "datetime": "till", "note": "info:"}      # the text before the value of a status that asks for one, when none is set
+PREFIXES = {"time": "kl", "date": "till", "datetime": "till", "note": "info:"}      # the text before the value of a status that has none saved yet
 
 
 def _prefix(raw, needs):
-    """The text before the time / date / note in a status: what is set, else a default, so every status that asks for a value has one."""
-    p = re.sub(r"\s+", " ", str(raw or "")).strip()[:20]
-    return p or PREFIXES.get(needs, "")
+    """The text before the time / date / note in a status. A status saved before the text existed (None) gets the default; one saved with
+    an empty text keeps it empty (the user may want only the value), so what is typed in the editor is what comes back."""
+    if raw is None:
+        return PREFIXES.get(needs, "")
+    return re.sub(r"\s+", " ", str(raw)).strip()[:20]
 
 
 def _palette_id(v, default):
@@ -211,15 +213,19 @@ def group_colours(people, kind, cfg):
     """{name: palette id} for every department (or building): the user's pick, else one from AUTO by the name's place in the sorted list."""
     names = sorted(set(_key_of(p, kind) for p in people), key=lambda s: s.lower())
     mine = cfg["colours"].get(kind, {})
-    auto = [c for c in AUTO if c in core.palette_ids()] or [core.DEFAULT_COLOUR]        # the Colour palette module may have deleted some
+    auto = [c for c in AUTO if c in core.palette_ids()] or [core.default_colour()]        # the Colour palette module may have deleted some
     return dict((n, mine.get(n) or auto[i % len(auto)]) for i, n in enumerate(names))
 
 
 def _status_text(st, detail):
-    t = st["label"]
-    if detail:
-        t += " \u00b7 " + ((st["prefix"] + " ") if st["prefix"] and st["needs"] else "") + detail
-    return t
+    """The line on the board. A free-text status shows only the text before and what was typed (not the status name); the others
+    show the name, then the text before and the value. Without a value, the name."""
+    if not detail:
+        return st["label"]
+    before = (st["prefix"] + " ") if st["prefix"] and st["needs"] else ""
+    if st["needs"] == "note":
+        return before + detail
+    return st["label"] + " \u00b7 " + before + detail
 
 
 def snapshot(data=None):

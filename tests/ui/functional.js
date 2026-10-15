@@ -209,7 +209,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('.rp-sheet button[data-code="OTHER"]').click(); await settle(300);
   for (const k of ['shift', 'cO', 'ck', 'layersym', 'c7', 'c!']) await page.click('[data-k="' + k + '"]');
   await page.click('.rp-need2 [data-k=done]'); await settle(700);
-  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'Annat \u00b7 info: Ok7!')), 'a note is typed on the text keyboard (letters, numbers, special characters)');
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => p.text === 'info: Ok7!')), 'a note is typed on the text keyboard (letters, numbers, special characters)');
   // the keyboard is laid out like the iPhone's Swedish one: 11 letters in the first two rows, shift and delete round the last letters, 123, emoji, space, done
   await page.locator('.rp-t').nth(4).click(); await settle(300);
   await page.locator('.rp-sheet button[data-code="OTHER"]').click(); await settle(300);
@@ -234,7 +234,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.click('.rp-need2 [data-k="layeremoji"]'); await page.locator('.rp-egrid .rp-emo').first().click(); await page.keyboard.type('!');
   ok(Array.from((await page.locator('.rp-need2 .rp-shown').textContent()).trim()).slice(-1)[0] === '!', 'and the two can be mixed');
   await page.keyboard.press('Enter'); await settle(700);
-  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => /^Annat \u00b7 info: Hej \u00e5\u00e4.*!$/.test(p.text))), 'Enter on the physical keyboard sets the status');
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.groups.some(g => g.people.some(p => /^info: Hej \u00e5\u00e4.*!$/.test(p.text))), 'Enter on the physical keyboard sets the status');
   await page.locator('.rp-t').nth(4).click(); await settle(300);
   await page.locator('.rp-sheet button[data-code=""]').click(); await settle(500);
   await page.locator('.rp-t').nth(4).click(); await settle(300);

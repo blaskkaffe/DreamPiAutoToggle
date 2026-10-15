@@ -47,13 +47,13 @@ class BoxTests(LayoutBase):
         self.assertEqual(lay["settings"], [])
 
     def test_two_modules_share_a_box_by_name_ignoring_case(self):
-        self.module("one", {"settings": [{"box": "GPIO", "title": "GPIO", "items": [{"type": "text", "text": "a"}]}]})
-        self.module("two", {"settings": [{"box": "gpio", "items": [{"type": "text", "text": "b"}]}]})
+        self.module("one", {"settings": [{"box": "Extra", "title": "Extra", "items": [{"type": "text", "text": "a"}]}]})
+        self.module("two", {"settings": [{"box": "extra", "items": [{"type": "text", "text": "b"}]}]})
         lay = self.load(["one", "two"])
         self.assertEqual(len(lay["settings"]), 1)
         box = lay["settings"][0]
-        self.assertEqual(box["id"], "gpio")
-        self.assertEqual(box["title"], "GPIO")
+        self.assertEqual(box["id"], "extra")
+        self.assertEqual(box["title"], "Extra")
         self.assertEqual([(w["text"], w["mod"]) for w in box["items"]], [("a", "one"), ("b", "two")])
         self.assertEqual(box["mods"], ["one", "two"])
 
