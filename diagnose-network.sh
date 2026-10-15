@@ -17,6 +17,11 @@ for d in /sys/class/net/*; do [ -d "$d/wireless" ] || continue; WL=1; n=$(basena
 [ "$WL" = 1 ] || echo "(no wireless interface)"
 [ "$WL" = 0 ] || have iw || echo "(iw is not installed: apt install iw. The add-on can only switch Wi-Fi power saving off with iw or iwconfig; a cable is better than Wi-Fi for the host)"
 sec "wired link speed / duplex"; have ethtool && for d in /sys/class/net/*; do n=$(basename "$d"); [ -e "$d/device" ] && [ ! -d "$d/wireless" ] && ethtool "$n" 2>/dev/null | grep -E "Speed|Duplex|Link detected"; done
+sec "is another computer using this computer's address? (needs arping: apt install iputils-arping)"
+if have arping && have ip; then
+  for n in $(ip -4 -o addr show scope global | awk '{print $2}' | sort -u); do a=$(ip -4 -o addr show dev "$n" scope global | awk '{print $4; exit}' | cut -d/ -f1)
+    [ -n "$a" ] && { echo "$n $a:"; arping -D -c 2 -w 3 -I "$n" "$a" 2>&1 | tail -2; echo "(a reply from another MAC address means two computers have this address)"; }; done
+else echo "(arping is not installed)"; fi
 sec "names"; hostname; have avahi-daemon && (systemctl is-active avahi-daemon 2>/dev/null); have getent && getent hosts "$(hostname).local" 2>/dev/null
 sec "services"
 for s in checkin-board checkin-board-pxe checkin-board-pxe-http avahi-daemon NetworkManager systemd-networkd dhcpcd; do

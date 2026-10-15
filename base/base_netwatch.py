@@ -54,7 +54,10 @@ def snapshot():
     for n in names:
         if n.startswith(SKIP):
             continue
-        nets[n] = {"state": _read(os.path.join(SYS_NET, n, "operstate")), "carrier": _read(os.path.join(SYS_NET, n, "carrier")), "addrs": sorted(addrs.get(n, []))}
+        d = os.path.join(SYS_NET, n)
+        speed = _read(os.path.join(d, "speed"))
+        nets[n] = {"state": _read(os.path.join(d, "operstate")), "carrier": _read(os.path.join(d, "carrier")), "addrs": sorted(addrs.get(n, [])),
+                   "link": ("%s Mb/s %s" % (speed, _read(os.path.join(d, "duplex")) or "?")) if speed.isdigit() else ""}      # what the card negotiated with the switch
     return {"nets": nets, "gateway": parse_gateway(_run(["ip", "-4", "route", "show", "default"]))}
 
 
@@ -80,6 +83,8 @@ def changes(old, new):
         else:
             if a["state"] != b["state"] or a["carrier"] != b["carrier"]:
                 lines.append("%s link %s -> %s (carrier %s -> %s)" % (n, a["state"] or "?", b["state"] or "?", a["carrier"] or "?", b["carrier"] or "?"))
+            if a.get("link", "") != b.get("link", ""):
+                lines.append("%s negotiated %s -> %s" % (n, a.get("link") or "nothing", b.get("link") or "nothing"))
             if a["addrs"] != b["addrs"]:
                 lines.append("%s address %s -> %s" % (n, ", ".join(a["addrs"]) or "none", ", ".join(b["addrs"]) or "none"))
     if old["gateway"] != new["gateway"]:
@@ -91,7 +96,7 @@ def watch(every=10, log=None):
     """Forever: log what changes in the network. Runs in a thread of the web service."""
     log = log or (lambda text: sys.stderr.write("network: %s\n" % text))
     last = snapshot()
-    log("watching %s; gateway %s" % (", ".join("%s %s %s" % (n, v["state"] or "?", "/".join(v["addrs"]) or "no address") for n, v in sorted(last["nets"].items())) or "no interface", last["gateway"] or "none"))
+    log("watching %s; gateway %s" % (", ".join("%s %s %s %s" % (n, v["state"] or "?", "/".join(v["addrs"]) or "no address", v.get("link", "")) for n, v in sorted(last["nets"].items())) or "no interface", last["gateway"] or "none"))
     gw_ok = None
     while True:
         time.sleep(every)

@@ -24,6 +24,9 @@ class NetWatch(unittest.TestCase):
         other = {"nets": {"eth0": {"state": "up", "carrier": "1", "addrs": ["192.168.1.99/24"]}}, "gateway": "192.168.1.1"}
         self.assertIn("192.168.1.20/24 -> 192.168.1.99/24", "\n".join(nw.changes(up, other)))
         self.assertIn("appeared", "\n".join(nw.changes({"nets": {}, "gateway": ""}, up)))
+        slow = {"nets": {"eth0": {"state": "up", "carrier": "1", "addrs": ["192.168.1.20/24"], "link": "10 Mb/s half"}}, "gateway": "192.168.1.1"}
+        fast = {"nets": {"eth0": {"state": "up", "carrier": "1", "addrs": ["192.168.1.20/24"], "link": "1000 Mb/s full"}}, "gateway": "192.168.1.1"}
+        self.assertIn("eth0 negotiated 10 Mb/s half -> 1000 Mb/s full", "\n".join(nw.changes(slow, fast)))
 
     def test_a_snapshot_never_fails(self):
         s = nw.snapshot()
