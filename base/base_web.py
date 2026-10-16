@@ -53,7 +53,7 @@ def api_state(have_palette=""):
     warnings = ["Module %s is not loaded: %s" % (name, why) for name, why in sorted(modules.errors().items())]
     d = {"pin": security.pin_required(),     # the page asks for it before an action a module marks PROTECTED
          "colours": modules.live_colours(), "tints": modules.live_tints(), "primary": {}, "primary_key": {}, "enabled": modules.enabled_map(),
-         "warnings": warnings, "now": int(time.time()),
+         "warnings": warnings, "now": int(time.time()), "lang": core.language(),
          "notices": [],         # banners over the boxes that are not warnings: {"id", "text", "post" (dismiss: POST {"id"} there)}
          "screen": core.screen_settings(), "tile_layout": core.tile_layout(), "daylight": core.daylight(),
          "settings_pin": {"on": security.settings_locked(), "pin": security.pin_required()}}
@@ -109,6 +109,13 @@ def _palette_reply(extra=None):
     return body
 
 
+def _language_reply():
+    """Settings > Appearance > Language (the form widget's format)."""
+    code = core.language()
+    return {"values": {"language": code}, "options": {"languages": [{"value": c, "label": n} for c, n in core.LANGUAGES]},
+            "texts": {"language": dict(core.LANGUAGES)[code]}}
+
+
 def _timezone_reply():
     """The form widget's answer for the common time zone (Settings > About)."""
     import base_tz as tz
@@ -122,6 +129,13 @@ def _layout_script():
     lay = modules.layout()
     lay["palette"] = palette_json()
     return "window.LAYOUT=" + json.dumps(lay).replace("</", "<\\/") + ";"
+
+
+def _i18n_script():
+    """window.I18N: the language of the page and its dictionary (see tr() in page.js). Built into the page, so the first draw is in the right language."""
+    code = core.language()
+    d = modules.lang_dictionary(code) if code != "en" else {"strings": {}, "patterns": []}
+    return "window.I18N=" + json.dumps({"lang": code, "strings": d["strings"], "patterns": d["patterns"]}, ensure_ascii=False).replace("</", "<\\/") + ";"
 
 
 def build_page():
@@ -142,8 +156,8 @@ def build_page():
 
 def _build_page(part):
     extra = modules.page_parts()
-    js = _layout_script() + "\n" + part("page.js") + "\n" + part("widgets.js") + "\n" + extra["js"] + "\n" + part("boot.js")
-    html = part("index.html").replace("@@TITLE@@", core.PROJECT.get("title", "Dashboard")).replace("@@ICON@@", core.PROJECT.get("icon", "")).replace("@@TOUCH@@", core.PROJECT.get("touch_icon", core.PROJECT.get("icon", ""))).replace("@@THEME@@", core.screen_settings()["theme"]).replace("@@CSS@@", core.colours_css() + part("page.css") + "\n" + extra["css"]).replace("@@JS@@", js)
+    js = _layout_script() + "\n" + _i18n_script() + "\n" + part("page.js") + "\n" + part("widgets.js") + "\n" + extra["js"] + "\n" + part("boot.js")
+    html = part("index.html").replace("@@LANG@@", core.language()).replace("@@TITLE@@", core.PROJECT.get("title", "Dashboard")).replace("@@ICON@@", core.PROJECT.get("icon", "")).replace("@@TOUCH@@", core.PROJECT.get("touch_icon", core.PROJECT.get("icon", ""))).replace("@@THEME@@", core.screen_settings()["theme"]).replace("@@CSS@@", core.colours_css() + part("page.css") + "\n" + extra["css"]).replace("@@JS@@", js)
     return html
 
 
@@ -164,7 +178,12 @@ PAGE = PAGE_BYTES = None
 
 
 def _page_signature():
-    sig = [PAGE_DIR, json.dumps(modules.live_colours(), sort_keys=True)]    # the colours are built into the page
+    sig = [PAGE_DIR, json.dumps(modules.live_colours(), sort_keys=True), core.language()]    # the colours and the language are built into the page
+    for f in modules.lang_files(core.language()):
+        try:
+            sig.append(os.path.getmtime(f))
+        except OSError:
+            sig.append(None)
     for f in BASE_PAGE_FILES:
         try:
             sig.append(os.path.getmtime(os.path.join(PAGE_DIR, f)))
@@ -337,6 +356,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(json.dumps(_colour_reply()), "application/json")
         elif path == "/timezone":
             self.send(json.dumps(_timezone_reply()), "application/json")
+        elif path == "/language":
+            self.send(json.dumps(_language_reply()), "application/json")
         elif path == "/palette/list":
             self.send(json.dumps(_palette_reply()), "application/json")
         elif path == "/screen":
@@ -383,6 +404,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_colour()
         if path == "/timezone":
             return self._post_timezone()
+        if path == "/language":
+            return self._post_language()
         if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/fit", "/screen/drag", "/screen/noscroll", "/screen/autohide", "/screen/locations", "/screen/sound"):
             return self._post_screen(path)
         if path == "/palette":
@@ -557,6 +580,19 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, AttributeError, IOError, OSError) as e:
             return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
         self.send(json.dumps(_screen_reply()), "application/json")
+
+    def _post_language(self):
+        """Settings > Appearance > Language: {"values": {"language": "sv" | "en"}}. Every screen follows (the /api answer carries it, the page loads again)."""
+        try:
+            values = json.loads(self._body(1024).decode("utf-8")).get("values") or {}
+            ok = core.save_language(values.get("language"))
+        except (ValueError, AttributeError, IOError, OSError) as e:
+            return self.send("Bad request: %s" % e, "text/plain; charset=utf-8", status=400)
+        if not ok:
+            return self.send("Unknown language", "text/plain; charset=utf-8", status=400)
+        core.log("web page: language %s" % core.language())
+        refresh_page(force=True)
+        self.send(json.dumps(_language_reply()), "application/json")
 
     def _post_timezone(self):
         """Settings > About > Time zone: {"values": {"zone": "" | IANA name}} (the form widget's format)."""

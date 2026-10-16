@@ -305,7 +305,8 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.setViewportSize({ width: 360, height: 900 }); await settle(1200);
   const narrow = await page.evaluate(() => Array.from(document.querySelectorAll('#dash .rp-stt[data-short]')).map(e => [e.textContent, e.getAttribute('data-short'), e.getAttribute('data-full'), e.scrollWidth > e.clientWidth + 1]));
   ok(narrow.length > 0 && narrow.every(x => x[0] === x[1] || x[0] === x[2]) && narrow.some(x => x[0] === x[1] && x[1] !== x[2]), 'scrolling off: a status that does not fit shows only its name, the others show everything (' + JSON.stringify(narrow.map(x => x[0])) + ')');
-  await page.setViewportSize({ width: 1500, height: 900 }); await settle(1200);
+  await page.evaluate(() => fetch('/screen/stretch', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ value: true }) }));
+  await page.setViewportSize({ width: 1500, height: 900 }); await settle(2500);
   const wide = await page.evaluate(() => Array.from(document.querySelectorAll('#dash .rp-stt[data-short]')).map(e => e.textContent === e.getAttribute('data-full')));
   ok(wide.length > 0 && wide.every(Boolean), 'and in a wide window the whole status is shown again');
   await page.setViewportSize({ width: 1500, height: 900 });

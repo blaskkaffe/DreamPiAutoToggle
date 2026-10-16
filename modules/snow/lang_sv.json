@@ -1,0 +1,26 @@
+{
+ "strings": {
+  "A snowstorm in soft fog as the page's background (3D, rendered with WebGL), with a day and night that follow the time zone.": "Ett snöoväder i mjuk dimma som sidans bakgrund (3D, ritat med WebGL), med dag och natt som följer tidszonen.",
+  "Always day": "Alltid dag",
+  "Always night": "Alltid natt",
+  "Amount of snow": "Mängd snö",
+  "Bad request": "Felaktig begäran",
+  "Blizzard": "Snöstorm",
+  "Breeze": "Bris",
+  "Calm": "Lugnt",
+  "Fog": "Dimma",
+  "Follows the time zone": "Följer tidszonen",
+  "Heavy snow": "Mycket snö",
+  "Light fog": "Lätt dimma",
+  "Light snow": "Lite snö",
+  "No fog": "Ingen dimma",
+  "Normal snow": "Normalt med snö",
+  "Snow": "Snö",
+  "Snow background": "Snöbakgrund",
+  "Storm": "Storm",
+  "Thick fog": "Tjock dimma",
+  "Time of day": "Tid på dygnet",
+  "Wind": "Vind"
+ },
+ "patterns": []
+}

@@ -22,6 +22,7 @@ if not os.environ.get("EMPTY"):
 import shutil
 shutil.copytree(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "base", "sounds"), core.SOUNDS_DIR, dirs_exist_ok=True)      # the shipped button sounds
 if os.environ.get("IMGBG"): core.save_module_enabled("imagebg", True)
+if os.environ.get("LANG_UI"): core.save_language(os.environ["LANG_UI"])      # the page language (the browser checks read English unless this is "sv")
 if os.environ.get("FAKEUPDATE"):
     import subprocess
     import rebootupdate_update as up

@@ -1,0 +1,39 @@
+{
+ "strings": {
+  "A picture is set": "En bild är vald",
+  "Background image": "Bakgrundsbild",
+  "Background picture": "Bakgrundsbild",
+  "Bad request": "Felaktig begäran",
+  "Choose": "Välj",
+  "Choose a background picture": "Välj en bakgrundsbild",
+  "Cover the screen": "Täck skärmen",
+  "Darken": "Gör mörkare",
+  "Image": "Bild",
+  "No picture": "Ingen bild",
+  "No picture yet: choose one from this device": "Ingen bild än: välj en från den här enheten",
+  "Not a PNG, JPEG, GIF or WebP picture": "Ingen PNG-, JPEG-, GIF- eller WebP-bild",
+  "Not darkened": "Inte mörkare",
+  "Off": "Av",
+  "Picture": "Bild",
+  "Picture fit": "Bildens passning",
+  "Picture set": "Bild vald",
+  "Remove the background picture": "Ta bort bakgrundsbilden",
+  "Remove the background picture?": "Ta bort bakgrundsbilden?",
+  "Show it whole": "Visa hela bilden",
+  "Stretch": "Utsträckt",
+  "The picture was not saved.": "Bilden sparades inte.",
+  "This browser can't read that picture. Try a JPEG or PNG.": "Webbläsaren kan inte läsa den bilden. Försök med en JPEG eller PNG.",
+  "Tile": "Kakla",
+  "Use a picture as the page's background.": "Använd en bild som sidans bakgrund."
+ },
+ "patterns": [
+  [
+   "^(\\d+) % darker, for the text's sake$",
+   "$1 % mörkare, för textens skull"
+  ],
+  [
+   "^The picture is too big \\((\\d+) MB at most\\)$",
+   "Bilden är för stor (högst $1 MB)"
+  ]
+ ]
+}

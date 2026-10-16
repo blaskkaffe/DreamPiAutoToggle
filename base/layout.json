@@ -6,6 +6,26 @@
    "items": [
     {
      "type": "form",
+     "get": "/language",
+     "post": "/language",
+     "fields": [
+      {
+       "title": "Language",
+       "sub_text": "language",
+       "controls": [
+        {
+         "type": "choice",
+         "key": "language",
+         "options": "languages",
+         "label": "Language"
+        }
+       ]
+      }
+     ],
+     "order": 5
+    },
+    {
+     "type": "form",
      "get": "/screen",
      "post": "/screen",
      "fields": [

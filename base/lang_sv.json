@@ -1,0 +1,376 @@
+{
+ "strings": {
+  "4 to 64 characters. It is also asked for before updating, restarting and any other action that can change the machine.": "4 till 64 tecken. Den frågas också efter före uppdatering, omstart och andra åtgärder som kan ändra datorn.",
+  "A handle on each tile lets you drag it to another place; the modules take that order (the same as dragging them in Modules)": "Ett handtag på varje ruta låter dig dra den till en annan plats; modulerna får den ordningen (samma sak som att dra dem i Moduler)",
+  "Add": "Lägg till",
+  "Add colour": "Lägg till färg",
+  "Add-on": "Tillägg",
+  "Address": "Adress",
+  "Africa and Middle East": "Afrika och Mellanöstern",
+  "All": "Alla",
+  "All ▾": "Alla ▾",
+  "Always on": "Alltid på",
+  "Americas": "Amerika",
+  "Appearance": "Utseende",
+  "Asia and Pacific": "Asien och Stillahavsområdet",
+  "Ask for the PIN to open Settings": "Be om PIN-koden för att öppna Inställningar",
+  "Asked before update and restart": "Frågas före uppdatering och omstart",
+  "At what time?": "Vilken tid?",
+  "Athens": "Aten",
+  "Automatic": "Automatisk",
+  "Automatic (black on light boxes, white on dark)": "Automatisk (svart på ljusa rutor, vit på mörka)",
+  "Back": "Tillbaka",
+  "Back to the colour the add-on ships": "Tillbaka till den färg tillägget levererar",
+  "Background": "Bakgrund",
+  "Backgrounds": "Bakgrunder",
+  "Backspace": "Backsteg",
+  "Black": "Svart",
+  "Blue": "Blå",
+  "Bright blue": "Ljusblå",
+  "Bright cyan": "Ljus cyan",
+  "Bright green": "Ljusgrön",
+  "Bright pink": "Ljusrosa",
+  "Bright purple": "Ljuslila",
+  "Bright red": "Ljusröd",
+  "Bring back the colours the add-on ships, with their names and order? Your own colours and your changes are lost (what another module shows for a colour is kept).": "Återställa de färger som tillägget levererar, med deras namn och ordning? Dina egna färger och dina ändringar går förlorade (det en annan modul visar för en färg behålls).",
+  "Buildings": "Byggnader",
+  "Button sounds": "Knappljud",
+  "By the time of day": "Efter tid på dygnet",
+  "Cairo": "Kairo",
+  "Calendar": "Kalender",
+  "Cancel": "Avbryt",
+  "Change PIN": "Ändra PIN-kod",
+  "Check": "Kontrollera",
+  "Check-in": "Incheckning",
+  "Choose buildings": "Välj byggnader",
+  "Close": "Stäng",
+  "Close ": "Stäng ",
+  "Colour": "Färg",
+  "Colour of the text on the board": "Färg på texten på tavlan",
+  "Colour palette": "Färgpalett",
+  "Colours": "Färger",
+  "Colours: tap a colour to change it, edit its name, drag the handle to move it. A colour you delete is taken out of every colour pick.": "Färger: tryck på en färg för att ändra den, redigera dess namn och dra i handtaget för att flytta den. En färg du tar bort tas bort ur alla färgval.",
+  "Columns": "Kolumner",
+  "Computer": "Dator",
+  "Copenhagen": "Köpenhamn",
+  "Could not save the module changes": "Det gick inte att spara ändringarna av modulerna",
+  "Current status": "Aktuell status",
+  "Cyan": "Cyan",
+  "Dark": "Mörkt",
+  "Dashboard:": "Huvudskärm:",
+  "Date, day and month": "Datum, dag och månad",
+  "Delete": "Ta bort",
+  "Delete this colour": "Ta bort den här färgen",
+  "Departments": "Avdelningar",
+  "Dismiss": "Stäng",
+  "Done": "Klar",
+  "Drag to move (or use the arrow keys)": "Dra för att flytta (eller använd piltangenterna)",
+  "Drag to move (or use the up and down arrow keys)": "Dra för att flytta (eller använd piltangenterna upp och ned)",
+  "Edit": "Redigera",
+  "Edit the colour palette": "Redigera färgpaletten",
+  "Emoji": "Emoji",
+  "English": "English",
+  "Enter the PIN": "Ange PIN-koden",
+  "Enter the PIN to open Settings": "Ange PIN-koden för att öppna Inställningar",
+  "Enter the new PIN again": "Ange den nya PIN-koden igen",
+  "Europe": "Europa",
+  "Fit": "Anpassad",
+  "Fit to screen": "Anpassa till skärmen",
+  "Global main": "Global huvudfärg",
+  "Global main colour": "Global huvudfärg",
+  "Green": "Grön",
+  "Helsinki": "Helsingfors",
+  "Hide the top bar": "Dölj översta raden",
+  "Highlight: a coloured background (off = a neutral one)": "Markera: en färgad bakgrund (av = en neutral)",
+  "Import people to pick colours for their departments and buildings.": "Importera personer för att välja färger för deras avdelningar och byggnader.",
+  "In Settings only": "Endast i Inställningar",
+  "Information": "Information",
+  "Internal error": "Internt fel",
+  "Kathmandu": "Katmandu",
+  "Kyiv": "Kiev",
+  "Language": "Språk",
+  "Large": "Stor",
+  "Larger": "Större",
+  "Largest": "Störst",
+  "Layout": "Layout",
+  "Light": "Ljust",
+  "Like the device": "Som enheten",
+  "Lisbon": "Lissabon",
+  "Log": "Logg",
+  "Max columns: dashboard": "Högst antal kolumner: huvudskärmen",
+  "Max columns: settings": "Högst antal kolumner: inställningar",
+  "Mexico City": "Mexico City",
+  "Modules": "Moduler",
+  "Modules: tick to switch on or off, drag the handle to move inside its group. The top one has priority.": "Moduler: kryssa i för att slå på eller av, dra i handtaget för att flytta inom sin grupp. Den översta har prioritet.",
+  "Moscow": "Moskva",
+  "Name": "Namn",
+  "Name of the colour": "Färgens namn",
+  "New PIN (4 to 64 characters)": "Ny PIN-kod (4 till 64 tecken)",
+  "New colour": "Ny färg",
+  "Next month": "Nästa månad",
+  "No scrolling": "Ingen rullning",
+  "No such sound": "Inget sådant ljud",
+  "Nobody to show for the chosen buildings.": "Ingen att visa för de valda byggnaderna.",
+  "None": "Ingen",
+  "Normal": "Normal",
+  "Not checked yet": "Inte kontrollerad än",
+  "Not found (or the module that answers it is off)": "Hittades inte (eller så är modulen som svarar avstängd)",
+  "Not possible (an unknown colour, not #rrggbb, one that cannot be deleted, or the palette is full)": "Inte möjligt (en okänd färg, inte #rrggbb, en som inte kan tas bort eller så är paletten full)",
+  "Nothing on file yet": "Inget inlagt än",
+  "Nothing to pick": "Inget att välja",
+  "Off": "Av",
+  "Off: anyone on your network can update or restart (install.sh --pin sets one)": "Av: vem som helst på nätverket kan uppdatera eller starta om (install.sh --pin ställer in en)",
+  "On": "På",
+  "On a wide screen the columns fill the width, so the boxes are wider": "På en bred skärm fyller kolumnerna hela bredden, så rutorna blir bredare",
+  "On the main screen": "På huvudskärmen",
+  "Open": "Öppna",
+  "Orange": "Orange",
+  "PIN": "PIN-kod",
+  "PIN refused": "PIN-koden nekades",
+  "Pick Global main for a box or a button to give it this colour": "Välj Global huvudfärg för en ruta eller en knapp för att ge den den här färgen",
+  "Pick a colour": "Välj en färg",
+  "Previous month": "Föregående månad",
+  "Purple": "Lila",
+  "Rearrange the main screen": "Ordna om huvudskärmen",
+  "Rearranging": "Ordnar om",
+  "Red": "Röd",
+  "Refreshing": "Uppdaterar",
+  "Refused: this request did not come from the page": "Nekad: den här begäran kom inte från sidan",
+  "Remove": "Ta bort",
+  "Remove the PIN?": "Ta bort PIN-koden?",
+  "Reset palette": "Återställ paletten",
+  "Restarting...": "Startar om...",
+  "Reykjavík": "Reykjavik",
+  "Rome": "Rom",
+  "Save": "Spara",
+  "Saved ✓": "Sparat ✓",
+  "Scale": "Skala",
+  "Scale content": "Skala innehållet",
+  "Search": "Sök",
+  "Select": "Välj",
+  "Set": "Ange",
+  "Set PIN": "Ange PIN-kod",
+  "Set a PIN first": "Ange en PIN-kod först",
+  "Settings": "Inställningar",
+  "Settings:": "Inställningar:",
+  "Shift": "Skift",
+  "Show or hide details": "Visa eller dölj detaljer",
+  "Skip": "Hoppa över",
+  "Small": "Liten",
+  "Sound (more: copy .wav, .mp3 or .ogg files into /opt/checkin-board/sounds)": "Ljud (fler: kopiera .wav-, .mp3- eller .ogg-filer till /opt/checkin-board/sounds)",
+  "Space": "Mellanslag",
+  "Stretch": "Utsträckt",
+  "Stretch boxes": "Sträck ut rutorna",
+  "Svenska": "Svenska",
+  "Switch modules on or off and set their priority": "Slå på eller av moduler och bestäm deras prioritet",
+  "System": "System",
+  "Tap an item to edit it, drag the handle to move it.": "Tryck på en rad för att ändra den, dra i handtaget för att flytta den.",
+  "Tehran": "Teheran",
+  "Text": "Text",
+  "Text colour": "Textfärg",
+  "Text scale": "Textskala",
+  "Text size": "Textstorlek",
+  "That colour cannot be deleted.": "Den färgen kan inte tas bort.",
+  "That date does not exist": "Det datumet finns inte",
+  "That did not start": "Det startade inte",
+  "The PIN is removed.": "PIN-koden är borttagen.",
+  "The PIN is set.": "PIN-koden är angiven.",
+  "The PIN must be 4 to 64 characters.": "PIN-koden måste vara 4 till 64 tecken.",
+  "The PIN was not changed.": "PIN-koden ändrades inte.",
+  "The bar with the building buttons, the title and the cogwheel is out of sight, so the whole screen is for the people. Move the pointer to the top edge or tap there to bring it down; it goes up again after a few seconds.": "Raden med byggnadsknapparna, titeln och kugghjulet göms, så att hela skärmen är till för personerna. För pekaren till övre kanten eller tryck där för att få ner den; den går upp igen efter några sekunder.",
+  "The dashboard keeps working without it; opening Settings and changing anything in it needs the PIN. Set a PIN first.": "Huvudskärmen fungerar som vanligt utan den; att öppna Inställningar och ändra något där kräver PIN-koden. Ange en PIN-kod först.",
+  "The hour must be 0 to 23": "Timmen måste vara 0 till 23",
+  "The hour must be 1 to 12": "Timmen måste vara 1 till 12",
+  "The main screen is made as tall as it can be without scrolling, so there is no empty space under it: the columns fill the width and the rows grow. If the page is too tall at the normal size the text is made smaller, never bigger.": "Huvudskärmen görs så hög den kan bli utan att rulla, så att det inte blir någon tom yta under den: kolumnerna fyller bredden och raderna växer. Om sidan är för hög i normal storlek görs texten mindre, aldrig större.",
+  "The main screen never scrolls: it stays as it is drawn, so people can only tap what is on the screen (use with columns, and a screen that is big enough)": "Huvudskärmen rullar aldrig: den står still som den ritas, så att man bara kan trycka på det som syns (använd med kolumner och en tillräckligt stor skärm)",
+  "The minutes must be 0 to 59": "Minuterna måste vara 0 till 59",
+  "The new order was not saved.": "Den nya ordningen sparades inte.",
+  "The new places were not saved.": "De nya platserna sparades inte.",
+  "The palette is full.": "Paletten är full.",
+  "The rows and the spacing of a stretched box grow with it, so the box is taller too. The text keeps its size (see Text).": "Raderna och avstånden i en utsträckt ruta växer med den, så rutan blir också högre. Texten behåller sin storlek (se Text).",
+  "The time must be tt:mm, for example 08:30": "Tiden måste vara tt:mm, till exempel 08:30",
+  "The two PINs are not the same.": "De två PIN-koderna är inte lika.",
+  "Theme": "Tema",
+  "This action needs the PIN": "Den här åtgärden kräver PIN-koden",
+  "This computer's own time zone": "Datorns egen tidszon",
+  "Time zone": "Tidszon",
+  "Time, hour and minute": "Tid, timme och minut",
+  "Too many": "För många",
+  "Top bar hidden": "Översta raden dold",
+  "Type a date, a time or both (or press Skip)": "Skriv ett datum, en tid eller båda (eller tryck på Hoppa över)",
+  "Type the date as åååå-mm-dd, for example 2026-12-24": "Skriv datumet som åååå-mm-dd, till exempel 2026-12-24",
+  "Type the date as åååå-mm-dd, for example 2026-12-24 (or leave it empty to skip it)": "Skriv datumet som åååå-mm-dd, till exempel 2026-12-24 (eller lämna det tomt för att hoppa över det)",
+  "Type the day and the month, for example 0107 for 1 July": "Skriv dag och månad, till exempel 0107 för 1 juli",
+  "Type the day and the month, for example 0107 for 1 July (or clear the date to skip it)": "Skriv dag och månad, till exempel 0107 för 1 juli (eller rensa datumet för att hoppa över det)",
+  "Type the time as tt:mm, for example 08:30": "Skriv tiden som tt:mm, till exempel 08:30",
+  "Type the time as tt:mm, for example 08:30 (or leave it empty to skip it)": "Skriv tiden som tt:mm, till exempel 08:30 (eller lämna den tom för att hoppa över den)",
+  "Type the time, for example 0830": "Skriv tiden, till exempel 0830",
+  "UTC": "UTC",
+  "Unknown host name": "Okänt värdnamn",
+  "Unknown language": "Okänt språk",
+  "Until which date and / or time? (leave one out to skip it)": "Till vilket datum och / eller vilken tid? (lämna det ena tomt för att hoppa över det)",
+  "Until which date?": "Till vilket datum?",
+  "Volume": "Volym",
+  "Warsaw": "Warszawa",
+  "What is it?": "Vad är det?",
+  "White": "Vit",
+  "Working...": "Arbetar...",
+  "Wrong PIN": "Fel PIN-kod",
+  "Wrong PIN, try again": "Fel PIN-kod, försök igen",
+  "Yellow": "Gul",
+  "not set": "inte vald",
+  "off": "av",
+  "on": "på",
+  "unknown": "okänd"
+ },
+ "patterns": [
+  [
+   "^Edit (.+)$",
+   "Redigera $1"
+  ],
+  [
+   "^Edit: (.+)$",
+   "Redigera: $1"
+  ],
+  [
+   "^Open (.+)$",
+   "Öppna $1"
+  ],
+  [
+   "^Move (.+): drag, or use the up and down arrow keys$",
+   "Flytta $1: dra eller använd piltangenterna upp och ned"
+  ],
+  [
+   "^Move (.+): drag, or use the arrow keys$",
+   "Flytta $1: dra eller använd piltangenterna"
+  ],
+  [
+   "^Colour of (.+)$",
+   "Färg för $1"
+  ],
+  [
+   "^Back to the default colour of (.+)$",
+   "Tillbaka till standardfärgen för $1"
+  ],
+  [
+   "^Delete (.+)$",
+   "Ta bort $1"
+  ],
+  [
+   "^Delete the colour (.+)\\? Whatever uses it goes back to its default colour\\.$",
+   "Ta bort färgen $1? Allt som använder den går tillbaka till sin standardfärg."
+  ],
+  [
+   "^Colour: (.+)$",
+   "Färg: $1"
+  ],
+  [
+   "^(.+): highlight with a coloured background$",
+   "$1: markera med en färgad bakgrund"
+  ],
+  [
+   "^Up to 1 column$",
+   "Högst 1 kolumn"
+  ],
+  [
+   "^Up to (\\d+) columns$",
+   "Högst $1 kolumner"
+  ],
+  [
+   "^Text size (.+)× · (.+)$",
+   "Textstorlek $1× · $2"
+  ],
+  [
+   "^Text size (.+)×$",
+   "Textstorlek $1×"
+  ],
+  [
+   "^(.+) · volume (\\d+)%$",
+   "$1 · volym $2 %"
+  ],
+  [
+   "^(\\d+) colours$",
+   "$1 färger"
+  ],
+  [
+   "^(.+) \\(UTC(.*) now\\)$",
+   "$1 (UTC$2 nu)"
+  ],
+  [
+   "^(.+), (UTC.*) now \\(summer and winter time follow the zone\\)$",
+   "$1, $2 nu (sommar- och vintertid följer zonen)"
+  ],
+  [
+   "^This computer's own time zone, (.+) now$",
+   "Datorns egen tidszon, $1 nu"
+  ],
+  [
+   "^This computer's own time zone \\((.+) now\\)$",
+   "Datorns egen tidszon ($1 nu)"
+  ],
+  [
+   "^(.+) is not known on this computer: its own time zone is used$",
+   "$1 är okänd på den här datorn: datorns egen tidszon används"
+  ],
+  [
+   "^Status for (.+)$",
+   "Status för $1"
+  ],
+  [
+   "^(.+): in, open the status menu$",
+   "$1: incheckad, öppna statusmenyn"
+  ],
+  [
+   "^(.+): out, open the status menu$",
+   "$1: utcheckad, öppna statusmenyn"
+  ],
+  [
+   "^(.+): (.+), open the status menu$",
+   "$1: $2, öppna statusmenyn"
+  ],
+  [
+   "^(.+): checked in, tap to check out$",
+   "$1: incheckad, tryck för att checka ut"
+  ],
+  [
+   "^(.+): checked out, tap to check in$",
+   "$1: utcheckad, tryck för att checka in"
+  ],
+  [
+   "^Emoji group (\\d+)$",
+   "Emojigrupp $1"
+  ],
+  [
+   "^Could not load: (.+)$",
+   "Kunde inte laddas: $1"
+  ],
+  [
+   "^Module (.+) is not loaded: (.+)$",
+   "Modulen $1 är inte laddad: $2"
+  ],
+  [
+   "^Photo of (.+)$",
+   "Foto av $1"
+  ],
+  [
+   "^(.+): date$",
+   "$1: datum"
+  ],
+  [
+   "^(.+): time$",
+   "$1: tid"
+  ],
+  [
+   "^Bad request: (.+)$",
+   "Felaktig begäran: $1"
+  ],
+  [
+   "^Too many wrong PINs, try again in (\\d+) seconds$",
+   "För många felaktiga PIN-koder, försök igen om $1 sekunder"
+  ],
+  [
+   "^(.+): (.+)$",
+   "$1: $2"
+  ]
+ ]
+}

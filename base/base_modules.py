@@ -502,6 +502,30 @@ def listing():
     return out
 
 
+def lang_files(code):
+    """The translation files for a language, base first, then the installed modules in picker order: lang_<code>.json, {"strings": {English: text},
+    "patterns": [[regex, template]]} (the page's tr() in page.js uses them; a module only translates its own texts)."""
+    files = [os.path.join(os.path.dirname(os.path.abspath(core.__file__)), "lang_%s.json" % code)]
+    files += [os.path.join(core.MODULES_DIR, name, "lang_%s.json" % code) for name in core.module_names()]      # every installed module: a module that is off still has its row in the Modules menu
+    return [f for f in files if os.path.exists(f)]
+
+
+def lang_dictionary(code):
+    """{"strings": {...}, "patterns": [...]} merged from lang_files(code) ({} strings and no patterns for a language without files, as English)."""
+    out = {"strings": {}, "patterns": []}
+    for path in lang_files(code):
+        try:
+            data = json.loads(_read(path))
+        except ValueError as e:
+            sys.stderr.write("%s: %s\n" % (path, e))
+            continue
+        if isinstance(data.get("strings"), dict):
+            out["strings"].update(dict((k, v) for k, v in data["strings"].items() if isinstance(k, str) and isinstance(v, str)))
+        if isinstance(data.get("patterns"), list):
+            out["patterns"] += [p for p in data["patterns"] if isinstance(p, list) and len(p) == 2 and all(isinstance(x, str) for x in p)]
+    return out
+
+
 def page_parts():
     """{"css": text, "js": text} of the loaded modules, in picker order: their page.css and page.js (a module only needs
     them for what the standard widgets can't do: custom widgets, hooks, a background). The page of a background module

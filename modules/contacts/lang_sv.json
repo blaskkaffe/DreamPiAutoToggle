@@ -1,0 +1,94 @@
+{
+ "strings": {
+  "A person needs a name": "En person behöver ett namn",
+  "Building": "Byggnad",
+  "CSV file": "CSV-fil",
+  "CSV text": "CSV-text",
+  "Choose a file or paste some text first": "Välj en fil eller klistra in text först",
+  "Choose file": "Välj fil",
+  "Choose photo": "Välj foto",
+  "Columns: name, department, role, phone, location, restrictToLocation. A line that starts with # is ignored. Location is the building or area.": "Kolumner: name, department, role, phone, location, restrictToLocation (rubriker som namn, avdelning och telefon fungerar också). En rad som börjar med # hoppas över. Location är byggnaden eller området.",
+  "Contacts": "Kontakter",
+  "Deleted": "Borttagen",
+  "Department": "Avdelning",
+  "Download": "Ladda ner",
+  "Export": "Exportera",
+  "Import": "Importera",
+  "Importing...": "Importerar...",
+  "No file chosen": "Ingen fil vald",
+  "No people yet: import a CSV file.": "Inga personer än: importera en CSV-fil.",
+  "No photo": "Inget foto",
+  "Nothing to change": "Inget att ändra",
+  "Only show on the board when this building is chosen": "Visa bara på tavlan när den här byggnaden är vald",
+  "Paste CSV here, or choose a file": "Klistra in CSV här eller välj en fil",
+  "People": "Personer",
+  "Phone": "Telefon",
+  "Remove photo": "Ta bort foto",
+  "Role": "Roll",
+  "Saved": "Sparat",
+  "Somebody else already has that name in that department and building": "Någon annan har redan det namnet på den avdelningen och byggnaden",
+  "Switch off people that are not in the file": "Stäng av personer som inte finns i filen",
+  "Tap a person to edit them, drag the handle to move them inside their department (the order of the rows on the board). The switch takes a person off the board.": "Tryck på en person för att ändra dem, dra i handtaget för att flytta dem inom sin avdelning (ordningen på raderna på tavlan). Reglaget tar bort en person från tavlan.",
+  "That did not work": "Det fungerade inte",
+  "That file is not a picture": "Den filen är ingen bild",
+  "That is not a CSV file": "Det där är ingen CSV-fil",
+  "That is not a photo": "Det där är inget foto",
+  "The current people as a CSV file": "De nuvarande personerna som en CSV-fil",
+  "The import did not work": "Importen fungerade inte",
+  "The people: import a CSV (name, department, role, phone, location) that the check-in board is built from.": "Personerna: importera en CSV (name, department, role, phone, location) som incheckningstavlan byggs av.",
+  "The photo must be a JPEG or PNG": "Fotot måste vara en JPEG eller PNG",
+  "The photo must be a small JPEG or PNG": "Fotot måste vara en liten JPEG eller PNG",
+  "The photo was not saved": "Fotot sparades inte",
+  "Unknown person": "Okänd person"
+ },
+ "patterns": [
+  [
+   "^Delete (.+)\\? This can't be undone\\.$",
+   "Ta bort $1? Det går inte att ångra."
+  ],
+  [
+   "^(\\d+) on the board, (\\d+) switched off$",
+   "$1 på tavlan, $2 avstängda"
+  ],
+  [
+   "^(\\d+) on the board$",
+   "$1 på tavlan"
+  ],
+  [
+   "^Imported: (\\d+) new, (\\d+) changed, (\\d+) unchanged(.*)$",
+   "Importerat: $1 nya, $2 ändrade, $3 oförändrade$4"
+  ],
+  [
+   "^, (\\d+) switched off(.*)$",
+   ", $1 avstängda$2"
+  ],
+  [
+   "^, (\\d+) rows? without a name skipped$",
+   ", $1 rader utan namn hoppades över"
+  ],
+  [
+   "^(\\d+) people in (\\d+) departments? and (\\d+) buildings?(.*)$",
+   "$1 {1?person:personer} på $2 {2?avdelning:avdelningar} och $3 {3?byggnad:byggnader}$4"
+  ],
+  [
+   "^(\\d+) people in (\\d+) departments?(.*)$",
+   "$1 {1?person:personer} på $2 {2?avdelning:avdelningar}$3"
+  ],
+  [
+   "^ ?\\((\\d+) switched off\\)$",
+   " ($1 avstängda)"
+  ],
+  [
+   "^The first line must name the columns, and one of them must be \\\"name\\\" \\((.+)\\)$",
+   "Första raden måste ange kolumnerna och en av dem måste vara \"name\" ($1)"
+  ],
+  [
+   "^Too many people \\(at most (\\d+)\\)$",
+   "För många personer (högst $1)"
+  ],
+  [
+   "^(.+) / (.+)$",
+   "$1 / $2"
+  ]
+ ]
+}

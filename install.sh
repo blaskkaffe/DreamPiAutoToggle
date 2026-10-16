@@ -59,7 +59,7 @@ fi
 
 mkdir -p "$DEST"
 chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
-cp "$SRC"/base/base_*.py "$SRC/base/layout.json" "$SRC/project.json" "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$SRC/diagnose-network.sh" "$DEST/"
+cp "$SRC"/base/base_*.py "$SRC"/base/lang_*.json "$SRC/base/layout.json" "$SRC/project.json" "$SRC/uninstall.sh" "$SRC/wifi-powersave-off.sh" "$SRC/diagnose-network.sh" "$DEST/"
 mkdir -p "$DEST/page" "$DEST/kiosk"
 cp "$SRC"/base/page/index.html "$SRC"/base/page/page.css "$SRC"/base/page/page.js "$SRC"/base/page/widgets.js "$SRC"/base/page/boot.js "$DEST/page/"
 cp "$SRC"/kiosk/* "$DEST/kiosk/"

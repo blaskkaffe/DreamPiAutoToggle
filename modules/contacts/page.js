@@ -24,7 +24,7 @@ custom("contacts-people",function(host){var key="",box=host.querySelector(".cpeo
   '<input type="file" accept="image/*" class="cfilepick" data-photo="1" hidden aria-label="Photo of '+esc(p.name)+'"></div></div>'+FIELDS.map(function(f){return '<label class="rp-nl">'+f[1]+'<input class="rp-big" type="'+f[2]+'" data-f="'+f[0]+'" value="'+esc(p[f[0]]||"")+'" maxlength="80"></label>'}).join("")+
   '<label class="rp-nl rp-chk"><input type="checkbox" class="cbox neutral" data-f="restrictToLocation"'+(p.restrict?" checked":"")+'> Only show on the board when this building is chosen</label>'+
   '<div class="rp-cmsg sub" aria-live="polite"></div><div class="rp-nb rp-nb3"><button type="button" class="pill-s danger rp-so" data-del="1">Delete</button><button type="button" class="pill-s rp-so" data-close="1">Cancel</button><button type="button" class="pill-s pri rp-so c-green" data-save="1">Save</button></div></div>';
-  modal.style.display="";var f0=modal.querySelector("input");if(f0&&f0.focus)f0.focus();
+  trDom(modal);modal.style.display="";var f0=modal.querySelector("input");if(f0&&f0.focus)f0.focus();
   modal._id=p.id}
  // Delete: asks first in a pop-up, then removes the person (and their photo) for good
  function del(b){var name=modal.querySelector(".rp-wn").textContent;
@@ -55,7 +55,7 @@ custom("contacts-people",function(host){var key="",box=host.querySelector(".cpeo
  // board", a tap on a person to edit them. The list is grouped by department; a handle moves a person inside their department.
  var ed=orderEditor(box,{title:"People",help:"Tap a person to edit them, drag the handle to move them inside their department (the order of the rows on the board). The switch takes a person off the board.",
   sub:function(l){var on=l.filter(function(p){return p.active}).length;return on+" on the board"+(on===l.length?"":", "+(l.length-on)+" switched off")},
-  item:function(p){var tg=build({type:"toggle",bind:p.active,post:"/contacts/active",body:{id:p.id},label:p.title+" on the board"},{saved:function(){reloadData("contacts")}});
+  idOf:function(p){return p.id},item:function(p){var tg=build({type:"toggle",bind:p.active,post:"/contacts/active",body:{id:p.id},label:p.title+" on the board"},{saved:function(){reloadData("contacts")}});
    return {id:p.id,title:p.title,sub:p.tag,group:p.department,control:tg}},
   onEdit:edit,onOrder:function(ids){post("/contacts/order",{order:ids},function(r){if(r){reloadData("contacts");refresh()}})}});
  bind("@contacts.people",function(list){list=list||[];var k=JSON.stringify(list);if(k===key)return;key=k;list0=list;

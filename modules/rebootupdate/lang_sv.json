@@ -1,0 +1,87 @@
+{
+ "strings": {
+  "An update is already running": "En uppdatering pågår redan",
+  "Check": "Kontrollera",
+  "Checking...": "Kontrollerar...",
+  "Couldn't tell if the add-on is current.": "Kunde inte avgöra om tillägget är aktuellt.",
+  "Install from USB": "Installera från USB",
+  "Install the update from the USB stick now? The page is unavailable for a few seconds.": "Installera uppdateringen från USB-minnet nu? Sidan är otillgänglig i några sekunder.",
+  "No USB stick with an update folder was found": "Inget USB-minne med en uppdateringsmapp hittades",
+  "Not checked yet": "Inte kontrollerad än",
+  "Reboot": "Starta om",
+  "Reboot and Update": "Starta om och uppdatera",
+  "Reboot the computer now? The boards are back in about a minute.": "Starta om datorn nu? Tavlorna är tillbaka om ungefär en minut.",
+  "Restarts the computer": "Startar om datorn",
+  "The add-on was updated.": "Tillägget uppdaterades.",
+  "The update failed. Details below.": "Uppdateringen misslyckades. Detaljer nedan.",
+  "This install can't update itself (no git checkout recorded): use the update guide": "Den här installationen kan inte uppdatera sig själv (ingen git-kopia registrerad): använd uppdateringsguiden",
+  "This install doesn't know which commit it came from, so it can't tell if it is current.": "Den här installationen vet inte vilken commit den kommer från, så den kan inte avgöra om den är aktuell.",
+  "This install has changes that are not on GitHub as well as missing updates.": "Den här installationen har ändringar som inte finns på GitHub och saknar dessutom uppdateringar.",
+  "This install's commit isn't on GitHub (local changes), so it can't be compared.": "Den här installationens commit finns inte på GitHub (lokala ändringar), så den kan inte jämföras.",
+  "Update from a USB stick": "Uppdatera från ett USB-minne",
+  "Update log": "Uppdateringslogg",
+  "Update now": "Uppdatera nu",
+  "Update started": "Uppdateringen startade",
+  "Update the add-on": "Uppdatera tillägget",
+  "Update the add-on from GitHub and reboot the computer.": "Uppdatera tillägget från GitHub och starta om datorn.",
+  "Update the add-on now? It is fetched from GitHub and installed; this page is unavailable for a few seconds.": "Uppdatera tillägget nu? Det hämtas från GitHub och installeras; sidan är otillgänglig i några sekunder.",
+  "Updates": "Uppdateringar",
+  "Updating... the page is unavailable for a few seconds while the services restart.": "Uppdaterar... sidan är otillgänglig i några sekunder medan tjänsterna startar om.",
+  "the checkout's git origin changed since the add-on was installed (run install.sh by hand to accept it)": "kopians git-ursprung har ändrats sedan tillägget installerades (kör install.sh för hand för att godkänna det)",
+  "the checkout's git origin isn't a GitHub address": "kopians git-ursprung är inte en GitHub-adress"
+ },
+ "patterns": [
+  [
+   "^A newer add-on version is available: (.+?)(?: \\((\\d{4}-\\d\\d-\\d\\d)\\))?, (\\d+) new changes?\\. You have (.+)\\.(.*)$",
+   "En nyare version av tillägget finns: $1 ($2), $3 {3?ny ändring:nya ändringar}. Du har $4.$5"
+  ],
+  [
+   "^A newer add-on version is available: (.+?) \\((\\d{4}-\\d\\d-\\d\\d)\\)\\. You have (.+)\\.(.*)$",
+   "En nyare version av tillägget finns: $1 ($2). Du har $3.$4"
+  ],
+  [
+   "^A newer add-on version is available: (.+?), (\\d+) new changes?\\. You have (.+)\\.(.*)$",
+   "En nyare version av tillägget finns: $1, $2 {2?ny ändring:nya ändringar}. Du har $3.$4"
+  ],
+  [
+   "^A newer add-on version is available: (.+?)\\. You have (.+)\\.(.*)$",
+   "En nyare version av tillägget finns: $1. Du har $2.$3"
+  ],
+  [
+   "^Up to date \\((.+?)\\)\\.(.*)$",
+   "Aktuell ($1).$2"
+  ],
+  [
+   "^This install is ahead of (.+) on GitHub\\.$",
+   "Den här installationen ligger före $1 på GitHub."
+  ],
+  [
+   "^Fetches the new version from GitHub and installs it \\((.+) branch\\)\\. Settings are kept\\.$",
+   "Hämtar den nya versionen från GitHub och installerar den (grenen $1). Inställningarna behålls."
+  ],
+  [
+   "^The update folder on the USB stick (.*) \\((.+), files from (.+)\\)\\. Installs it and keeps the settings\\.$",
+   "Uppdateringsmappen på USB-minnet $1 ($2, filer från $3). Installerar den och behåller inställningarna."
+  ],
+  [
+   "^USB update (.+)$",
+   "USB-uppdatering $1"
+  ],
+  [
+   "^Could not reboot \\((.+)\\)$",
+   "Det gick inte att starta om ($1)"
+  ],
+  [
+   "^Couldn't reach GitHub \\((.+)\\)$",
+   "Kunde inte nå GitHub ($1)"
+  ],
+  [
+   "^Update refused: (.+)$",
+   "Uppdateringen nekades: $1"
+  ],
+  [
+   "^Could not start the update \\((.+)\\)$",
+   "Det gick inte att starta uppdateringen ($1)"
+  ]
+ ]
+}

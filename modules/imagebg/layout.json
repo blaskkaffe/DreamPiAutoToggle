@@ -18,14 +18,14 @@
      "post": "/imagebg",
      "fields": [
       {
-       "title": "Fit",
+       "title": "Picture fit",
        "sub_text": "fit",
        "controls": [
         {
          "type": "choice",
          "key": "fit",
          "options": "fits",
-         "label": "Fit"
+         "label": "Picture fit"
         }
        ],
        "nosum": true

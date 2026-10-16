@@ -60,6 +60,8 @@ def sandbox(*modules):
                 setattr(mod, name, tmp + val[len(base):])
             elif val.startswith("/tmp/checkin-board"):
                 setattr(mod, name, os.path.join(tmp, os.path.basename(val)))
+    with open(core.LANGUAGE, "w") as f:           # the tests read English texts (a new install is Swedish: project.json); a test of Swedish chooses it itself
+        f.write("en\n")
     return tmp
 
 

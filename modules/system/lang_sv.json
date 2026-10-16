@@ -1,0 +1,14 @@
+{
+ "strings": {
+  "Add-on": "Tillägg",
+  "Address": "Adress",
+  "Computer": "Dator",
+  "GitHub": "GitHub",
+  "Open the project on GitHub": "Öppna projektet på GitHub",
+  "Source, instructions and updates": "Källkod, instruktioner och uppdateringar",
+  "System": "System",
+  "Versions of the add-on and the computer, the time zone, PIN and a link to the project (always on).": "Versioner av tillägget och datorn, tidszon, PIN-kod och en länk till projektet (alltid på).",
+  "unknown": "okänd"
+ },
+ "patterns": []
+}

@@ -170,7 +170,7 @@ class WithEverything(Base):
         lay = layout_of(self.page())
         appearance = [b for b in lay["settings"] if b["id"] == "appearance"][0]
         menus = dict((w["id"], w) for w in appearance["items"] if w["type"] == "menu")
-        self.assertEqual([w.get("id") or w["type"] for w in appearance["items"]], ["form", "layout", "row", "row", "text", "form", "colours", "background"])      # the order of the user's list
+        self.assertEqual([w.get("id") or w["type"] for w in appearance["items"]], ["form", "form", "layout", "row", "row", "text", "form", "colours", "background"])      # the order of the user's list
         self.assertEqual([w["type"] for w in menus["colours"]["items"]], ["palette", "row", "row"])                  # the palette, Global main colour (base), Check-in board colour (check-in)
         self.assertEqual(menus["colours"]["items"][2]["mod"], "checkin")
         bg = menus["background"]["items"]

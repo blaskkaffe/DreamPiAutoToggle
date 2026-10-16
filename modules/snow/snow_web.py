@@ -9,7 +9,7 @@ import os
 import base_core as core
 
 SNOW_CONFIG = os.path.join(core.BASE_DIR, "snow.json")
-AMOUNTS = [("light", "Light"), ("normal", "Normal"), ("heavy", "Heavy"), ("blizzard", "Blizzard")]
+AMOUNTS = [("light", "Light snow"), ("normal", "Normal snow"), ("heavy", "Heavy snow"), ("blizzard", "Blizzard")]
 WINDS = [("calm", "Calm"), ("breeze", "Breeze"), ("storm", "Storm")]
 FOGS = [("none", "No fog"), ("light", "Light fog"), ("thick", "Thick fog")]
 TIMES = [("follow", "Follows the time zone"), ("day", "Always day"), ("night", "Always night")]

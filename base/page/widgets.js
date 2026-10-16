@@ -11,12 +11,13 @@ function isBind(v){return typeof v==="string"&&v.charAt(0)==="@"}
 function val(v){return isBind(v)?getPath(S,v.slice(1)):v}
 // bind(v, apply): apply(value) now, and again whenever S is refreshed and the value is a binding (apply decides if anything changed)
 function bind(v,apply){if(v===undefined)return;apply(val(v));if(isBind(v))UPD.push(function(){apply(val(v))})}
+function TN(t){return document.createTextNode(tr(String(t==null?"":t)))}      // a text node in the language of the page
 function h(tag,attrs,kids){var el=document.createElement(tag),k;
  for(k in (attrs||{})){var v=attrs[k];if(v===undefined||v===null)continue;
-  if(k==="class")el.className=v;else if(k==="text")el.textContent=v;else if(k==="html")el.innerHTML=v;
-  else if(k.slice(0,2)==="on")el[k]=v;else el.setAttribute(k,v)}
+  if(k==="class")el.className=v;else if(k==="text")el.textContent=tr(v);else if(k==="html"){el.innerHTML=v;trDom(el)}
+  else if(k.slice(0,2)==="on")el[k]=v;else el.setAttribute(k,k==="title"||k==="aria-label"||k==="placeholder"||k==="alt"?tr(v):v)}
  (kids||[]).forEach(function(c){if(c)el.appendChild(c)});return el}
-function lines(t){return esc(t==null?"":t).replace(/\n/g,"<br>")}
+function lines(t){return esc(t==null?"":tr(String(t))).replace(/\n/g,"<br>")}
 function setLines(el,t){setHtml(el,lines(t))}
 function sh(el,show){setStyle(el,"display",show?"":"none")}
 // A colour reference: a palette id ("orange"), one of the module's own colour keys ("main") or "module.key" of another module
@@ -60,7 +61,7 @@ function buildAll(list,ctx){return(list||[]).map(function(w){return build(w,ctx)
 function box(section,b){var ctx={mod:b.mods[0],box:b.id,saved:function(){}},items=b.items;
  if(section==="settings"){
   var saved=h("span",{"class":"saved",text:"Saved ✓"}),
-   tt=h("span"),head=b.title?h("h2",{},[tt,document.createTextNode(" "),saved]):null,
+   tt=h("span"),head=b.title?h("h2",{},[tt,TN(" "),saved]):null,
    card=h("div",{"class":"card"}),sec=h("section",{"class":"sec","data-box":b.id,"data-mod":b.mods[0]},[head,card]);
   bind(b.title,function(t){setText(tt,t==null?"":t)});
   ctx.saved=function(){saved.classList.add("show");setTimeout(function(){saved.classList.remove("show")},1200)};
@@ -126,7 +127,7 @@ W.row=function(s,ctx){var title=h("span"),sub=h("span",{"class":"sub"}),left=h("
  // what a menu shows of this row in its subtitle: a switch that is on gives its short name ("short", else the title); a module's switch says on or off
  var tg=s.control&&s.control.type==="toggle"?s.control:null;
  if(tg)el._sum=function(){var v=tg.module?val("@enabled."+tg.module):val(tg.bind),name=s.short||val(s.title)||"";
-  return tg.module?name+(v?" on":" off"):(v?name:(s.short_off||""))};
+  return tg.module?tr(name)+" "+tr(v?"on":"off"):(v?tr(name):(s.short_off||""))};
  if(s.below)el.appendChild(h("div",{"class":"below"},buildAll(s.below.map(function(w){return Object.assign({mod:s.mod},w)}),ctx)));return el};
 W.link=function(s){var el=h("a",{"class":"pill-s",href:s.href,target:"_blank",rel:"noopener noreferrer"});
  bind(s.label,function(t){setText(el,t)});if(s.aria)el.setAttribute("aria-label",s.aria);return el};
@@ -168,7 +169,7 @@ W.pinset=function(s,ctx){var set=h("button",{type:"button","class":"pill-s",text
   else alert(st===400?"The PIN must be 4 to 64 characters.":"The PIN was not changed.")})})}
  set.onclick=function(e){e.stopPropagation();choosePin(function(){alert("The PIN is set.");ctx.saved()})};
  rem.onclick=function(e){e.stopPropagation();if(confirm("Remove the PIN?"))send("","The PIN is removed.")};
- function paint(){var has=!!(S.settings_pin&&S.settings_pin.pin);set.textContent=has?"Change PIN":"Set PIN";sh(rem,has)}
+ function paint(){var has=!!(S.settings_pin&&S.settings_pin.pin);set.textContent=tr(has?"Change PIN":"Set PIN");sh(rem,has)}
  UPD.push(paint);paint();return el};
 // "palette": the colour palette editor (Settings > Appearance): a row with an Edit button; its pop-up lists the palette, one row per colour: a handle (drag to move),
 // the colour (tap to change it), its name, Default (a changed colour of the add-on) and Delete. Add colour and Reset palette are under the list. Saved as it is done;
@@ -207,7 +208,7 @@ W.palette=function(s,ctx){var r=editRow({title:"Colour palette",button:"Edit",ar
  UPD.push(function(){if(PV!==lastPV){lastPV=PV;if(!list.contains(document.activeElement)&&!list.classList.contains("dragging"))load()}});
  load();return el};
 W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.look||"neutral"),"aria-label":s.label||""}),el=box;
- if(s.text){el=h("label",{"class":"sub tgl"},[box,document.createTextNode(s.text)])}
+ if(s.text){el=h("label",{"class":"sub tgl"},[box,TN(s.text)])}
  if(s.colour)colourClass(box,s.colour,s.mod);
  if(s.local){S._local[s.local]=s["default"]!==false;box.checked=S._local[s.local];box.onchange=function(){S._local[s.local]=box.checked;engineUpdate()};return el}
  if(s.module){bind("@enabled."+s.module,function(v){box.checked=!!v});         // switches a whole module on or off (POST /modules), then the page is built again
@@ -230,7 +231,7 @@ W.menu=function(s,ctx){var key="menu:"+(s.id||s.title),open=false,title=h("span"
  function paintSub(){var parts=[];kids.forEach(function(k){if(k._sum&&k.style.display!=="none"){var t=k._sum();if(t)parts.push(t)}});
   var t=parts.join(" \u00b7 ");setText(sub,t);sh(sub,!!t);
   var any=kids.some(function(k){return k.style.display!=="none"});sh(el,any)}
- function paint(){sh(body,open);btn.textContent=open?"Close":"Edit";btn.setAttribute("aria-expanded",open?"true":"false");el.classList.toggle("open",open)}
+ function paint(){sh(body,open);btn.textContent=tr(open?"Close":"Edit");btn.setAttribute("aria-expanded",open?"true":"false");el.classList.toggle("open",open)}
  btn.onclick=function(e){e.stopPropagation();open=!open;try{sessionStorage.setItem(key,open?"1":"0")}catch(x){}paint()};
  head.addEventListener("click",function(e){if(e.target===btn||btn.contains(e.target))return;btn.click()});
  head.style.cursor="pointer";UPD.push(paintSub);paint();paintSub();return el};
@@ -452,8 +453,8 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
  pop.appendChild(msg);pop.appendChild(h("div",{"class":"bar end"},[go]));
  var inner=h("div"),p;el.appendChild(inner);el.appendChild(pop);p=ui.popup(pop);
  function compactRow(it){var R=s.row,tag=R.tag?it[R.tag]:"",c=h("span",{"class":"pw",text:tag}),title=it[R.title||"title"],
-  tn=R.href&&it[R.href]?h("a",{href:it[R.href],target:"_blank",rel:"noopener noreferrer",text:title}):document.createTextNode(title),
-  t=h("span",{"class":"pn"},s.style==="compact"?[marquee(tn),h("span",{"class":"pg"},[marquee(document.createTextNode(it[R.sub||"sub"]||""))])]
+  tn=R.href&&it[R.href]?h("a",{href:it[R.href],target:"_blank",rel:"noopener noreferrer",text:title}):TN(title),
+  t=h("span",{"class":"pn"},s.style==="compact"?[marquee(tn),h("span",{"class":"pg"},[marquee(TN(it[R.sub||"sub"]||""))])]
    :[tn,h("span",{"class":"pg",text:it[R.sub||"sub"]||""})]);      // long names scroll (not in the grid style, its pairs are short)
   if(R.tag_colour&&it[R.tag_colour]){var id=colourId(it[R.tag_colour],s.mod);if(id)c.style.color="var(--c-"+id+"-l)"}
   var kids=[R.lead?h("span",{"class":"pl"},[h("span",{text:it[R.lead]||""}),h("b",{text:it[R.lead_big]||""})]):null,t,R.tag?c:null],ic=R.icon;
@@ -470,7 +471,7 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
   title=extra?it.title:it[s.row.title||"title"],b=h("button",{type:"button","class":"pill-s",text:extra?it.button:(s.row.button||"Select"),"aria-label":(extra?it.button:(s.row.button||"Select"))+" "+title});
   var item=extra?it.item:it;
   b.onclick=function(e){open(item,b,e)};
-  return h("div",{"class":"srow"},[h("span",{},[document.createTextNode(title),info?h("span",{"class":"sub",text:info}):null]),b])}
+  return h("div",{"class":"srow"},[h("span",{},[TN(title),info?h("span",{"class":"sub",text:info}):null]),b])}
  function open(it,b,e){if(p.isOpen()&&p.anchor===b){p.close();return}cur=it;
   setText(popT,((it.other&&P.title_other)||P.title||"").replace(/\{(\w+)\}/g,function(m,k){return it[k]!=null?it[k]:""}));setText(msg,"");
   var first=null;fields.forEach(function(x){var f=x.f,showIt=!f.show_if||!!it[f.show_if];x.el.style.display=showIt?"block":"none";
@@ -495,7 +496,7 @@ W.list=function(s,ctx){var el=h("div",{"class":"wlist"+(s.style==="compact"?" co
 // ---- the standard "edit row": the title and a grey line on the left, a small button on the right (Edit, Add ...), and - once there is
 // something to show - a list of tags underneath. Forms, the phone number table and the colour picks all use this one look.
 //   r.el the row   r.btn the button   r.setSub(text)   r.setList(items, onRemove(i))   (an empty or missing list takes no room)
-function editRow(o){var sub=h("span",{"class":"sub"}),title=document.createTextNode(o.title||""),
+function editRow(o){var sub=h("span",{"class":"sub"}),title=TN(o.title||""),
  btn=h("button",{type:"button","class":"pill-s",text:o.button||"Edit"}),btn2=o.button2?h("button",{type:"button","class":"pill-s",text:o.button2}):null,
  below=h("div",{"class":"below"}),left=h("span",{},[title,sub]),
  row=h("div",{"class":"srow wrap edit"},[left,btn2?h("span",{"class":"btns"},[btn,btn2]):btn,below]);
@@ -513,7 +514,7 @@ function editRow(o){var sub=h("span",{"class":"sub"}),title=document.createTextN
   setList:function(items,onRemove){below.innerHTML="";items=items||[];sh(below,items.length>0);if(!items.length)return;below.appendChild(tagList(items,onRemove))}}}
 // the tags of a list (phone numbers, messages): with onRemove(i) each has a remove button, without it they are only shown
 function tagList(items,onRemove){var tags=h("div",{"class":"tags"});
- items.forEach(function(it,i){var t=h("span",{"class":"tag"},[document.createTextNode(it)]);
+ items.forEach(function(it,i){var t=h("span",{"class":"tag"},[TN(it)]);
   if(onRemove){var x=h("button",{type:"button","aria-label":"Remove "+it,html:"&#10005;"});x.onclick=function(e){e.stopPropagation();onRemove(i)};t.appendChild(x)}
   else t.style.paddingRight="12px";
   tags.appendChild(t)});return tags}
@@ -572,7 +573,7 @@ W.picker=function(s,ctx){var el=h("div",{"class":"wpicker"}),cfg=null,timer=null
  function paintChoices(g){choices.innerHTML="";sh(choices,!!g.choices);if(!g.choices)return;
   var q=inp.value.toLowerCase(),shown=0;
   g.choices.forEach(function(c){if(g.items.indexOf(c.value)>=0||(q&&(c.label+" "+c.value).toLowerCase().indexOf(q)<0)||(!q&&g.initial&&!c.now))return;shown++;
-   var b=h("button",{type:"button","class":"choice",disabled:c.disabled?"disabled":null},[document.createTextNode(c.label||c.value)]);
+   var b=h("button",{type:"button","class":"choice",disabled:c.disabled?"disabled":null},[TN(c.label||c.value)]);
    if(c.sub)b.appendChild(h("span",{"class":"sub",text:c.sub}));
    b.onclick=function(){g.items.push(c.value);p.close();save()};choices.appendChild(b)});
   if(!shown)choices.appendChild(h("div",{"class":"sub",text:(!q&&g.initial?g.initial:g.empty)||"Nothing to pick"}))}
@@ -865,8 +866,8 @@ W.roster=function(s,ctx){
    '<div class="rp-wt"><div class="rp-wn">'+esc(p.name)+'</div>'+(who?'<div class="rp-wl">'+esc(who)+'</div>':'')+(p.role?'<div class="rp-wl">'+esc(p.role)+'</div>':'')+(p.phone?'<div class="rp-wl">'+esc(p.phone)+'</div>':'')+'</div></div>'+
     '<div class="rp-cur"><span class="rp-curl">Current status</span>'+(p.status&&p.text?'<span class="rp-curv'+colourCls(p)+'">'+esc(p.text)+'</span>':'<span class="rp-curv none">None</span>')+'</div>'+
    '<div class="rp-opts">'+st.map(function(x){return '<button type="button" class="pill-s pri rp-so c-'+esc(x.colour)+(p.status===x.code?" on":"")+'" data-code="'+esc(x.code)+'" aria-pressed="'+(p.status===x.code?"true":"false")+'">'+esc(x.label)+'</button>'}).join("")+
-   '</div><div class="rp-clear"><button type="button" class="pill-s rp-so" data-code="">Rensa status</button></div></div>'}
- function openPersonMenu(id){var p=person(id);if(!p)return;cur=id;modal.innerHTML=menuHtml(p);modal.style.display="";var x=modal.querySelector(".rp-x");if(x&&x.focus)x.focus()}
+   '</div><div class="rp-clear"><button type="button" class="pill-s rp-so" data-code="">Clear status</button></div></div>'}
+ function openPersonMenu(id){var p=person(id);if(!p)return;cur=id;modal.innerHTML=menuHtml(p);trDom(modal);modal.style.display="";var x=modal.querySelector(".rp-x");if(x&&x.focus)x.focus()}
  // a status that needs a time, a date or a note: its own pop-up on top of the menu, with a big field (Enter sets it, Esc or a tap outside goes back)
  function openNeed(code,st){var p=person(cur),kind=st.needs,kb=!!(D&&D.keyboard),twelve=false,
   what=kind==="time"?"At what time?":kind==="date"?"Until which date?":kind==="datetime"?"Until which date and / or time? (leave one out to skip it)":"What is it?",field,
@@ -903,7 +904,7 @@ W.roster=function(s,ctx){
      if(!m||dt.getMonth()!==+m[2]-1){setText(msg,"Type the date as åååå-mm-dd, for example 2026-12-24");return null}return v}
     return v};
    if(field.focus)setTimeout(function(){field.focus()},0)}
-  modal2.style.display=""}
+  trDom(modal2);modal2.style.display=""}
  function closeNeed(){modal2.style.display="none";modal2.innerHTML=""}
  modal2.addEventListener("click",function(e){if(e.target===modal2){closeNeed();return}
   var b=e.target.closest&&e.target.closest("button");if(!b)return;
@@ -922,7 +923,7 @@ W.roster=function(s,ctx){
  hook("escape",function(){if(modal2.style.display!=="none"){closeNeed();return true}if(cur!==null){closeMenu();return true}});
 bind(s.source,function(d){if(!d)return;document.body.classList.toggle("no-title",d.show_title===false);
  var h1=document.querySelector("body > header h1");if(h1){if(h1._dflt===undefined){h1._dflt=h1.textContent;h1._dtitle=document.title}      // the page title the user chose (Settings, Page title); empty = the project's
-  setText(h1,d.title||h1._dflt);var want=d.title||h1._dtitle;if(document.title!==want)document.title=want}});
+  setText(h1,d.title||h1._dflt);var want=tr(d.title||h1._dtitle,true);if(document.title!==want)document.title=want}});
  bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+d.groups.length;if(key===last)return;last=key;D=d;adopt();setRowBox(d.box);paint()});
  return el};
 // the settings list: a department / building per row with a select of palette colours ("Automatic" = the module picks one)
@@ -954,7 +955,7 @@ function control(spec,F,change){var key=spec.key,el,paint;
   paint=function(){var opts=optionList(spec,F),k=JSON.stringify(opts);
    if(k!==last){last=k;var groups={},order=[],html="";
     opts.forEach(function(o,i){var g=o.group||"";if(!groups[g]){groups[g]=[];order.push(g)}groups[g].push('<option value="'+i+'">'+esc(o.label)+'</option>')});
-    el.innerHTML=order.map(function(g){return g?'<optgroup label="'+esc(g)+'">'+groups[g].join("")+'</optgroup>':groups[g].join("")}).join("")}
+    el.innerHTML=order.map(function(g){return g?'<optgroup label="'+esc(g)+'">'+groups[g].join("")+'</optgroup>':groups[g].join("")}).join("");trDom(el)}
    var cur=F.values[key];opts.forEach(function(o,i){if(String(o.value)===String(cur))el.value=String(i)})};
   el.onchange=function(){var o=optionList(spec,F)[+el.value];if(o){F.values[key]=o.value;change()}};
   el._paint=paint;return el}
@@ -1026,7 +1027,8 @@ W.form=function(s,ctx){var el=h("div",{"class":"wform"}),F={values:{},options:{}
   if(f.show!==undefined)bind(f.show,function(v){sh(r.el,!!v)})});
  function paint(){ctls.forEach(function(c){c._paint()});subs.forEach(function(f){f()})}
  el._sum=function(){var out=[];(s.fields||[]).forEach(function(f){var t=f.sub_text?(F.texts||{})[f.sub_text]:f.sub;if(t&&!f.nosum)out.push((f.sum?f.sum+" ":"")+t)});return out.join(" \u00b7 ")};      // the chosen settings, for a menu's subtitle
- function take(r){F.values=r.values||F.values;F.options=r.options||F.options;F.texts=r.texts||F.texts;F.lists=r.lists||F.lists}
+ function take(r){if(I18N.lang!=="en"){trTree(r.options);trTree(r.texts)}      // the server's labels and ready-made lines, in the language of the page
+  F.values=r.values||F.values;F.options=r.options||F.options;F.texts=r.texts||F.texts;F.lists=r.lists||F.lists}
  function load(){xhrJson("GET",s.get,function(r){if(!r)return;take(r);paint()})}
  function save(){clearTimeout(timer);paint();timer=setTimeout(function(){post(s.post||s.get,{values:F.values},function(r){
   if(r){take(r);paint();ctx.saved()}})},250)}
@@ -1081,7 +1083,7 @@ function sortable(box,onDone){
 // ---- a list that is edited in a pop-up, like the module picker: a row in the box (title, a grey line, an Edit button) whose pop-up lists the items, each with
 // a drag handle (drag it, or use the arrow keys, to move the item). Tap an item (not its handle or its switch) to edit it. The list is made by a module's
 // own widget (statuses, people); the look and the drag are the kit's.
-//   orderEditor(host, {title, help, sub(items) -> grey line, item(it) -> {id, title, sub, colour, group, control}, onOrder(ids), onEdit(it), add: "Add ...", onAdd(), canAdd(items)})
+//   orderEditor(host, {title, help, sub(items) -> grey line, idOf(it), item(it) -> {id, title, sub, colour, group, control}, onOrder(ids), onEdit(it), add: "Add ...", onAdd(), canAdd(items)})
 //   returns {set(items), open(), close(), isOpen()}; set() is called again whenever the items change (it does not redraw while a handle is being dragged).
 //   item(): colour = a palette id for the dot before the title; group = a heading, items with the same one must follow each other (a handle moves its item
 //   inside its group); control = an element at the right (a switch).
@@ -1089,18 +1091,18 @@ function orderEditor(host,o){
  var btn=h("button",{type:"button","class":"pill-s",text:"Edit","aria-haspopup":"dialog"}),subEl=h("span",{"class":"sub"}),list=h("div",{"class":"mlist olist"}),
   done=h("button",{type:"button","class":"pill-s",text:"Done"}),add=o.add?h("button",{type:"button","class":"pill-s",text:o.add}):null,
   pop=h("div",{},[h("div",{"class":"t",text:o.help||"Tap an item to edit it, drag the handle to move it."}),list,h("div",{"class":"bar end"},add?[add,done]:[done])]),
-  row=h("div",{"class":"srow edit"},[h("span",{},[document.createTextNode(o.title),subEl]),btn]),items=[],key="",p,byId={};
+  row=h("div",{"class":"srow edit"},[h("span",{},[TN(o.title),subEl]),btn]),items=[],key="",p,byId={};
  host.appendChild(row);host.appendChild(pop);p=ui.popup(pop);
- function paint(){list.innerHTML="";var shown;byId={};
-  items.forEach(function(it){var d=o.item(it);byId[d.id]=it;
+ function paint(){list.innerHTML="";var shown;
+  items.forEach(function(it){var d=o.item(it);
    if(d.group!==undefined&&d.group!==shown){shown=d.group;list.appendChild(h("div",{"class":"sub grp",text:d.group}))}
    var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+d.title+": drag, or use the up and down arrow keys",html:GRIP_SVG}),
-    left=h("span",{},[d.colour?h("span",{"class":"dot c-"+d.colour+" rp-sw"}):document.createTextNode(""),document.createTextNode(d.title),d.sub?h("span",{"class":"sub",text:d.sub}):document.createTextNode("")]),
+    left=h("span",{},[d.colour?h("span",{"class":"dot c-"+d.colour+" rp-sw"}):TN(""),TN(d.title),d.sub?h("span",{"class":"sub",text:d.sub}):TN("")]),
     r=h("div",{"class":"srow rp-edit","data-id":d.id,title:"Edit "+d.title},d.control?[grip,left,d.control]:[grip,left]);
-   r.addEventListener("click",function(e){if(e.target.closest&&e.target.closest("input,label,button"))return;o.onEdit(it)});
+   r.addEventListener("click",function(e){if(e.target.closest&&e.target.closest("input,label,button"))return;if(byId[d.id])o.onEdit(byId[d.id])});      // the current item: set() replaces the items while the rows stay
    list.appendChild(r)});
   sortable(list,function(ids){items=ids.map(function(i){return byId[i]}).filter(Boolean);key=JSON.stringify(items);o.onOrder(ids)})}
- var api={set:function(l){items=l||[];setText(subEl,o.sub(items));if(add)sh(add,!o.canAdd||o.canAdd(items));
+ var api={set:function(l){items=l||[];byId={};items.forEach(function(it){byId[o.idOf(it)]=it});setText(subEl,o.sub(items));if(add)sh(add,!o.canAdd||o.canAdd(items));
    var k=JSON.stringify(items);if(k===key||list.classList.contains("dragging"))return;key=k;paint()},
   open:function(){p.open(btn)},close:function(){p.close()},isOpen:function(){return p.isOpen()}};
  btn.onclick=function(e){e.stopPropagation();if(p.isOpen())p.close();else p.open(btn)};done.onclick=function(){p.close()};
@@ -1114,7 +1116,7 @@ function buildPicker(cols){
   btn=h("button",{type:"button","class":"pill-s",text:"Edit","aria-haspopup":"dialog"}),list=h("div",{"class":"mlist"}),
   done=h("button",{type:"button","class":"pill-s",text:"Done"}),
   pop=h("div",{},[h("div",{"class":"t",text:"Modules: tick to switch on or off, drag the handle to move inside its group. The top one has priority."}),list,h("div",{"class":"bar end"},[done])]),
-  row=h("div",{"class":"srow edit","data-picker":"modules"},[h("span",{},[document.createTextNode("Modules"),h("span",{"class":"sub",text:"Switch modules on or off and set their priority"})]),btn]);
+  row=h("div",{"class":"srow edit","data-picker":"modules"},[h("span",{},[TN("Modules"),h("span",{"class":"sub",text:"Switch modules on or off and set their priority"})]),btn]);
  if(!card){card=h("div",{"class":"card"});cols.appendChild(h("section",{"class":"sec","data-box":"system"},[h("h2",{text:"System"}),card]))}
  var slot=card.querySelector('[data-slot="modules"]');card.insertBefore(row,slot||card.firstChild);card.appendChild(pop);
  var p=ui.popup(pop),mods=[],boxes={};
@@ -1124,7 +1126,7 @@ function buildPicker(cols){
    if(m.visible===false)cb=h("span",{"class":"sub fixed",text:"Always on"});                     // can be moved, not switched off
    else{cb=h("input",{type:"checkbox","class":"cbox neutral","data-module":m.name,"aria-label":m.title});cb.checked=m.enabled;boxes[m.name]=cb}
    var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+m.title+": drag, or use the up and down arrow keys",html:GRIP_SVG}),
-    left=h("span",{},[document.createTextNode(m.title),h("span",{"class":"sub",html:esc(m.description)+(m.note?"<br>"+esc(m.note):"")+(m.error?'<br><b class="modbad">Could not load: '+esc(m.error)+"</b>":"")})]);
+    left=h("span",{},[TN(m.title),h("span",{"class":"sub",html:esc(m.description)+(m.note?"<br>"+esc(m.note):"")+(m.error?'<br><b class="modbad">Could not load: '+esc(m.error)+"</b>":"")})]);
    list.appendChild(h("div",{"class":"srow","data-id":m.name},[grip,left,cb]))});
   sortable(list,function(){})}                                                                       // the order is read from the page when Done is pressed
  function apply(){var order=Array.prototype.map.call(list.children,function(r){return r.getAttribute("data-id")}).filter(Boolean),

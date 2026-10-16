@@ -1,5 +1,31 @@
 
 function $(id){return document.getElementById(id)}
+// ---- language. English is the text written in the code; tr(text) gives it in the language of the page (window.I18N, built from lang_<code>.json of the base and
+// of the modules: exact texts in "strings", texts with numbers or names in "patterns" [regex, template with $1 $2]). A text with no translation stays as it is
+// (and is noted in window.TRMISS for the checks). Everything the page writes passes tr(): setText, setLines, h(), alert(), the templates.
+var I18N=window.I18N||{lang:"en",strings:{},patterns:[]},TRP=(I18N.patterns||[]).map(function(p){try{return [new RegExp(p[0]),p[1]]}catch(e){return null}}).filter(Boolean),TRMISS={},TRDONE={};
+if(I18N.lang!=="en"){var _setAttr=Element.prototype.setAttribute;      // every title, aria-label and placeholder the page sets is in the language of the page
+ Element.prototype.setAttribute=function(n,v){if(n==="title"||n==="aria-label"||n==="placeholder"||n==="alt")v=tr(String(v));return _setAttr.call(this,n,v)}}
+function tr(s,quiet){if(I18N.lang==="en"||typeof s!=="string"||s==="")return s;
+ var d=I18N.strings[s];if(d!==undefined){TRDONE[d]=1;return d}
+ var pad=/^(\s+)(\S[\s\S]*)$/.exec(s)||/^(\S[\s\S]*?)(\s+)$/.exec(s);       // spaces round a text are kept
+ if(pad){var lead=/^\s/.test(s),core=lead?pad[2]:pad[1],x=tr(core,true);if(x!==core)return lead?pad[1]+x:x+pad[2]}
+ for(var i=0;i<TRP.length;i++){var m=TRP[i][0].exec(s);if(!m)continue;
+  // $1 is the first captured part (translated too: a name stays as it is); {1?one:many} chooses by the captured number (one when it is 1)
+  var out=TRP[i][1].replace(/\{(\d)\?([^:}]*):([^}]*)\}/g,function(_,n,a,b){return m[+n]==="1"?a:b}).replace(/\$(\d)/g,function(_,n){return m[+n]===undefined?"":tr(m[+n],true)});
+  TRDONE[out]=1;return out}
+ if(!quiet&&!TRDONE[s]&&/[A-Za-z]{3}/.test(s))TRMISS[s]=1;return s}
+// the texts of a layout (window.LAYOUT: titles, subtitles, labels ...) in the language of the page; names, paths and keys are left alone
+var TR_SKIP={type:1,box:1,id:1,key:1,post:1,get:1,url:1,bind:1,mod:1,name:1,module:1,source:1,"in":1,look:1,href:1,hook:1,then:1,mode:1,cls:1,style:1,"default":1,colour:1,position:1,sub_text:1,html:1,html_file:1,show:1,hide:1,when:1,every:1,reload:1,method:1,scale:1,unit:1,retry_if:1,body:1};
+function trTree(o){if(I18N.lang==="en")return;
+ if(Array.isArray(o)){o.forEach(function(v,i){if(typeof v==="string")o[i]=tr(v,true);else trTree(v)})}
+ else if(o&&typeof o==="object"){for(var k in o){var v=o[k];if(typeof v==="string"){if(!TR_SKIP[k]&&v.charAt(0)!=="@")o[k]=tr(v,true)}else if(!TR_SKIP[k])trTree(v)}}}
+// the text nodes and the title / aria-label / placeholder of a piece of the page that was written in English (the frame, a module's HTML file)
+function trDom(root){if(I18N.lang==="en"||!root)return;
+ var w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null,false),n,list=[];while((n=w.nextNode()))list.push(n);
+ list.forEach(function(t){var v=t.nodeValue,m=/^(\s*)([\s\S]*?)(\s*)$/.exec(v);if(m[2]){var x=tr(m[2]);if(x!==m[2])t.nodeValue=m[1]+x+m[3]}});
+ Array.prototype.forEach.call(root.querySelectorAll?root.querySelectorAll("[title],[aria-label],[placeholder]"):[],function(e){["title","aria-label","placeholder"].forEach(function(a){var v=e.getAttribute(a);if(v){var x=tr(v);if(x!==v)e.setAttribute(a,x)}})})}
+(function(){var a=window.alert,c=window.confirm;window.alert=function(m){return a.call(window,tr(String(m)))};window.confirm=function(m){return c.call(window,tr(String(m)))}})();
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 // Hooks: how the optional modules (modules/*/page.js, appended to this script) take part. A module calls
 // hook(name, fn); this page calls fire(name, arg) at the matching moment. fire() is true if a hook returned true.
@@ -57,8 +83,8 @@ ui.iconButton=function(kind,on,what){var d=document.createElement("div");d.inner
 hook("escape",function(){if(ui._pops.some(function(p){return p.isOpen()})){ui.closePopups();return true}});
 hook("settingsClose",function(){ui.closePopups()});
 // The page is redrawn from /api every second: only touch the DOM when something actually changed (no flicker, less work on a slow phone)
-function setText(el,t){t=String(t);if(el.textContent!==t)el.textContent=t}
-function setHtml(el,h){if(el._html!==h){el._html=h;el.innerHTML=h}}
+function setText(el,t){t=tr(String(t));if(el.textContent!==t)el.textContent=t}
+function setHtml(el,h){if(el._html!==h){el._html=h;el.innerHTML=h;trDom(el)}}
 function setClass(el,c){if(el.className!==c)el.className=c}
 function setStyle(el,prop,v){if(el.style[prop]!==v)el.style[prop]=v}
 function dot(el,state){setClass(el,"dot "+(state||""))}
@@ -70,6 +96,7 @@ function lookDot(el,look){setClass(el,"dot");if(!look||!look.colour){setStyle(el
  var f=DOT_FX[look.effect];setStyle(el,"background","var(--c-"+colourId(look.colour,look.module)+")");
  setStyle(el,"animation",f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none")}
 function render(d){
+ if(d.lang&&d.lang!==I18N.lang){location.reload();return}      // the language was changed (on this screen or on another one)
  pinNeeded=!!d.pin;
  for(var k in d)S[k]=d[k];       // S keeps the data sources' answers and the page's own state between /api answers
  NOTICES=d.notices||[];if(SCR.theme==="time")applyLook();

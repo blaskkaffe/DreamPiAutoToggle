@@ -42,6 +42,7 @@ ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the op
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
 SETTINGS_PIN = os.path.join(BASE_DIR, "settings_pin")   # exists = Settings asks for the PIN (when one is set) before it opens and changes anything
 SCREEN = os.path.join(BASE_DIR, "screen.json")         # how the page is laid out on a wide screen: max columns, stretch, scale (Settings > Appearance)
+LANGUAGE = os.path.join(BASE_DIR, "language")          # the language of the page: a code of LANGUAGES, for every screen (Settings > Appearance > Language)
 TIME_ZONE = os.path.join(BASE_DIR, "time_zone")      # the time zone every module may show times in: an IANA name, or empty / missing = the computer's own (Settings > About)
 DEBUG_LOG = TMP_PREFIX + PROJECT.get("debug_log", "-debug.log")           # the debug timeline
 POKE_PREFIX = TMP_PREFIX + ".poke."   # poke(name): "measure it again now", see poke()
@@ -927,6 +928,31 @@ def set_module_tint(name, key, coloured):
         json.dump(data, f, sort_keys=True)
     os.rename(tmp, MODULE_TINTS)
     return module_tints(name)
+
+
+LANGUAGES = (("sv", "Svenska"), ("en", "English"))      # the languages of the page; English is the text written in the code, the others are in lang_<code>.json files
+DEFAULT_LANGUAGE = "en"
+
+
+def language():
+    """The language of the page: what was chosen in Settings, else "language" in project.json, else English."""
+    codes = [c for c, _n in LANGUAGES]
+    saved = (read_file(LANGUAGE) or "").strip()
+    if saved in codes:
+        return saved
+    wanted = PROJECT.get("language")
+    return wanted if wanted in codes else DEFAULT_LANGUAGE
+
+
+def save_language(code):
+    """Choose the language of the page. False for a code that is not one of LANGUAGES."""
+    if code not in [c for c, _n in LANGUAGES]:
+        return False
+    tmp = LANGUAGE + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(code + "\n")
+    os.rename(tmp, LANGUAGE)
+    return True
 
 
 def time_zone():
