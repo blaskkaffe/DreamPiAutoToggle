@@ -326,6 +326,15 @@ class BoardTests(Base):
         self.assertIsNone(contacts.set_order("x"))
         self.assertIsNone(contacts.set_order([1]))
 
+    def test_a_page_that_sent_the_swedish_word_for_off_or_on_is_understood(self):
+        """The first Swedish version translated the values of a choice too (off -> av, on -> p\u00e5): pages that were still open sent those."""
+        checkin.save_config({"scroll": "av"})
+        self.assertEqual(checkin.config()["scroll"], "off")
+        checkin.save_config({"scroll": "p\u00e5"})
+        self.assertEqual(checkin.config()["scroll"], "on")
+        checkin.save_config({"scroll": "status"})
+        self.assertEqual(checkin.config()["scroll"], "status")
+
     def test_the_order_of_the_boxes_is_kept(self):
         self.assertEqual([g["title"] for g in checkin.snapshot()["groups"]], ["Kök", "No department", "Servering"])
         checkin.set_group_order(["Servering", "Kök"])

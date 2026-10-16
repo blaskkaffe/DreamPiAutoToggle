@@ -371,6 +371,7 @@ def save_config(values):
         data = _load()
         cur = config(data)
         if isinstance(values, dict):
+            values = dict(values, scroll={"av": "off", "p\u00e5": "on"}.get(values.get("scroll"), values.get("scroll")))      # a page that was open during the first Swedish version sent the translated word
             for k, allowed in (("group_by", GROUPS), ("colour_by", GROUPS), ("scroll", SCROLLS), ("frame", FRAMES), ("box", BOXES)):
                 if values.get(k) in allowed:
                     cur[k] = values[k]

@@ -97,6 +97,7 @@ function lookDot(el,look){setClass(el,"dot");if(!look||!look.colour){setStyle(el
  setStyle(el,"animation",f?f[0]+" "+(look.speed=="fast"?f[2]:f[1])+"s "+f[3]+" infinite":"none")}
 function render(d){
  if(d.lang&&d.lang!==I18N.lang){location.reload();return}      // the language was changed (on this screen or on another one)
+ if(d.page_v&&window.PAGE_V&&d.page_v!==window.PAGE_V){if(!pageStale)pageStale=Date.now();if(Date.now()-pageStale>3000){location.reload();return}}else pageStale=0      // the host has a newer page program (an update): load it, so a screen never keeps running an old one
  pinNeeded=!!d.pin;
  for(var k in d)S[k]=d[k];       // S keeps the data sources' answers and the page's own state between /api answers
  NOTICES=d.notices||[];if(SCR.theme==="time")applyLook();
@@ -357,7 +358,7 @@ function applyPalette(d){PV=d.palette_v;S.palette=d.palette;
 // One question to /api at a time, with a time limit: a request that hangs (a network blip, the host restarting) is given up after 8 s instead of piling
 // new ones up behind it (a browser only has a few connections per host, so the page looked dead for minutes). When the host answers again after contact
 // was lost for 10 s or more, the page reloads: it comes back clean, with the page files of the host's current version.
-var apiBusy=null,apiDownAt=0;
+var apiBusy=null,apiDownAt=0,pageStale=0;
 function apiLost(){if(!apiDownAt)apiDownAt=Date.now()}
 function refresh(){if(apiBusy){if(Date.now()-apiBusy.t<5000)return;try{apiBusy.x.abort()}catch(e){}apiBusy=null;apiLost()}
  var x=new XMLHttpRequest(),rec={x:x,t:Date.now()};apiBusy=rec;x.open("GET","/api?pv="+PV,true);x.timeout=8000;if(SCREEN_ID)x.setRequestHeader("X-Screen",SCREEN_ID);

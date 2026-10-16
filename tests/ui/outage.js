@@ -25,6 +25,9 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await page.evaluate(() => { window.__marker = 'same page'; });
   let n = 0; await page.route('**/api?*', route => { n++; n <= 2 ? route.abort() : route.continue(); }); await settle(5000);
   ok(await page.evaluate(() => window.__marker) === 'same page', 'a short blip (2 failed answers) does not reload the page');
+  // the host has a newer page program (an update): an open page loads it by itself
+  await page.evaluate(() => { window.__marker = 'same page'; window.PAGE_V = 'an-old-version'; }); await settle(7000);
+  ok(await page.evaluate(() => window.__marker) === undefined, 'a page with an old program version loads again by itself');
   ok(errors.length === 0, 'no JavaScript errors' + (errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''));
   await browser.close();
   console.log(failed ? 'FAILED' : 'all checks passed');

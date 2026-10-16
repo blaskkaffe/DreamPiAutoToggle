@@ -2,6 +2,7 @@
 # Base - the web service: the HTTP side (page, API, HTTPS, watchdog). Settings and state are in base_core.py, the features
 # (and what they measure) are modules in modules/ that base_modules.py loads. Works on Python 3 and 2.7.
 import gzip
+import hashlib
 import io
 import json
 import re
@@ -53,7 +54,7 @@ def api_state(have_palette=""):
     warnings = ["Module %s is not loaded: %s" % (name, why) for name, why in sorted(modules.errors().items())]
     d = {"pin": security.pin_required(),     # the page asks for it before an action a module marks PROTECTED
          "colours": modules.live_colours(), "tints": modules.live_tints(), "primary": {}, "primary_key": {}, "enabled": modules.enabled_map(),
-         "warnings": warnings, "now": int(time.time()), "lang": core.language(),
+         "warnings": warnings, "now": int(time.time()), "lang": core.language(), "page_v": PAGE_CODE_VERSION["v"],
          "notices": [],         # banners over the boxes that are not warnings: {"id", "text", "post" (dismiss: POST {"id"} there)}
          "screen": core.screen_settings(), "tile_layout": core.tile_layout(), "daylight": core.daylight(),
          "settings_pin": {"on": security.settings_locked(), "pin": security.pin_required()}}
@@ -154,9 +155,14 @@ def build_page():
         core.set_screen(mine)
 
 
+PAGE_CODE_VERSION = {"v": ""}      # a short tag of the page's program text (page.js, widgets.js, the modules' scripts, boot.js): an open page that has another one is old
+
+
 def _build_page(part):
     extra = modules.page_parts()
-    js = _layout_script() + "\n" + _i18n_script() + "\n" + part("page.js") + "\n" + part("widgets.js") + "\n" + extra["js"] + "\n" + part("boot.js")
+    code = part("page.js") + "\n" + part("widgets.js") + "\n" + extra["js"] + "\n" + part("boot.js")
+    PAGE_CODE_VERSION["v"] = hashlib.md5(code.encode("utf-8")).hexdigest()[:10]
+    js = _layout_script() + "\n" + _i18n_script() + "\nwindow.PAGE_V=" + json.dumps(PAGE_CODE_VERSION["v"]) + ";\n" + code
     html = part("index.html").replace("@@LANG@@", core.language()).replace("@@TITLE@@", core.PROJECT.get("title", "Dashboard")).replace("@@ICON@@", core.PROJECT.get("icon", "")).replace("@@TOUCH@@", core.PROJECT.get("touch_icon", core.PROJECT.get("icon", ""))).replace("@@THEME@@", core.screen_settings()["theme"]).replace("@@CSS@@", core.colours_css() + part("page.css") + "\n" + extra["css"]).replace("@@JS@@", js)
     return html
 
@@ -568,7 +574,7 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(self._body(1024).decode("utf-8"))
             if path == "/screen":
                 vals = dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols", "theme", "font_scale", "font_colour", "sound_name", "sound_volume") if k in (data.get("values") or {}))
-                if vals.get("sound_name") == "off":          # "Off" in the sound list switches the button sounds off (the file name is kept)
+                if vals.get("sound_name") in ("off", "av"):          # "Off" in the sound list switches the button sounds off (the file name is kept)
                     vals.pop("sound_name")
                     vals["sound"] = False
                 elif "sound_name" in vals:

@@ -54,6 +54,12 @@ class HttpTests(unittest.TestCase):
         self.assertTrue(web.ping_ok(port))
         self.assertFalse(web.ping_ok(1, 1))
 
+    def test_the_page_knows_its_program_version_and_the_api_says_the_hosts(self):
+        """An open page that has another program version than the host's (an update) loads again by itself."""
+        api = json.loads(self.get("/api")[2])
+        self.assertTrue(re.match(r"^[0-9a-f]{10}$", api["page_v"]))
+        self.assertIn('window.PAGE_V="%s"' % api["page_v"], self.get("/")[2].decode("utf-8"))
+
     def test_api_shape(self):
         d = json.loads(self.get("/api")[2].decode())
         for key in ("pin", "warnings", "now", "enabled", "colours", "checkin"):
