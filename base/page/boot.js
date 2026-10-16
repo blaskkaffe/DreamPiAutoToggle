@@ -4,3 +4,4 @@ trTree(LAY);trDom(document.body);document.title=tr(document.title,true);restoreD
 refresh();setInterval(refresh,1000);
 // back in Settings after switching or moving a module (the page was reloaded)
 try{if(sessionStorage.getItem("reopen")){sessionStorage.removeItem("reopen");showSettings(true)}}catch(e){}
+if(settingsRoute())openSettingsRoute();

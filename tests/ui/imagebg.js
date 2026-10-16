@@ -8,7 +8,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 420, height: 900 } });
-  const openMenus = () => page.evaluate(() => document.querySelectorAll('.wmenu .menubtn[aria-expanded="false"]').forEach(b => b.click()));      // Settings has menus (Layout, Text, Colours, Background): open them all
+  const openMenus = () => page.addStyleTag({ content: '.wmenu > .msub{display:block!important;position:static!important;background:none!important;padding:0!important} .wmenu .rp-msheet{width:auto!important;max-height:none!important;border:0!important;box-shadow:none!important;padding:0 0 0 12px!important;background:none!important} .wmenu .rp-mx,.wmenu .rp-mt,.wmenu .rp-menu > .bar{display:none!important}' });      // the menus open in a pop-up; here they are laid flat in the page so one run can reach everything (menus.js tests the pop-up itself)
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 150)); });

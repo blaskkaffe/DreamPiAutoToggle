@@ -223,7 +223,10 @@
   "off": "av",
   "on": "på",
   "space": "mellanslag",
-  "unknown": "okänd"
+  "unknown": "okänd",
+  "Hide the cogwheel": "Dölj kugghjulet",
+  "Cogwheel hidden": "Kugghjulet dolt",
+  "The cogwheel is out of sight on this screen. Settings is then at the address of this computer followed by /settings (it asks for the PIN when one is set).": "Kugghjulet är dolt på den här skärmen. Inställningar finns då på datorns adress följt av /settings (PIN-koden frågas efter om en är satt)."
  },
  "patterns": [
   [

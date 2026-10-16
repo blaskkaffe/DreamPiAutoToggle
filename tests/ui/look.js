@@ -63,7 +63,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   await load(); await page.click('#cog'); await settle(1200);
   const app = page.locator('[data-box="appearance"]');
   ok(await app.locator('.wmenu').count() === 4, 'Appearance has four menus (Layout, Text, Colours, Background)');
-  await page.evaluate(() => document.querySelectorAll('.wmenu .menubtn[aria-expanded="false"]').forEach(b => b.click())); await settle(300);
+  await page.addStyleTag({ content: '.wmenu > .msub{display:block!important;position:static!important;background:none!important;padding:0!important} .wmenu .rp-msheet{width:auto!important;max-height:none!important;border:0!important;box-shadow:none!important;padding:0 0 0 12px!important;background:none!important} .wmenu .rp-mx,.wmenu .rp-mt,.wmenu .rp-menu > .bar{display:none!important}' }); await settle(300);
   for (const t of ['Theme', 'Hide the top bar', 'Max columns: dashboard', 'Stretch boxes', 'Fit to screen', 'Rearrange the main screen', 'No scrolling', 'Text size', 'Text colour', 'Button sounds', 'Colour palette', 'Global main colour', 'Check-in board colour']) ok(await app.locator('.srow', { hasText: t }).count() >= 1, 'Appearance has a "' + t + '" row');
   ok(await page.locator('[data-box="colours"], [data-box="about"]').count() === 0, 'the Global colours and About boxes are gone');
   ok(await page.locator('[data-box="system"] .srow', { hasText: 'Time zone' }).count() === 1 && await page.locator('[data-box="system"] .srow', { hasText: 'Ask for the PIN' }).count() === 1, 'the time zone and the PIN are in System');

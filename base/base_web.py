@@ -372,7 +372,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send(json.dumps(_screen_reply()), "application/json")
         elif modules.route("GET", path):
             modules.route("GET", path)(self)         # an enabled module's own endpoint
-        elif path == "/":
+        elif path in ("/", "/settings", "/settings/"):         # /settings is the same page; it opens Settings by itself (and asks for the PIN when one is set)
             self.send(PAGE_BYTES, "text/html; charset=utf-8", fixed=True)
         else:
             self._refuse(404, "Not found (or the module that answers it is off)")
@@ -414,7 +414,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._post_timezone()
         if path == "/language":
             return self._post_language()
-        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/fit", "/screen/drag", "/screen/noscroll", "/screen/autohide", "/screen/locations", "/screen/sound"):
+        if path in ("/screen", "/screen/stretch", "/screen/scale", "/screen/fit", "/screen/drag", "/screen/noscroll", "/screen/autohide", "/screen/nocog", "/screen/locations", "/screen/sound"):
             return self._post_screen(path)
         if path == "/palette":
             return self._post_palette()

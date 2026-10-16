@@ -63,6 +63,18 @@
        "short": "Top bar hidden"
       },
       {
+       "type": "row",
+       "title": "Hide the cogwheel",
+       "sub": "The cogwheel is out of sight on this screen. Settings is then at the address of this computer followed by /settings (it asks for the PIN when one is set).",
+       "control": {
+        "type": "toggle",
+        "bind": "@screen.nocog",
+        "post": "/screen/nocog",
+        "label": "Hide the cogwheel"
+       },
+       "short": "Cogwheel hidden"
+      },
+      {
        "type": "form",
        "get": "/screen",
        "post": "/screen",

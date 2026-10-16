@@ -219,20 +219,29 @@ W.toggle=function(s,ctx){var box=h("input",{type:"checkbox","class":"cbox "+(s.l
   // "ensure_pin": switching it on with no PIN set first asks for a new one on the PIN pad (the server refuses the lock without one)
   if(s.ensure_pin&&want&&!(S.settings_pin&&S.settings_pin.pin)){box.checked=false;choosePin(function(){box.checked=true;post(s.post,{value:true},function(){refresh();ctx.saved()})});return}
   post(s.post,s.body?Object.assign({value:want},s.body):{value:want},function(){refresh();ctx.saved()})};return el};
-// ---- a menu: a row (title, a subtitle that shows what is chosen in it, a button) that opens its settings under it, inside the same card, indented. "id" names it (items of other
-// boxes and modules join it with "in": "<id>"); "items" are its widgets. Each child may tell its choice for the subtitle (el._sum: a switch that is on, the texts of a form's fields).
-// It stays open or shut as the user left it (this tab).
+// ---- a menu: a row (title, a subtitle that shows what is chosen in it, an Edit button) whose settings open in a pop-up in the middle of the screen (the same look as the
+// status menu: a sheet with a cross in the corner and a Done button; Esc or a tap outside closes it). "id" names it (items of other boxes and modules join it with "in": "<id>");
+// "items" are its widgets. Each child may tell its choice for the subtitle (el._sum: a switch that is on, the texts of a form's fields). The pop-up stays in its box in the page
+// (CSS makes it cover the screen while it is open); after the page is built again with Settings open (reloadInSettings) it opens again.
+var MENUS=[];
+function closeMenus(except){MENUS.forEach(function(m){if(m!==except)m.close()})}
 W.menu=function(s,ctx){var key="menu:"+(s.id||s.title),open=false,title=h("span"),sub=h("span",{"class":"sub"}),left=h("span",{},[title,sub]),
- btn=h("button",{type:"button","class":"pill-s menubtn","aria-expanded":"false"}),head=h("div",{"class":"srow edit menuhead"},[left,btn]),
- body=h("div",{"class":"msub"}),el=h("div",{"class":"wmenu"},[head,body]),kids=buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx);
- try{open=sessionStorage.getItem(key)==="1"}catch(e){}
- bind(s.title,function(t){setText(title,t==null?"":t);btn.setAttribute("aria-label",(open?"Close ":"Open ")+(t||"menu"))});
- kids.forEach(function(k){body.appendChild(k)});
+ btn=h("button",{type:"button","class":"pill-s menubtn","aria-haspopup":"dialog","aria-expanded":"false",text:"Edit"}),head=h("div",{"class":"srow edit menuhead"},[left,btn]),
+ x=h("button",{type:"button","class":"rp-mx",title:"Close","aria-label":"Close",text:"\u2715"}),sheetTitle=h("div",{"class":"rp-mt"}),content=h("div",{"class":"rp-mc"}),
+ done=h("button",{type:"button","class":"pill-s",text:"Done"}),sheet=h("div",{"class":"rp-msheet rp-menu",role:"dialog","aria-modal":"true"},[x,sheetTitle,content,h("div",{"class":"bar end"},[done])]),
+ body=h("div",{"class":"msub"},[sheet]),el=h("div",{"class":"wmenu"},[head,body]),kids=buildAll((s.items||[]).map(function(w){return Object.assign({mod:s.mod},w)}),ctx),api={};
+ try{open=sessionStorage.getItem(key)==="1"&&!!sessionStorage.getItem("reopen")}catch(e){}
+ bind(s.title,function(t){setText(title,t==null?"":t);setText(sheetTitle,t==null?"":t);btn.setAttribute("aria-label","Edit "+(t||"menu"));sheet.setAttribute("aria-label",t||"menu")});
+ kids.forEach(function(k){content.appendChild(k)});
  function paintSub(){var parts=[];kids.forEach(function(k){if(k._sum&&k.style.display!=="none"){var t=k._sum();if(t)parts.push(t)}});
   var t=parts.join(" \u00b7 ");setText(sub,t);sh(sub,!!t);
   var any=kids.some(function(k){return k.style.display!=="none"});sh(el,any)}
- function paint(){sh(body,open);btn.textContent=tr(open?"Close":"Edit");btn.setAttribute("aria-expanded",open?"true":"false");el.classList.toggle("open",open)}
- btn.onclick=function(e){e.stopPropagation();open=!open;try{sessionStorage.setItem(key,open?"1":"0")}catch(x){}paint()};
+ function paint(){body.classList.toggle("open",open);btn.setAttribute("aria-expanded",open?"true":"false");el.classList.toggle("open",open)}
+ function set(v){if(v)closeMenus(api);open=v;try{sessionStorage.setItem(key,v?"1":"0")}catch(e){}paint();if(v){ui.closePopups();x.focus()}}
+ api.close=function(){if(open)set(false)};MENUS.push(api);
+ btn.onclick=function(e){e.stopPropagation();set(!open)};x.onclick=done.onclick=function(e){e.stopPropagation();set(false)};
+ body.addEventListener("click",function(e){if(e.target===body)set(false)});
+ hook("escape",function(){if(open){set(false);return true}});hook("settingsClose",function(){if(open)set(false)});
  head.addEventListener("click",function(e){if(e.target===btn||btn.contains(e.target))return;btn.click()});
  head.style.cursor="pointer";UPD.push(paintSub);paint();paintSub();return el};
 W.divider=function(){return h("div",{"class":"wdiv",role:"separator"})};
@@ -948,7 +957,9 @@ function control(spec,F,change){var key=spec.key,el,paint;
  if(spec.type==="choice"){el=h("span",{"class":"optrow",role:"group","aria-label":spec.aria||spec.label||key});var lastc="",btns=[];
   paint=function(){var opts=optionList(spec,F),k=JSON.stringify(opts);
    if(k!==lastc){lastc=k;el.innerHTML="";btns=opts.map(function(o){var b=h("button",{type:"button","class":"pill-s",text:o.label});
-    b.onclick=function(e){e.stopPropagation();F.values[key]=o.value;change();if(el._after)el._after()};el.appendChild(b);return b})}
+    b.onclick=function(e){e.stopPropagation();F.values[key]=o.value;change();if(el._after)el._after()};el.appendChild(b);return b});
+    var long=0;opts.forEach(function(o){long=Math.max(long,String(o.label).length)});var per=long>10?2:long>6?3:4;      // equal buttons: fewer in a row when the words are long, the rows as even as they can be
+    el.style.setProperty("--n",Math.ceil(opts.length/Math.ceil(opts.length/per)))}
    opts.forEach(function(o,i){var on=String(o.value)===String(F.values[key]);btns[i].classList.toggle("pri",on);btns[i].setAttribute("aria-pressed",on?"true":"false")})};
   el._paint=paint;return el}
  if(spec.type==="select"){el=h("select",{"class":"ord","aria-label":spec.aria||spec.label||key});var last="";

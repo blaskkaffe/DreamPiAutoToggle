@@ -69,7 +69,7 @@
  .srow.wrap{flex-wrap:wrap} .srow .below{flex-basis:100%}
  .srow.wrap > span:first-child{flex:1 1 0;min-width:0}   /* the text takes the room that is left and wraps; a button never gets pushed down below it */
  .srow.edit{align-items:flex-start}   /* a row with an Edit button: the button is always at the top right, however many lines the text has */
- .optrow{display:flex;gap:8px;flex-wrap:wrap} .optrow .pill-s{flex:1 1 auto;text-align:center} .frow .optrow{justify-content:flex-end} .frow .optrow .pill-s{flex:none}   /* a simple pick: the options as a row of buttons in a pop-up */
+ .optrow{display:grid;grid-template-columns:repeat(var(--n,3),minmax(0,1fr));gap:8px;width:100%} .optrow .pill-s{width:100%;min-width:0;white-space:normal;text-align:center;overflow-wrap:anywhere} .frow .optrow{width:auto;min-width:min(100%,24em)}   /* a simple pick: the options as a row of buttons in a pop-up */
  .wpicker .addarea{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
  .pop .frow.stack > span{text-align:left} .stackctl{display:flex;flex-direction:column;gap:8px;align-items:stretch;width:100%} .stackctl .rangev{max-width:none} .stackctl .frow{padding:0}
  .rows.noopen{cursor:default}
@@ -224,14 +224,16 @@
  html[data-rows] .rp-tile.rp-col .rp-gh,html[data-rows] .rp-tile.rp-col .rp-gh .sub{color:#fff;opacity:1}
  /* the status menu: in the middle of the screen, about 60 % of its width */
  .rp-modal{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.62)}
- .rp-sheet{position:relative;box-sizing:border-box;width:clamp(320px,60vw,900px);max-width:100%;max-height:96vh;overflow:auto;padding:20px;border-radius:var(--r-box);background:var(--pop);border:var(--bw) solid var(--ctl-line)}
- .rp-x{position:absolute;top:10px;right:10px;width:40px;height:40px;padding:0;border-radius:50%;background:rgba(255,255,255,.12);font-size:1.2em;line-height:1}
+ .rp-sheet,.rp-msheet{position:relative;box-sizing:border-box;width:clamp(320px,60vw,900px);max-width:100%;max-height:96vh;overflow:auto;padding:20px;border-radius:var(--r-box);background:var(--pop);border:var(--bw) solid var(--ctl-line)}
+ .rp-x,.rp-mx{position:absolute;top:10px;right:10px;width:40px;height:40px;padding:0;border-radius:50%;background:rgba(255,255,255,.12);font-size:1.2em;line-height:1}
  .rp-who{display:flex;align-items:center;gap:18px;margin:0 48px 16px 0} .rp-wt{min-width:0}
  .rp-cur{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;margin:0 0 16px} .rp-who .rp-av{flex:none}      /* the whole status under the person, as wide as the card: a long message wraps inside it */ .rp-curl{font-size:1.05em;color:var(--text-2)} .rp-curv{display:inline-block;max-width:100%;padding:4px 12px;border-radius:var(--r-ctl);font-size:1.1em;font-weight:600;overflow-wrap:anywhere;min-width:0;background:rgba(var(--primary-rgb),.82);border:var(--bw) solid rgb(var(--primary-l-rgb));color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55)} .rp-curv.none{background:var(--btn-bg);border-color:var(--btn-line);color:var(--text-2);text-shadow:none;font-weight:500}
  .rp-wn{font-size:1.6em;font-weight:600;line-height:1.2;overflow-wrap:break-word} .rp-wl{font-size:1.05em;color:var(--text-2);margin-top:2px;overflow-wrap:break-word}
  .cphoto{flex:none}
  /* a menu (a row that opens its settings under it) and a divider line */
- .wmenu > .msub{margin:0 0 6px 12px;padding:0 0 0 10px;border-left:var(--bw) solid var(--line)} .wmenu.open > .menuhead{border-bottom-color:transparent} .menubtn{min-width:5.2em}
+ .wmenu > .msub{display:none} .wmenu > .msub.open{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(0,0,0,.62);cursor:default}
+ .rp-menu{width:clamp(320px,46vw,680px);padding-top:20px} .rp-mt{margin:0 48px 12px 0;font-size:1.3em;font-weight:600} .rp-menu > .bar{margin-top:14px}
+ .srow .pill-s,.pop .bar .pill-s,.bar > .pill-s{min-width:6.5em}   /* the buttons of the rows and the pop-ups' Done / Add are one size */
  .wdiv{height:0;margin:8px 0;border-top:var(--bw) solid var(--line)}
  .rp-av{display:flex;align-items:center;justify-content:center;border-radius:50%;background-color:rgb(var(--primary-rgb));background-size:cover;background-position:center;color:#fff;font-weight:700}
  .rp-avb{width:96px;height:96px;font-size:2.2em}
@@ -339,3 +341,4 @@
  html[data-theme=light]:not(.dark-only) .console .l-err{color:#b3261e} html[data-theme=light]:not(.dark-only) .console .l-ok{color:#1b7a34}
  html[data-theme=light]:not(.dark-only) .console .l-dim{color:#8a8d96} html[data-theme=light]:not(.dark-only) .console .l-hd{color:#1b1c20} html[data-theme=light]:not(.dark-only) .console .l-mod{color:#5d6068}
  html[data-theme=light]:not(.dark-only) select.ord{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23444' stroke-width='1.6'/></svg>")}
+body.nocog #cog{display:none}   /* Settings is then reached at /settings */

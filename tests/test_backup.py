@@ -97,6 +97,16 @@ class Backup(unittest.TestCase):
         self.assertEqual(open(os.path.join(core.BASE_DIR, "contacts.json")).read(), before)
         self.assertEqual(self.call("POST", "/backup/restore", b"{}")[0], 400)
 
+    def test_settings_address_serves_the_page_and_the_cogwheel_can_be_hidden(self):
+        home = self.call("GET", "/")[1]
+        for path in ("/settings", "/settings/"):
+            status, body, _r = self.call("GET", path)
+            self.assertEqual((status, body), (200, home))                     # the page itself: it opens Settings by itself
+        self.assertEqual(self.call("POST", "/screen/nocog", json.dumps({"value": True}).encode())[0], 200)
+        self.assertTrue(json.loads(self.call("GET", "/api")[1].decode())["screen"]["nocog"])
+        self.assertEqual(self.call("POST", "/screen/nocog", json.dumps({"value": "yes"}).encode())[0], 200)      # not a boolean: ignored
+        self.assertTrue(json.loads(self.call("GET", "/api")[1].decode())["screen"]["nocog"])
+
     def test_restore_needs_the_pin_when_one_is_set(self):
         self.assertIn("/backup/restore", sw.PROTECTED)
         self.assertTrue(web.modules.protected("/backup/restore"))

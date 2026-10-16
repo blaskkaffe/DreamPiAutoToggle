@@ -379,7 +379,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   // the board colour picked in Settings recolours the boxes at once, in the light theme as in the dark one (no reload)
   const boxHead = () => page.evaluate(() => getComputedStyle(document.querySelector('.rp-gh')).backgroundColor);
   const before = await boxHead();
-  await openSettings(); await page.evaluate(() => document.querySelectorAll('.wmenu .menubtn[aria-expanded="false"]').forEach(b => b.click())); await settle(300);
+  await openSettings(); await page.addStyleTag({ content: '.wmenu > .msub{display:block!important;position:static!important;background:none!important;padding:0!important} .wmenu .rp-msheet{width:auto!important;max-height:none!important;border:0!important;box-shadow:none!important;padding:0 0 0 12px!important;background:none!important} .wmenu .rp-mx,.wmenu .rp-mt,.wmenu .rp-menu > .bar{display:none!important}' }); await settle(300);
   await page.locator('.srow', { hasText: 'Check-in board colour' }).locator('.colourpick > button').click(); await settle(400);
   await page.locator('.pop.open .swatch[aria-label="Red"]').click(); await settle(1500);
   const after = await boxHead();

@@ -52,7 +52,7 @@ ui.popup=function(el){
  var p={el:el,anchor:null,onclose:null};
  el.classList.add("pop");el.setAttribute("role","dialog");
  // the pop-up is placed inside the card it belongs to (the first time it opens it moves there, so it can use the card's whole width)
- function host(){var c=el.closest&&el.closest(".card");if(c&&el.parentNode!==c)c.appendChild(el);
+ function host(){var c=el.closest&&(el.closest(".rp-msheet")||el.closest(".card"));if(c&&el.parentNode!==c)c.appendChild(el);
   var par=el.parentNode;if(window.getComputedStyle(par).position==="static")par.style.position="relative";return par}
  p.isOpen=function(){return el.classList.contains("open")};
  p.open=function(anchor){ui.closePopups(p);p.anchor=anchor;var par=host();el.classList.add("open");
@@ -110,7 +110,10 @@ function render(d){
 var NOTICES=[];
 $("warnings").addEventListener("click",function(e){var b=e.target.closest&&e.target.closest(".nx");if(!b)return;var n=NOTICES[+b.getAttribute("data-n")];
  if(n&&n.post){b.disabled=true;xhrJson("POST",n.post,function(){refresh()},{id:n.id})}});
+// the address /settings opens Settings by itself (the cogwheel can be hidden on a screen); with a PIN set it asks for it first
+function settingsRoute(){return location.pathname.replace(/\/+$/,"")==="/settings"}
 function showSettings(open){$("settings").classList.toggle("open",open);
+ if(!open&&settingsRoute()){location.replace("/");return}      // /settings: closing it goes back to the board
  if(!open){fire("settingsClose");if(S.settings_pin&&S.settings_pin.on)pinValue=""}       // a locked Settings asks again next time
  document.body.classList.toggle("settings-open",open);
  if(!open&&SCR.noscroll)window.scrollTo(0,0);
@@ -141,7 +144,7 @@ window.addEventListener("resize",function(){applyScreen();if($("settings").class
 // whether they stretch. A column is about COLW px wide; there are as many as fit, up to the setting. Stretch: the columns share the whole width
 // (the boxes are wider). Scale content: a stretched box grows in step with its width (--z: the rows are taller, the spacing larger) but its text keeps its size;
 // the text has its own scaler (font_scale, 0.5 to 2: --fz) and colour (font_colour: --rp-text, black by default).
-var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,noscroll:false,fit:false,autohide:false,theme:"dark",font_scale:1,font_colour:"auto",sound:true,sound_name:"pop.wav",sound_volume:.6},COLW=428,SGAP=12,scrKey="";
+var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,noscroll:false,fit:false,autohide:false,nocog:false,theme:"dark",font_scale:1,font_colour:"auto",sound:true,sound_name:"pop.wav",sound_volume:.6},COLW=428,SGAP=12,scrKey="";
 function colsFor(max,W){return Math.max(1,Math.min(max,Math.floor((W+SGAP)/(COLW+SGAP))))}
 function scrZoom(n,W){return SCR.stretch&&SCR.scale?Math.max(1,((W-SGAP*(n-1))/n)/COLW):1}
 // The dashboard's boxes in dn columns: each box goes to the column that is shortest so far, in the order of the layout (so the first boxes are at
@@ -288,7 +291,7 @@ function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;applyLook();
   sn=colsFor(SCR.set_cols,W),key=[dn,dz,sn,pad,SCR.stretch,SCR.set_cols].join("/");
  var dash=$("dash"),b=document.body,inn=document.querySelector("#settings .in");
  document.documentElement.classList.toggle("noscroll",!!SCR.noscroll);
- document.body.classList.toggle("hdr-auto",!!SCR.autohide);if(!SCR.autohide)document.body.classList.remove("hdr-show");b.style.setProperty("--pad",pad+"px");
+ document.body.classList.toggle("nocog",!!SCR.nocog);document.body.classList.toggle("hdr-auto",!!SCR.autohide);if(!SCR.autohide)document.body.classList.remove("hdr-show");b.style.setProperty("--pad",pad+"px");
  b.style.maxWidth=wide?"none":(dn*COLW+(dn-1)*SGAP+2*pad)+"px";b.style.paddingLeft=b.style.paddingRight=pad+"px";
  dash.style.setProperty("--z",SCR.fit?fitState.z:dz);dash.classList.toggle("multi",dn>1);layoutDash(dn);applyGrips();
  if(SCR.fit)dash.style.setProperty("--z",fitZoom(dn,W));else{fitState={key:"",z:1};dash.style.removeProperty("--fz")}
@@ -298,19 +301,19 @@ function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;applyLook();
 // The PIN (when one is set with install.sh --pin) is asked for once per page load, before an action a module marks PROTECTED.
 var pinNeeded=false,pinValue="";
 // askPin(title, cb): a PIN pad in the middle of the screen (round number keys, a field that also takes the keyboard); cb(pin) when OK or Enter, nothing when it is cancelled
-var pinDlg=null;
-function askPin(title,cb){closePin();var m=h("div",{"class":"rp-modal keep-visible pinm",role:"dialog","aria-modal":"true","aria-label":title}),
+var pinDlg=null,pinCancel=null;
+function askPin(title,cb,cancel){closePin();pinCancel=cancel||null;var m=h("div",{"class":"rp-modal keep-visible pinm",role:"dialog","aria-modal":"true","aria-label":title}),
   inp=h("input",{type:"password","class":"pininp",autocomplete:"off",maxlength:64,"aria-label":title}),keys=h("div",{"class":"pinpad"});
  function key(label,act,aria){var b=h("button",{type:"button","class":"pill-s pinkey","data-k":act,text:ICO[label]?"":label});if(ICO[label])b.innerHTML=ICO[label];if(aria)b.setAttribute("aria-label",aria);return b}
  "123456789".split("").forEach(function(d){keys.appendChild(key(d,d))});keys.appendChild(key("\u2715","x","Cancel"));keys.appendChild(key("0","0"));keys.appendChild(key("back","back","Backspace"));
  var sheet=h("div",{"class":"rp-sheet pinsheet"},[h("div",{"class":"rp-wn",text:title}),inp,keys,h("button",{type:"button","class":"pill-s pri c-green pinok","data-k":"ok",text:"OK"})]);m.appendChild(sheet);
- function done(ok){var v=inp.value;closePin();if(ok&&v)cb(v)}
+ function done(ok){var v=inp.value,c=pinCancel;closePin();if(ok&&v)cb(v);else if(!ok&&c)c()}
  m.addEventListener("click",function(e){if(e.target===m){done(false);return}var b=e.target.closest&&e.target.closest("[data-k]");if(!b)return;var a=b.getAttribute("data-k");
   if(a==="x")done(false);else if(a==="ok")done(true);else if(a==="back")inp.value=inp.value.slice(0,-1);else if(inp.value.length<64)inp.value+=a;inp.focus()});
  inp.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();done(true)}});
  document.body.appendChild(m);pinDlg=m;inp.focus()}
 function closePin(){if(pinDlg&&pinDlg.parentNode)pinDlg.parentNode.removeChild(pinDlg);pinDlg=null}
-hook("escape",function(){if(pinDlg){closePin();return true}});
+hook("escape",function(){if(pinDlg){var c=pinCancel;closePin();if(c)c();return true}});
 // askConfirm(text, okLabel, cb): a small question pop-up (Cancel / okLabel); cb() when the answer is yes. Esc, the cross or a tap outside is no.
 function askConfirm(text,okLabel,cb){closePin();var m=h("div",{"class":"rp-modal keep-visible pinm",role:"alertdialog","aria-modal":"true","aria-label":text}),
  no=h("button",{type:"button","class":"pill-s rp-so",text:"Cancel"}),yes=h("button",{type:"button","class":"pill-s danger rp-so",text:okLabel||"OK"});
@@ -335,6 +338,11 @@ function xhrJson(method,url,cb,body){var x=new XMLHttpRequest(),counted=method!=
 function unlockThen(go){if(!(S.settings_pin&&S.settings_pin.on)||pinValue)return go();
  askPin("Enter the PIN to open Settings",function(p){pinValue=p;
   xhrJson("POST","/pin/check",function(r,st,b){if(r)return go();pinValue="";alert(b&&b.message?b.message:"Wrong PIN")},{})})}
+function openSettingsRoute(){var t0=Date.now();(function go(){
+ if(S.pin===undefined&&Date.now()-t0<5000){setTimeout(go,100);return}
+ if(!S.pin||pinValue){showSettings(true);return}
+ askPin("Enter the PIN to open Settings",function(p){pinValue=p;
+  xhrJson("POST","/pin/check",function(r,st,b){if(r){showSettings(true);return}pinValue="";alert(b&&b.message?b.message:"Wrong PIN");openSettingsRoute()},{})},function(){location.replace("/")})})()}
 $("cog").onclick=function(){unlockThen(function(){showSettings(true)})};
 $("close-settings").onclick=function(){showSettings(false)};
 document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(!fire("escape"))showSettings(false)}});
