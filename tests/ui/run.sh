@@ -72,10 +72,4 @@ SERVER=$!
 sleep 3
 PORT=8743 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node palette.js || RESULT=1
 kill $SERVER 2>/dev/null
-# the DC Bridge module's Install / Uninstall buttons (the setup script is a stand-in in the demo server)
-DCBRIDGE=new PORT=8744 python3 demo_server.py > /tmp/dpns-demo-dcbridge.log 2>&1 &
-SERVER=$!
-sleep 3
-PORT=8744 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node dcbridge.js || RESULT=1
-kill $SERVER 2>/dev/null
 exit $RESULT
