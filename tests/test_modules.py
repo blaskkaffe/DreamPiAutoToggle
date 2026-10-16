@@ -176,7 +176,7 @@ class WithEverything(Base):
         bg = menus["background"]["items"]
         self.assertEqual([w["mod"] for w in bg], ["imagebg", "imagebg", "imagebg", "snow", "snow"])                 # each background module: its switch, then its settings
         self.assertEqual([w["type"] for w in bg], ["row", "custom", "form", "row", "form"])
-        self.assertEqual([w["title"] for w in menus["layout"]["items"] if w["type"] == "row"], ["Hide the top bar", "Hide the cogwheel", "Stretch boxes", "Scale content", "Fit to screen"])
+        self.assertEqual([w["title"] for w in menus["layout"]["items"] if w["type"] == "row"], ["Hide the top bar", "Hide the top bar completely", "Hide the cogwheel", "Stretch boxes", "Scale content", "Fit to screen"])
         self.assertFalse(any(w.get("in") for w in appearance["items"]))                                            # nothing is left outside its menu
 
     def test_a_menu_with_nothing_in_it_is_still_a_valid_widget(self):

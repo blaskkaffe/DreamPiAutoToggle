@@ -64,6 +64,18 @@
       },
       {
        "type": "row",
+       "title": "Hide the top bar completely",
+       "sub": "Nothing is shown at the top, not even at the edge: no building buttons and no cogwheel. Settings is then at the address of this computer followed by /settings.",
+       "control": {
+        "type": "toggle",
+        "bind": "@screen.nobar",
+        "post": "/screen/nobar",
+        "label": "Hide the top bar completely"
+       },
+       "short": "Top bar gone"
+      },
+      {
+       "type": "row",
        "title": "Hide the cogwheel",
        "sub": "The cogwheel is out of sight on this screen. Settings is then at the address of this computer followed by /settings (it asks for the PIN when one is set).",
        "control": {

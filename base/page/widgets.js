@@ -163,13 +163,13 @@ function choosePin(ok,cancelled){
  askPin("New PIN (4 to 64 characters)",function(a){askPin("Enter the new PIN again",function(b){if(b!==a){alert("The two PINs are not the same.");if(cancelled)cancelled();return}
   withPin(function(){post("/pin",{pin:a},function(r,st){if(r){pinValue=a;refresh();if(ok)ok()}else{alert(st===400?"The PIN must be 4 to 64 characters.":"The PIN was not changed.");if(cancelled)cancelled()}})})})});
 }
-W.pinset=function(s,ctx){var set=h("button",{type:"button","class":"pill-s",text:"Set PIN"}),rem=h("button",{type:"button","class":"pill-s",text:"Remove"}),
+W.pinset=function(s,ctx){var set=h("button",{type:"button","class":"pill-s",text:"Set","aria-label":"Set PIN"}),rem=h("button",{type:"button","class":"pill-s",text:"Remove"}),
  el=h("span",{"class":"optrow"},[set,rem]);
  function send(pin,okText){withPin(function(){post("/pin",{pin:pin},function(r,st){if(r){pinValue=pin;alert(okText);refresh();ctx.saved()}
   else alert(st===400?"The PIN must be 4 to 64 characters.":"The PIN was not changed.")})})}
  set.onclick=function(e){e.stopPropagation();choosePin(function(){alert("The PIN is set.");ctx.saved()})};
  rem.onclick=function(e){e.stopPropagation();if(confirm("Remove the PIN?"))send("","The PIN is removed.")};
- function paint(){var has=!!(S.settings_pin&&S.settings_pin.pin);set.textContent=tr(has?"Change PIN":"Set PIN");sh(rem,has)}
+ function paint(){var has=!!(S.settings_pin&&S.settings_pin.pin);set.textContent=tr(has?"Change":"Set");set.setAttribute("aria-label",tr(has?"Change PIN":"Set PIN"));sh(rem,has)}
  UPD.push(paint);paint();return el};
 // "palette": the colour palette editor (Settings > Appearance): a row with an Edit button; its pop-up lists the palette, one row per colour: a handle (drag to move),
 // the colour (tap to change it), its name, Default (a changed colour of the add-on) and Delete. Add colour and Reset palette are under the list. Saved as it is done;

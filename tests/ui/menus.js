@@ -72,6 +72,23 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(new URL(page.url()).pathname === '/' && !(await opened()), 'closing it goes back to the board at /');
   ok(await post('/screen/nocog', { value: false }) === 200, 'Hide the cogwheel can be switched off');
 
+  // the top bar: hidden at the edge, it goes up again after use (also when the focus stays on its buttons); hidden completely it never shows
+  ok(await post('/screen/autohide', { value: true }) === 200, 'Hide the top bar is on');
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' }); await settle(1200);
+  const shown = () => page.evaluate(() => document.body.classList.contains('hdr-show'));
+  await page.mouse.move(640, 3); await settle(400);
+  ok(await shown(), 'the bar comes down at the top edge');
+  await page.mouse.move(640, 3); await page.click('#cog'); await settle(900); await page.evaluate(() => showSettings(false)); await page.mouse.move(640, 500); await settle(7000);      // tapped the cogwheel: it keeps the focus (not keyboard focus)
+  ok(!(await shown()), 'and goes up again after a few seconds although the cogwheel still has the focus');
+  ok(await post('/screen/nobar', { value: true }) === 200, 'Hide the top bar completely is on');
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' }); await settle(1200);
+  await page.mouse.move(640, 3); await settle(500);
+  ok(!(await page.locator('body > header').isVisible()) && !(await page.locator('#cog').isVisible()), 'the bar is not there, not even at the edge');
+  await page.goto(BASE + '/settings', { waitUntil: 'networkidle' }); await settle(1800);
+  ok(await opened(), '/settings still opens Settings');
+  await page.click('#close-settings'); await settle(800);
+  ok(await post('/screen/nobar', { value: false }) === 200 && await post('/screen/autohide', { value: false }) === 200, 'the bar is back to normal');
+
   // with a PIN set /settings asks for it
   ok(await post('/pin', { pin: '4821' }) === 200, 'a PIN is set');
   await page.goto(BASE + '/settings', { waitUntil: 'networkidle' }); await settle(1500);

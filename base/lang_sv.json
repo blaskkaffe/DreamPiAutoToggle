@@ -226,7 +226,11 @@
   "unknown": "okänd",
   "Hide the cogwheel": "Dölj kugghjulet",
   "Cogwheel hidden": "Kugghjulet dolt",
-  "The cogwheel is out of sight on this screen. Settings is then at the address of this computer followed by /settings (it asks for the PIN when one is set).": "Kugghjulet är dolt på den här skärmen. Inställningar finns då på datorns adress följt av /settings (PIN-koden frågas efter om en är satt)."
+  "The cogwheel is out of sight on this screen. Settings is then at the address of this computer followed by /settings (it asks for the PIN when one is set).": "Kugghjulet är dolt på den här skärmen. Inställningar finns då på datorns adress följt av /settings (PIN-koden frågas efter om en är satt).",
+  "Change": "Byt",
+  "Hide the top bar completely": "Dölj översta raden helt",
+  "Top bar gone": "Översta raden borta",
+  "Nothing is shown at the top, not even at the edge: no building buttons and no cogwheel. Settings is then at the address of this computer followed by /settings.": "Inget visas högst upp, inte ens vid kanten: inga byggnadsknappar och inget kugghjul. Inställningar finns då på datorns adress följt av /settings."
  },
  "patterns": [
   [

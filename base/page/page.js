@@ -139,7 +139,7 @@ window.addEventListener("resize",function(){applyScreen();if($("settings").class
 // whether they stretch. A column is about COLW px wide; there are as many as fit, up to the setting. Stretch: the columns share the whole width
 // (the boxes are wider). Scale content: a stretched box grows in step with its width (--z: the rows are taller, the spacing larger) but its text keeps its size;
 // the text has its own scaler (font_scale, 0.5 to 2: --fz) and colour (font_colour: --rp-text, black by default).
-var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,noscroll:false,fit:false,autohide:false,nocog:false,theme:"dark",font_scale:1,font_colour:"auto",sound:true,sound_name:"pop.wav",sound_volume:.6},COLW=428,SGAP=12,scrKey="";
+var SCR={dash_cols:1,set_cols:4,stretch:false,scale:false,drag:false,noscroll:false,fit:false,autohide:false,nocog:false,nobar:false,theme:"dark",font_scale:1,font_colour:"auto",sound:true,sound_name:"pop.wav",sound_volume:.6},COLW=428,SGAP=12,scrKey="";
 function colsFor(max,W){return Math.max(1,Math.min(max,Math.floor((W+SGAP)/(COLW+SGAP))))}
 function scrZoom(n,W){return SCR.stretch&&SCR.scale?Math.max(1,((W-SGAP*(n-1))/n)/COLW):1}
 // The dashboard's boxes in dn columns: each box goes to the column that is shortest so far, in the order of the layout (so the first boxes are at
@@ -286,7 +286,7 @@ function applyScreen(fromSettings){var s=S.screen;if(s)SCR=s;applyLook();
   sn=colsFor(SCR.set_cols,W),key=[dn,dz,sn,pad,SCR.stretch,SCR.set_cols].join("/");
  var dash=$("dash"),b=document.body,inn=document.querySelector("#settings .in");
  document.documentElement.classList.toggle("noscroll",!!SCR.noscroll);
- document.body.classList.toggle("nocog",!!SCR.nocog);document.body.classList.toggle("hdr-auto",!!SCR.autohide);if(!SCR.autohide)document.body.classList.remove("hdr-show");b.style.setProperty("--pad",pad+"px");
+ document.body.classList.toggle("nocog",!!SCR.nocog);document.body.classList.toggle("nobar",!!SCR.nobar);document.body.classList.toggle("hdr-auto",!!SCR.autohide);if(!SCR.autohide)document.body.classList.remove("hdr-show");b.style.setProperty("--pad",pad+"px");
  b.style.maxWidth=wide?"none":(dn*COLW+(dn-1)*SGAP+2*pad)+"px";b.style.paddingLeft=b.style.paddingRight=pad+"px";
  dash.style.setProperty("--z",SCR.fit?fitState.z:dz);dash.classList.toggle("multi",dn>1);layoutDash(dn);applyGrips();
  if(SCR.fit)dash.style.setProperty("--z",fitZoom(dn,W));else{fitState={key:"",z:1};dash.style.removeProperty("--fz")}
@@ -301,7 +301,7 @@ function askPin(title,cb,cancel){closePin();pinCancel=cancel||null;var m=h("div"
   inp=h("input",{type:"password","class":"pininp",autocomplete:"off",maxlength:64,"aria-label":title}),keys=h("div",{"class":"pinpad"});
  function key(label,act,aria){var b=h("button",{type:"button","class":"pill-s pinkey","data-k":act,text:ICO[label]?"":label});if(ICO[label])b.innerHTML=ICO[label];if(aria)b.setAttribute("aria-label",aria);return b}
  "123456789".split("").forEach(function(d){keys.appendChild(key(d,d))});keys.appendChild(key("\u2715","x","Cancel"));keys.appendChild(key("0","0"));keys.appendChild(key("back","back","Backspace"));
- var sheet=h("div",{"class":"rp-sheet pinsheet"},[h("div",{"class":"rp-wn",text:title}),inp,keys,h("button",{type:"button","class":"pill-s pri c-green pinok","data-k":"ok",text:"OK"})]);m.appendChild(sheet);
+ var sheet=h("div",{"class":"rp-sheet pinsheet"},[h("button",{type:"button","class":"rp-x","data-k":"x",title:"Cancel","aria-label":"Cancel",text:"\u2715"}),h("div",{"class":"rp-wn",text:title}),inp,keys,h("button",{type:"button","class":"pill-s pri c-green pinok","data-k":"ok",text:"OK"})]);m.appendChild(sheet);
  function done(ok){var v=inp.value,c=pinCancel;closePin();if(ok&&v)cb(v);else if(!ok&&c)c()}
  m.addEventListener("click",function(e){if(e.target===m){done(false);return}var b=e.target.closest&&e.target.closest("[data-k]");if(!b)return;var a=b.getAttribute("data-k");
   if(a==="x")done(false);else if(a==="ok")done(true);else if(a==="back")inp.value=inp.value.slice(0,-1);else if(inp.value.length<64)inp.value+=a;inp.focus()});
@@ -312,9 +312,10 @@ hook("escape",function(){if(pinDlg){var c=pinCancel;closePin();if(c)c();return t
 // askConfirm(text, okLabel, cb): a small question pop-up (Cancel / okLabel); cb() when the answer is yes. Esc, the cross or a tap outside is no.
 function askConfirm(text,okLabel,cb){closePin();var m=h("div",{"class":"rp-modal keep-visible pinm",role:"alertdialog","aria-modal":"true","aria-label":text}),
  no=h("button",{type:"button","class":"pill-s rp-so",text:"Cancel"}),yes=h("button",{type:"button","class":"pill-s danger rp-so",text:okLabel||"OK"});
- m.appendChild(h("div",{"class":"rp-sheet pinsheet"},[h("div",{"class":"rp-wn",text:text}),h("div",{"class":"rp-nb"},[no,yes])]));
+ var xb=h("button",{type:"button","class":"rp-x",title:"Cancel","aria-label":"Cancel",text:"\u2715"});
+ m.appendChild(h("div",{"class":"rp-sheet pinsheet"},[xb,h("div",{"class":"rp-wn",text:text}),h("div",{"class":"rp-nb"},[no,yes])]));
  function done(ok){closePin();if(ok)cb()}
- m.addEventListener("click",function(e){if(e.target===m)done(false)});no.onclick=function(){done(false)};yes.onclick=function(){done(true)};
+ m.addEventListener("click",function(e){if(e.target===m)done(false)});no.onclick=xb.onclick=function(){done(false)};yes.onclick=function(){done(true)};
  document.body.appendChild(m);pinDlg=m;no.focus()}
 function withPin(go){if(!pinNeeded||pinValue)return go();askPin("Enter the PIN",function(p){pinValue=p;go()})}
 // A screen names itself with ?screen=<id> in its address (a kiosk computer: its serial number); the id is kept for this tab and sent with every
@@ -347,7 +348,8 @@ document.addEventListener("keydown",function(e){if(e.key=="Escape"){if(!fire("es
 var hdrTimer=null,hdrHot=null;
 function hdrShow(){var b=document.body;if(!b.classList.contains("hdr-auto"))return;b.classList.add("hdr-show");clearTimeout(hdrTimer);hdrTimer=setTimeout(hdrHide,4000)}
 function hdrHide(){var hd=document.querySelector("body > header"),m=document.querySelector(".rp-chipmenu");
- if((hd&&(hd.matches(":hover")||hd.contains(document.activeElement)))||(m&&m.style.display!=="none")){hdrTimer=setTimeout(hdrHide,2000);return}document.body.classList.remove("hdr-show")}
+ var mouse=window.matchMedia&&matchMedia("(hover:hover)").matches,kbd=false;try{kbd=!!(hd&&hd.querySelector(":focus-visible"))}catch(e){}      // a tap leaves the focus (and a touch screen's "hover") on the bar: that must not keep it down
+ if((hd&&((mouse&&hd.matches(":hover"))||kbd))||(m&&m.style.display!=="none")){hdrTimer=setTimeout(hdrHide,2000);return}document.body.classList.remove("hdr-show")}
 document.addEventListener("pointermove",function(e){if(e.clientY<=8)hdrShow()});
 document.addEventListener("pointerdown",function(e){if(e.clientY<=28)hdrShow()});
 document.addEventListener("focusin",function(e){var hd=document.querySelector("body > header");if(hd&&hd.contains(e.target))hdrShow()});

@@ -343,3 +343,5 @@
  html[data-theme=light]:not(.dark-only) .console .l-dim{color:#8a8d96} html[data-theme=light]:not(.dark-only) .console .l-hd{color:#1b1c20} html[data-theme=light]:not(.dark-only) .console .l-mod{color:#5d6068}
  html[data-theme=light]:not(.dark-only) select.ord{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23444' stroke-width='1.6'/></svg>")}
 body.nocog #cog{display:none}   /* Settings is then reached at /settings */
+body.nobar > header{display:none}   /* the top bar gone for good: Settings is at /settings */
+#settings .srow > input[type=text]{width:auto;flex:0 1 14em;min-width:8em;margin:0}   /* a text box on a row (the page title) is no wider than a short line needs */

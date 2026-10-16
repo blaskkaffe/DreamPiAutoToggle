@@ -736,7 +736,7 @@ def save_settings_pin(on):
 
 # ---- screen layout: how many columns the dashboard and Settings may use on a wide screen, and whether the boxes stretch to fill it
 THEMES = ("dark", "light", "auto", "time")      # "auto": like the device's own setting; "time": light by day, dark by night at the common time zone
-SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "nocog": False, "theme": "dark", "font_scale": 1.0, "font_colour": "auto",
+SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "nocog": False, "nobar": False, "theme": "dark", "font_scale": 1.0, "font_colour": "auto",
                    "sound": True, "sound_name": "pop.wav", "sound_volume": 0.6}
 MAX_COLUMNS = 6
 SOUNDS_DIR = os.path.join(BASE_DIR, "sounds")   # the button sounds: the add-on's own (pop.wav ...) and any .wav / .mp3 / .ogg the user copies in by hand
@@ -812,7 +812,7 @@ def screen_settings():
             v = data.get(k)
             if isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= MAX_COLUMNS:
                 out[k] = v
-        for k in ("stretch", "scale", "drag", "noscroll", "fit", "autohide", "nocog"):
+        for k in ("stretch", "scale", "drag", "noscroll", "fit", "autohide", "nocog", "nobar"):
             if isinstance(data.get(k), bool):
                 out[k] = data[k]
         if data.get("theme") in THEMES:
@@ -841,7 +841,7 @@ def save_screen_settings(changes):
                 continue
             if 1 <= v <= MAX_COLUMNS:
                 cur[k] = v
-        elif k in ("stretch", "scale", "drag", "noscroll", "fit", "autohide", "nocog") and isinstance(v, bool):
+        elif k in ("stretch", "scale", "drag", "noscroll", "fit", "autohide", "nocog", "nobar") and isinstance(v, bool):
             cur[k] = v
         elif k == "theme" and v in THEMES:
             cur[k] = v
