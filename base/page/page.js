@@ -22,7 +22,7 @@ function trTree(o){if(I18N.lang==="en")return;
  else if(o&&typeof o==="object"){for(var k in o){var v=o[k];if(typeof v==="string"){if(!TR_SKIP[k]&&v.charAt(0)!=="@")o[k]=tr(v,true)}else if(!TR_SKIP[k])trTree(v)}}}
 // the text nodes and the title / aria-label / placeholder of a piece of the page that was written in English (the frame, a module's HTML file)
 function trDom(root){if(I18N.lang==="en"||!root)return;
- var w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null,false),n,list=[];while((n=w.nextNode()))list.push(n);
+ var w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:function(t){var p=t.parentNode&&t.parentNode.nodeName;return p==='SCRIPT'||p==='STYLE'?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT}},false),n,list=[];while((n=w.nextNode()))list.push(n);
  list.forEach(function(t){var v=t.nodeValue,m=/^(\s*)([\s\S]*?)(\s*)$/.exec(v);if(m[2]){var x=tr(m[2]);if(x!==m[2])t.nodeValue=m[1]+x+m[3]}});
  Array.prototype.forEach.call(root.querySelectorAll?root.querySelectorAll("[title],[aria-label],[placeholder]"):[],function(e){["title","aria-label","placeholder"].forEach(function(a){var v=e.getAttribute(a);if(v){var x=tr(v);if(x!==v)e.setAttribute(a,x)}})})}
 (function(){var a=window.alert,c=window.confirm;window.alert=function(m){return a.call(window,tr(String(m)))};window.confirm=function(m){return c.call(window,tr(String(m)))}})();

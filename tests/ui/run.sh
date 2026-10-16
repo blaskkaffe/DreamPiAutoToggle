@@ -20,6 +20,7 @@ run functional.js IN=0 FAKEUPDATE=1
 run boot.js
 run outage.js IN=3
 run datetime.js IN=3
+run swedish.js IN=6 LANG_UI=sv FAKEUPDATE=1
 # the update controls: Check shows the Update now row at once, a finished update reloads the page with Settings open
 run update.js FAKEUPDATE=1
 # an update from a USB stick that has an update folder

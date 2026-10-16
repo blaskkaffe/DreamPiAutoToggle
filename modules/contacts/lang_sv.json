@@ -48,7 +48,11 @@
   ],
   [
    "^(\\d+) on the board, (\\d+) switched off$",
-   "$1 på tavlan, $2 avstängda"
+   "$1 på tavlan, $2 {2?avstängd:avstängda}"
+  ],
+  [
+   "^(.+) on the board$",
+   "$1 på tavlan"
   ],
   [
    "^(\\d+) on the board$",
@@ -56,11 +60,11 @@
   ],
   [
    "^Imported: (\\d+) new, (\\d+) changed, (\\d+) unchanged(.*)$",
-   "Importerat: $1 nya, $2 ändrade, $3 oförändrade$4"
+   "Importerat: $1 {1?ny:nya}, $2 {2?ändrad:ändrade}, $3 {3?oförändrad:oförändrade}$4"
   ],
   [
    "^, (\\d+) switched off(.*)$",
-   ", $1 avstängda$2"
+   ", $1 {1?avstängd:avstängda}$2"
   ],
   [
    "^, (\\d+) rows? without a name skipped$",
