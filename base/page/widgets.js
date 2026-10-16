@@ -1002,6 +1002,7 @@ W.form=function(s,ctx){var el=h("div",{"class":"wform"}),F={values:{},options:{}
 // ---- drag and drop ordering: rows of a container, each with a ".grip" handle. Grab the handle (mouse, finger or pen) and move the row;
 // the others make room as it passes them and onDone(names) gets the new order of the rows' data-id values when it is dropped.
 // The handle also takes the arrow keys (up / down move the row, then onDone), so it works without a pointer. Esc while dragging cancels.
+function scrollerOf(box){for(var n=box;n&&n!==document.body&&n.nodeType===1;n=n.parentNode){var oy=getComputedStyle(n).overflowY;if((oy==="auto"||oy==="scroll")&&n.scrollHeight>n.clientHeight)return n}return $("settings")}
 function sortable(box,onDone){
  function hasId(el){return !!el&&el.hasAttribute&&el.hasAttribute("data-id")}
  function rows(){return Array.prototype.filter.call(box.children,hasId)}
@@ -1011,7 +1012,7 @@ function sortable(box,onDone){
  rows().forEach(function(row){var grip=row.querySelector(".grip");if(!grip)return;
   grip.addEventListener("pointerdown",function(e){
    if(e.pointerType==="mouse"&&e.button!==0)return;
-   e.preventDefault();var start=names(),grab=e.clientY-row.getBoundingClientRect().top,y=e.clientY,tx=0,done=false,pid=e.pointerId,scroller=$("settings");
+   e.preventDefault();var start=names(),grab=e.clientY-row.getBoundingClientRect().top,y=e.clientY,tx=0,done=false,pid=e.pointerId,scroller=scrollerOf(box);
    try{grip.setPointerCapture(pid)}catch(x){}
    row.classList.add("drag");box.classList.add("dragging");
    // The grabbed row itself is never taken out of the document and put back (iOS Safari ends a touch whose element is re-inserted):
@@ -1024,8 +1025,9 @@ function sortable(box,onDone){
      else if(hasId(next)&&c>mid(next))box.insertBefore(next,row);
      else break}}
    function move(ev){if(ev.pointerId!==pid)return;y=ev.clientY;place()}
-   var scroll=setInterval(function(){var hh=window.innerHeight;                        // near the top / bottom edge: scroll Settings along
-    if(y<70)scroller.scrollTop-=14;else if(y>hh-70)scroller.scrollTop+=14;else return;place()},16);
+   var scroll=setInterval(function(){var top=0,bottom=window.innerHeight;                        // near the top / bottom edge: scroll along (the list, when it scrolls itself, else Settings)
+    if(scroller!==$("settings")){var rc=scroller.getBoundingClientRect();top=Math.max(0,rc.top);bottom=Math.min(bottom,rc.bottom)}
+    if(y<top+70)scroller.scrollTop-=14;else if(y>bottom-70)scroller.scrollTop+=14;else return;place()},16);
    function finish(cancel){if(done)return;done=true;clearInterval(scroll);
     grip.removeEventListener("pointermove",move);grip.removeEventListener("pointerup",up);grip.removeEventListener("pointercancel",lost);
     grip.removeEventListener("lostpointercapture",lost);document.removeEventListener("keydown",esc,true);
@@ -1044,6 +1046,34 @@ function sortable(box,onDone){
    if(!hasId(other))return;
    if(e.key==="ArrowUp")box.insertBefore(row,other);else box.insertBefore(other,row);
    grip.focus();clearTimeout(keyTimer);keyTimer=setTimeout(function(){onDone(names())},900)})})}
+// ---- a list that is edited in a pop-up, like the module picker: a row in the box (title, a grey line, an Edit button) whose pop-up lists the items, each with
+// a drag handle (drag it, or use the arrow keys, to move the item). Tap an item (not its handle or its switch) to edit it. The list is made by a module's
+// own widget (statuses, people); the look and the drag are the kit's.
+//   orderEditor(host, {title, help, sub(items) -> grey line, item(it) -> {id, title, sub, colour, group, control}, onOrder(ids), onEdit(it), add: "Add ...", onAdd(), canAdd(items)})
+//   returns {set(items), open(), close(), isOpen()}; set() is called again whenever the items change (it does not redraw while a handle is being dragged).
+//   item(): colour = a palette id for the dot before the title; group = a heading, items with the same one must follow each other (a handle moves its item
+//   inside its group); control = an element at the right (a switch).
+function orderEditor(host,o){
+ var btn=h("button",{type:"button","class":"pill-s",text:"Edit","aria-haspopup":"dialog"}),subEl=h("span",{"class":"sub"}),list=h("div",{"class":"mlist olist"}),
+  done=h("button",{type:"button","class":"pill-s",text:"Done"}),add=o.add?h("button",{type:"button","class":"pill-s",text:o.add}):null,
+  pop=h("div",{},[h("div",{"class":"t",text:o.help||"Tap an item to edit it, drag the handle to move it."}),list,h("div",{"class":"bar end"},add?[add,done]:[done])]),
+  row=h("div",{"class":"srow edit"},[h("span",{},[document.createTextNode(o.title),subEl]),btn]),items=[],key="",p,byId={};
+ host.appendChild(row);host.appendChild(pop);p=ui.popup(pop);
+ function paint(){list.innerHTML="";var shown;byId={};
+  items.forEach(function(it){var d=o.item(it);byId[d.id]=it;
+   if(d.group!==undefined&&d.group!==shown){shown=d.group;list.appendChild(h("div",{"class":"sub grp",text:d.group}))}
+   var grip=h("button",{type:"button","class":"grip",title:"Drag to move (or use the up and down arrow keys)","aria-label":"Move "+d.title+": drag, or use the up and down arrow keys",html:GRIP_SVG}),
+    left=h("span",{},[d.colour?h("span",{"class":"dot c-"+d.colour+" rp-sw"}):document.createTextNode(""),document.createTextNode(d.title),d.sub?h("span",{"class":"sub",text:d.sub}):document.createTextNode("")]),
+    r=h("div",{"class":"srow rp-edit","data-id":d.id,title:"Edit "+d.title},d.control?[grip,left,d.control]:[grip,left]);
+   r.addEventListener("click",function(e){if(e.target.closest&&e.target.closest("input,label,button"))return;o.onEdit(it)});
+   list.appendChild(r)});
+  sortable(list,function(ids){items=ids.map(function(i){return byId[i]}).filter(Boolean);key=JSON.stringify(items);o.onOrder(ids)})}
+ var api={set:function(l){items=l||[];setText(subEl,o.sub(items));if(add)sh(add,!o.canAdd||o.canAdd(items));
+   var k=JSON.stringify(items);if(k===key||list.classList.contains("dragging"))return;key=k;paint()},
+  open:function(){p.open(btn)},close:function(){p.close()},isOpen:function(){return p.isOpen()}};
+ btn.onclick=function(e){e.stopPropagation();if(p.isOpen())p.close();else p.open(btn)};done.onclick=function(){p.close()};
+ if(add)add.onclick=function(e){e.stopPropagation();o.onAdd()};
+ return api}
 // ---- the module picker (the loader's own row in System): an Edit button opens a pop-up with every module - drag a row by its handle to
 // move it, tick or untick its switch (the always-on ones have none) - and nothing is applied until it is closed with Done (or Esc, or a
 // click outside); then the changes are saved and the page is built again with Settings still open.

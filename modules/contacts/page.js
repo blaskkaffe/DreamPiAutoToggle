@@ -11,10 +11,10 @@ custom("contacts-import",function(host){
    setText(msg,(b&&b.message)||"The import did not work");
    if(r&&r.ok){ta.value="";file.value="";setText(fname,"No file chosen");reloadData("contacts");refresh()}})}});
 
-// The people on file, one row each with a switch for "on the board" (the standard row and toggle widgets, built from the data source /contacts).
-// A tap on a row (not on its switch) opens a pop-up to edit the person: name, department, role, phone, building (POST /contacts/person).
+// The people on file: a row with an Edit button opens the list in a pop-up (orderEditor() in page/widgets.js; one row each with a drag handle and a switch for
+// "on the board", built from the data source /contacts). A tap on a person (not on the handle or the switch) opens a pop-up to edit the person: name, department, role, phone, building (POST /contacts/person).
 custom("contacts-people",function(host){var key="",box=host.querySelector(".cpeople"),modal=h("div",{"class":"rp-modal keep-visible",style:"display:none"}),list0=[];
- document.body.appendChild(modal);box.style.maxHeight="46vh";box.style.overflowY="auto";
+ document.body.appendChild(modal);
  var FIELDS=[["name","Name","text"],["department","Department","text"],["role","Role","text"],["phone","Phone","tel"],["location","Building","text"]];
  function close(){modal.style.display="none";modal.innerHTML=""}
  function edit(p){modal.innerHTML='<div class="rp-sheet rp-need2" role="dialog" aria-modal="true" aria-label="Edit '+esc(p.title)+'"><button type="button" class="rp-x" data-close="1" title="Close" aria-label="Close">&#10005;</button>'+
@@ -51,7 +51,13 @@ custom("contacts-people",function(host){var key="",box=host.querySelector(".cpeo
   img.onerror=function(){URL.revokeObjectURL(url);alert("That file is not a picture")};img.src=url;e.target.value=""});
  modal.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target.type!=="checkbox"){e.preventDefault();save()}});
  hook("escape",function(){if(modal.style.display!=="none"){close();return true}});
- bind("@contacts.people",function(list){list=list||[];var k=JSON.stringify(list);if(k===key)return;key=k;list0=list;box.innerHTML="";
-  list.forEach(function(p){var row=build({type:"row",title:p.title,sub:p.tag,control:{type:"toggle",bind:p.active,post:"/contacts/active",body:{id:p.id},label:p.title+" on the board"}},{saved:function(){reloadData("contacts")}});
-   row.classList.add("rp-edit");row.setAttribute("title","Edit "+p.title);
-   row.addEventListener("click",function(e){if(e.target.closest&&e.target.closest("input,label,button"))return;edit(p)});box.appendChild(row)})})});
+ // the people are edited in a pop-up like the Modules menu: a handle to drag a person (the order of the rows inside a department on the board), the switch for "on the
+ // board", a tap on a person to edit them. The list is grouped by department; a handle moves a person inside their department.
+ var ed=orderEditor(box,{title:"People",help:"Tap a person to edit them, drag the handle to move them inside their department (the order of the rows on the board). The switch takes a person off the board.",
+  sub:function(l){var on=l.filter(function(p){return p.active}).length;return on+" on the board"+(on===l.length?"":", "+(l.length-on)+" switched off")},
+  item:function(p){var tg=build({type:"toggle",bind:p.active,post:"/contacts/active",body:{id:p.id},label:p.title+" on the board"},{saved:function(){reloadData("contacts")}});
+   return {id:p.id,title:p.title,sub:p.tag,group:p.department,control:tg}},
+  onEdit:edit,onOrder:function(ids){post("/contacts/order",{order:ids},function(r){if(r){reloadData("contacts");refresh()}})}});
+ bind("@contacts.people",function(list){list=list||[];var k=JSON.stringify(list);if(k===key)return;key=k;list0=list;
+  var seen=[],by={};list.forEach(function(p){if(!by[p.department]){by[p.department]=[];seen.push(p.department)}by[p.department].push(p)});
+  ed.set(seen.reduce(function(a,d){return a.concat(by[d])},[]))})});

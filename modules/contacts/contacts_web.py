@@ -195,6 +195,26 @@ def export_csv():
     return out.getvalue()
 
 
+def set_order(ids):
+    """The order of the people: the given ids first, in that order, then the others as they were. It decides the order of the rows inside a department on the
+    board. Returns the number of people moved to the front, None when ids is not a list of ids."""
+    if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids) or len(ids) > MAX_PEOPLE * 2:
+        return None
+    with _lock:
+        data = read()
+        by_id = dict((p["id"], p) for p in data["people"])
+        first = []
+        for i in ids:
+            if i in by_id and by_id[i] not in first:
+                first.append(by_id[i])
+        rest = [p for p in data["people"] if p not in first]
+        for n, p in enumerate(first + rest):
+            p["order"] = n
+        data["people"] = first + rest
+        _write(data)
+    return len(first)
+
+
 def view():
     """What the Settings box shows: counts and the people (inactive ones are greyed in the list and can be brought back)."""
     people = read()["people"]
@@ -258,6 +278,16 @@ def _post_delete(h):
     except (ValueError, UnicodeDecodeError, AttributeError):
         ok = False
     h.send(json.dumps({"ok": ok, "message": "Deleted" if ok else "Unknown person"}), "application/json", status=200 if ok else 400)
+    return True
+
+
+def _post_order(h):
+    try:
+        body = json.loads(h._body(65536).decode("utf-8"))
+        n = set_order(body.get("order"))
+    except (ValueError, UnicodeDecodeError, AttributeError):
+        n = None
+    h.send(json.dumps({"ok": n is not None}), "application/json", status=200 if n is not None else 400)
     return True
 
 
@@ -335,8 +365,8 @@ def _get_photo(h):
 
 GET = {"/contacts": _get_view, "/contacts.csv": _get_csv}
 GET_PREFIX = {"/contacts/photo/": _get_photo}
-POST = {"/contacts/import": _post_import, "/contacts/active": _post_active, "/contacts/person": _post_person, "/contacts/delete": _post_delete, "/contacts/photo": _post_photo}
-PROTECTED = ("/contacts/import", "/contacts/active", "/contacts/person", "/contacts/delete")
+POST = {"/contacts/import": _post_import, "/contacts/active": _post_active, "/contacts/order": _post_order, "/contacts/person": _post_person, "/contacts/delete": _post_delete, "/contacts/photo": _post_photo}
+PROTECTED = ("/contacts/import", "/contacts/active", "/contacts/order", "/contacts/person", "/contacts/delete")
 OPEN = ("/contacts/photo",)          # a photo is set from the status menu on the board
 
 

@@ -1,5 +1,6 @@
-// The check-in module's one custom widget: the status menu editor (Settings > Statuses). Each status is a row (tap it to edit: name, colour, the extra field it
-// asks for, prefix, start time, whether it checks the person out, whether it is sticky, dots); the arrows move it, Add status makes a new one.
+// The check-in module's one custom widget: the status menu editor (Settings > Statuses). A row with an Edit button opens the list in a pop-up (orderEditor() in
+// page/widgets.js, like the Modules menu): tap a status to edit it (name, colour, the extra field it asks for, text before, start time, whether it checks the
+// person out, whether it is sticky, dots), drag its handle to move it, Add status makes a new one.
 // The whole list is POSTed to /checkin/statuses.
 custom("checkin-statuses",function(host){var box=host.querySelector(".cstatuses"),modal=h("div",{"class":"rp-modal keep-visible",style:"display:none"}),key="",items=[],editing=-1;
  document.body.appendChild(modal);
@@ -7,17 +8,13 @@ custom("checkin-statuses",function(host){var box=host.querySelector(".cstatuses"
  function colours(){return PAL()}
  function summary(s){var t=[];if(s.needs)t.push({time:"asks for a time",date:"asks for a date",datetime:"asks for a date and a time",note:"asks for a note"}[s.needs]);if(s.out)t.push("checks out");if(s.sticky)t.push("sticky");if(s.dots)t.push(s.dots+" dot"+(s.dots>1?"s":""));return t.join(" · ")}
  function save(list,done){post("/checkin/statuses",{statuses:list},function(r,st,b){if(r&&r.ok){refresh();if(done)done(true,b)}else if(done)done(false,b)})}
- function paint(list){items=list||[];var k=JSON.stringify(items);if(k===key)return;key=k;box.innerHTML="";
-  var add=h("button",{type:"button","class":"pill-s",text:"Add status"});add.onclick=function(){edit(-1)};sh(add,items.length<16);
-  box.appendChild(h("div",{"class":"bar end"},[add]));
-  items.forEach(function(s,i){var row=h("div",{"class":"srow rp-edit",title:"Edit "+s.label});
-   var up=h("button",{type:"button","class":"pill-s",text:"▲","aria-label":"Move "+s.label+" up"}),dn=h("button",{type:"button","class":"pill-s",text:"▼","aria-label":"Move "+s.label+" down"});
-   up.disabled=i===0;dn.disabled=i===items.length-1;
-   function move(d){var l=items.slice(),t=l[i];l.splice(i,1);l.splice(i+d,0,t);save(l)}
-   up.onclick=function(e){e.stopPropagation();move(-1)};dn.onclick=function(e){e.stopPropagation();move(1)};
-   row.appendChild(h("span",{},[h("span",{"class":"dot c-"+s.colour+" rp-sw"}),document.createTextNode(s.label),h("div",{"class":"sub",text:summary(s)})]));
-   row.appendChild(h("span",{"class":"ctls"},[up,dn]));
-   row.addEventListener("click",function(e){if(e.target.closest&&e.target.closest("button"))return;edit(i)});box.appendChild(row)})}
+ // the list is edited in a pop-up like the Modules menu: tap a status to change it, drag its handle to move it (the order is the order of the buttons in the status menu)
+ var ed=orderEditor(box,{title:"Statuses",help:"Tap a status to change it, drag the handle to move it. The order is the order of the buttons in the status menu on the board.",
+  sub:function(l){return l.length+" status"+(l.length===1?"":"es")},
+  item:function(s){return {id:s.code,title:s.label,sub:summary(s),colour:s.colour}},
+  onEdit:function(s){edit(items.indexOf(s))},add:"Add status",onAdd:function(){edit(-1)},canAdd:function(l){return l.length<16},
+  onOrder:function(ids){var by={};items.forEach(function(s){by[s.code]=s});save(ids.map(function(c){return by[c]}).filter(Boolean))}});
+ function paint(list){items=list||[];ed.set(items)}
  function field(label,inner,id){return '<label class="rp-nl" data-row="'+id+'">'+label+inner+'</label>'}
  function edit(i){editing=i;var s=i>=0?items[i]:{label:"",colour:"blue",needs:"",out:false,sticky:false,dots:0,prefix:"",default:""};
   modal.innerHTML='<div class="rp-sheet rp-need2" role="dialog" aria-modal="true" aria-label="'+(i>=0?"Edit "+esc(s.label):"New status")+'"><button type="button" class="rp-x" data-close="1" title="Close" aria-label="Close">&#10005;</button>'+

@@ -304,6 +304,21 @@ class BoardTests(Base):
         s = checkin.statuses()[0]
         self.assertEqual((s["default"], s["colour"], s["code"]), ("", "white", "FYS"))
 
+    def test_the_order_of_the_people_is_set_by_drag_and_drop(self):
+        contacts.import_csv(CSV)
+        ids = dict((p["name"], p["id"]) for p in contacts.read()["people"])
+        kok = lambda: [p["name"] for g in checkin.snapshot()["groups"] if g["title"] == "Kök" for p in g["people"]]
+        self.assertEqual(kok(), ["Anna Svensson", "Erik Lindqvist"])
+        self.assertEqual(contacts.set_order([ids["Erik Lindqvist"], ids["Anna Svensson"]]), 2)
+        self.assertEqual(kok(), ["Erik Lindqvist", "Anna Svensson"])                       # the board follows the new order
+        self.assertEqual([p["name"] for p in contacts.read()["people"]][:2], ["Erik Lindqvist", "Anna Svensson"])
+        self.assertEqual(len(contacts.read()["people"]), 4)                                # people not named keep their places after the named ones
+        contacts.import_csv(CSV)                                                           # a new import keeps the order that was set
+        self.assertEqual(kok(), ["Erik Lindqvist", "Anna Svensson"])
+        self.assertEqual(contacts.set_order(["nope", ids["Maja Berg"], ids["Maja Berg"]]), 1)   # unknown ids and doubles are ignored
+        self.assertIsNone(contacts.set_order("x"))
+        self.assertIsNone(contacts.set_order([1]))
+
     def test_the_order_of_the_boxes_is_kept(self):
         self.assertEqual([g["title"] for g in checkin.snapshot()["groups"]], ["Kök", "No department", "Servering"])
         checkin.set_group_order(["Servering", "Kök"])

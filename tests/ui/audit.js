@@ -57,7 +57,7 @@ const AUDIT = () => {
     await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
     await page.screenshot({ path: `/tmp/dpns-audit-main-${w}.png`, fullPage: true });
     await page.click('#cog'); await page.waitForTimeout(1500); await check('settings');
-    await page.locator('[data-box="contacts"] .cpeople .srow').first().locator('span').first().click(); await page.waitForTimeout(300); await check('settings person editor');
+    await page.locator('[data-box="contacts"] .cpeople .srow.edit button').first().click(); await page.waitForTimeout(300); await check('settings people list'); await page.locator('[data-box="contacts"] .olist .srow[data-id]').first().locator('span').first().click(); await page.waitForTimeout(300); await check('settings person editor');
     await page.keyboard.press('Escape');
     await page.screenshot({ path: `/tmp/dpns-audit-settings-${w}.png`, fullPage: true });
     summary[w] = problems;

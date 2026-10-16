@@ -14,6 +14,10 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   page.on('console', m => { if (m.type() === 'error' && !/status of 400/.test(m.text())) errors.push(m.text().slice(0, 150)); });      // the refused import is a 400 on purpose
   page.on('dialog', d => d.accept());
   const settle = ms => page.waitForTimeout(ms || 1300);
+  // the people and the statuses are edited in a pop-up (like the Modules menu): open it, the rows have a drag handle
+  const PEOPLE = '[data-box="contacts"] .cpeople', STATUSES = '[data-box="statuses"] .cstatuses';
+  const rowsOf = box => box.split(' ')[0] + ' .olist .srow[data-id]';      // the pop-up moves into the card when it opens
+
   const openSettings = async () => { await page.click('#cog'); await settle(900); };
   const closeSettings = async () => { await page.click('#close-settings'); await settle(300); };
   const person = name => page.locator('.rp-r', { hasText: name });
@@ -141,23 +145,26 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   ok(!(await page.locator('header h1').first().isVisible()), 'Show the title off hides the title (the board starts at the top)');
   await openSettings();
   await page.locator('[data-box="check-in"] .srow:has-text("Title") input[type=checkbox]').check(); await settle(900);
-  ok(await page.locator('[data-box="contacts"] .cpeople .srow').count() === 25, 'Settings lists the people on file, a switch each');
-  await page.locator('[data-box="contacts"] .cpeople .srow').first().locator('input').uncheck(); await settle(1500);
+  const openList = async box => { if (!(await page.locator(rowsOf(box)).first().isVisible())) { await page.locator(box + ' .srow.edit button').first().click(); await settle(300); } };
+  const drag = async (grip, dy) => { const b = await grip.boundingBox(), x = b.x + b.width / 2, y = b.y + b.height / 2; await page.mouse.move(x, y); await page.mouse.down(); for (let i = 1; i <= 10; i++) { await page.mouse.move(x, y + dy * i / 10); await settle(20); } await page.mouse.up(); await settle(900); };
+  await openList(PEOPLE);
+  ok(await page.locator(rowsOf(PEOPLE)).count() === 25, 'Settings lists the people on file in a pop-up (like the Modules menu), a handle and a switch each');
+  await page.locator(rowsOf(PEOPLE)).first().locator('input').uncheck(); await settle(1500);
   ok(/24 people/.test(await page.locator('[data-box="contacts"] .wtext').first().textContent()) || /switched off/.test(await page.locator('[data-box="contacts"] .wtext').first().textContent()), 'switching a person off takes them off the board');
-  await page.locator('[data-box="contacts"] .cpeople .srow').first().locator('input').check(); await settle(1200);
-  await page.locator('[data-box="contacts"] .cpeople .srow').first().locator('span').first().click(); await settle(400);
+  await page.locator(rowsOf(PEOPLE)).first().locator('input').check(); await settle(1200);
+  await openList(PEOPLE); await page.locator(rowsOf(PEOPLE)).first().locator('span').first().click(); await settle(400);
   ok(await page.locator('.rp-need2 input[data-f=name]').count() === 1 && await page.locator('.rp-need2 input[data-f=name]').isVisible(), 'a tap on a person in the list opens the editor');
   await page.locator('.rp-need2 input[data-f=role]').fill('Testroll'); await page.locator('.rp-need2 [data-save]').click(); await settle(1500);
   ok(await page.locator('.rp-modal:visible').count() === 0, 'saving closes the editor');
   ok((await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.some(p => p.role === 'Testroll'), 'the edit is kept on the host');
   // the photo is chosen here: cut to a square in the browser, kept by the host, shown in the editor and on the board
-  await page.locator('[data-box="contacts"] .cpeople .srow').first().locator('span').first().click(); await settle(400);
+  await openList(PEOPLE); await page.locator(rowsOf(PEOPLE)).first().locator('span').first().click(); await settle(400);
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
   await page.locator('.rp-need2 input[type=file]').setInputFiles({ name: 'p.png', mimeType: 'image/png', buffer: png }); await settle(2500);
   ok(await page.locator('.rp-need2 .cphoto .rp-av[style*="contacts/photo"]').count() === 1, 'a photo chosen in the contacts editor is kept and shown there');
   ok(await page.locator('.rp-need2 [data-nophoto]').isEnabled(), 'and can be removed');
   await page.keyboard.press('Escape'); await settle(300);
-  await page.locator('[data-box="contacts"] .cpeople .srow').first().locator('span').first().click(); await settle(400);
+  await openList(PEOPLE); await page.locator(rowsOf(PEOPLE)).first().locator('span').first().click(); await settle(400);
   await page.locator('.rp-need2 input[data-f=name]').fill(''); await page.locator('.rp-need2 [data-save]').click(); await settle(800);
   ok(/needs a name/.test(await page.locator('.rp-cmsg').textContent()), 'an empty name is refused with a message in the editor');
   await page.keyboard.press('Escape'); await settle(300);
@@ -279,7 +286,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await openSettings();
   const nBefore = (await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length;
   ok(await page.locator('[data-box="contacts"] .cpick').count() === 1 && await page.locator('[data-box="contacts"] input[type=file]').isHidden(), 'the CSV box has a styled Choose file button instead of the browser one');
-  await page.locator('[data-box="contacts"] .cpeople .srow').last().locator('span').first().click(); await settle(400);
+  await openList(PEOPLE); await page.locator(rowsOf(PEOPLE)).last().locator('span').first().click(); await settle(400);
   await page.locator('.rp-need2 [data-del]').click(); await settle(300);
   ok(/Delete/.test(await page.locator('.rp-need2 [data-del]').textContent()) && await page.locator('.pinm .rp-sheet').count() === 1 && (await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length === nBefore, 'Delete asks in a pop-up first');
   await page.locator('.pinm button', { hasText: 'Cancel' }).click(); await settle(300);
@@ -312,9 +319,10 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
 
   // ---- the status editor (Settings > Statuses)
   await openSettings();
-  const nSt = await page.locator('[data-box="statuses"] .cstatuses .srow').count();
+  await openList(STATUSES);
+  const nSt = await page.locator(rowsOf(STATUSES)).count();
   ok(nSt >= 12, 'Settings > Statuses lists the statuses (' + nSt + ')');
-  await page.locator('[data-box="statuses"] button', { hasText: 'Add status' }).click(); await settle(300);
+  await page.locator(STATUSES + ' button', { hasText: 'Add status' }).click(); await settle(300);
   ok(parseFloat(await page.locator('.rp-need2 input[data-f=label]').evaluate(e => getComputedStyle(e).fontSize)) >= 18, 'the editor fields have a readable font size');
   await page.locator('.rp-need2 input[data-f=label]').fill('Testst\u00e4ll'); await page.selectOption('.rp-need2 select[data-f=needs]', 'time');
   ok(await page.locator('.rp-need2 [data-row=default]').isVisible() && await page.locator('.rp-need2 [data-row=prefix]').isVisible(), 'a time status asks for a start time and has a text before the time');
@@ -322,10 +330,12 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.click('.rp-need2 [data-dot="2"]'); await page.locator('.rp-need2 input[data-f=sticky]').check(); await page.locator('.rp-need2 [data-save]').click(); await settle(1200);
   const made = (await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.statuses.find(x => x.label === 'Testst\u00e4ll');
   ok(made && made.sticky && made.dots === 2 && made.needs === 'time', 'the new status is saved with its settings (' + JSON.stringify(made) + ')');
-  await page.locator('[data-box="statuses"] .cstatuses .srow', { hasText: 'Testst\u00e4ll' }).locator('button[aria-label$="up"]').click(); await settle(1000);
+  await openList(STATUSES);
+  await drag(page.locator(rowsOf(STATUSES), { hasText: 'Testst\u00e4ll' }).locator('.grip'), -70);
   const labels = (await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.statuses.map(x => x.label);
-  ok(labels.indexOf('Testst\u00e4ll') === labels.length - 2, 'the arrows move a status');
-  await page.locator('[data-box="statuses"] .cstatuses .srow', { hasText: 'Testst\u00e4ll' }).locator('span').first().click(); await settle(300);
+  ok(labels.indexOf('Testst\u00e4ll') === labels.length - 2, 'dragging the handle moves a status (' + labels.slice(-3).join(', ') + ')');
+  await openList(STATUSES);
+  await page.locator(rowsOf(STATUSES), { hasText: 'Testst\u00e4ll' }).locator('span').first().click(); await settle(300);
   await page.locator('.rp-need2 [data-del]').click(); await settle(300);
   await page.locator('.pinm button', { hasText: /^Delete$/ }).click(); await settle(1200);
   ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.statuses.length === nSt, 'a status is deleted after a question');
