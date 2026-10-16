@@ -1,6 +1,7 @@
 {
  "strings": {
   "A person needs a name": "En person behöver ett namn",
+  "Add person": "Lägg till person",
   "Building": "Byggnad",
   "CSV file": "CSV-fil",
   "CSV text": "CSV-text",
@@ -15,6 +16,7 @@
   "Export": "Exportera",
   "Import": "Importera",
   "Importing...": "Importerar...",
+  "New person": "Ny person",
   "No file chosen": "Ingen fil vald",
   "No people yet: import a CSV file.": "Inga personer än: importera en CSV-fil.",
   "No photo": "Inget foto",

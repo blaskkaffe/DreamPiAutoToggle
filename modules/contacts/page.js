@@ -17,13 +17,15 @@ custom("contacts-people",function(host){var key="",box=host.querySelector(".cpeo
  document.body.appendChild(modal);
  var FIELDS=[["name","Name","text"],["department","Department","text"],["role","Role","text"],["phone","Phone","tel"],["location","Building","text"]];
  function close(){modal.style.display="none";modal.innerHTML=""}
- function edit(p){modal.innerHTML='<div class="rp-sheet rp-need2" role="dialog" aria-modal="true" aria-label="Edit '+esc(p.title)+'"><button type="button" class="rp-x" data-close="1" title="Close" aria-label="Close">&#10005;</button>'+
+ // a new person: the same pop-up with empty fields, no photo (it needs the person to exist first) and no Delete (POST /contacts/add)
+ function add(){edit({id:"",title:"",name:"",department:"",role:"",phone:"",location:"",restrict:false,photo:"",isNew:true})}
+ function edit(p){modal.innerHTML='<div class="rp-sheet rp-need2" role="dialog" aria-modal="true" aria-label="'+(p.isNew?"New person":"Edit "+esc(p.title))+'"><button type="button" class="rp-x" data-close="1" title="Close" aria-label="Close">&#10005;</button>'+
   
-  '<div class="rp-who"><span class="cphoto">'+rosterAvatar({name:p.name,photo:p.photo},"rp-avb")+'</span><div class="rp-wt"><div class="rp-wn">'+esc(p.title)+'</div>'+
-  '<div class="rp-nb"><button type="button" class="pill-s rp-so" data-pick="1">Choose photo</button><button type="button" class="pill-s rp-so" data-nophoto="1"'+(p.photo?"":" disabled")+'>Remove photo</button></div>'+
-  '<input type="file" accept="image/*" class="cfilepick" data-photo="1" hidden aria-label="Photo of '+esc(p.name)+'"></div></div>'+FIELDS.map(function(f){return '<label class="rp-nl">'+f[1]+'<input class="rp-big" type="'+f[2]+'" data-f="'+f[0]+'" value="'+esc(p[f[0]]||"")+'" maxlength="80"></label>'}).join("")+
+  '<div class="rp-who"><span class="cphoto">'+rosterAvatar({name:p.name,photo:p.photo},"rp-avb")+'</span><div class="rp-wt"><div class="rp-wn">'+(p.isNew?"New person":esc(p.title))+'</div>'+
+  (p.isNew?'':'<div class="rp-nb"><button type="button" class="pill-s rp-so" data-pick="1">Choose photo</button><button type="button" class="pill-s rp-so" data-nophoto="1"'+(p.photo?"":" disabled")+'>Remove photo</button></div>'+
+  '<input type="file" accept="image/*" class="cfilepick" data-photo="1" hidden aria-label="Photo of '+esc(p.name)+'">')+'</div></div>'+FIELDS.map(function(f){return '<label class="rp-nl">'+f[1]+'<input class="rp-big" type="'+f[2]+'" data-f="'+f[0]+'" value="'+esc(p[f[0]]||"")+'" maxlength="80"></label>'}).join("")+
   '<label class="rp-nl rp-chk"><input type="checkbox" class="cbox neutral" data-f="restrictToLocation"'+(p.restrict?" checked":"")+'> Only show on the board when this building is chosen</label>'+
-  '<div class="rp-cmsg sub" aria-live="polite"></div><div class="rp-nb rp-nb3"><button type="button" class="pill-s danger rp-so" data-del="1">Delete</button><button type="button" class="pill-s rp-so" data-close="1">Cancel</button><button type="button" class="pill-s pri rp-so c-green" data-save="1">Save</button></div></div>';
+  '<div class="rp-cmsg sub" aria-live="polite"></div><div class="rp-nb rp-nb3">'+(p.isNew?'<span></span>':'<button type="button" class="pill-s danger rp-so" data-del="1">Delete</button>')+'<button type="button" class="pill-s rp-so" data-close="1">Cancel</button><button type="button" class="pill-s pri rp-so c-green" data-save="1">Save</button></div></div>';
   trDom(modal);modal.style.display="";var f0=modal.querySelector("input");if(f0&&f0.focus)f0.focus();
   modal._id=p.id}
  // Delete: asks first in a pop-up, then removes the person (and their photo) for good
@@ -33,7 +35,8 @@ custom("contacts-people",function(host){var key="",box=host.querySelector(".cpeo
     if(r&&r.ok){close();reloadData("contacts");refresh();return}setText(modal.querySelector(".rp-cmsg"),(x&&x.message)||"That did not work")})})}
  function save(){var body={id:modal._id},msg=modal.querySelector(".rp-cmsg"),btn=modal.querySelector("[data-save]");
   Array.prototype.forEach.call(modal.querySelectorAll("[data-f]"),function(i){body[i.getAttribute("data-f")]=i.type==="checkbox"?i.checked:i.value});
-  btn.disabled=true;post("/contacts/person",body,function(r,st,b){btn.disabled=false;
+  if(!modal._id)delete body.id;      // a new person
+  btn.disabled=true;post(modal._id?"/contacts/person":"/contacts/add",body,function(r,st,b){btn.disabled=false;
    if(r&&r.ok){close();reloadData("contacts");refresh();return}
    setText(msg,(b&&b.message)||"That did not work")})}
  modal.addEventListener("click",function(e){if(e.target===modal){close();return}var b=e.target.closest&&e.target.closest("button");if(!b)return;
@@ -57,7 +60,7 @@ custom("contacts-people",function(host){var key="",box=host.querySelector(".cpeo
   sub:function(l){var on=l.filter(function(p){return p.active}).length;return on+" on the board"+(on===l.length?"":", "+(l.length-on)+" switched off")},
   idOf:function(p){return p.id},item:function(p){var tg=build({type:"toggle",bind:p.active,post:"/contacts/active",body:{id:p.id},label:p.title+" on the board"},{saved:function(){reloadData("contacts")}});
    return {id:p.id,title:p.title,sub:p.tag,group:p.department,control:tg}},
-  onEdit:edit,onOrder:function(ids){post("/contacts/order",{order:ids},function(r){if(r){reloadData("contacts");refresh()}})}});
+  onEdit:edit,add:"Add person",onAdd:add,onOrder:function(ids){post("/contacts/order",{order:ids},function(r){if(r){reloadData("contacts");refresh()}})}});
  bind("@contacts.people",function(list){list=list||[];var k=JSON.stringify(list);if(k===key)return;key=k;list0=list;
   var seen=[],by={};list.forEach(function(p){if(!by[p.department]){by[p.department]=[];seen.push(p.department)}by[p.department].push(p)});
   ed.set(seen.reduce(function(a,d){return a.concat(by[d])},[]))})});

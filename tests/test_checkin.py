@@ -311,6 +311,21 @@ class BoardTests(Base):
         s = checkin.statuses()[0]
         self.assertEqual((s["default"], s["colour"], s["code"]), ("", "white", "FYS"))
 
+    def test_a_person_can_be_added_by_hand(self):
+        contacts.import_csv(CSV)
+        n = len(contacts.read()["people"])
+        p = contacts.add_person({"name": "  Nils Ny ", "department": "Kök", "role": "Kock", "phone": "070-9", "location": "Område A", "restrictToLocation": True})
+        self.assertEqual((p["name"], p["department"], p["location"], p["restrictToLocation"], p["active"]), ("Nils Ny", "Kök", "Område A", True, True))
+        self.assertEqual(len(contacts.read()["people"]), n + 1)
+        kok = [x["name"] for g in checkin.snapshot()["groups"] if g["title"] == "Kök" for x in g["people"]]
+        self.assertEqual(kok[-1], "Nils Ny")                                              # last in the department
+        self.assertEqual(contacts.add_person({"name": "Utan Avdelning"})["department"], contacts.NO_DEPARTMENT)
+        for bad in ({"name": ""}, {"name": "   "}, {}, None, {"name": "Nils Ny", "department": "Kök", "location": "Område A"}):
+            with self.assertRaises(ValueError):
+                contacts.add_person(bad)
+        contacts.import_csv(CSV)                                                           # a CSV import afterwards keeps the person
+        self.assertTrue(any(x["name"] == "Nils Ny" for x in contacts.read()["people"]))
+
     def test_the_order_of_the_people_is_set_by_drag_and_drop(self):
         contacts.import_csv(CSV)
         ids = dict((p["name"], p["id"]) for p in contacts.read()["people"])

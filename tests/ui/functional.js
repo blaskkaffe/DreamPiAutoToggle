@@ -296,6 +296,17 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('.rp-need2 [data-del]').click(); await settle(300);
   await page.locator('.pinm button', { hasText: /^Delete$/ }).click(); await settle(1200);
   ok((await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people.length === nBefore - 1 && await page.locator('.rp-modal:visible').count() === 0, 'confirming deletes the person');
+  // a person is added by hand: Add person in the People pop-up
+  await openSettings(); await openList(PEOPLE);
+  await page.locator('[data-box="contacts"] .pop button', { hasText: 'Add person' }).click(); await settle(400);
+  ok(await page.locator('.rp-need2 [data-del]').count() === 0 && await page.locator('.rp-need2 [data-pick]').count() === 0, 'the new-person pop-up has no Delete and no photo buttons');
+  await page.locator('.rp-need2 [data-save]').click(); await settle(400);
+  ok(/needs a name/.test(await page.locator('.rp-need2 .rp-cmsg').textContent()), 'a person without a name is refused with a message');
+  await page.locator('.rp-need2 input[data-f=name]').fill('Nyanst\u00e4lld Person'); await page.locator('.rp-need2 input[data-f=department]').fill('Lager'); await page.locator('.rp-need2 [data-save]').click(); await settle(1500);
+  const added = (await page.evaluate(() => fetch('/contacts').then(r => r.json()))).people;
+  ok(added.length === nBefore && added.some(x => x.name === 'Nyanst\u00e4lld Person' && x.department === 'Lager'), 'Add person adds the person');
+  ok(await page.locator('#dash .rp-r', { hasText: 'Nyanst\u00e4lld Person' }).count() === 1, 'and the person is on the board');
+  await closeSettings();
   await closeSettings();
 
   // ---- scrolling text: off / auto / on

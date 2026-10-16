@@ -165,6 +165,32 @@ def update_person(pid, fields):
         return p
 
 
+def add_person(fields):
+    """Add one person by hand (the same fields as an edit; the CSV import is the way to add many). The person goes last in their department.
+    Returns the person; ValueError with a message when there is no name, somebody already has that name in that department and building, or there are too many."""
+    if not isinstance(fields, dict):
+        raise ValueError("A person needs a name")
+    clean = {}
+    for k, limit in (("name", 80), ("department", 80), ("role", 80), ("phone", 40), ("location", 80)):
+        clean[k] = str(fields.get(k) if fields.get(k) is not None else "").strip()[:limit]
+    if not clean["name"]:
+        raise ValueError("A person needs a name")
+    clean["department"] = clean["department"] or NO_DEPARTMENT
+    with _lock:
+        data = read()
+        pid = person_id(clean["name"], clean["department"], clean["location"])
+        if any(person_id(x["name"], x["department"], x.get("location", "")) == pid or x["id"] == pid for x in data["people"]):
+            raise ValueError("Somebody else already has that name in that department and building")
+        if len(data["people"]) >= MAX_PEOPLE:
+            raise ValueError("Too many people (at most %d)" % MAX_PEOPLE)
+        rf = fields.get("restrictToLocation")
+        person = {"id": pid, "name": clean["name"], "department": clean["department"], "role": clean["role"], "phone": clean["phone"], "location": clean["location"],
+                  "restrictToLocation": rf if isinstance(rf, bool) else _flag(rf), "active": True, "order": max([x.get("order", 0) for x in data["people"]] + [-1]) + 1}
+        data["people"].append(person)
+        _write(data)
+        return person
+
+
 def delete_person(pid):
     """Remove one person for good (and their photo). True when there was such a person. (Switching a person off keeps them on file; a CSV
     import with the same name, department and building would bring a deleted person back as a new one.)"""
@@ -271,6 +297,17 @@ def _post_person(h):
     return True
 
 
+def _post_add(h):
+    try:
+        body = json.loads(h._body(8192).decode("utf-8"))
+        person = add_person(body)
+    except (ValueError, UnicodeDecodeError, AttributeError) as e:
+        h.send(json.dumps({"ok": False, "message": str(e) or "That did not work"}), "application/json", status=400)
+        return True
+    h.send(json.dumps({"ok": True, "message": "Saved", "id": person["id"]}), "application/json")
+    return True
+
+
 def _post_delete(h):
     try:
         body = json.loads(h._body(4096).decode("utf-8"))
@@ -365,8 +402,8 @@ def _get_photo(h):
 
 GET = {"/contacts": _get_view, "/contacts.csv": _get_csv}
 GET_PREFIX = {"/contacts/photo/": _get_photo}
-POST = {"/contacts/import": _post_import, "/contacts/active": _post_active, "/contacts/order": _post_order, "/contacts/person": _post_person, "/contacts/delete": _post_delete, "/contacts/photo": _post_photo}
-PROTECTED = ("/contacts/import", "/contacts/active", "/contacts/order", "/contacts/person", "/contacts/delete")
+POST = {"/contacts/import": _post_import, "/contacts/active": _post_active, "/contacts/order": _post_order, "/contacts/add": _post_add, "/contacts/person": _post_person, "/contacts/delete": _post_delete, "/contacts/photo": _post_photo}
+PROTECTED = ("/contacts/import", "/contacts/active", "/contacts/order", "/contacts/add", "/contacts/person", "/contacts/delete")
 OPEN = ("/contacts/photo",)          # a photo is set from the status menu on the board
 
 
