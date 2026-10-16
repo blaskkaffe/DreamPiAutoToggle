@@ -8,7 +8,27 @@
   "Source, instructions and updates": "Källkod, instruktioner och uppdateringar",
   "System": "System",
   "Versions of the add-on and the computer, the time zone, PIN and a link to the project (always on).": "Versioner av tillägget och datorn, tidszon, PIN-kod och en länk till projektet (alltid på).",
-  "unknown": "okänd"
+  "unknown": "okänd",
+  "Backup": "Säkerhetskopia",
+  "A backup is one file with the people, the statuses, who is in, the colours, the screen settings and the profile photos. PINs and the HTTPS key are not in it.": "En säkerhetskopia är en fil med personerna, statusarna, vem som är inne, färgerna, skärminställningarna och profilbilderna. PIN-koder och HTTPS-nyckeln finns inte med.",
+  "Back up": "Säkerhetskopiera",
+  "Download the settings as a zip file": "Ladda ner inställningarna som en zip-fil",
+  "Download a backup": "Ladda ner en säkerhetskopia",
+  "Download": "Ladda ner",
+  "No file chosen": "Ingen fil vald",
+  "Choose backup": "Välj säkerhetskopia",
+  "Backup file": "Säkerhetskopia",
+  "Restore": "Återställ",
+  "Restore this backup? The people, statuses and settings now on this computer are replaced.": "Återställa den här säkerhetskopian? Personerna, statusarna och inställningarna på datorn ersätts.",
+  "That file could not be read": "Filen kunde inte läsas",
+  "Restoring...": "Återställer...",
+  "Restored. Loading the page again...": "Återställt. Laddar om sidan...",
+  "The restore did not work": "Återställningen fungerade inte"
  },
- "patterns": []
+ "patterns": [
+  [
+   "^Restored (\\d+) files$",
+   "Återställde $1 filer"
+  ]
+ ]
 }

@@ -164,7 +164,7 @@ class WithEverything(Base):
         kinds = [(w["type"], w.get("title") or w.get("name") or "") for w in system["items"]]
         self.assertEqual(kinds[:8], [("info", ""), ("row", "GitHub"), ("divider", ""), ("row", "PIN"), ("row", "Ask for the PIN to open Settings"),
                                       ("form", ""), ("slot", "modules"), ("row", "Updates")])          # info, GitHub, a line, the PIN, the time zone, the Modules row, the updates ...
-        self.assertEqual(kinds[-1], ("row", "Reboot"))
+        self.assertEqual(kinds[-5:], [("row", "Reboot"), ("divider", ""), ("text", ""), ("row", "Back up"), ("custom", "system-restore")])      # the backup comes last
 
     def test_menus_take_items_from_other_modules_and_sort_by_order(self):
         lay = layout_of(self.page())
@@ -194,7 +194,7 @@ class WithEverything(Base):
 
     def test_protected_paths_are_the_modules_own_post_routes(self):
         import base_modules as mods
-        self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/update/usb", "/contacts/import", "/contacts/active", "/contacts/order", "/contacts/add", "/contacts/person", "/contacts/delete"})
+        self.assertEqual(mods._state["protected"], {"/reboot", "/update/start", "/update/usb", "/contacts/import", "/contacts/active", "/contacts/order", "/contacts/add", "/contacts/person", "/contacts/delete", "/backup/restore"})
         for path in mods._state["protected"]:
             self.assertTrue(mods.route("POST", path), path)
 

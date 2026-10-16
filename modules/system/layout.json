@@ -44,6 +44,33 @@
        ]
       }
      ]
+    },
+    {
+     "type": "divider",
+     "order": 51
+    },
+    {
+     "type": "text",
+     "text": "A backup is one file with the people, the statuses, who is in, the colours, the screen settings and the profile photos. PINs and the HTTPS key are not in it.",
+     "order": 52
+    },
+    {
+     "type": "row",
+     "order": 53,
+     "title": "Back up",
+     "sub": "Download the settings as a zip file",
+     "control": {
+      "type": "link",
+      "href": "/backup",
+      "label": "Download",
+      "aria": "Download a backup"
+     }
+    },
+    {
+     "type": "custom",
+     "order": 54,
+     "name": "system-restore",
+     "html_file": "restore.html"
     }
    ]
   }

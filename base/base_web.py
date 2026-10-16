@@ -240,13 +240,13 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"   # keep-alive: the page asks /api every second, a new TLS handshake each time is heavy on a computer
     _body_read = 0
 
-    def send(self, body, ctype, cache=None, status=200, fixed=False):
+    def send(self, body, ctype, cache=None, status=200, fixed=False, download=None):
         """cache: seconds the browser may keep it (None = always ask again).
         fixed: the body never changes (page, static files), so its gzipped
         form is kept in memory instead of compressed for every request."""
         if not isinstance(body, bytes):
             body = body.encode("utf-8")
-        gz = len(body) > 2000 and "gzip" in (self.headers.get("Accept-Encoding") or "") and not ctype.startswith("image/")      # pictures are packed already
+        gz = len(body) > 2000 and not download and "gzip" in (self.headers.get("Accept-Encoding") or "") and not ctype.startswith("image/")      # pictures are packed already
         if gz:
             key = (id(body), len(body)) if fixed else None
             if key and key in _gz_cache:
@@ -258,6 +258,8 @@ class Handler(BaseHTTPRequestHandler):
                 body = packed
         self.send_response(status)
         self.send_header("Content-Type", ctype)
+        if download:                       # the browser saves it under this name (a plain file name)
+            self.send_header("Content-Disposition", 'attachment; filename="%s"' % re.sub(r"[^A-Za-z0-9._-]", "_", download))
         if gz:
             self.send_header("Content-Encoding", "gzip")
             self.send_header("Vary", "Accept-Encoding")
