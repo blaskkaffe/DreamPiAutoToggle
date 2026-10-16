@@ -16,7 +16,7 @@ function tr(s,quiet){if(I18N.lang==="en"||typeof s!=="string"||s==="")return s;
   TRDONE[out]=1;return out}
  if(!quiet&&!TRDONE[s]&&/[A-Za-z]{3}/.test(s))TRMISS[s]=1;return s}
 // the texts of a layout (window.LAYOUT: titles, subtitles, labels ...) in the language of the page; names, paths and keys are left alone
-var TR_SKIP={type:1,box:1,id:1,key:1,post:1,get:1,url:1,bind:1,mod:1,name:1,module:1,source:1,"in":1,look:1,href:1,hook:1,then:1,mode:1,cls:1,style:1,"default":1,colour:1,position:1,sub_text:1,html:1,html_file:1,show:1,hide:1,when:1,every:1,reload:1,method:1,scale:1,unit:1,retry_if:1,body:1};
+var TR_SKIP={value:1,values:1,type:1,box:1,id:1,key:1,post:1,get:1,url:1,bind:1,mod:1,name:1,module:1,source:1,"in":1,look:1,href:1,hook:1,then:1,mode:1,cls:1,style:1,"default":1,colour:1,position:1,sub_text:1,html:1,html_file:1,show:1,hide:1,when:1,every:1,reload:1,method:1,scale:1,unit:1,retry_if:1,body:1};
 function trTree(o){if(I18N.lang==="en")return;
  if(Array.isArray(o)){o.forEach(function(v,i){if(typeof v==="string")o[i]=tr(v,true);else trTree(v)})}
  else if(o&&typeof o==="object"){for(var k in o){var v=o[k];if(typeof v==="string"){if(!TR_SKIP[k]&&v.charAt(0)!=="@")o[k]=tr(v,true)}else if(!TR_SKIP[k])trTree(v)}}}

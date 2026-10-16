@@ -38,6 +38,14 @@ const ENGLISH = /\b(the|and|to|of|is|for|with|or|on|in|an|your|you|are|not|this|
   for (const box of ['contacts', 'statuses']) { await click('[data-box="' + box + '"] .srow.edit button'); await click('[data-box="' + box + '"] .olist .srow[data-id] >> nth=0'); await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await settle(200); }
   const miss = (await page.evaluate(() => Object.keys(window.TRMISS || {}))).filter(t => !FINE.test(t) && ENGLISH.test(t) && !/^[A-ZÅÄÖ][a-zåäö]+ [A-ZÅÄÖ][a-zåäö]+$/.test(t));
   ok(miss.length === 0, 'nothing in English is left in Settings' + (miss.length ? ': ' + miss.slice(0, 8).join(' | ') : ''));
+  // a choice keeps its value when its label is translated ("off" was once turned into "av", which the server refused)
+  ok(await page.evaluate(() => { const o = [{ value: 'off', label: 'Off' }, { value: 'on', label: 'On (always)' }]; trTree(o); return o[0].value === 'off' && o[1].value === 'on' && o[0].label === 'Av'; }), 'translating the options of a choice leaves their values alone');
+  if (!(await page.evaluate(() => document.getElementById('settings').classList.contains('open')))) { await click('#cog'); await settle(1500); }
+  const scrollSel = page.locator('[data-box="check-in"] .srow:has-text("Rullande text") select');
+  await scrollSel.selectOption({ label: 'Av' }); await settle(1500);
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.scroll === 'off', 'Rullande text: Av is saved as off');
+  await scrollSel.selectOption({ label: 'På (alltid)' }); await settle(1500);
+  ok((await page.evaluate(() => fetch('/api').then(r => r.json()))).checkin.scroll === 'on', 'and På (alltid) as on');
   // the language toggle: English, then Swedish again (the page loads again each time)
   if (!(await page.evaluate(() => document.getElementById('settings').classList.contains('open')))) { await click('#cog'); await settle(1500); }
   await click('[data-box="appearance"] .srow:has-text("Språk") button'); await click('.pop.open button:has-text("English")'); await settle(2500);
