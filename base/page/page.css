@@ -243,6 +243,7 @@
  .rp-need2.rp-withkb{width:clamp(340px,88vw,1180px);padding:22px 24px 24px}
  div.rp-shown{display:flex;align-items:center;justify-content:center;box-sizing:border-box;flex:1;min-width:0;min-height:76px;margin:0;padding:8px 14px;font-size:2.4em;font-weight:600;letter-spacing:.1em;overflow-wrap:anywhere;background:var(--ctl);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl)}
  .rp-kb-text div.rp-shown{justify-content:flex-start;min-height:72px;font-size:2em;letter-spacing:0;text-align:left;white-space:pre-wrap}
+ .rp-shown .rp-seg{padding:2px 12px;margin:0 4px;border-radius:var(--r-ctl);cursor:pointer;white-space:pre} .rp-shown .rp-seg.on{box-shadow:0 0 0 3px var(--text-1)}   /* a date and a time: the part that is typed into is ringed */
  .rp-shownrow{display:flex;align-items:stretch;gap:12px;margin:8px 0 14px} .rp-shownrow .rp-calbtn{flex:none;width:76px;min-height:76px;padding:0;font-size:2em;border-radius:var(--r-ctl)}
  /* the keys: every key of a pad or a keyboard is the same size and gap (a CSS grid for the number pad, a flex row for the keyboard) */
  .rp-kb{margin-top:4px;--kh:72px;--kgap:10px} .rp-kr{display:flex;gap:var(--kgap);margin-top:var(--kgap)}

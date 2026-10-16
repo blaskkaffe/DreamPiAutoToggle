@@ -4,6 +4,7 @@
 # host's address, in kiosk mode if you like), and every /api answer carries the whole board with a revision number, so a change
 # made on one screen shows on all of them within a second. A button is grey while the person is out, in the colour of their
 # department (or building) while in, and in the colour of the status once one is set. Colours are palette ids only. Python 3.
+import datetime
 import io
 import json
 import os
@@ -304,16 +305,29 @@ def toggle(pid):
         return snapshot(data)
 
 
+def _real_date(y, m, d):
+    """True for a day that exists (2026-02-30 and 2026-13-40 do not)."""
+    try:
+        datetime.date(int(y), int(m), int(d))
+        return True
+    except ValueError:
+        return False
+
+
 def _clean_detail(st, detail):
     detail = re.sub(r"\s+", " ", str(detail or "")).strip()[:DETAIL_MAX]
     if st["needs"] == "time" and not re.match(r"^([01]?\d|2[0-3]):[0-5]\d$", detail):
         detail = st["default"] if re.match(r"^\d\d:\d\d$", st["default"]) else ""
     if st["needs"] == "date":
         m = re.match(r"^(\d{4})-(\d\d)-(\d\d)$", detail)
-        detail = "%s/%s" % (int(m.group(3)), int(m.group(2))) if m else (detail if re.match(r"^V\d{1,3}$", detail) else "")
-    if st["needs"] == "datetime":          # "2026-12-24 08:30" (or just the date: the time part is skipped) -> "24/12 08:30"
-        m = re.match(r"^(\d{4})-(\d\d)-(\d\d)(?: (([01]?\d|2[0-3]):[0-5]\d))?$", detail)
-        detail = ("%s/%s" % (int(m.group(3)), int(m.group(2))) + (" " + m.group(4) if m.group(4) else "")) if m else ""
+        detail = "%s/%s" % (int(m.group(3)), int(m.group(2))) if m and _real_date(*m.groups()) else (detail if re.match(r"^V\d{1,3}$", detail) else "")
+    if st["needs"] == "datetime":          # either part can be skipped: "2026-12-24 08:30" -> "24/12 08:30", "2026-12-24" -> "24/12", "08:30" -> "08:30"
+        m = re.match(r"^(?:(\d{4})-(\d\d)-(\d\d))?(?: ?(([01]?\d|2[0-3]):[0-5]\d))?$", detail)
+        if m and (m.group(1) or m.group(4)) and (not m.group(1) or _real_date(m.group(1), m.group(2), m.group(3))):
+            day = ("%s/%s" % (int(m.group(3)), int(m.group(2)))) if m.group(1) else ""
+            detail = " ".join(x for x in (day, m.group(4) or "") if x)
+        else:
+            detail = ""
     return detail
 
 

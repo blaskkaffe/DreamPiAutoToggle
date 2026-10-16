@@ -1,0 +1,70 @@
+// A status that asks for a date and a time: the date, the time or both can be set, and either can be skipped (plain fields and the touch pad).
+const { chromium } = require('playwright');
+const URL = 'http://127.0.0.1:' + (process.env.PORT || 8741) + '/';
+let failed = 0;
+const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if (!cond) failed++; };
+const settle = ms => new Promise(r => setTimeout(r, ms));
+(async () => {
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  const post = (p, b) => page.evaluate(([p, b]) => fetch(p, { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify(b || {}) }).then(r => r.text()), [p, b]);
+  await page.goto(URL, { waitUntil: 'networkidle' });
+  const api = () => page.evaluate(() => fetch('/api').then(r => r.json()));
+  const a0 = await api();
+  const st = a0.checkin.statuses.slice(); st.push({ label: 'Möte', colour: 'blue', needs: 'datetime', prefix: 'till' });
+  await post('/checkin/statuses', { statuses: st });
+  const code = (await api()).checkin.statuses.find(s => s.label === 'Möte').code;
+  await settle(1500);
+  const person = a0.checkin.groups[0].people[0];
+  const textNow = async () => (await api()).checkin.groups.flatMap(g => g.people).find(p => p.id === person.id).text;
+  const openNeed = async () => { await page.locator('.rp-r[data-id="' + person.id + '"] .rp-t').click(); await settle(300); await page.locator('.rp-sheet button[data-code="' + code + '"]').click(); await settle(300); };
+  const set = async () => { await page.locator('.rp-need2 [data-set]').click(); await settle(700); };
+
+  // ---- the plain fields: a date field and a time field
+  await openNeed();
+  ok(await page.locator('.rp-need2 input.rp-big').count() === 2, 'a date and time status has a date field and a time field');
+  ok(await page.locator('.rp-need2 [data-skip]').count() === 1, 'and a Skip button');
+  await page.locator('.rp-need2 [data-set]').click(); await settle(300);
+  ok(/date, a time or both/.test(await page.locator('.rp-cmsg').textContent()), 'with both empty, Set asks for something (or Skip)');
+  await page.locator('.rp-need2 input.rp-big').nth(0).fill('20261224'); await set();
+  ok(await textNow() === 'Möte · till 24/12', 'the date alone is set (' + await textNow() + ')');
+  await openNeed(); await page.locator('.rp-need2 input.rp-big').nth(1).fill('0830'); await set();
+  ok(await textNow() === 'Möte · till 08:30', 'the time alone is set (' + await textNow() + ')');
+  await openNeed(); await page.locator('.rp-need2 input.rp-big').nth(0).fill('20261224'); await page.locator('.rp-need2 input.rp-big').nth(1).fill('0830'); await set();
+  ok(await textNow() === 'Möte · till 24/12 08:30', 'both are set (' + await textNow() + ')');
+  await openNeed(); await page.locator('.rp-need2 input.rp-big').nth(1).fill('2599'); await page.locator('.rp-need2 [data-set]').click(); await settle(300);
+  ok(/time as tt:mm/.test(await page.locator('.rp-cmsg').textContent()) && await page.locator('.rp-need2').count() === 1, 'a wrong time is refused with a message');
+  await page.locator('.rp-need2 [data-skip]').click(); await settle(700);
+  ok(await textNow() === 'Möte', 'Skip sets the status without a date or a time');
+
+  // ---- the touch pad: Date and Time are two parts
+  await post('/checkin/config', { values: { keyboard: true } });
+  await page.goto(URL, { waitUntil: 'networkidle' }); await settle(800);
+  await openNeed();
+  ok(await page.locator('.rp-shown .rp-seg').count() === 2, 'the pad shows a date part and a time part');
+  for (const k of ['d2', 'd4', 'd1', 'd2']) await page.click('[data-k="' + k + '"]');
+  ok((await page.locator('.rp-shown .rp-seg.on').getAttribute('data-seg')) === 'time', 'after the day and the month the time part is next');
+  await set();
+  ok(await textNow() === 'Möte · till 24/12', 'the date alone is set on the pad (' + await textNow() + ')');
+  await openNeed(); await page.locator('.rp-shown .rp-seg[data-seg=time]').click();
+  for (const k of ['d0', 'd8', 'd3', 'd0']) await page.click('[data-k="' + k + '"]');
+  await set();
+  ok(await textNow() === 'Möte · till 08:30', 'the time alone is set on the pad (' + await textNow() + ')');
+  await openNeed();
+  for (const k of ['d2', 'd4', 'd1', 'd2', 'd0', 'd9', 'd1', 'd5']) await page.click('[data-k="' + k + '"]');
+  await set();
+  ok(await textNow() === 'Möte · till 24/12 09:15', 'both are set on the pad (' + await textNow() + ')');
+  await openNeed(); await page.click('[data-k="d2"]'); await page.locator('.rp-need2 [data-set]').click(); await settle(300);
+  ok(/day and the month/.test(await page.locator('.rp-cmsg').textContent()), 'half a date is refused with a message');
+  await page.locator('.rp-need2 [data-set]').first().scrollIntoViewIfNeeded();
+  await page.click('[data-k="back"]'); await page.locator('.rp-need2 [data-set]').click(); await settle(300);
+  ok(/date, a time or both/.test(await page.locator('.rp-cmsg').textContent()), 'with nothing typed, Set asks for something (or Skip)');
+  await page.locator('.rp-need2 [data-skip]').click(); await settle(700);
+  ok(await textNow() === 'Möte', 'Skip works on the pad too');
+  ok(errors.length === 0, 'no JavaScript errors' + (errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''));
+  await browser.close();
+  console.log(failed ? 'FAILED' : 'all checks passed');
+  process.exit(failed ? 1 : 0);
+})();

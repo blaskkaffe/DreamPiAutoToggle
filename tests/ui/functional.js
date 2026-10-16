@@ -322,7 +322,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await openList(STATUSES);
   const nSt = await page.locator(rowsOf(STATUSES)).count();
   ok(nSt >= 12, 'Settings > Statuses lists the statuses (' + nSt + ')');
-  await page.locator(STATUSES + ' button', { hasText: 'Add status' }).click(); await settle(300);
+  await page.locator('[data-box="statuses"] .pop button', { hasText: 'Add status' }).click(); await settle(300);
   ok(parseFloat(await page.locator('.rp-need2 input[data-f=label]').evaluate(e => getComputedStyle(e).fontSize)) >= 18, 'the editor fields have a readable font size');
   await page.locator('.rp-need2 input[data-f=label]').fill('Testst\u00e4ll'); await page.selectOption('.rp-need2 select[data-f=needs]', 'time');
   ok(await page.locator('.rp-need2 [data-row=default]').isVisible() && await page.locator('.rp-need2 [data-row=prefix]').isVisible(), 'a time status asks for a start time and has a text before the time');

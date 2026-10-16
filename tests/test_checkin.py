@@ -198,6 +198,13 @@ class BoardTests(Base):
         self.assertEqual(self.people()["Anna Svensson"]["text"], "Möte · till 24/12 08:30")
         checkin.set_status(anna, "MEET", "2026-12-24")                  # only the date: the time is left out
         self.assertEqual(self.people()["Anna Svensson"]["text"], "Möte · till 24/12")
+        checkin.set_status(anna, "MEET", "08:30")                       # only the time: the date is left out
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "Möte · till 08:30")
+        checkin.set_status(anna, "MEET", "")                            # neither: the status alone
+        self.assertEqual(self.people()["Anna Svensson"]["text"], "Möte")
+        for bad in ("25:99", "2026-13-40", "24/12", "x"):
+            checkin.set_status(anna, "MEET", bad)
+            self.assertEqual(self.people()["Anna Svensson"]["text"], "Möte", bad)
         checkin.set_status(anna, "MEET", "2026-12-24 25:99")            # not a time: nothing is kept
         self.assertEqual(self.people()["Anna Svensson"]["text"], "Möte")
         checkin.set_status(anna, "TRAVEL", "")                          # Skip: the status without its date

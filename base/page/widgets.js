@@ -663,7 +663,8 @@ var EMOJI=[["\ud83d\ude00","\ud83d\ude00 \ud83d\ude03 \ud83d\ude04 \ud83d\ude01 
 // day fills the field (el.setDate(iso)); el._done is called by the Done key of the text keyboard.
 function onScreenKeys(kind,o){
  var el=h("div",{"class":"rp-kb rp-kb-"+kind}),shown=h("div",{"class":"rp-big rp-shown",role:"textbox","aria-readonly":"true","aria-live":"polite"}),digits="",pm=false,txt=String(o.value||""),layer="abc",shift=false,fresh=true,max=o.max||60,
-  dateIso="",cal=null,emojiGroup=0,numeric=kind!=="text",maxDigits=kind==="datetime"?8:4,withDate=kind==="date"||kind==="datetime";
+  dateIso="",cal=null,emojiGroup=0,numeric=kind!=="text",maxDigits=4,withDate=kind==="date"||kind==="datetime",
+  tdigits="",seg="date";      // a date and a time: two parts (digits = the date, tdigits = the time), either of them may be left empty; seg is the one being typed
  function key(label,act,cls,aria){var b=h("button",{type:"button","class":"pill-s rp-k"+(cls?" "+cls:""),"data-k":act,text:label});if(aria)b.setAttribute("aria-label",aria);return b}
  function row(keys,cls){var r=h("div",{"class":"rp-kr"+(cls?" "+cls:"")});keys.forEach(function(k){r.appendChild(k)});el.appendChild(r);return r}
  function dropLast(t){var a=Array.from(t),x=a.pop();if(x==="\ufe0f")a.pop();return a.join("")}
@@ -671,9 +672,14 @@ function onScreenKeys(kind,o){
  function pad2(n){return (n<10?"0":"")+n}
  function slots(){var d=digits,s="";
   if(kind==="date")return d.slice(0,2).padEnd(2,"\u2012")+" / "+d.slice(2,4).padEnd(2,"\u2012");
-  if(kind==="datetime")return d.slice(0,2).padEnd(2,"\u2012")+" / "+d.slice(2,4).padEnd(2,"\u2012")+"    "+d.slice(4,6).padEnd(2,"\u2012")+" : "+d.slice(6,8).padEnd(2,"\u2012");
+  if(kind==="datetime")return "";
   var hl=d.length===3?1:2;return d.slice(0,hl).padEnd(2,"\u2012")+" : "+d.slice(hl,hl+2).padEnd(2,"\u2012")+(o.twelve?"  "+(pm?"PM":"AM"):"")}
- function draw(){shown.textContent=kind==="text"?(txt||"\u00a0"):slots()}
+ function two(d){return d.slice(0,2).padEnd(2,"\u2012")}
+ function draw(){if(kind==="datetime"){      // Date and Time are two parts: tap one to type into it, leave one empty to skip it
+   var dh='<span class="rp-seg'+(seg==="date"?" on":"")+'" data-seg="date" role="button" aria-label="Date, day and month">'+two(digits)+" / "+two(digits.slice(2))+'</span>',
+    th='<span class="rp-seg'+(seg==="time"?" on":"")+'" data-seg="time" role="button" aria-label="Time, hour and minute">'+two(tdigits)+" : "+two(tdigits.slice(2))+'</span>';
+   setHtml(shown,dh+th);return}
+  shown.textContent=kind==="text"?(txt||"\u00a0"):slots()}
  // the number pad: three even columns, every key the same size; the display has the calendar button at its right (dates)
  function pad(){el.innerHTML="";var top=h("div",{"class":"rp-shownrow"});top.appendChild(shown);
   if(withDate){var cb=key("\ud83d\udcc5","cal","rp-calbtn","Calendar");top.appendChild(cb)}
@@ -698,13 +704,20 @@ function onScreenKeys(kind,o){
    row(keys,"l"+i)});
   row([key(layer==="abc"?"123":"ABC",layer==="abc"?"layersym":"layerabc","rp-kw rp-k2"),key("\ud83d\ude00","layeremoji","rp-kw rp-k2","Emoji"),key("mellanslag","c ","rp-ksp","Space"),key("klar","done","rp-kw rp-k3 pri","Done")])}
  function render(){if(kind==="text")text();else pad();draw()}
- function typed(c){if(c==="back"){if(kind==="text")txt=dropLast(txt);else{digits=digits.slice(0,-1);dateIso=""}fresh=false;return}
+ function typed(c){
+  if(kind==="datetime"){fresh=false;
+   if(c==="back"){if(seg==="time"&&!tdigits)seg="date";if(seg==="time")tdigits=tdigits.slice(0,-1);else{digits=digits.slice(0,-1);dateIso=""}return}
+   if(seg==="date"){if(digits.length<4){digits+=c;dateIso=""}if(digits.length===4)seg="time"}      // the time comes next
+   else if(tdigits.length<4)tdigits+=c;
+   return}
+  if(c==="back"){if(kind==="text")txt=dropLast(txt);else{digits=digits.slice(0,-1);dateIso=""}fresh=false;return}
   if(kind==="text"){if(Array.from(txt).length<max)txt+=c;if(shift){shift=false;render()}return}
   if(fresh){digits="";fresh=false}if(digits.length<maxDigits){digits+=c;dateIso=""}}
  // a day picked in the calendar: the day and month go in the number field (the year is kept: it can be another year than this one)
  el.setDate=function(iso){var m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(iso);if(!m)return;dateIso=iso;fresh=false;
-  digits=m[3]+m[2]+(kind==="datetime"?digits.slice(4):"");cal=null;render()};
- el.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-k]");if(!b)return;e.stopPropagation();var a=b.getAttribute("data-k");
+  digits=m[3]+m[2];if(kind==="datetime")seg="time";cal=null;render()};
+ el.addEventListener("click",function(e){var sg=e.target.closest&&e.target.closest("[data-seg]");if(sg){e.stopPropagation();seg=sg.getAttribute("data-seg");draw();return}
+  var b=e.target.closest&&e.target.closest("[data-k]");if(!b)return;e.stopPropagation();var a=b.getAttribute("data-k");
   if(a==="none")return;
   if(a==="cal"){if(cal){cal=null}else{cal=calendar(dateIso,function(iso){el.setDate(iso)})}render();return}
   if(a==="ampm"){pm=!pm;render();return}
@@ -721,6 +734,7 @@ function onScreenKeys(kind,o){
   var k=e.key;
   if(k==="Backspace"){typed("back");draw();e.preventDefault();return}
   if(k==="Enter"){if(el._done){el._done();e.preventDefault()}return}
+  if(kind==="datetime"&&(k==="ArrowRight"||k==="ArrowLeft"||k==="Tab")){seg=seg==="date"?"time":"date";draw();e.preventDefault();return}      // between the date and the time
   if(Array.from(k).length!==1)return;
   if(numeric){if(/\d/.test(k)){typed(k);draw();e.preventDefault()}else if(o.twelve&&kind==="time"&&/[apAP]/.test(k)){pm=/[pP]/.test(k);render();e.preventDefault()}return}
   if(cal)return;typed(k);draw();e.preventDefault()}
@@ -739,8 +753,12 @@ function onScreenKeys(kind,o){
   if(kind==="time")return timeOf(d,o.twelve);
   if(kind==="date"){if(d.length!==4){if(o.say)o.say("Type the day and the month, for example 0107 for 1 July");return null}
    var iso=dateOf(d);if(!iso){if(o.say)o.say("That date does not exist");return null}return iso}
-  if(d.length!==8){if(o.say)o.say("Type the day, the month and the time, for example 01071530");return null}
-  var di=dateOf(d.slice(0,4)),ti=timeOf(d.slice(4),false);if(!di){if(o.say)o.say("That date does not exist");return null}if(!ti)return null;return di+" "+ti};
+  // a date and a time: the date, the time or both ("" is not a value: Skip is the way to leave both out)
+  var td=tdigits,di="",ti="";
+  if(d){if(d.length!==4){if(o.say)o.say("Type the day and the month, for example 0107 for 1 July (or clear the date to skip it)");return null}di=dateOf(d);if(!di){if(o.say)o.say("That date does not exist");return null}}
+  if(td){ti=timeOf(td,false);if(!ti)return null}
+  if(!di&&!ti){if(o.say)o.say("Type a date, a time or both (or press Skip)");return null}
+  return di&&ti?di+" "+ti:di||ti};
  render();return el}
 W.roster=function(s,ctx){
  if(s.mode==="colours")return rosterColours(s,ctx);
@@ -844,7 +862,7 @@ W.roster=function(s,ctx){
  function openPersonMenu(id){var p=person(id);if(!p)return;cur=id;modal.innerHTML=menuHtml(p);modal.style.display="";var x=modal.querySelector(".rp-x");if(x&&x.focus)x.focus()}
  // a status that needs a time, a date or a note: its own pop-up on top of the menu, with a big field (Enter sets it, Esc or a tap outside goes back)
  function openNeed(code,st){var p=person(cur),kind=st.needs,kb=!!(D&&D.keyboard),twelve=false,
-  what=kind==="time"?"At what time?":kind==="date"?"Until which date?":kind==="datetime"?"Until which date and time?":"What is it?",field,
+  what=kind==="time"?"At what time?":kind==="date"?"Until which date?":kind==="datetime"?"Until which date and / or time? (leave one out to skip it)":"What is it?",field,
   skip=kind==="date"||kind==="datetime",withCal=skip;      // a date can be left out (Skip: the status is set without it); a date has a calendar
   modal2.innerHTML='<div class="rp-sheet rp-need2'+(kb?' rp-withkb':'')+'" role="dialog" aria-modal="true" aria-label="'+esc(st.label)+'"><button type="button" class="rp-x" data-back="1" title="Back" aria-label="Back">&#10005;</button>'+
    '<div class="rp-wn">'+esc(st.label)+'</div><div class="rp-wl">'+esc(p?p.name:"")+'</div><div class="rp-nl">'+what+'<div class="rp-field"></div></div><div class="rp-cmsg sub" aria-live="polite"></div>'+
@@ -853,22 +871,29 @@ W.roster=function(s,ctx){
   var host=modal2.querySelector(".rp-field"),msg=modal2.querySelector(".rp-cmsg");
   if(kb){var keys=onScreenKeys(kind==="note"?"text":kind,{value:st.default||"",twelve:twelve,say:function(t){setText(msg,t)}});keys._done=function(){var b=modal2.querySelector("[data-set]");if(b)b.click()};host.appendChild(keys);modal2._get=function(){return keys.value()}}
   else{var isT=kind==="time",isD=kind==="date",isDT=kind==="datetime",row=h("div",{"class":"rp-fieldrow"});      // not the browser's own time / date fields (they follow the browser's language): 24 h tt:mm and åååå-mm-dd, as in Sweden
-   field=h("input",{"class":"rp-big",type:"text",inputmode:(isT||isD||isDT)?"numeric":"text",value:isT?(st.default||""):"",maxlength:isT?5:isD?10:isDT?16:60,placeholder:isT?"tt:mm":isD?"åååå-mm-dd":isDT?"åååå-mm-dd tt:mm":"",autocomplete:"off","aria-label":st.label});
-   function mask(){var d=field.value.replace(/\D/g,"").slice(0,isT?4:isD?8:12);
-    field.value=isT?(d.length>2?d.slice(0,2)+":"+d.slice(2):d):(function(){var x=d.length>6?d.slice(0,4)+"-"+d.slice(4,6)+"-"+d.slice(6,8):d.length>4?d.slice(0,4)+"-"+d.slice(4):d;
-     return isDT&&d.length>8?x+" "+d.slice(8,10)+(d.length>10?":"+d.slice(10):""):x})()}
+   field=h("input",{"class":"rp-big",type:"text",inputmode:(isT||isD||isDT)?"numeric":"text",value:isT?(st.default||""):"",maxlength:isT?5:(isD||isDT)?10:60,placeholder:isT?"tt:mm":(isD||isDT)?"åååå-mm-dd":"",autocomplete:"off","aria-label":isDT?st.label+": date":st.label}),
+    tfield=isDT?h("input",{"class":"rp-big",type:"text",inputmode:"numeric",maxlength:5,placeholder:"tt:mm",autocomplete:"off","aria-label":st.label+": time"}):null;      // a date and a time: two fields, either may be left empty
+   function maskT(f){var d=f.value.replace(/\D/g,"").slice(0,4);f.value=d.length>2?d.slice(0,2)+":"+d.slice(2):d}
+   function mask(){if(isT)return maskT(field);var d=field.value.replace(/\D/g,"").slice(0,8);
+    field.value=d.length>6?d.slice(0,4)+"-"+d.slice(4,6)+"-"+d.slice(6,8):d.length>4?d.slice(0,4)+"-"+d.slice(4):d}
    if(isT||isD||isDT)field.addEventListener("input",mask);
-   row.appendChild(field);host.appendChild(row);
+   if(isDT)tfield.addEventListener("input",function(){maskT(tfield)});
+   row.appendChild(field);host.appendChild(row);if(isDT)host.appendChild(tfield);
    if(withCal){var cb=h("button",{type:"button","class":"pill-s rp-calbtn","aria-label":"Calendar","aria-expanded":"false",text:"📅"}),calEl=null;
     row.appendChild(cb);
     cb.onclick=function(e){e.stopPropagation();if(calEl){calEl.parentNode.removeChild(calEl);calEl=null;cb.setAttribute("aria-expanded","false");return}
-     var m=/^(\d{4}-\d\d-\d\d)/.exec(field.value);calEl=calendar(m?m[1]:"",function(iso){var rest=isDT?field.value.slice(10):"";field.value=iso+rest;if(calEl&&calEl.parentNode)calEl.parentNode.removeChild(calEl);calEl=null;cb.setAttribute("aria-expanded","false");if(isDT&&!rest.trim())field.focus()});
+     var m=/^(\d{4}-\d\d-\d\d)/.exec(field.value);calEl=calendar(m?m[1]:"",function(iso){field.value=iso;if(calEl&&calEl.parentNode)calEl.parentNode.removeChild(calEl);calEl=null;cb.setAttribute("aria-expanded","false");if(isDT&&!tfield.value.trim())tfield.focus()});
      host.appendChild(calEl);cb.setAttribute("aria-expanded","true")}}
    modal2._get=function(){var v=field.value.trim(),m;
     if(isT){m=/^(\d{1,2}):?(\d{2})$/.exec(v);if(!m||+m[1]>23||+m[2]>59){setText(msg,"Type the time as tt:mm, for example 08:30");return null}return (m[1].length<2?"0":"")+m[1]+":"+m[2]}
-    if(isD||isDT){m=/^(\d{4})-(\d\d)-(\d\d)(?: (\d\d):(\d\d))?$/.exec(v);var dt=m&&new Date(+m[1],+m[2]-1,+m[3]);
-     if(!m||dt.getMonth()!==+m[2]-1||(isD&&m[4])){setText(msg,isDT?"Type the date and time as åååå-mm-dd tt:mm, for example 2026-12-24 08:30":"Type the date as åååå-mm-dd, for example 2026-12-24");return null}
-     if(m[4]&&(+m[4]>23||+m[5]>59)){setText(msg,"The time must be tt:mm, for example 08:30");return null}return v}
+    if(isDT){var tv=tfield.value.trim(),mt=null,md=null;      // the date, the time or both
+     if(v){md=/^(\d{4})-(\d\d)-(\d\d)$/.exec(v);var dd=md&&new Date(+md[1],+md[2]-1,+md[3]);
+      if(!md||dd.getMonth()!==+md[2]-1){setText(msg,"Type the date as åååå-mm-dd, for example 2026-12-24 (or leave it empty to skip it)");return null}}
+     if(tv){mt=/^(\d{1,2}):?(\d{2})$/.exec(tv);if(!mt||+mt[1]>23||+mt[2]>59){setText(msg,"Type the time as tt:mm, for example 08:30 (or leave it empty to skip it)");return null}tv=(mt[1].length<2?"0":"")+mt[1]+":"+mt[2]}
+     if(!v&&!tv){setText(msg,"Type a date, a time or both (or press Skip)");return null}
+     return v&&tv?v+" "+tv:v||tv}
+    if(isD){m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(v);var dt=m&&new Date(+m[1],+m[2]-1,+m[3]);
+     if(!m||dt.getMonth()!==+m[2]-1){setText(msg,"Type the date as åååå-mm-dd, for example 2026-12-24");return null}return v}
     return v};
    if(field.focus)setTimeout(function(){field.focus()},0)}
   modal2.style.display=""}
