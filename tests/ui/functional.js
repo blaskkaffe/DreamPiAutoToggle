@@ -146,7 +146,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await openSettings();
   await page.locator('[data-box="check-in"] .srow:has-text("Title") input[type=checkbox]').check(); await settle(900);
   const openList = async box => { if (!(await page.locator(rowsOf(box)).first().isVisible())) { await page.locator(box + ' .srow.edit button').first().click(); await settle(300); } };
-  const drag = async (grip, dy) => { const b = await grip.boundingBox(), x = b.x + b.width / 2, y = b.y + b.height / 2; await page.mouse.move(x, y); await page.mouse.down(); for (let i = 1; i <= 10; i++) { await page.mouse.move(x, y + dy * i / 10); await settle(20); } await page.mouse.up(); await settle(900); };
+  const drag = async (grip, dy) => { await grip.scrollIntoViewIfNeeded(); const b = await grip.boundingBox(), x = b.x + b.width / 2, y = b.y + b.height / 2; await page.mouse.move(x, y); await page.mouse.down(); for (let i = 1; i <= 10; i++) { await page.mouse.move(x, y + dy * i / 10); await settle(20); } await page.mouse.up(); await settle(900); };
   await openList(PEOPLE);
   ok(await page.locator(rowsOf(PEOPLE)).count() === 25, 'Settings lists the people on file in a pop-up (like the Modules menu), a handle and a switch each');
   await page.locator(rowsOf(PEOPLE)).first().locator('input').uncheck(); await settle(1500);
@@ -302,6 +302,12 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   const scrollIs = async mode => { await cfg({ scroll: mode }); await page.reload({ waitUntil: 'networkidle' }); await settle(1500); return page.evaluate(() => ({ trk: document.querySelectorAll('#dash .rp-trk').length, still: document.querySelectorAll('#dash .rp-mq.still').length, stt: document.querySelectorAll('#dash .rp-stt').length })); };
   let sc = await scrollIs('off');
   ok(sc.trk === 0 && sc.stt > 0, 'scrolling off: the status is plain text on the row (' + JSON.stringify(sc) + ')');
+  await page.setViewportSize({ width: 360, height: 900 }); await settle(1200);
+  const narrow = await page.evaluate(() => Array.from(document.querySelectorAll('#dash .rp-stt[data-short]')).map(e => [e.textContent, e.getAttribute('data-short'), e.getAttribute('data-full'), e.scrollWidth > e.clientWidth + 1]));
+  ok(narrow.length > 0 && narrow.every(x => x[0] === x[1] || x[0] === x[2]) && narrow.some(x => x[0] === x[1] && x[1] !== x[2]), 'scrolling off: a status that does not fit shows only its name, the others show everything (' + JSON.stringify(narrow.map(x => x[0])) + ')');
+  await page.setViewportSize({ width: 1500, height: 900 }); await settle(1200);
+  const wide = await page.evaluate(() => Array.from(document.querySelectorAll('#dash .rp-stt[data-short]')).map(e => e.textContent === e.getAttribute('data-full')));
+  ok(wide.length > 0 && wide.every(Boolean), 'and in a wide window the whole status is shown again');
   await page.setViewportSize({ width: 1500, height: 900 });
   await page.evaluate(() => fetch('/screen/stretch', { method: 'POST', headers: { 'X-Requested-With': 'x', 'Content-Type': 'application/json' }, body: JSON.stringify({ value: true }) }));
   sc = await scrollIs('auto');

@@ -665,7 +665,7 @@ function onScreenKeys(kind,o){
  var el=h("div",{"class":"rp-kb rp-kb-"+kind}),shown=h("div",{"class":"rp-big rp-shown",role:"textbox","aria-readonly":"true","aria-live":"polite"}),digits="",pm=false,txt=String(o.value||""),layer="abc",shift=false,fresh=true,max=o.max||60,
   dateIso="",cal=null,emojiGroup=0,numeric=kind!=="text",maxDigits=4,withDate=kind==="date"||kind==="datetime",
   tdigits="",seg="date";      // a date and a time: two parts (digits = the date, tdigits = the time), either of them may be left empty; seg is the one being typed
- function key(label,act,cls,aria){var b=h("button",{type:"button","class":"pill-s rp-k"+(cls?" "+cls:""),"data-k":act,text:label});if(aria)b.setAttribute("aria-label",aria);return b}
+ function key(label,act,cls,aria){var b=h("button",{type:"button","class":"pill-s rp-k"+(cls?" "+cls:""),"data-k":act,text:ICO[label]?"":label});if(ICO[label])b.innerHTML=ICO[label];if(aria)b.setAttribute("aria-label",aria);return b}
  function row(keys,cls){var r=h("div",{"class":"rp-kr"+(cls?" "+cls:"")});keys.forEach(function(k){r.appendChild(k)});el.appendChild(r);return r}
  function dropLast(t){var a=Array.from(t),x=a.pop();if(x==="\ufe0f")a.pop();return a.join("")}
  if(kind==="time"){var m=/^(\d\d):(\d\d)$/.exec(o.value||"");if(m){var hh=+m[1];if(o.twelve){pm=hh>=12;hh=hh%12||12}digits=(hh<10?"0":"")+hh+m[2]}}
@@ -687,7 +687,7 @@ function onScreenKeys(kind,o){
   if(cal){el.appendChild(cal);return}
   var k=function(n){return key(String(n),"d"+n)};
   row([k(1),k(2),k(3)],"pad");row([k(4),k(5),k(6)],"pad");row([k(7),k(8),k(9)],"pad");
-  row([o.twelve&&kind==="time"?key(pm?"PM":"AM","ampm","rp-kw"):key("","none","rp-kn"),k(0),key("\u232b","back","rp-kw","Backspace")],"pad")}
+  row([o.twelve&&kind==="time"?key(pm?"PM":"AM","ampm","rp-kw"):key("","none","rp-kn"),k(0),key("back","back","rp-kw","Backspace")],"pad")}
  // the text keyboard: the iPhone's Swedish layout. Letters, 123 (numbers and punctuation), #+= (more symbols), emoji.
  var L={abc:[["q","w","e","r","t","y","u","i","o","p","\u00e5"],["a","s","d","f","g","h","j","k","l","\u00f6","\u00e4"],["z","x","c","v","b","n","m"]],
   sym:[["1","2","3","4","5","6","7","8","9","0"],["-","/",":",";","(",")","kr","&","@","\""],[".",",","?","!","'"]],
@@ -697,10 +697,10 @@ function onScreenKeys(kind,o){
    EMOJI.forEach(function(g,i){var t=key(g[0],"egroup"+i,"rp-etab"+(i===emojiGroup?" on":""),"Emoji group "+(i+1));tabs.appendChild(t)});
    EMOJI[emojiGroup][1].split(" ").forEach(function(c){grid.appendChild(key(c,"c"+c,"rp-emo"))});
    el.appendChild(tabs);el.appendChild(grid);
-   row([key("ABC","layerabc","rp-kw rp-k2"),key("mellanslag","c ","rp-ksp","Space"),key("\u232b","back","rp-kw rp-k2","Backspace"),key("klar","done","rp-kw rp-k2 pri","Done")]);return}
+   row([key("ABC","layerabc","rp-kw rp-k2"),key("mellanslag","c ","rp-ksp","Space"),key("back","back","rp-kw rp-k2","Backspace"),key("klar","done","rp-kw rp-k2 pri","Done")]);return}
   var rows=L[layer];
   rows.forEach(function(r,i){var keys=r.map(function(c){var ch=layer==="abc"&&shift?c.toUpperCase():c;return key(ch,"c"+ch,i===2&&layer!=="abc"?"rp-kp":"")});
-   if(i===2){keys.unshift(layer==="abc"?key(shift?"\u21ea":"\u21e7","shift","rp-kw rp-k2"+(shift?" on":""),"Shift"):key(layer==="sym"?"#+=":"123","layer"+(layer==="sym"?"more":"sym"),"rp-kw rp-k2"));keys.push(key("\u232b","back","rp-kw rp-k2","Backspace"))}
+   if(i===2){keys.unshift(layer==="abc"?key(shift?"shifton":"shift","shift","rp-kw rp-k2"+(shift?" on":""),"Shift"):key(layer==="sym"?"#+=":"123","layer"+(layer==="sym"?"more":"sym"),"rp-kw rp-k2"));keys.push(key("back","back","rp-kw rp-k2","Backspace"))}
    row(keys,"l"+i)});
   row([key(layer==="abc"?"123":"ABC",layer==="abc"?"layersym":"layerabc","rp-kw rp-k2"),key("\ud83d\ude00","layeremoji","rp-kw rp-k2","Emoji"),key("mellanslag","c ","rp-ksp","Space"),key("klar","done","rp-kw rp-k3 pri","Done")])}
  function render(){if(kind==="text")text();else pad();draw()}
@@ -787,9 +787,10 @@ W.roster=function(s,ctx){
  // the small grey text at the right of a row: the role and / or the building, as chosen in Settings (Display roles / Display buildings, each with a list of the ones to show)
  function shownIn(list,v){return !!v&&(list==null||list.indexOf(v)>=0)}
  function sideText(p){var out=[];if(D.show_roles!==false&&shownIn(D.roles_shown,p.role))out.push(p.role);if(D.show_buildings&&shownIn(D.buildings_shown,p.building))out.push(p.building);return out.join(" \u00b7 ")}
+ function statusName(p){var n=p.text;(D.statuses||[]).forEach(function(s){if(s.code===p.status)n=s.label});return n}      // the status without its time, date or text
  function row(p){var text=p.name+(p.text?"  ·  "+p.text:""),state=p.text?p.text:(p.in?"in":"out"),
   inner=p.status&&D.scroll==="status"?'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-sm"><span class="rp-mq" data-scroll="auto" style="--d:'+Math.max(8,Math.round(String(p.text).length*.45))+'s"><span class="rp-trk"><span>'+esc(p.text)+'</span><span>'+esc(p.text)+'</span></span></span></span>'+(p.dots?'<span class="rp-dots" aria-label="'+p.dots+(p.dots>1?' dots':' dot')+'">'+"\u25cf".repeat(p.dots)+'</span>':'')
-   :p.status&&D.scroll==="off"?'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-s rp-stt">'+esc(p.text)+'</span>'+(p.dots?'<span class="rp-dots" aria-label="'+p.dots+(p.dots>1?' dots':' dot')+'">'+"\u25cf".repeat(p.dots)+'</span>':'')
+   :p.status&&D.scroll==="off"?'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-s rp-stt" data-full="'+esc(p.text)+'" data-short="'+esc(statusName(p))+'">'+esc(p.text)+'</span>'+(p.dots?'<span class="rp-dots" aria-label="'+p.dots+(p.dots>1?' dots':' dot')+'">'+"\u25cf".repeat(p.dots)+'</span>':'')
    :p.status?'<span class="rp-mq" data-scroll="'+(D.scroll==="auto"?"auto":"on")+'" style="--d:'+Math.max(8,Math.round(text.length*.45))+'s"><span class="rp-trk"><span>'+esc(text)+'</span><span>'+esc(text)+'</span></span></span>'+(p.dots?'<span class="rp-dots" aria-label="'+p.dots+(p.dots>1?' dots':' dot')+'">'+"\u25cf".repeat(p.dots)+'</span>':'')
    :'<span class="rp-n">'+esc(p.name)+'</span><span class="rp-s">'+esc(sideText(p))+'</span>';
   return '<div class="rp-r '+(p.colour?"pri"+colourCls(p):"out")+'" data-id="'+esc(p.id)+'"><button type="button" class="rp-t" data-act="menu" aria-label="'+esc(p.name)+': '+esc(state)+', open the status menu">'+inner+'</button>'+
@@ -827,7 +828,13 @@ W.roster=function(s,ctx){
  // the boxes take the board colour (the board colour in Appearance) for their frame and header when the setting says so; the tile already carries that colour as its primary
  function styleTiles(){var on=D&&D.box==="board";Object.keys(tiles).forEach(function(id){tiles[id].classList.toggle("rp-col",!!on)})}
  var ro=null,raf=0;
- function fillCarousels(){Array.prototype.forEach.call(document.querySelectorAll("#dash .rp-mq"),function(mq){if(window.ResizeObserver){if(!ro)ro=new ResizeObserver(function(){if(!raf)raf=requestAnimationFrame(function(){raf=0;fillCarousels()})});ro.observe(mq)}
+ // Scrolling off: a status that does not fit its room on the row shows only its name (the time, date or text are in the status menu, which shows it all)
+ function fitStatuses(){Array.prototype.forEach.call(document.querySelectorAll("#dash .rp-stt[data-short]"),function(el){
+  if(window.ResizeObserver&&!el._ro){el._ro=true;if(!ro)ro=new ResizeObserver(function(){if(!raf)raf=requestAnimationFrame(function(){raf=0;fillCarousels()})});ro.observe(el)}
+  var full=el.getAttribute("data-full"),short=el.getAttribute("data-short");
+  if(el.textContent!==full)el.textContent=full;      // measured with everything in it
+  if(full!==short&&el.scrollWidth>el.clientWidth+1)el.textContent=short})}
+ function fillCarousels(){fitStatuses();Array.prototype.forEach.call(document.querySelectorAll("#dash .rp-mq"),function(mq){if(window.ResizeObserver){if(!ro)ro=new ResizeObserver(function(){if(!raf)raf=requestAnimationFrame(function(){raf=0;fillCarousels()})});ro.observe(mq)}
   var trk=mq.querySelector(".rp-trk");if(!trk||!trk.firstChild)return;
   if(mq.classList.contains("still"))mq.classList.remove("still");        // measured as if it scrolled
   var one=trk.firstChild.getBoundingClientRect().width,w=mq.getBoundingClientRect().width;if(!one||!w)return;
@@ -855,8 +862,8 @@ W.roster=function(s,ctx){
  function menuHtml(p){var st=D.statuses||[],who=[p.department,p.building].filter(Boolean).join(" · ");
   return '<div class="rp-sheet" role="dialog" aria-modal="true" aria-label="Status for '+esc(p.name)+'"><button type="button" class="rp-x" data-close="1" title="Close" aria-label="Close">&#10005;</button>'+
    '<div class="rp-who">'+rosterAvatar(p,"rp-avb")+
-   '<div class="rp-wt"><div class="rp-wn">'+esc(p.name)+'</div>'+(who?'<div class="rp-wl">'+esc(who)+'</div>':'')+(p.role?'<div class="rp-wl">'+esc(p.role)+'</div>':'')+(p.phone?'<div class="rp-wl">'+esc(p.phone)+'</div>':'')+
-    '<div class="rp-cur"><span class="rp-curl">Current status</span>'+(p.status&&p.text?'<span class="rp-curv'+colourCls(p)+'">'+esc(p.text)+'</span>':'<span class="rp-curv none">None</span>')+'</div></div></div>'+
+   '<div class="rp-wt"><div class="rp-wn">'+esc(p.name)+'</div>'+(who?'<div class="rp-wl">'+esc(who)+'</div>':'')+(p.role?'<div class="rp-wl">'+esc(p.role)+'</div>':'')+(p.phone?'<div class="rp-wl">'+esc(p.phone)+'</div>':'')+'</div></div>'+
+    '<div class="rp-cur"><span class="rp-curl">Current status</span>'+(p.status&&p.text?'<span class="rp-curv'+colourCls(p)+'">'+esc(p.text)+'</span>':'<span class="rp-curv none">None</span>')+'</div>'+
    '<div class="rp-opts">'+st.map(function(x){return '<button type="button" class="pill-s pri rp-so c-'+esc(x.colour)+(p.status===x.code?" on":"")+'" data-code="'+esc(x.code)+'" aria-pressed="'+(p.status===x.code?"true":"false")+'">'+esc(x.label)+'</button>'}).join("")+
    '</div><div class="rp-clear"><button type="button" class="pill-s rp-so" data-code="">Rensa status</button></div></div>'}
  function openPersonMenu(id){var p=person(id);if(!p)return;cur=id;modal.innerHTML=menuHtml(p);modal.style.display="";var x=modal.querySelector(".rp-x");if(x&&x.focus)x.focus()}
@@ -1052,7 +1059,7 @@ function sortable(box,onDone){
    function move(ev){if(ev.pointerId!==pid)return;y=ev.clientY;place()}
    var scroll=setInterval(function(){var top=0,bottom=window.innerHeight;                        // near the top / bottom edge: scroll along (the list, when it scrolls itself, else Settings)
     if(scroller!==$("settings")){var rc=scroller.getBoundingClientRect();top=Math.max(0,rc.top);bottom=Math.min(bottom,rc.bottom)}
-    if(y<top+70)scroller.scrollTop-=14;else if(y>bottom-70)scroller.scrollTop+=14;else return;place()},16);
+    var zone=Math.min(70,(bottom-top)/4);if(y<top+zone)scroller.scrollTop-=14;else if(y>bottom-zone)scroller.scrollTop+=14;else return;place()},16);
    function finish(cancel){if(done)return;done=true;clearInterval(scroll);
     grip.removeEventListener("pointermove",move);grip.removeEventListener("pointerup",up);grip.removeEventListener("pointercancel",lost);
     grip.removeEventListener("lostpointercapture",lost);document.removeEventListener("keydown",esc,true);

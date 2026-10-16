@@ -18,6 +18,10 @@ var ui={version:2,_pops:[]};   // keep in step with UI_KIT in base_modules.py
 ui.closePopups=function(except){ui._pops.forEach(function(p){if(p!==except)p.close()})};
 // the drag handle (list rows and main-screen tiles): two columns of three dots, drawn, so it looks the same in every font
 var GRIP_SVG='<svg viewBox="0 0 10 16" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>';
+// the keys' icons (the shift and backspace keys of the keyboards and the PIN pad): drawn, so they look the same in every font and fit the rest
+var ICO={back:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 5.5h10.3a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5H9.2L3 12z"/><path d="M12.6 9.6l5 4.8M17.6 9.6l-5 4.8"/></svg>',
+ shift:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.2l7.6 7.9h-4.6v6.7H9v-6.7H4.4z"/></svg>',
+ shifton:'<svg class="ico solid" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.2l7.6 7.9h-4.6v6.7H9v-6.7H4.4z"/></svg>'};
 ui.popup=function(el){
  var p={el:el,anchor:null,onclose:null};
  el.classList.add("pop");el.setAttribute("role","dialog");
@@ -269,8 +273,8 @@ var pinNeeded=false,pinValue="";
 var pinDlg=null;
 function askPin(title,cb){closePin();var m=h("div",{"class":"rp-modal keep-visible pinm",role:"dialog","aria-modal":"true","aria-label":title}),
   inp=h("input",{type:"password","class":"pininp",autocomplete:"off",maxlength:64,"aria-label":title}),keys=h("div",{"class":"pinpad"});
- function key(label,act,aria){var b=h("button",{type:"button","class":"pill-s pinkey","data-k":act,text:label});if(aria)b.setAttribute("aria-label",aria);return b}
- "123456789".split("").forEach(function(d){keys.appendChild(key(d,d))});keys.appendChild(key("\u2715","x","Cancel"));keys.appendChild(key("0","0"));keys.appendChild(key("\u232b","back","Backspace"));
+ function key(label,act,aria){var b=h("button",{type:"button","class":"pill-s pinkey","data-k":act,text:ICO[label]?"":label});if(ICO[label])b.innerHTML=ICO[label];if(aria)b.setAttribute("aria-label",aria);return b}
+ "123456789".split("").forEach(function(d){keys.appendChild(key(d,d))});keys.appendChild(key("\u2715","x","Cancel"));keys.appendChild(key("0","0"));keys.appendChild(key("back","back","Backspace"));
  var sheet=h("div",{"class":"rp-sheet pinsheet"},[h("div",{"class":"rp-wn",text:title}),inp,keys,h("button",{type:"button","class":"pill-s pri c-green pinok","data-k":"ok",text:"OK"})]);m.appendChild(sheet);
  function done(ok){var v=inp.value;closePin();if(ok&&v)cb(v)}
  m.addEventListener("click",function(e){if(e.target===m){done(false);return}var b=e.target.closest&&e.target.closest("[data-k]");if(!b)return;var a=b.getAttribute("data-k");
