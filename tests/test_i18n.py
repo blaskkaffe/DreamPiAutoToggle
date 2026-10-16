@@ -36,14 +36,7 @@ def texts_of(o, found):
                 texts_of(v, found)
     elif isinstance(o, list):
         for v in o:
-            if isinstance(v, str) and k_is_text(v):
-                found.add(v)
-            else:
-                texts_of(v, found)
-
-
-def k_is_text(v):
-    return False
+            texts_of(v, found)
 
 
 class Dictionaries(unittest.TestCase):
