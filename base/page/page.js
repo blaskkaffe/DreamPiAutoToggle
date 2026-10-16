@@ -49,26 +49,21 @@ var ICO={back:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="
  shift:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.2l7.6 7.9h-4.6v6.7H9v-6.7H4.4z"/></svg>',
  shifton:'<svg class="ico solid" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.2l7.6 7.9h-4.6v6.7H9v-6.7H4.4z"/></svg>'};
 ui.popup=function(el){
- var p={el:el,anchor:null,onclose:null};
- el.classList.add("pop");el.setAttribute("role","dialog");
- // the pop-up is placed inside the card it belongs to (the first time it opens it moves there, so it can use the card's whole width)
- function host(){var c=el.closest&&(el.closest(".rp-msheet")||el.closest(".card"));if(c&&el.parentNode!==c)c.appendChild(el);
-  var par=el.parentNode;if(window.getComputedStyle(par).position==="static")par.style.position="relative";return par}
+ var p={el:el,anchor:null,onclose:null},x=null;
+ el.classList.add("pop");el.setAttribute("role","dialog");el.setAttribute("aria-modal","true");
  p.isOpen=function(){return el.classList.contains("open")};
- p.open=function(anchor){ui.closePopups(p);p.anchor=anchor;var par=host();el.classList.add("open");
-  var box=par.getBoundingClientRect(),r=anchor.getBoundingClientRect(),f=par.offsetWidth?box.width/par.offsetWidth:1;   // f: how much bigger than its own pixels the card is drawn (Scale content)
-  var cs=window.getComputedStyle(par),padL=parseFloat(cs.paddingLeft)||0,padR=parseFloat(cs.paddingRight)||0;
-  el.style.left=padL+"px";el.style.width=(box.width/f-padL-padR)+"px";     // every pop-up spans the card between its left and right padding
-  el.style.top=((r.bottom-box.top)/f+6)+"px";fit();
-  if(window.ResizeObserver&&!p._ro){p._ro=new ResizeObserver(function(){if(p.isOpen())fit()});p._ro.observe(el)}};
- // A pop-up hangs below its row and may be taller than the card. In the multi-column settings view a box that sticks out of its
- // card is continued in the next column, so the card grows to hold the pop-up while it is open.
- function fit(){var par=el.parentNode;if(!par||!p.isOpen())return;par.style.minHeight="";
-  var need=el.offsetTop+el.offsetHeight+8;if(need>par.offsetHeight)par.style.minHeight=need+"px"}
- p.close=function(){if(!p.isOpen())return;el.classList.remove("open");p.anchor=null;if(el.parentNode)el.parentNode.style.minHeight="";if(p.onclose)p.onclose()};
+ // every pop-up is a sheet in the middle of the screen (the same look as the menus: a cross in the corner, the rest of the screen dimmed)
+ p.open=function(anchor){ui.closePopups(p);p.anchor=anchor;
+  if(!x){x=document.createElement("button");x.type="button";x.className="rp-mx";x.title=tr("Close");x.setAttribute("aria-label",tr("Close"));x.textContent="\u2715";x.onclick=function(e){e.stopPropagation();p.close()};el.insertBefore(x,el.firstChild)}
+  el.classList.add("open");if(x.focus)x.focus()};
+ p.close=function(){if(!p.isOpen())return;el.classList.remove("open");p.anchor=null;if(p.onclose)p.onclose()};
  p.toggle=function(anchor,e){if(e&&e.stopPropagation)e.stopPropagation();if(p.isOpen()&&p.anchor===anchor)p.close();else p.open(anchor)};
  el.addEventListener("click",function(e){e.stopPropagation()});
  ui._pops.push(p);return p};
+// a tap outside an open pop-up only closes it (it does not also press what is under the dimmed screen); taps in pop-ups, dialogs and on the button that opened it go through
+document.addEventListener("click",function(e){var t=e.target;if(!ui._pops.some(function(p){return p.isOpen()}))return;
+ if(t.closest&&(t.closest(".pop")||t.closest(".rp-modal")||ui._pops.some(function(p){return p.anchor&&(p.anchor===t||p.anchor.contains(t))})))return;
+ e.stopPropagation();e.preventDefault();ui.closePopups()},true);
 document.addEventListener("click",function(){ui.closePopups()});
 // Round icon buttons that are on or off: a bell (remind me), a star (favourite) and a play button (start something on the device a module announces as its launcher; never "on"). ui.iconButtonHtml(kind, on, what, attrs) is the markup
 // (a module that builds its rows as HTML puts attrs, such as a data-id, on the button); ui.iconButton(kind, on, what) the element.

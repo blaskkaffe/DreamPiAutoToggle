@@ -45,6 +45,15 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   ok(new Set(sizes).size === 1, 'the Edit buttons of the menus are all the same size (' + sizes[0] + ', ' + sizes.length + ' of them)');
   const rowBtns = await page.locator('#settings .srow > .pill-s, #settings .srow > span > .pill-s').evaluateAll(bs => bs.filter(b => b.offsetWidth).map(b => Math.round(b.getBoundingClientRect().width)));
   ok(Math.min.apply(null, rowBtns) >= 87, 'no button of a row is narrower than the minimum size (narrowest ' + Math.min.apply(null, rowBtns) + ' px of ' + rowBtns.length + ')');
+  // every other Edit button opens the same kind of sheet
+  for (const [box, row] of [['system', /^Time zone/], ['statuses', /^Statuses/], ['contacts', /^People/], ['appearance', /^Language/]]) {
+    await page.locator('[data-box="' + box + '"] .srow', { hasText: row }).first().locator('button').click(); await settle(400);
+    const g = await page.evaluate(() => { const p = document.querySelector('.pop.open'); if (!p) return null; const r = p.getBoundingClientRect();
+      return { dx: Math.round(r.left + r.width / 2 - innerWidth / 2), dy: Math.round(r.top + r.height / 2 - innerHeight / 2), x: !!p.querySelector(':scope > .rp-mx'), inside: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight }; });
+    ok(g && Math.abs(g.dx) <= 2 && Math.abs(g.dy) <= 2 && g.x && g.inside, box + ': Edit opens a sheet in the middle of the screen with a cross (' + JSON.stringify(g) + ')');
+    await page.locator('.pop.open > .rp-mx').click(); await settle(200);
+    ok(await page.locator('.pop.open').count() === 0, box + ': the cross closes it');
+  }
   const theme = page.locator('[data-box="appearance"] .srow', { hasText: /^Theme/ }).first();
   await theme.locator('button').click(); await settle(300);
   const tb = await page.locator('.pop.open .optrow .pill-s').evaluateAll(bs => bs.map(b => { const r = b.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height); }));

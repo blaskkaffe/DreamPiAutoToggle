@@ -61,9 +61,9 @@ const settle = ms => new Promise(r => setTimeout(r, ms));
   const pickBtn = app.locator('.srow', { hasText: 'Check-in board colour' }).locator('.colourpick > button'), pickBox = null;
   await pickBtn.click(); await settle(500);
   const pickAfter = await pickBtn.boundingBox();
-  const geo = await page.evaluate(btn => { const p = document.querySelector('.pop.open'), c = p.closest('.card').getBoundingClientRect(), r = p.getBoundingClientRect();
-    return { l: r.left - c.left, rr: c.right - r.right, below: r.top - (btn.y + btn.height) }; }, pickAfter);
-  ok(Math.abs(geo.l - 16 * 1.0) < 40 && geo.rr >= -1 && geo.l >= -1 && geo.below > -4 && geo.below < 40, 'a pop-up in a scaled box sits under its button and inside the card (' + JSON.stringify(geo) + ')');
+  const geo = await page.evaluate(() => { const r = document.querySelector('.pop.open').getBoundingClientRect(), w = innerWidth, h = innerHeight;
+    return { dx: Math.round(r.left + r.width / 2 - w / 2), dy: Math.round(r.top + r.height / 2 - h / 2), inside: r.left >= 0 && r.top >= 0 && r.right <= w && r.bottom <= h }; });
+  ok(Math.abs(geo.dx) <= 2 && Math.abs(geo.dy) <= 2 && geo.inside, 'a pop-up in a scaled box is a sheet in the middle of the screen, whole (' + JSON.stringify(geo) + ')');
   await page.keyboard.press('Escape'); await settle(300);
   // the rows
   ok(await app.locator('.srow', { hasText: 'Max columns: dashboard' }).count() === 1 && await app.locator('.srow', { hasText: 'Stretch boxes' }).count() === 1, 'Appearance has the Max columns and Stretch boxes rows');

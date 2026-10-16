@@ -92,8 +92,9 @@
  .swatch.sel{border-color:var(--text-hi)} .swatch:focus-visible{outline-offset:3px}
  @media(max-width:420px){.pop .swatches.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}   /* eight across would make the balls too small to tap on a phone */
  .msg{color:var(--danger-on-line);font-size:var(--fs-sm)} .msg:empty{display:none}
- .pop{display:none;position:absolute;z-index:20;left:16px;right:16px;box-sizing:border-box;padding:12px 16px;border-radius:var(--r-box);background:var(--pop);box-shadow:0 6px 24px rgba(0,0,0,.6)}
- .pop.open{display:block}   /* its width and left edge are set when it opens (ui.popup): the card's content width, the same for every pop-up */
+ .pop{display:none;position:fixed;z-index:30;left:50%;top:50%;transform:translate(-50%,-50%);width:clamp(300px,46vw,680px);max-width:calc(100vw - 24px);max-height:92vh;overflow:auto;box-sizing:border-box;padding:20px;border-radius:var(--r-box);background:var(--pop);border:var(--bw) solid var(--ctl-line);box-shadow:0 0 0 100vmax rgba(0,0,0,.62)}
+ .pop.open{display:block}   /* a sheet in the middle of the screen, the rest dimmed by its shadow (ui.popup) */
+ .pop > .rp-mx{position:absolute;top:10px;right:10px} .pop .t{margin-right:44px}
  .pop .t{font-size:var(--fs-sm);color:var(--text-2);margin-bottom:8px;overflow-wrap:anywhere}
  .pop .fld{display:flex;gap:8px;align-items:center} .pop .fld input{flex:1;min-width:0;margin:0}
  .pop input[type=text],.pop input[type=password]{margin:0 0 8px} .pop .fld input[type=text]{margin:0}
@@ -120,7 +121,7 @@
  .mlist .srow:first-child{border-top:0} .pop .mlist{margin:0 0 8px} .pop .mlist.olist{max-height:55vh;overflow-y:auto;overscroll-behavior:contain} .olist .srow.rp-edit{cursor:pointer} .srow[data-id] > span:nth-child(2){flex:1} .srow[data-id] > .fixed{flex:none;white-space:nowrap}
  .dragging,.dragging *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none} .dragging .grip{cursor:grabbing}
  .srow.drag{position:relative;z-index:5;will-change:transform;background:var(--card);border-radius:var(--r-ctl);box-shadow:0 8px 22px rgba(0,0,0,.65);border-top-color:transparent}
- .pop .srow.drag{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}   /* in a pop-up the lifted row is as wide as the pop-up itself */
+ .pop .srow.drag{margin-left:-20px;margin-right:-20px;padding-left:20px;padding-right:20px}   /* in a pop-up the lifted row is as wide as the pop-up itself */
  .wtext{margin:6px 0} .wtext.ctr{text-align:center}
  .carousel{display:block;min-width:0;white-space:nowrap} .carousel .dup,.carousel .sp{display:none}      /* never wraps: its natural width says whether it fits */
  .carousel.sc{white-space:nowrap;overflow:hidden} .carousel.sc .trk{display:inline-block;animation:marquee var(--d,20s) linear infinite}

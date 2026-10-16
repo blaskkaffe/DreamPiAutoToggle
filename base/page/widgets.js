@@ -240,7 +240,7 @@ W.menu=function(s,ctx){var key="menu:"+(s.id||s.title),open=false,title=h("span"
  function set(v){if(v)closeMenus(api);open=v;try{sessionStorage.setItem(key,v?"1":"0")}catch(e){}paint();if(v){ui.closePopups();x.focus()}}
  api.close=function(){if(open)set(false)};MENUS.push(api);
  btn.onclick=function(e){e.stopPropagation();set(!open)};x.onclick=done.onclick=function(e){e.stopPropagation();set(false)};
- body.addEventListener("click",function(e){if(e.target===body)set(false)});
+ body.addEventListener("click",function(e){if(e.target===body)set(false)});      // (a pop-up open inside it was closed by the page already)
  hook("escape",function(){if(open){set(false);return true}});hook("settingsClose",function(){if(open)set(false)});
  head.addEventListener("click",function(e){if(e.target===btn||btn.contains(e.target))return;btn.click()});
  head.style.cursor="pointer";UPD.push(paintSub);paint();paintSub();return el};
