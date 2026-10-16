@@ -27,6 +27,26 @@
        }
       },
       {
+       "label": "Serial PPP",
+       "show": "@serialppp.show",
+       "value": {
+        "type": "status",
+        "dot": "@serialppp.state",
+        "text": "@serialppp.text",
+        "sub": "@serialppp.sub"
+       }
+      },
+      {
+       "label": "KOSnet",
+       "show": "@kosnet.show",
+       "value": {
+        "type": "status",
+        "dot": "@kosnet.state",
+        "text": "@kosnet.text",
+        "sub": "@kosnet.sub"
+       }
+      },
+      {
        "label": "Internet",
        "value": {
         "type": "status",

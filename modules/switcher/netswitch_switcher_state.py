@@ -18,6 +18,14 @@ STATE = TMP + ".state"                                       # "<starting|ready|
 MODEM = TMP + ".modem"                                       # "<unix time> <text>": the latest modem event DreamPi logged (the hook)
 NET_STATE = TMP + ".net"                                     # the checker's JSON: links, internet, Pi health, modem (read by the LED module)
 NET_STALE = 20                                               # ignore NET_STATE when older than this (the web service is down)
+NETLINK_CONFIGS = ("/boot/netlink_config.ini", "/home/pi/dreampi/netlink_config.ini")   # the first that exists is the one DreamPi's netlink.py reads
+NOAUTO = "/boot/noautoupdates.txt"                           # while it exists netlink.py does not read its config at all (its defaults apply)
+SYS_NET = "/sys/class/net"
+PROC = "/proc"
+RUN_DIR = "/var/run"                                         # pppd's ppp0.pid, ppp1.pid ...
+ARP = "/proc/net/arp"
+KOSNET_IFACE = "dcusb0"                                      # the RP2040 Dreamcast cable's network side (its dreampi/install.sh names it so): KOS's W5500 driver
+KOSNET_LEASES = "/run/dcusb0.leases"                         # the cable's dnsmasq lease file (expiry, mac, ip, name, id per line)
 BUTTON1_GPIO = os.path.join(BASE_DIR, "button1_gpio")
 BUTTON2_GPIO = os.path.join(BASE_DIR, "button2_gpio")
 BUTTON1_FUNCTION = os.path.join(BASE_DIR, "button1_function")
@@ -230,3 +238,105 @@ def save_button_function(which, v):
     with open(tmp, "w") as f:
         f.write(v)
     os.rename(tmp, path)
+
+
+# ------------------------------------------------------------------ the two Dreamcast paths besides the modem
+# The network box shows them between Modem and Internet, only while they are in use on this Pi (no cable, no row).
+
+def serial_config():
+    """(port, baud, disabled, explicit) of DreamPi's serial adapter ([Serial Port] in netlink_config.ini, as netlink.py reads it): its defaults are
+    /dev/ttyUSB0 at 115200; "explicit" = the file names a port. While /boot/noautoupdates.txt exists netlink.py reads no config, so only the defaults count."""
+    port, baud, disabled, explicit = "/dev/ttyUSB0", 115200, False, False
+    if os.path.exists(NOAUTO):
+        return port, baud, disabled, explicit
+    for path in NETLINK_CONFIGS:
+        if os.path.isfile(path):
+            text = core.read_file(path) or ""
+            section = re.search(r"^\[Serial Port\](.*?)(?=^\[|\Z)", text, re.M | re.S)
+            for key, value in re.findall(r"^\s*(port|baud|disabled)\s*=\s*(\S+)", section.group(1) if section else "", re.M):
+                if key == "port":
+                    port, explicit = value, True
+                elif key == "baud" and value.isdigit():
+                    baud = int(value)
+                elif key == "disabled":
+                    disabled = value.lower() == "yes"
+            break
+    return port, baud, disabled, explicit
+
+
+def _ppp_interfaces():
+    try:
+        return sorted(n for n in os.listdir(SYS_NET) if n.startswith("ppp"))
+    except OSError:
+        return []
+
+
+def serial_call(port):
+    """The ppp interface of a call running over the serial adapter (a pppd that has this port as its device), "ppp" when its interface is not known,
+    None when there is none. Looks at /proc only while some ppp interface exists, so an idle Pi does no work."""
+    names = _ppp_interfaces()
+    if not names or not port:
+        return None
+    want = os.path.realpath(port)
+    try:
+        pids = [n for n in os.listdir(PROC) if n.isdigit()]
+    except OSError:
+        return None
+    for pid in pids:
+        try:
+            with open(os.path.join(PROC, pid, "cmdline"), "rb") as f:
+                argv = f.read().decode("utf-8", "replace").split("\0")
+        except (IOError, OSError):
+            continue
+        if not argv or os.path.basename(argv[0]) != "pppd":
+            continue
+        if any(a.startswith("/") and os.path.realpath(a) == want for a in argv[1:]):
+            for name in names:
+                if (core.read_file(os.path.join(RUN_DIR, name + ".pid")) or "").split("\n")[0].strip() == pid:
+                    return name
+            return "ppp"
+    return None
+
+
+def serial_ppp_view():
+    """The Serial PPP row: {"show", "state", "text", "sub"}. Shown when the adapter is plugged in (its port exists) or the config names a port that is
+    missing; hidden when DreamPi's serial support is disabled or no serial adapter is used."""
+    port, baud, disabled, explicit = serial_config()
+    here = bool(port) and os.path.exists(port)
+    if disabled or not (here or explicit):
+        return {"show": False, "state": "unknown", "text": "", "sub": ""}
+    if not here:
+        return {"show": True, "state": "warn", "text": "Cable not found", "sub": port}
+    call = serial_call(port)
+    if call:
+        return {"show": True, "state": "ok", "text": "Connected", "sub": "%s \u2022 %s" % (call, port)}
+    return {"show": True, "state": "ok", "text": "Ready", "sub": "%s \u2022 %d baud" % (port, baud)}
+
+
+def kosnet_dreamcast():
+    """The Dreamcast's address on the KOSnet link when it has a lease from the cable's dnsmasq and is in the Pi's ARP table (a complete entry), else None."""
+    leased = set()
+    for line in (core.read_file(KOSNET_LEASES) or "").splitlines():
+        parts = line.split()
+        if len(parts) >= 3:
+            leased.add(parts[2])
+    if not leased:
+        return None
+    for line in (core.read_file(ARP) or "").splitlines()[1:]:
+        parts = line.split()
+        if len(parts) >= 6 and parts[5] == KOSNET_IFACE and parts[0] in leased and int(parts[2], 16) & 2:
+            return parts[0]
+    return None
+
+
+def kosnet_view():
+    """The KOSnet row (a KOS program using the cable's W5500 side): {"show", "state", "text", "sub"}. Hidden while the cable's network interface does not exist."""
+    base = os.path.join(SYS_NET, KOSNET_IFACE)
+    if not os.path.isdir(base):
+        return {"show": False, "state": "unknown", "text": "", "sub": ""}
+    if (core.read_file(os.path.join(base, "operstate")) or "").strip() == "down":
+        return {"show": True, "state": "warn", "text": "Link down", "sub": KOSNET_IFACE}
+    ip = kosnet_dreamcast()
+    if ip:
+        return {"show": True, "state": "ok", "text": "Connected", "sub": "Dreamcast %s" % ip}
+    return {"show": True, "state": "ok", "text": "Ready", "sub": KOSNET_IFACE}

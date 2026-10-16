@@ -72,4 +72,12 @@ SERVER=$!
 sleep 3
 PORT=8743 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node palette.js || RESULT=1
 kill $SERVER 2>/dev/null
+# the network box's Serial PPP and KOSnet rows: shown with the RP2040 Dreamcast cable (CABLE=call), hidden without
+CABLE=call PORT=8752 python3 demo_server.py > /tmp/dpns-demo-cable.log 2>&1 &
+SERVER=$!
+PORT=8753 python3 demo_server.py > /tmp/dpns-demo-nocable.log 2>&1 &
+SERVER2=$!
+sleep 4
+PORT_CABLE=8752 PORT_PLAIN=8753 NODE_PATH=${NODE_PATH:-/opt/node22/lib/node_modules} node cable.js || RESULT=1
+kill $SERVER $SERVER2 2>/dev/null
 exit $RESULT

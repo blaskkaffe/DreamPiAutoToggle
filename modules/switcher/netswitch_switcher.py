@@ -135,6 +135,7 @@ def api(d, warnings):
     pi_lines = [pi["line1"], pi.get("line2") or ""] + ([pi["warn"]] if pi.get("warn") else []) if pi.get("line1") else [pi.get("text") or "..."]
     d.update({"network": sel["id"], "selected": sel,
               "modem": {"state": _modem_dot(dstate, plugged, compat), "text": mtext, "since": msince, "since_text": _ago(msince, now), "plugged": plugged, "label": label, "compat": compat},
+              "serialppp": state.serial_ppp_view(), "kosnet": state.kosnet_view(),
               "internet": _internet_view(checks["internet"], pi),
               "pi": {"state": pi.get("state"), "text": pi.get("text"), "line1": pi.get("line1"), "line2": pi.get("line2"),
                      "warn": pi.get("warn"), "lines": pi_lines},
