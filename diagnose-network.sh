@@ -15,12 +15,7 @@ sec "interfaces (state, addresses)"; if have ip; then ip -br addr; elif have ifc
 sec "routes"; have ip && ip route
 sec "link details (errors, drops)"; have ip && ip -s link | head -60
 sec "neighbours (ARP: who this computer has seen on the LAN)"; have ip && ip neigh | head -40
-sec "wireless (power saving off is what we want)"
-WL=0
-for d in /sys/class/net/*; do [ -d "$d/wireless" ] || continue; WL=1; n=$(basename "$d"); echo "$n is wireless"; have iw && iw dev "$n" get power_save; have iw && iw dev "$n" link; done
-[ "$WL" = 1 ] || echo "(no wireless interface)"
-[ "$WL" = 0 ] || have iw || echo "(iw is not installed: apt install iw. The add-on can only switch Wi-Fi power saving off with iw or iwconfig; a cable is better than Wi-Fi for the host)"
-sec "wired link speed / duplex"; have ethtool && for d in /sys/class/net/*; do n=$(basename "$d"); [ -e "$d/device" ] && [ ! -d "$d/wireless" ] && ethtool "$n" 2>/dev/null | grep -E "Speed|Duplex|Link detected"; done
+sec "link speed / duplex"; have ethtool && for d in /sys/class/net/*; do n=$(basename "$d"); [ -e "$d/device" ] && ethtool "$n" 2>/dev/null | grep -E "Speed|Duplex|Link detected"; done
 sec "is another computer using this computer's address? (needs arping: apt install iputils-arping)"
 if have arping && have ip; then
   for n in $(ip -4 -o addr show scope global | awk '{print $2}' | sort -u); do a=$(ip -4 -o addr show dev "$n" scope global | awk '{print $4; exit}' | cut -d/ -f1)
@@ -33,7 +28,7 @@ for s in checkin-board checkin-board-pxe checkin-board-pxe-http avahi-daemon Net
 sec "listening ports (80/443 the board, 67/69/4011/8069 network boot)"; have ss && ss -lntu | grep -E ":(80|443|67|69|4011|8069|5353)\b"
 sec "firewall"; have ufw && ufw status 2>/dev/null | head -20; have nft && nft list ruleset 2>/dev/null | head -40
 sec "what the network did while the board was running (the service logs a line at every change)"; have journalctl && journalctl -u checkin-board --no-pager 2>/dev/null | grep -E "network:|restarting the service|failed" | tail -40
-sec "kernel messages about the network card, Wi-Fi or link"; have journalctl && journalctl -k --no-pager 2>/dev/null | grep -iE "link is|link down|NETDEV WATCHDOG|reset|firmware|hang|timeout|r8169|e1000|iwl|brcm|rtl|ath" | tail -30
+sec "kernel messages about the network card or link"; have journalctl && journalctl -k --no-pager 2>/dev/null | grep -iE "link is|link down|NETDEV WATCHDOG|reset|firmware|hang|timeout|r8169|e1000|iwl|brcm|rtl|ath" | tail -30
 sec "reaching things"
 GW=$(ip -4 route show default 2>/dev/null | awk '{print $3; exit}')
 [ -z "$GW" ] || { echo "router $GW:"; ping -c 3 -W 2 "$GW" 2>&1 | tail -3; }

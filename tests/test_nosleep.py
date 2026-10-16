@@ -55,7 +55,7 @@ class NoSleep(unittest.TestCase):
         self.assertIn("unmask", open(self.calls).read())
 
     def test_the_scripts_parse_and_uninstall_undoes_it(self):
-        for name in ("install.sh", "uninstall.sh", "diagnose-network.sh", "wifi-powersave-off.sh"):
+        for name in ("install.sh", "uninstall.sh", "diagnose-network.sh"):
             subprocess.check_call(["sh", "-n", os.path.join(ROOT, name)])
         un = read("uninstall.sh")
         self.assertIn("90-checkin-no-sleep.conf", un)
