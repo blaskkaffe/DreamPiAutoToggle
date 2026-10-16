@@ -698,12 +698,12 @@ function onScreenKeys(kind,o){
    EMOJI.forEach(function(g,i){var t=key(g[0],"egroup"+i,"rp-etab"+(i===emojiGroup?" on":""),"Emoji group "+(i+1));tabs.appendChild(t)});
    EMOJI[emojiGroup][1].split(" ").forEach(function(c){grid.appendChild(key(c,"c"+c,"rp-emo"))});
    el.appendChild(tabs);el.appendChild(grid);
-   row([key("ABC","layerabc","rp-kw rp-k2"),key("mellanslag","c ","rp-ksp","Space"),key("back","back","rp-kw rp-k2","Backspace"),key("klar","done","rp-kw rp-k2 pri","Done")]);return}
+   row([key("ABC","layerabc","rp-kw rp-k2"),key("space","c ","rp-ksp","Space"),key("back","back","rp-kw rp-k2","Backspace"),key("done","done","rp-kw rp-k2 pri","Done")]);return}
   var rows=L[layer];
   rows.forEach(function(r,i){var keys=r.map(function(c){var ch=layer==="abc"&&shift?c.toUpperCase():c;return key(ch,"c"+ch,i===2&&layer!=="abc"?"rp-kp":"")});
    if(i===2){keys.unshift(layer==="abc"?key(shift?"shifton":"shift","shift","rp-kw rp-k2"+(shift?" on":""),"Shift"):key(layer==="sym"?"#+=":"123","layer"+(layer==="sym"?"more":"sym"),"rp-kw rp-k2"));keys.push(key("back","back","rp-kw rp-k2","Backspace"))}
    row(keys,"l"+i)});
-  row([key(layer==="abc"?"123":"ABC",layer==="abc"?"layersym":"layerabc","rp-kw rp-k2"),key("\ud83d\ude00","layeremoji","rp-kw rp-k2","Emoji"),key("mellanslag","c ","rp-ksp","Space"),key("klar","done","rp-kw rp-k3 pri","Done")])}
+  row([key(layer==="abc"?"123":"ABC",layer==="abc"?"layersym":"layerabc","rp-kw rp-k2"),key("\ud83d\ude00","layeremoji","rp-kw rp-k2","Emoji"),key("space","c ","rp-ksp","Space"),key("done","done","rp-kw rp-k3 pri","Done")])}
  function render(){if(kind==="text")text();else pad();draw()}
  function typed(c){
   if(kind==="datetime"){fresh=false;

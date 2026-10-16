@@ -218,9 +218,11 @@
   "Wrong PIN": "Fel PIN-kod",
   "Wrong PIN, try again": "Fel PIN-kod, försök igen",
   "Yellow": "Gul",
+  "done": "klar",
   "not set": "inte vald",
   "off": "av",
   "on": "på",
+  "space": "mellanslag",
   "unknown": "okänd"
  },
  "patterns": [

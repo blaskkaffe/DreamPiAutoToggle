@@ -226,7 +226,7 @@ const ok = (cond, what) => { console.log((cond ? 'ok   ' : 'FAIL ') + what); if 
   await page.locator('.rp-t').nth(4).click(); await settle(300);
   await page.locator('.rp-sheet button[data-code="OTHER"]').click(); await settle(300);
   ok(await page.locator('.rp-kb .rp-kr.l0 .rp-k').count() === 11 && await page.locator('.rp-kb .rp-kr.l1 .rp-k').count() === 11 && await page.locator('.rp-kb .rp-kr.l2 .rp-k').count() === 9, 'the text keyboard has the iPhone Swedish rows (q w e r t y u i o p \u00e5 / a s d f g h j k l \u00f6 \u00e4 / shift z x c v b n m delete)');
-  ok((await page.locator('.rp-kb .rp-kr:last-child .rp-k').allTextContents()).join('|') === '123|\ud83d\ude00|mellanslag|klar', 'and the bottom row is 123, emoji, space, done');
+  ok((await page.locator('.rp-kb .rp-kr:last-child .rp-k').allTextContents()).join('|') === '123|\ud83d\ude00|space|done', 'and the bottom row is 123, emoji, space, done');
   const kh = await page.locator('.rp-kb [data-k=cq]').boundingBox();
   ok(kh.height >= 60 && kh.width >= 60, 'the keys are large (' + Math.round(kh.width) + 'x' + Math.round(kh.height) + ')');
   await page.click('[data-k="layeremoji"]'); await page.click('[data-k="egroup3"]');
