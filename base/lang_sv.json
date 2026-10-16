@@ -253,12 +253,12 @@
    "Tillbaka till standardfärgen för $1"
   ],
   [
-   "^Delete (.+)$",
-   "Ta bort $1"
-  ],
-  [
    "^Delete the colour (.+)\\? Whatever uses it goes back to its default colour\\.$",
    "Ta bort färgen $1? Allt som använder den går tillbaka till sin standardfärg."
+  ],
+  [
+   "^Delete (.+)$",
+   "Ta bort $1"
   ],
   [
    "^Colour: (.+)$",

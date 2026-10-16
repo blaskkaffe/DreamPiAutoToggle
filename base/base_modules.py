@@ -510,9 +510,13 @@ def lang_files(code):
     return [f for f in files if os.path.exists(f)]
 
 
+GENERIC_PATTERN = "^(.+): (.+)$"      # "A: B" with both parts translated; it must come after the patterns that have a colon in them
+
+
 def lang_dictionary(code):
-    """{"strings": {...}, "patterns": [...]} merged from lang_files(code) ({} strings and no patterns for a language without files, as English)."""
-    out = {"strings": {}, "patterns": []}
+    """{"strings": {...}, "patterns": [...]} merged from lang_files(code) ({} strings and no patterns for a language without files, as English).
+    A module's own patterns come before the base's (a module knows its texts better than the base's general ones) and the general fallback comes last."""
+    strings, per_file = {}, []
     for path in lang_files(code):
         try:
             data = json.loads(_read(path))
@@ -520,10 +524,13 @@ def lang_dictionary(code):
             sys.stderr.write("%s: %s\n" % (path, e))
             continue
         if isinstance(data.get("strings"), dict):
-            out["strings"].update(dict((k, v) for k, v in data["strings"].items() if isinstance(k, str) and isinstance(v, str)))
-        if isinstance(data.get("patterns"), list):
-            out["patterns"] += [p for p in data["patterns"] if isinstance(p, list) and len(p) == 2 and all(isinstance(x, str) for x in p)]
-    return out
+            strings.update(dict((k, v) for k, v in data["strings"].items() if isinstance(k, str) and isinstance(v, str)))
+        per_file.append([p for p in data.get("patterns", []) if isinstance(p, list) and len(p) == 2 and all(isinstance(x, str) for x in p)] if isinstance(data.get("patterns"), list) else [])
+    patterns = []
+    for part in per_file[1:] + per_file[:1]:                  # the modules' first, the base's last
+        patterns += part
+    patterns.sort(key=lambda p: p[0] == GENERIC_PATTERN)
+    return {"strings": strings, "patterns": patterns}
 
 
 def page_parts():

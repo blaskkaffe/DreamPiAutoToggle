@@ -192,6 +192,7 @@
  .rp-t{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:4px 4px 4px 16px;background:none;text-align:left;font-size:1.75em;line-height:1.2;color:inherit;text-shadow:inherit}
  .rp-n{flex:0 0 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600} .rp-s{flex:0 1 auto;min-width:0;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.6em;opacity:.85}      /* the role gives way before the name does */
  .rp-r.out .rp-n{font-weight:500}
+ .rp-n,.rp-s,.rp-sm,.rp-mq,.rp-gt{padding-block:.25em;margin-block:-.25em}   /* these cut their text at the line (ellipsis, scrolling): a font with a taller em box (Segoe UI, Calibri) lost the tails of g, j and y and the dots over Å Ä Ö; the padding gives the cut more room and the margin takes the room back, so nothing moves */
  .rp-s.rp-stt{font-size:.8em;font-weight:600;opacity:1}
  .rp-sm{flex:0 1 auto;min-width:0;margin-left:auto;overflow:hidden;font-size:.8em} .rp-sm .rp-mq{display:block;max-width:100%}   /* only the status scrolls: the name stays */
  .rp-mq.still .rp-trk{animation:none} .rp-mq.still .rp-trk > span + span{display:none} .rp-mq.still .rp-trk > span{padding-right:0}
