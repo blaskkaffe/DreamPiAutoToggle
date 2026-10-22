@@ -190,6 +190,8 @@
   "The rows and the spacing of a stretched box grow with it, so the box is taller too. The text keeps its size (see Text).": "Raderna och avstånden i en utsträckt ruta växer med den, så rutan blir också högre. Texten behåller sin storlek (se Text).",
   "The time must be tt:mm, for example 08:30": "Tiden måste vara tt:mm, till exempel 08:30",
   "The two PINs are not the same.": "De två PIN-koderna är inte lika.",
+  "Title on this screen": "Rubrik på den här skärmen",
+  "Title on this screen (empty = the board's title)": "Rubrik på den här skärmen (tom = tavlans rubrik)",
   "Theme": "Tema",
   "This action needs the PIN": "Den här åtgärden kräver PIN-koden",
   "This computer's own time zone": "Datorns egen tidszon",

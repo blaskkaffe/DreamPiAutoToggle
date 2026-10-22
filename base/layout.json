@@ -40,6 +40,17 @@
          "label": "Theme"
         }
        ]
+      },
+      {
+       "title": "Title on this screen",
+       "inline": true,
+       "controls": [
+        {
+         "type": "text",
+         "key": "title",
+         "label": "Title on this screen (empty = the board's title)"
+        }
+       ]
       }
      ],
      "order": 10

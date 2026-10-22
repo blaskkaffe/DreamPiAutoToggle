@@ -84,18 +84,26 @@ class HttpTests(unittest.TestCase):
         self.post("/timezone", {"values": {"zone": "Mars/Olympus"}})     # not a zone of the list: the computer's own
         self.assertEqual(core.time_zone(), "")
 
+    def test_a_screen_can_have_its_own_title(self):
+        self.post("/screen", {"values": {"title": "  Kök   entré  "}})
+        self.assertEqual(core.screen_settings()["title"], "Kök entré")
+        self.post("/screen", {"values": {"title": "x" * 60}})
+        self.assertEqual(len(core.screen_settings()["title"]), 40)
+        self.post("/screen", {"values": {"title": ""}})
+        self.assertEqual(core.screen_settings()["title"], "")
+
     def test_screen_layout_settings(self):
         d = json.loads(self.get("/api")[2].decode())
-        self.assertEqual(d["screen"], {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "nocog": False, "nobar": False, "theme": "dark", "font_scale": 1.0, "font_colour": "auto", "sound": True, "sound_name": "pop.wav", "sound_volume": 0.6})
+        self.assertEqual(d["screen"], {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "nocog": False, "nobar": False, "title": "", "theme": "dark", "font_scale": 1.0, "font_colour": "auto", "sound": True, "sound_name": "pop.wav", "sound_volume": 0.6})
         self.post("/screen", {"values": {"dash_cols": 3, "set_cols": 2}})
         self.post("/screen/stretch", {"value": True})
         self.post("/screen/scale", {"value": True})
         self.post("/screen/fit", {"value": True})
         d = json.loads(self.get("/api")[2].decode())
-        self.assertEqual(d["screen"], {"dash_cols": 3, "set_cols": 2, "stretch": True, "scale": True, "drag": False, "noscroll": False, "fit": True, "autohide": False, "nocog": False, "nobar": False, "theme": "dark", "font_scale": 1.0, "font_colour": "auto", "sound": True, "sound_name": "pop.wav", "sound_volume": 0.6})
+        self.assertEqual(d["screen"], {"dash_cols": 3, "set_cols": 2, "stretch": True, "scale": True, "drag": False, "noscroll": False, "fit": True, "autohide": False, "nocog": False, "nobar": False, "title": "", "theme": "dark", "font_scale": 1.0, "font_colour": "auto", "sound": True, "sound_name": "pop.wav", "sound_volume": 0.6})
         self.post("/screen/fit", {"value": False})
         reply = json.loads(self.get("/screen")[2].decode())
-        self.assertEqual(reply["values"], {"dash_cols": 3, "set_cols": 2, "theme": "dark", "font_scale": 1.0, "font_colour": "auto", "sound_name": "pop.wav", "sound_volume": 0.6})
+        self.assertEqual(reply["values"], {"dash_cols": 3, "set_cols": 2, "theme": "dark", "title": "", "font_scale": 1.0, "font_colour": "auto", "sound_name": "pop.wav", "sound_volume": 0.6})
         self.assertEqual([o["value"] for o in reply["options"]["cols"]], [1, 2, 3, 4, 5, 6])
         self.post("/screen", {"values": {"dash_cols": 9, "set_cols": "x"}})                       # out of range / not a number: kept
         self.assertEqual((core.screen_settings()["dash_cols"], core.screen_settings()["set_cols"]), (3, 2))

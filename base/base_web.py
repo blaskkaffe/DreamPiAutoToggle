@@ -83,7 +83,7 @@ def _screen_reply():
     colours = [{"value": "auto", "label": "Automatic (black on light boxes, white on dark)"}, {"value": "black", "label": "Black"}, {"value": "white", "label": "White"}] + \
               [{"value": c["id"], "label": c["name"]} for c in core.colours() if not c.get("token")]
     sounds = [{"value": "off", "label": "Off"}] + [{"value": n, "label": os.path.splitext(n)[0]} for n in core.list_sounds()]
-    return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"], "theme": cur["theme"], "font_scale": cur["font_scale"], "font_colour": cur["font_colour"],
+    return {"values": {"dash_cols": cur["dash_cols"], "set_cols": cur["set_cols"], "theme": cur["theme"], "title": cur["title"], "font_scale": cur["font_scale"], "font_colour": cur["font_colour"],
                        "sound_name": cur["sound_name"] if cur["sound"] else "off", "sound_volume": cur["sound_volume"]},
             "options": {"cols": opts, "themes": themes, "sizes": sizes, "font_colours": colours, "sounds": sounds},
             "texts": {"theme": dict((t["value"], t["label"]) for t in themes)[cur["theme"]],
@@ -575,7 +575,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             data = json.loads(self._body(1024).decode("utf-8"))
             if path == "/screen":
-                vals = dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols", "theme", "font_scale", "font_colour", "sound_name", "sound_volume") if k in (data.get("values") or {}))
+                vals = dict((k, (data.get("values") or {}).get(k)) for k in ("dash_cols", "set_cols", "theme", "title", "font_scale", "font_colour", "sound_name", "sound_volume") if k in (data.get("values") or {}))
                 if vals.get("sound_name") in ("off", "av"):          # "Off" in the sound list switches the button sounds off (the file name is kept)
                     vals.pop("sound_name")
                     vals["sound"] = False

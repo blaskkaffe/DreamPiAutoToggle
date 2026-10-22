@@ -739,7 +739,7 @@ def save_settings_pin(on):
 
 # ---- screen layout: how many columns the dashboard and Settings may use on a wide screen, and whether the boxes stretch to fill it
 THEMES = ("dark", "light", "auto", "time")      # "auto": like the device's own setting; "time": light by day, dark by night at the common time zone
-SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "nocog": False, "nobar": False, "theme": "dark", "font_scale": 1.0, "font_colour": "auto",
+SCREEN_DEFAULTS = {"dash_cols": 1, "set_cols": 4, "stretch": False, "scale": False, "drag": False, "noscroll": False, "fit": False, "autohide": False, "nocog": False, "nobar": False, "title": "", "theme": "dark", "font_scale": 1.0, "font_colour": "auto",
                    "sound": True, "sound_name": "pop.wav", "sound_volume": 0.6}
 MAX_COLUMNS = 6
 SOUNDS_DIR = os.path.join(BASE_DIR, "sounds")   # the button sounds: the add-on's own (pop.wav ...) and any .wav / .mp3 / .ogg the user copies in by hand
@@ -797,6 +797,11 @@ def _clean_locations(v):
     return [x.strip() for x in v if isinstance(x, _STR) and x.strip() and len(x) <= 80][:50]
 
 
+def _screen_title(text):
+    """The heading this screen shows instead of the board's (empty = the board's own): one line of at most 40 characters."""
+    return re.sub(r"\s+", " ", text).strip()[:40]
+
+
 def screen_settings():
     """{"dash_cols": 1-6, "set_cols": 1-6, "stretch": bool, "scale": bool}: the saved layout settings over the defaults (a bad or missing
     file gives the defaults). dash_cols / set_cols are the most columns the dashboard / Settings may use; they only get as many as the screen
@@ -820,6 +825,8 @@ def screen_settings():
                 out[k] = data[k]
         if data.get("theme") in THEMES:
             out["theme"] = data["theme"]
+        if isinstance(data.get("title"), _STR):
+            out["title"] = _screen_title(data["title"])
         if not isinstance(data.get("font_scale"), bool) and _font_scale(data.get("font_scale")) is not None:
             out["font_scale"] = _font_scale(data["font_scale"])
         if _font_colour(data.get("font_colour")):
@@ -848,6 +855,8 @@ def save_screen_settings(changes):
             cur[k] = v
         elif k == "theme" and v in THEMES:
             cur[k] = v
+        elif k == "title" and isinstance(v, _STR):
+            cur[k] = _screen_title(v)
         elif k == "font_scale" and not isinstance(v, bool) and _font_scale(v) is not None:
             cur[k] = _font_scale(v)
         elif k == "font_colour" and _font_colour(v):
