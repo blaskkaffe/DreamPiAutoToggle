@@ -29,16 +29,19 @@ def _read_project():
         return {}
 
 
-PROJECT = _read_project()      # project.json: {"name", "title" (the page's), "data_dir", "tmp_prefix", "service", "icon", "touch_icon"}
-BASE_DIR = PROJECT.get("data_dir", "/opt/" + PROJECT.get("name", "app"))           # where the project keeps its settings and state
-TMP_PREFIX = PROJECT.get("tmp_prefix", "/tmp/" + PROJECT.get("name", "app"))       # the start of the names of its short-lived state files
+PROJECT = _read_project()      # project.json: {"name", "title" (the page's), "install_dir", "data_dir", "tmp_prefix", "run_user", "service", "icon", "touch_icon"}
+# The web service runs as an ordinary user (project.json "run_user"), not as root: the code and what the installer records live in INSTALL_DIR,
+# owned by root and read-only for the service; everything the service writes is in BASE_DIR (its own folder) and TMP_PREFIX (a /run folder it owns).
+INSTALL_DIR = PROJECT.get("install_dir", "/opt/" + PROJECT.get("name", "app"))     # the installed code and the files only the installer writes (PIN hash, update source, version)
+BASE_DIR = PROJECT.get("data_dir", "/var/lib/" + PROJECT.get("name", "app"))       # where the service keeps its settings and state
+TMP_PREFIX = PROJECT.get("tmp_prefix", "/run/" + PROJECT.get("name", "app") + "/state")   # the start of the names of its short-lived state files
 PALETTE_CUSTOM = os.path.join(BASE_DIR, "palette_custom.json")   # the user's changes to the list of the palette (Appearance > Colour palette): {"order": [ids], "deleted": [ids], "names": {id: name}, "custom": [{"id", "name", "ui"}]}
 PALETTE_FILE = os.path.join(BASE_DIR, "palette.json")             # {"red": {"ui": "#rrggbb"}}: palette colours the user changed on screen (Appearance > Colour palette)
 MODULE_TINTS = os.path.join(BASE_DIR, "tints.json")               # {"clock": {"clock": false}}: colours whose background is neutral instead of coloured
 MODULE_COLOURS = os.path.join(BASE_DIR, "colours.json")          # {"clock": {"clock": "orange", ...}}: the global-palette colours each module uses
 MODULE_ORDER = os.path.join(BASE_DIR, "module_order.json")      # ["clock", "players", ...]: the order set in the module picker (top = first, wins)
 DEBUG_FLAG = os.path.join(BASE_DIR, PROJECT.get("debug_flag", "debug"))     # exists = the debug timeline is recorded (a debug module switches it)
-ADMIN_PIN = os.path.join(BASE_DIR, "admin_pin")          # salted hash of the optional PIN for the actions a module marks PROTECTED (install.sh --pin)
+ADMIN_PIN = os.path.join(INSTALL_DIR, "admin_pin")      # salted hash of the optional PIN for the actions a module marks PROTECTED (install.sh --pin); root-owned, the service cannot change it
 ALLOWED_HOSTS = os.path.join(BASE_DIR, "allowed_hosts")  # extra host names the web page answers to, one per line
 SETTINGS_PIN = os.path.join(BASE_DIR, "settings_pin")   # exists = Settings asks for the PIN (when one is set) before it opens and changes anything
 SCREEN = os.path.join(BASE_DIR, "screen.json")         # how the page is laid out on a wide screen: max columns, stretch, scale (Settings > Appearance)

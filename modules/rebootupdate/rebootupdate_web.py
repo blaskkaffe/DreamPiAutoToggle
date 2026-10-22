@@ -15,14 +15,23 @@ import time
 import base_core as core
 import rebootupdate_update as updater
 
-PROTECTED = ("/reboot", "/update/start", "/update/usb")      # run as root: the PIN is asked for when one is set
+PROTECTED = ("/reboot", "/update/start", "/update/usb")      # they start root-owned units (polkit lets this user do just that): the PIN is asked for when one is set
+
+
+REBOOT_UNIT = core.PROJECT.get("service", "app") + "-reboot.service"     # root-owned, reboots two seconds after it is started (see install.sh)
 
 
 def _spawn_reboot():
-    """Reboot the computer a couple of seconds from now, so the HTTP answer gets out first. Detached from this service
-    (which the reboot stops). Replaced by the tests."""
-    subprocess.Popen(["sh", "-c", "sleep 2; systemctl reboot || reboot"],
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    """Ask systemd to start the reboot unit, which reboots the computer a couple of seconds later, so the HTTP answer gets out first. This service
+    is an ordinary user: polkit allows it to start that one unit. Raises OSError when that is refused. Replaced by the tests."""
+    if os.path.exists("/run/systemd/system"):
+        r = subprocess.run(["systemctl", "start", "--no-block", REBOOT_UNIT], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+        if r.returncode != 0:
+            raise OSError("not allowed: is polkit installed? see docs/web.md")
+        return
+    if os.geteuid() != 0:                       # no systemd and not root (a test machine): nothing is allowed to reboot
+        raise OSError("needs systemd")
+    subprocess.Popen(["sh", "-c", "sleep 2; systemctl reboot || reboot"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
 def mark_reboot():
@@ -37,7 +46,7 @@ def start_reboot():
     """Reboot the whole computer (the add-on starts again with it). Returns (started, message)."""
     try:
         _spawn_reboot()
-    except OSError as e:
+    except (OSError, subprocess.SubprocessError) as e:
         return False, "Could not reboot (%s)" % e
     core.log("web page: reboot requested")
     return True, "Rebooting"

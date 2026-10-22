@@ -867,14 +867,26 @@ W.roster=function(s,ctx){
  function take(r){if(r&&r.checkin){S.checkin=D=r.checkin;last="";paint()}}
  function tap(e){var b=e.target.closest&&e.target.closest("[data-act]");if(!b)return;var r=b.closest(".rp-r"),id=r&&r.getAttribute("data-id");if(!id)return;
   if(b.getAttribute("data-act")==="menu"){openPersonMenu(id);return}
-  b.disabled=true;post(s.toggle,{id:id},function(r2){b.disabled=false;take(r2)})}
+  // the row switches at once and the board is redrawn from the answer; a failed request puts the old row back. Until the answer is there, the answers of the
+  // one-second poll (which may still be the old state) are brought in line with the tap (flip() is the same rule as toggle() in checkin_web.py)
+  var p=person(id),was=p&&Object.assign({},p),wasIn=D&&D.in;
+  if(p){flip(p,D);pending[id]={t:Date.now(),want:p.in};last="";paint()}
+  b.disabled=true;post(s.toggle,{id:id},function(r2){b.disabled=false;delete pending[id];
+   if(!r2&&was){Object.keys(was).forEach(function(k){p[k]=was[k]});D.in=wasIn;if(D.total)D.text=D.in+" of "+D.total+" in";last="";paint()}
+   take(r2)})}
+ var pending={};      // person id -> when the tap was made, while its answer is on the way
+ function flip(p,d){var keep=false;(d.statuses||[]).forEach(function(x){if(x.code===p.status&&x.sticky)keep=true});
+  p.in=!p.in;if(!keep){p.status="";p.text="";p.detail="";p.dots=0;p.state=p.in?"In":"Out";p.colour=p.in?(p.base||p.colour):""}
+  d.in=(d.in||0)+(p.in?1:-1);if(d.total)d.text=d.in+" of "+d.total+" in"}
+ function keepPending(d){var now=Date.now();Object.keys(pending).forEach(function(id){var w=pending[id];if(now-w.t>8000){delete pending[id];return}
+  d.groups.forEach(function(g){g.people.forEach(function(q){if(q.id===id&&q.in!==w.want)flip(q,d)})})})}
  // ---- the status menu: a pop-up in the middle of the screen (about 60 % of its width): who it is, the statuses three in a row, a cross in the corner
  function menuHtml(p){var st=D.statuses||[],who=[p.department,p.building].filter(Boolean).join(" · ");
   return '<div class="rp-sheet" role="dialog" aria-modal="true" aria-label="Status for '+esc(p.name)+'"><button type="button" class="rp-x" data-close="1" title="Close" aria-label="Close">&#10005;</button>'+
    '<div class="rp-who">'+rosterAvatar(p,"rp-avb")+
-   '<div class="rp-wt"><div class="rp-wn">'+esc(p.name)+'</div>'+(who?'<div class="rp-wl">'+esc(who)+'</div>':'')+(p.role?'<div class="rp-wl">'+esc(p.role)+'</div>':'')+(p.phone?'<div class="rp-wl">'+esc(p.phone)+'</div>':'')+'</div></div>'+
+   '<div class="rp-wt"><div class="rp-wn">'+esc(p.name)+'</div>'+(who?'<div class="rp-wl">'+esc(who)+'</div>':'')+(p.role?'<div class="rp-wl">'+esc(p.role)+'</div>':'')+(p.phone?'<div class="rp-wl">'+esc(p.phone)+'</div>':'')+(D.numpad&&p.num?'<div class="rp-wl">'+esc(p.num)+'</div>':'')+'</div></div>'+
     '<div class="rp-cur"><span class="rp-curl">Current status</span>'+(p.status&&p.text?'<span class="rp-curv'+colourCls(p)+'">'+esc(p.text)+'</span>':'<span class="rp-curv none">None</span>')+'</div>'+
-   '<div class="rp-opts">'+st.map(function(x){return '<button type="button" class="pill-s pri rp-so c-'+esc(x.colour)+(p.status===x.code?" on":"")+'" data-code="'+esc(x.code)+'" aria-pressed="'+(p.status===x.code?"true":"false")+'">'+esc(x.label)+'</button>'}).join("")+
+   '<div class="rp-opts">'+st.map(function(x){return '<button type="button" class="pill-s pri rp-so c-'+esc(x.colour)+(p.status===x.code?" on":"")+'" data-code="'+esc(x.code)+'" aria-pressed="'+(p.status===x.code?"true":"false")+'">'+(D.numpad&&x.num?'<span class="rp-num">'+esc(x.num)+'</span> ':'')+esc(x.label)+'</button>'}).join("")+
    '</div><div class="rp-clear"><button type="button" class="pill-s rp-so" data-code="">Clear status</button></div></div>'}
  function openPersonMenu(id){var p=person(id);if(!p)return;cur=id;modal.innerHTML=menuHtml(p);trDom(modal);modal.style.display="";var x=modal.querySelector(".rp-x");if(x&&x.focus)x.focus()}
  // a status that needs a time, a date or a note: its own pop-up on top of the menu, with a big field (Enter sets it, Esc or a tap outside goes back)
@@ -930,10 +942,34 @@ W.roster=function(s,ctx){
   if(!st||!st.needs){send(code);return}
   openNeed(code,st)});
  hook("escape",function(){if(modal2.style.display!=="none"){closeNeed();return true}if(cur!==null){closeMenu();return true}});
+ // ---- the number pad (a switch in the board's settings; the number of a person is part of the roster): type the 3 digits of a person's number anywhere on the board
+ // and their status menu opens; then 1 = in, 0 = out, # = switch in / out, two digits from 20 up (the number is on each status button) = that status; * or Backspace takes a digit
+ // back (and closes the menu when nothing is typed), Esc closes. Not while something has the keyboard (a field, Settings, a pop-up that asks for a time or a note).
+ var typed="",tipT=null,tip=h("div",{"class":"rp-typed",style:"display:none","aria-live":"polite"});document.body.appendChild(tip);
+ function showTip(t,bad){clearTimeout(tipT);if(!t){tip.style.display="none";return}setText(tip,t);tip.classList.toggle("bad",!!bad);tip.style.display="";if(bad)tipT=setTimeout(function(){showTip("")},1500)}
+ function byNum(n){var r=null;((D&&D.groups)||[]).forEach(function(g){g.people.forEach(function(p){if(p.num===n)r=p})});return r}
+ function padKey(k){
+  if(cur===null){      // no menu yet: the three digits of the person
+   if(/^\d$/.test(k)){typed+=k;if(typed.length<3){showTip(typed);return}
+    var p=byNum(typed);typed="";if(!p||!visible(p)){showTip("No such number",true);return}showTip("");openPersonMenu(p.id);return}
+   if(k==="*"||k==="Backspace"){typed=k==="*"?"":typed.slice(0,-1);showTip(typed)}
+   return}
+  if(modal2.style.display!=="none")return;      // the time / date / note pop-up has its own keys
+  if(k==="*"||k==="Backspace"){if(typed){typed=k==="*"?"":typed.slice(0,-1);showTip(typed)}else closeMenu();return}
+  if(typed&&/^\d$/.test(k)){var n=typed+k,st=null;typed="";showTip("");(D.statuses||[]).forEach(function(x){if(x.num===n)st=x});
+   var b=st&&modal.querySelector('[data-code="'+st.code+'"]');if(b){b.click()}else showTip("No such number",true);return}
+  if(k==="1"||k==="0"){send(k==="1"?"IN":"OUT");return}
+  if(k==="#"){var id=cur;post(s.toggle,{id:id},function(r){take(r);closeMenu()});return}
+  if(/^[2-9]$/.test(k)){typed=k;showTip(typed)}}
+ document.addEventListener("keydown",function(e){if(!el.isConnected||!D||!D.numpad||e.ctrlKey||e.metaKey||e.altKey)return;
+  var t=e.target,tag=t&&t.tagName;if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(t&&t.isContentEditable)||document.body.classList.contains("settings-open"))return;
+  var k=e.key;if(!(/^\d$/.test(k)||k==="#"||k==="*"||k==="Backspace"))return;e.preventDefault();padKey(k)});
+ hook("escape",function(){typed="";showTip("")});
+
 bind(s.source,function(d){if(!d)return;document.body.classList.toggle("no-title",d.show_title===false);
  var h1=document.querySelector("body > header h1");if(h1){if(h1._dflt===undefined){h1._dflt=h1.textContent;h1._dtitle=document.title}      // the page title the user chose (Settings, Page title); empty = the project's
   setText(h1,d.title||h1._dflt);var want=tr(d.title||h1._dtitle,true);if(document.title!==want)document.title=want}});
- bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+d.groups.length;if(key===last)return;last=key;D=d;adopt();setRowBox(d.box);paint()});
+ bind(s.source,function(d){if(!d)return;var key=d.rev+"|"+d.groups.length;if(key===last)return;last=key;keepPending(d);D=d;adopt();setRowBox(d.box);paint()});
  return el};
 // the settings list: a department / building per row with a select of palette colours ("Automatic" = the module picks one)
 function rosterColours(s,ctx){var el=h("div",{"class":"roster-cols"}),R=null;

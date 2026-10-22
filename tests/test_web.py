@@ -190,7 +190,7 @@ class HttpTests(unittest.TestCase):
 
     def test_system_card_links_to_the_github_project(self):
         html = self.get("/")[2].decode()
-        self.assertIn('"href": "https://github.com/blaskkaffe/DreamPiAutoToggle"', html)       # the System module's row (layout.json)
+        self.assertIn('"href": "https://github.com/blaskkaffe/CheckinChicken"', html)       # the System module's row (layout.json)
         self.assertIn("noopener noreferrer", html)                                              # which the link widget opens safely
 
     def test_about_rows(self):

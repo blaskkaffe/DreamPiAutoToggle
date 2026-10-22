@@ -15,7 +15,7 @@ import base_core as core
 import base_modules as modules
 import base_security as security
 
-VERSION_FILE = os.path.join(core.BASE_DIR, "version")      # written by install.sh: date and commit of the installed checkout
+VERSION_FILE = os.path.join(core.INSTALL_DIR, "version")      # written by install.sh: date and commit of the installed checkout
 
 
 def lan_ip():

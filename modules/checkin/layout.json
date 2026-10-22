@@ -158,6 +158,17 @@
          "label": "On-screen keyboard for times, dates and notes"
         }
        ]
+      },
+      {
+       "title": "Number pad",
+       "inline": true,
+       "controls": [
+        {
+         "type": "toggle",
+         "key": "numpad",
+         "label": "Type a person's 3-digit number on the board to open their status menu"
+        }
+       ]
       }
      ]
     },

@@ -29,6 +29,8 @@ run usb.js FAKEUPDATE=1 USB=1
 # the screen layout (max columns, stretch, scale), rearranging the tiles and the PIN lock on Settings
 run screen.js
 run menus.js
+# the number pad (type a person's 3-digit number) and the INNE / UTE button that switches before the answer comes
+run numpad.js IN=0
 # the Background image module: choose a picture, fit, darken, a big one is shrunk, remove
 run imagebg.js IMGBG=1
 # a group too long for one column is split over the next ones; No scrolling; the saved order of the boxes

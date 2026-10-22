@@ -1,8 +1,9 @@
 # Check-in add-on - update check and "Update now".
 # Asks GitHub whether the installed add-on commit is behind its branch. The page shows the result in Settings >
-# System with a manual update guide; "Update now" fast-forwards the checkout that
-# install.sh recorded (src_dir) and re-runs its installer, detached so the
-# restart of this web service doesn't kill it. Python 3.
+# System with a manual update guide. The web service is an ordinary user, so "Update now" does not run anything itself: it asks systemd to start
+# checkin-board-update@git.service (or @usb), a unit that runs update-run.sh next to this file as root. That script reads everything it needs from
+# the files only root can write (src_dir, update_origin, install_ports ...), fast-forwards the checkout that install.sh recorded and re-runs its
+# installer, outside this service's cgroup so that its restart doesn't kill it. Python 3.
 import glob
 import json
 import os
@@ -15,16 +16,21 @@ from urllib.request import urlopen, Request
 
 import base_core as core
 
-# the update module's files
-ADDON_COMMIT = os.path.join(core.BASE_DIR, "version_commit")  # full commit hash of the checkout that was installed (install.sh)
-ADDON_SRC = os.path.join(core.BASE_DIR, "src_dir")            # that checkout's folder, used by the web update
-INSTALL_PORTS = os.path.join(core.BASE_DIR, "install_ports")  # "<http port> <https port>", so an update keeps them
-UPDATE_ORIGIN = os.path.join(core.BASE_DIR, "update_origin")  # the checkout's git origin URL when installed; "Update now" refuses another one
-VERSION_FILE = os.path.join(core.BASE_DIR, "version")         # written by install.sh: date and commit of the installed checkout
-UPDATE_STATUS = core.TMP_PREFIX + ".update"                   # running / ok / failed, written by the update script
-UPDATE_LOG = core.TMP_PREFIX + ".update.log"
+# the update module's files: the first five are written by install.sh (root) and only read here, so the web service can not point the root updater
+# somewhere else; the last two are written by update-run.sh (root) into a folder of its own, readable by everyone
+ADDON_COMMIT = os.path.join(core.INSTALL_DIR, "version_commit")  # full commit hash of the checkout that was installed (install.sh)
+ADDON_SRC = os.path.join(core.INSTALL_DIR, "src_dir")            # that checkout's folder, used by the web update
+INSTALL_PORTS = os.path.join(core.INSTALL_DIR, "install_ports")  # "<http port> <https port>", so an update keeps them
+UPDATE_ORIGIN = os.path.join(core.INSTALL_DIR, "update_origin")  # the checkout's git origin URL when installed; "Update now" refuses another one
+UPDATE_BRANCH = os.path.join(core.INSTALL_DIR, "update_branch")  # the checkout's branch when installed
+VERSION_FILE = os.path.join(core.INSTALL_DIR, "version")         # written by install.sh: date and commit of the installed checkout
+UPDATE_DIR = "/run/" + core.PROJECT.get("service", "app") + "-update"    # the updater's own run folder (RuntimeDirectory of its unit)
+UPDATE_STATUS = os.path.join(UPDATE_DIR, "state.update")         # running / ok / failed, written by the update script
+UPDATE_LOG = os.path.join(UPDATE_DIR, "state.update.log")
+UPDATE_UNIT = core.PROJECT.get("service", "app") + "-update@%s.service"   # started with "git" or "usb"
+UPDATER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "update-run.sh")
 
-DEFAULT_REPO = "blaskkaffe/DreamPiAutoToggle"
+DEFAULT_REPO = "blaskkaffe/CheckinChicken"
 DEFAULT_BRANCH = "main"
 TIMEOUT = 10
 
@@ -38,29 +44,18 @@ def fetch(url):
     return urlopen(req, timeout=TIMEOUT).read().decode("utf-8", "replace")
 
 
-def _git(args):
-    src = core.read_file(ADDON_SRC)
-    if not src or not os.path.isdir(src.strip()):
-        return None
-    try:
-        out = subprocess.check_output(["git", "-c", "safe.directory=" + src.strip(), "-C", src.strip()] + args,
-                                      stderr=subprocess.PIPE)
-        return out.decode("utf-8", "replace").strip()
-    except (OSError, subprocess.CalledProcessError):
-        return None
+def _recorded(path):
+    return (core.read_file(path) or "").strip()
 
 
 def source():
-    """(repo "owner/name", branch, checkout folder or None) of this install."""
-    src = (core.read_file(ADDON_SRC) or "").strip() or None
-    if src and not os.path.isdir(src):
-        src = None
+    """(repo "owner/name", branch, checkout folder or None) of this install, as install.sh recorded them (the service does not read the checkout)."""
+    src = _recorded(ADDON_SRC) or None
     repo, branch = DEFAULT_REPO, DEFAULT_BRANCH
-    url = _git(["config", "--get", "remote.origin.url"]) if src else None
-    m = re.search(r"github\.com[:/]+([\w.-]+/[\w.-]+?)(?:\.git)?/?$", url or "")
+    m = re.search(r"github\.com[:/]+([\w.-]+/[\w.-]+?)(?:\.git)?/?$", _recorded(UPDATE_ORIGIN))
     if m:
         repo = m.group(1)
-    b = _git(["rev-parse", "--abbrev-ref", "HEAD"]) if src else None
+    b = _recorded(UPDATE_BRANCH)
     if b and b != "HEAD" and re.match(r"^[A-Za-z0-9._/-]+$", b):
         branch = b
     return repo, branch, src
@@ -159,6 +154,13 @@ def update_state():
                 return "idle"
         except OSError:
             return "idle"
+    if state != "running" and time.time() - _pending[0] < 30:       # the updater was asked a moment ago and has not written its first line yet
+        try:
+            answered = os.path.getmtime(UPDATE_STATUS) >= _pending[0]
+        except OSError:
+            answered = False
+        if not answered:
+            return "running"
     return state
 
 
@@ -188,7 +190,7 @@ def _log_tail(n=14):
 
 
 # ---- an update from a USB stick: a folder called "update" on a removable drive holds the add-on's files (a copy of the repository: install.sh, base/,
-# modules/ ...). "Install from USB" copies it to the data folder (so the stick can be pulled out) and runs its install.sh as root, like the GitHub update.
+# modules/ ...). "Install from USB" has the root updater copy it away (so the stick can be pulled out) and run its install.sh, like the GitHub update.
 USB_NAME = "update"
 USB_ROOTS = ["/media/*", "/media/*/*", "/run/media/*/*", "/mnt/*", "/mnt/*/*"]      # where a stick is mounted (replaced by the tests)
 
@@ -215,31 +217,10 @@ def usb_candidates():
     return sorted(out, key=lambda c: -c["time"])
 
 
-def usb_script(folder, http_port, https_port, version):
-    """The shell script that installs from a USB folder (built from validated values only: it runs as root): copy the folder to the data folder, then run
-    its install.sh from the copy with NS_KEEP_SRC (the recorded checkout stays) and NS_VERSION (what the page shows as the version)."""
-    work = os.path.join(core.BASE_DIR, "usb_src")
-    ok_path = re.compile(r"^[A-Za-z0-9._/ +@=:-]+$")
-    for p in (folder, work):
-        if not os.path.isabs(p) or not ok_path.match(p) or ".." in p.split("/"):
-            raise ValueError("unsafe update folder")
-    if not re.match(r"^[A-Za-z0-9 :.()_-]{1,60}$", version):
-        raise ValueError("unsafe version text")
-    ports = ["%d" % int(http_port), "--https-port=%d" % int(https_port)]
-    return (
-        "S=%s; D=%s; L=%s; ST=%s\n"
-        "rm -f \"$L\" \"$ST\"; set -C                      # never write through a link someone left in /tmp\n"
-        "exec >\"$L\" 2>&1\n"
-        "echo running > \"$ST\"\n"
-        "echo \"Copying the update from $S\"\n"
-        "rm -rf \"$D.new\" && cp -r \"$S\" \"$D.new\" && [ -f \"$D.new/install.sh\" ] && rm -rf \"$D\" && mv \"$D.new\" \"$D\" && cd \"$D\" "
-        "&& NS_KEEP_SRC=1 NS_VERSION=%s sh \"$D/install.sh\" %s && echo ok >| \"$ST\" || echo failed >| \"$ST\"\n"
-    ) % ("'%s'" % folder, "'%s'" % work, "'%s'" % UPDATE_LOG, "'%s'" % UPDATE_STATUS, "'%s'" % version, " ".join(ports))
-
-
 def can_update():
+    """The install recorded a checkout and an origin for it (origin_problem() says whether it is a GitHub address; the updater checks the checkout itself, as root)."""
     _repo, _branch, src = source()
-    return bool(src and os.path.exists(os.path.join(src, "install.sh")) and _git(["rev-parse", "HEAD"]))
+    return bool(src and origin_url())
 
 
 def status():
@@ -253,113 +234,70 @@ def status():
     return out
 
 
-def _ports():
-    try:
-        http, https = (core.read_file(INSTALL_PORTS) or "80 443").split()[:2]
-        return int(http), int(https)
-    except ValueError:
-        return 80, 443
-
-
 # Where the update may come from: GitHub over https (or ssh with the checkout owner's own key).
 ORIGIN_RE = re.compile(r"^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)[\w.-]+/[\w.-]+?(\.git)?/?$")
 
 
 def origin_url():
-    return _git(["config", "--get", "remote.origin.url"])
+    return _recorded(UPDATE_ORIGIN) or None
 
 
 def origin_problem():
-    """Why the checkout's git origin can't be trusted for an update, or None. The update runs the
-    checkout's install.sh as root, so it must come from GitHub and be the origin that was there
-    when the add-on was installed (anything that can edit the checkout's .git/config could
-    otherwise point it elsewhere). An install from before this check has no recorded origin; it
-    is accepted when it is a GitHub address and gets recorded by the update's own install."""
+    """Why the recorded git origin can't be trusted for an update, or None. The update runs the checkout's install.sh as root, so it must come from
+    GitHub. (update-run.sh also checks, as root, that the checkout's own origin is still the recorded one: anything that can edit the checkout's
+    .git/config could otherwise point it elsewhere.)"""
     url = origin_url()
     if not url or not ORIGIN_RE.match(url):
         return "the checkout's git origin isn't a GitHub address"
-    recorded = (core.read_file(UPDATE_ORIGIN) or "").strip()
-    if recorded and recorded != url:
-        return "the checkout's git origin changed since the add-on was installed (run install.sh by hand to accept it)"
     return None
 
 
-def update_script(src, branch, http_port, https_port, url=None):
-    """The shell script that updates and re-installs. Built from validated
-    values only (it runs as root). With `url` (already checked by origin_problem) the fetch uses that
-    address and only https/ssh transports; otherwise the checkout's own 'origin'."""
-    if url is not None and not ORIGIN_RE.match(url):
-        raise ValueError("unsafe update address")
-    if (not re.match(r"^[A-Za-z0-9._/][A-Za-z0-9._/-]*$", branch) or ".." in branch or branch.endswith("/")
-            or not os.path.isabs(src) or not re.match(r"^[A-Za-z0-9._/ +@=-]+$", src)):
-        raise ValueError("unsafe update settings")
-    ports = ["%d" % int(http_port), "--https-port=%d" % int(https_port)]
-    return (
-        "S=%s; B=%s; L=%s; ST=%s; U=%s\n"
-        "rm -f \"$L\" \"$ST\"; set -C                      # never write through a link someone left in /tmp\n"
-        "exec >\"$L\" 2>&1\n"
-        "echo running > \"$ST\"\n"
-        "echo \"Updating $S from origin/$B\"\n"
-        "OWNER=$(stat -c %%U \"$S\")\n"
-        "P=; [ \"$U\" != origin ] && P='env GIT_ALLOW_PROTOCOL=https:ssh'\n"
-        "if [ \"$(id -u)\" = 0 ] && [ \"$OWNER\" != root ]; then G=\"runuser -u $OWNER -- $P git\"; else G=\"$P git\"; fi\n"
-        "cd \"$S\" && $G fetch \"$U\" \"$B\" && $G merge --ff-only FETCH_HEAD && sh \"$S/install.sh\" %s && echo ok >| \"$ST\" || echo failed >| \"$ST\"\n"
-    ) % ("'%s'" % src, "'%s'" % branch, "'%s'" % UPDATE_LOG, "'%s'" % UPDATE_STATUS,
-                                                          "'%s'" % (url or "origin"), " ".join(ports))
+_pending = [0.0]      # when "Update now" last asked systemd to start the updater: it says "running" itself a moment later
 
 
-def _write_status(text):
-    """Write the status file without following a link that someone left at its (predictable) /tmp path."""
-    try:
-        if os.path.islink(UPDATE_STATUS):
-            os.remove(UPDATE_STATUS)
-    except OSError:
-        pass
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
-    fd = os.open(UPDATE_STATUS, flags, 0o644)
-    with os.fdopen(fd, "w") as f:
-        f.write(text)
+def reset_for_tests():
+    _pending[0] = 0.0
 
 
-def _spawn(cmd):
-    """Run cmd detached from this service (it is restarted by the installer).
-    Replaced by the tests."""
-    if os.path.exists("/run/systemd/system"):   # outside this service's cgroup: survives its restart
-        subprocess.Popen(["systemd-run", "--unit=checkin-board-update-%d" % int(time.time()), "--no-block",
-                          "--collect"] + cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    else:
-        subprocess.Popen(["setsid"] + cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+def _spawn(mode):
+    """Ask systemd to start the root-owned updater (mode "git" or "usb"). Returns False when that is refused. Replaced by the tests."""
+    if os.path.exists("/run/systemd/system"):   # a unit of its own: outside this service's cgroup, so it survives the installer's restart of this service
+        r = subprocess.run(["systemctl", "start", "--no-block", UPDATE_UNIT % mode], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=15)
+        return r.returncode == 0
+    if os.geteuid() != 0:                       # no systemd and not root (a test machine): nothing is allowed to run the updater
+        return False
+    subprocess.Popen(["setsid", "sh", UPDATER, mode], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return True
 
 
 _start_lock = threading.Lock()
 
 
+def _start(mode, what):
+    _pending[0] = time.time()
+    try:
+        ok = _spawn(mode)
+    except (OSError, subprocess.SubprocessError) as e:
+        ok, why = False, str(e)
+    else:
+        why = "the computer did not allow this service to start it: is polkit installed? see docs/web.md"
+    if ok is False:
+        _pending[0] = 0.0
+        core.log("web page: update could not be started (%s)" % why)
+        return False, "Could not start the update (%s)" % why
+    core.log("web page: %s started" % what)
+    return True, "Update started"
+
+
 def start_usb_update():
-    """Begin an update from the first USB stick that has an update folder; returns (started, message). One update at a time."""
+    """Begin an update from the first USB stick that has an update folder; returns (started, message). One update at a time. The root updater
+    looks for the stick itself: this only checks that there is one to tell the user early."""
     with _start_lock:
         if update_state() == "running":
             return False, "An update is already running"
-        found = usb_candidates()
-        if not found:
+        if not usb_candidates():
             return False, "No USB stick with an update folder was found"
-        pick = found[0]
-        http, https = _ports()
-        label = "USB update %s" % time.strftime("%Y-%m-%d %H:%M", time.localtime(pick["time"]))
-        try:
-            script = usb_script(pick["path"], http, https, label)
-        except ValueError as e:
-            return False, "Update refused: %s" % e
-        try:
-            _write_status("running")
-            _spawn(["sh", "-c", script])
-        except OSError as e:
-            try:
-                _write_status("failed")
-            except OSError:
-                pass
-            return False, "Could not start the update (%s)" % e
-    core.log("web page: update from USB started (%s)" % pick["path"])
-    return True, "Update started"
+        return _start("usb", "update from USB")
 
 
 def start_update():
@@ -367,26 +305,10 @@ def start_update():
     with _start_lock:
         if update_state() == "running":
             return False, "An update is already running"
-        repo, branch, src = source()
         if not can_update():
             return False, "This install can't update itself (no git checkout recorded): use the update guide"
         problem = origin_problem()
         if problem:
             core.log("web page: update refused (%s)" % problem)
             return False, "Update refused: %s" % problem
-        http, https = _ports()
-        try:
-            script = update_script(src, branch, http, https, origin_url())
-        except ValueError as e:
-            return False, "Update refused: %s" % e
-        try:
-            _write_status("running")
-            _spawn(["sh", "-c", script])
-        except OSError as e:
-            try:
-                _write_status("failed")
-            except OSError:
-                pass
-            return False, "Could not start the update (%s)" % e
-    core.log("web page: update started (%s, branch %s)" % (src, branch))
-    return True, "Update started"
+        return _start("git", "update (%s)" % (source()[2],))

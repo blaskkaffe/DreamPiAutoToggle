@@ -1,8 +1,10 @@
 {
  "name": "Check-in",
  "title": "Check-in",
- "data_dir": "/opt/checkin-board",
- "tmp_prefix": "/tmp/checkin-board",
+ "install_dir": "/opt/checkin-board",
+ "data_dir": "/var/lib/checkin-board",
+ "tmp_prefix": "/run/checkin-board/state",
+ "run_user": "checkin",
  "service": "checkin-board",
  "hostname": "checkinchicken",
  "language": "sv",

@@ -84,6 +84,47 @@ class ImportTests(Base):
         self.assertEqual(contacts.import_csv(out)["added"], 4)
 
 
+class NumberPadTests(Base):
+    """A person's three-digit number for the number pad on the board."""
+    CODES = u"name,department,code\nAnna,Kök,127\nErik,Kök,127\nMaja,Lager,12\nOla,Lager,305\n"
+
+    def test_a_number_belongs_to_one_person_and_must_be_three_digits(self):
+        contacts.import_csv(self.CODES)
+        got = dict((p["name"], p.get("code", "")) for p in contacts.read()["people"])
+        self.assertEqual(got, {"Anna": "127", "Erik": "", "Maja": "", "Ola": "305"})      # the first one keeps 127, "12" is not a number
+
+    def test_importing_again_without_the_column_keeps_the_numbers(self):
+        contacts.import_csv(self.CODES)
+        r = contacts.import_csv(u"name,department\nAnna,Kök\nOla,Lager\n")
+        self.assertEqual(r["changed"], 0)
+        self.assertEqual(dict((p["name"], p.get("code", "")) for p in contacts.read()["people"])["Anna"], "127")
+
+    def test_editing_and_adding_refuse_a_taken_or_bad_number(self):
+        contacts.import_csv(self.CODES)
+        erik = next(p for p in contacts.read()["people"] if p["name"] == "Erik")
+        with self.assertRaises(ValueError):
+            contacts.update_person(erik["id"], {"code": "127"})
+        with self.assertRaises(ValueError):
+            contacts.update_person(erik["id"], {"code": "1x7"})
+        self.assertEqual(contacts.update_person(erik["id"], {"code": "128"})["code"], "128")
+        self.assertEqual(contacts.update_person(erik["id"], {"code": ""})["code"], "")          # empty = no number
+        with self.assertRaises(ValueError):
+            contacts.add_person({"name": "Nils", "department": "Kök", "code": "305"})
+        self.assertEqual(contacts.add_person({"name": "Nils", "department": "Kök", "code": "306"})["code"], "306")
+
+    def test_the_csv_export_has_the_numbers_and_the_board_gets_them(self):
+        contacts.import_csv(self.CODES)
+        self.assertIn("Anna,Kök,,,,,127", contacts.export_csv().replace("\r", ""))
+        snap = checkin.snapshot()
+        self.assertEqual(dict((p["name"], p["num"]) for g in snap["groups"] for p in g["people"])["Ola"], "305")
+        self.assertTrue(snap["numpad"])
+        self.assertEqual([s["num"] for s in snap["statuses"]][:3], ["20", "21", "22"])           # a status is picked with two digits, from 20
+
+    def test_the_number_pad_can_be_switched_off(self):
+        checkin.save_config({"numpad": False})
+        self.assertFalse(checkin.snapshot()["numpad"])
+
+
 class BoardTests(Base):
     def setUp(self):
         Base.setUp(self)
@@ -444,7 +485,7 @@ class HttpTests(Base):
     def test_settings_and_colour_endpoints(self):
         r = self.get("/checkin/config")
         self.assertEqual(r["values"], {"show_title": True, "group_by": "department", "colour_by": "department", "scroll": "on", "title": "", "frame": "thin", "box": "auto", "show_roles": True, "show_buildings": False,
-                                       "keyboard": False, "roles_shown": None, "buildings_shown": None})
+                                       "keyboard": False, "numpad": True, "roles_shown": None, "buildings_shown": None})
         self.assertEqual([x["key"] for x in r["colours"]["department"]], ["Kök", "No department", "Servering"])
         r = self.post("/checkin/config", {"values": {"colour_by": "building", "group_by": "nonsense", "show_title": False}})
         self.assertEqual((r["values"]["show_title"], r["values"]["group_by"], r["values"]["colour_by"]), (False, "department", "building"))

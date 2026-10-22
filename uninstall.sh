@@ -1,6 +1,7 @@
 #!/bin/sh
 # Check-in add-on - removes everything the installer added.
-DEST=/opt/checkin-board
+DEST=/opt/checkin-board        # the code (root)
+DATA=/var/lib/checkin-board    # the state of the service: the people and who is in
 
 if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo $0"; exit 1; fi
 
@@ -16,5 +17,6 @@ rm -f /etc/systemd/logind.conf.d/90-checkin-no-sleep.conf      # the host may sl
 [ ! -f "$DEST/sleep_masked" ] || systemctl unmask $(cat "$DEST/sleep_masked") 2>/dev/null
 systemctl daemon-reload
 
-rm -rf "$DEST" /tmp/checkin-board.*      # and the state files in /tmp (update)
+[ ! -f "$DEST/user_created" ] || userdel "$(cat "$DEST/user_created")" 2>/dev/null     # the user the installer made for the service
+rm -rf "$DEST" "$DATA" /run/checkin-board /run/checkin-board-update      # and the state files in /run (update)
 echo "Uninstalled."

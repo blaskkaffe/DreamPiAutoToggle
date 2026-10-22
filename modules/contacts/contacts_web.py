@@ -21,11 +21,21 @@ PHOTOS_DIR = os.path.join(core.BASE_DIR, "photos")           # <person id>.jpg /
 
 MAX_BYTES = 1000000
 MAX_PEOPLE = 2000
-COLUMNS = ("name", "department", "role", "phone", "location", "restrictToLocation")
+COLUMNS = ("name", "department", "role", "phone", "location", "restrictToLocation", "code")
 ALIASES = {"namn": "name", "avdelning": "department", "roll": "role", "telefon": "phone", "omrade": "location", "område": "location",
-           "building": "location", "byggnad": "location", "restricttolocation": "restrictToLocation"}
+           "building": "location", "byggnad": "location", "restricttolocation": "restrictToLocation", "kod": "code", "nummer": "code", "number": "code"}
 NO_DEPARTMENT = "No department"
 _lock = threading.Lock()
+
+
+def clean_code(value):
+    """A person's number for the number pad on the board: exactly three digits, or "" for none."""
+    value = str(value if value is not None else "").strip()
+    return value if re.match(r"^\d{3}$", value) else ""
+
+
+def _code_taken(people, code, pid):
+    return bool(code) and any(x.get("code") == code and x["id"] != pid for x in people)
 
 
 def _slug(s):
@@ -95,6 +105,7 @@ def import_csv(text, replace=False):
         by_id = dict((p["id"], p) for p in data["people"])
         key_of = dict((person_id(p["name"], p["department"], p.get("location", "")), p["id"]) for p in data["people"])      # a person edited by hand keeps the id
         seen, added, changed, skipped = set(), 0, 0, 0
+        used = set()
         for i, row in enumerate(rows):
             name = row.get("name", "").strip()
             if not name:
@@ -108,9 +119,15 @@ def import_csv(text, replace=False):
                    "phone": row.get("phone", "") or (prev or {}).get("phone", ""), "location": location,
                    "restrictToLocation": _flag(row["restrictToLocation"]) if "restrictToLocation" in row else bool((prev or {}).get("restrictToLocation")),
                    "active": True, "order": (prev or {}).get("order", i)}
+            code = clean_code(row["code"]) if "code" in row else (prev or {}).get("code", "")
+            if code and (code in used or _code_taken([x for x in by_id.values() if x["id"] != pid], code, pid)):
+                code = ""         # a number is for one person: the first one in the file keeps it
+            used.add(code)
+            if code:
+                new["code"] = code
             if prev is None:
                 added += 1
-            elif any(prev.get(k) != new[k] for k in new):
+            elif any(prev.get(k) != new[k] for k in new) or prev.get("code", "") != new.get("code", ""):
                 changed += 1
             by_id[pid] = new
             seen.add(pid)
@@ -154,6 +171,13 @@ def update_person(pid, fields):
                 new[k] = str(fields[k] if fields[k] is not None else "").strip()[:limit]
         if "restrictToLocation" in fields:
             new["restrictToLocation"] = bool(fields["restrictToLocation"]) if isinstance(fields["restrictToLocation"], bool) else _flag(fields["restrictToLocation"])
+        if "code" in fields:
+            code = clean_code(fields["code"])
+            if str(fields["code"] or "").strip() and not code:
+                raise ValueError("The number is three digits, for example 127")
+            if _code_taken(data["people"], code, pid):
+                raise ValueError("Somebody else already has that number")
+            new["code"] = code
         if not new["name"]:
             raise ValueError("A person needs a name")
         new["department"] = new["department"] or NO_DEPARTMENT
@@ -183,9 +207,16 @@ def add_person(fields):
             raise ValueError("Somebody else already has that name in that department and building")
         if len(data["people"]) >= MAX_PEOPLE:
             raise ValueError("Too many people (at most %d)" % MAX_PEOPLE)
+        code = clean_code(fields.get("code"))
+        if str(fields.get("code") or "").strip() and not code:
+            raise ValueError("The number is three digits, for example 127")
+        if _code_taken(data["people"], code, pid):
+            raise ValueError("Somebody else already has that number")
         rf = fields.get("restrictToLocation")
         person = {"id": pid, "name": clean["name"], "department": clean["department"], "role": clean["role"], "phone": clean["phone"], "location": clean["location"],
                   "restrictToLocation": rf if isinstance(rf, bool) else _flag(rf), "active": True, "order": max([x.get("order", 0) for x in data["people"]] + [-1]) + 1}
+        if code:
+            person["code"] = code
         data["people"].append(person)
         _write(data)
         return person
@@ -217,7 +248,7 @@ def export_csv():
     for p in read()["people"]:
         if p.get("active", True):
             w.writerow([p["name"], p["department"], p.get("role", ""), p.get("phone", ""), p.get("location", ""),
-                        "1" if p.get("restrictToLocation") else ""])
+                        "1" if p.get("restrictToLocation") else "", p.get("code", "")])
     return out.getvalue()
 
 
@@ -258,7 +289,7 @@ def view():
     return {"text": text, "count": len(active), "columns": ", ".join(COLUMNS),
             "people": [{"id": p["id"], "photo": photos.get(p["id"], ""), "title": p["name"], "tag": p["department"] + (" / " + p["location"] if p["location"] else ""),
                         "active": p.get("active", True), "name": p["name"], "department": p["department"], "role": p.get("role", ""),
-                        "phone": p.get("phone", ""), "location": p.get("location", ""), "restrict": bool(p.get("restrictToLocation"))} for p in people]}
+                        "phone": p.get("phone", ""), "location": p.get("location", ""), "restrict": bool(p.get("restrictToLocation")), "code": p.get("code", "")} for p in people]}
 
 
 def _get_view(h):

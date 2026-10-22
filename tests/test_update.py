@@ -8,7 +8,7 @@ import unittest
 from urllib.error import HTTPError
 from urllib.request import urlopen, Request
 
-from support import core, web, sandbox, cleanup
+from support import core, web, sandbox, cleanup, run_updater
 import rebootupdate_update as up
 
 LOCAL = "a" * 40
@@ -133,24 +133,22 @@ class UpdateRunTests(unittest.TestCase):
         self.tmp = sandbox(up)
         self.src = os.path.join(self.tmp, "checkout")
         os.mkdir(self.src)
-        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
-        for cmd in (["git", "init", "-q", "-b", "feature/x"], ["git", "remote", "add", "origin", "https://github.com/someone/Fork.git"]):
-            subprocess.check_call(cmd, cwd=self.src)
         with open(os.path.join(self.src, "install.sh"), "w") as f:
             f.write("#!/bin/sh\n")
-        subprocess.check_call(["git", "add", "."], cwd=self.src)
-        subprocess.check_call(["git", "commit", "-q", "-m", "x"], cwd=self.src, env=env)
-        with open(up.ADDON_SRC, "w") as f:
-            f.write(self.src)
+        for path, text in ((up.ADDON_SRC, self.src), (up.UPDATE_ORIGIN, "https://github.com/someone/Fork.git\n"), (up.UPDATE_BRANCH, "feature/x\n")):
+            with open(path, "w") as f:
+                f.write(text)
         self._spawn = up._spawn
         self.spawned = []
         up._spawn = self.spawned.append
+        up._pending[0] = 0.0
 
     def tearDown(self):
         up._spawn = self._spawn
+        up._pending[0] = 0.0
         cleanup(self.tmp)
 
-    def test_source_comes_from_the_checkout(self):
+    def test_source_is_what_the_installer_recorded(self):
         self.assertEqual(up.source(), ("someone/Fork", "feature/x", self.src))
         self.assertTrue(up.can_update())
 
@@ -161,32 +159,24 @@ class UpdateRunTests(unittest.TestCase):
         self.assertFalse(started)
         self.assertEqual(self.spawned, [])
 
-    def test_start_runs_the_script_detached_with_the_remembered_ports(self):
-        with open(up.INSTALL_PORTS, "w") as f:
-            f.write("8080 0")
+    def test_start_asks_systemd_for_the_git_updater_and_says_running_at_once(self):
         started, message = up.start_update()
         self.assertTrue(started)
-        cmd = self.spawned[0]
-        script = cmd[-1]
-        self.assertIn("8080 --https-port=0", script)
-        self.assertIn("'feature/x'", script)
-        self.assertIn("merge --ff-only", script)
-        self.assertEqual(up.update_state(), "running")
+        self.assertEqual(self.spawned, ["git"])
+        self.assertEqual(up.update_state(), "running")           # before the updater has written its first line
         self.assertFalse(up.start_update()[0])                  # no second one while running
 
-    def test_script_rejects_unsafe_values(self):
-        for branch in ("main; rm -rf /", "a b", "$(x)", ""):
-            with self.assertRaises(ValueError):
-                up.update_script("/home/user/x", branch, 80, 443)
-        with self.assertRaises(ValueError):
-            up.update_script("/home/user/it's", "main", 80, 443)
-        with self.assertRaises(ValueError):
-            up.update_script("relative/path", "main", 80, 443)
+    def test_a_refused_start_is_reported_and_is_not_running(self):
+        up._spawn = lambda mode: False
+        started, message = up.start_update()
+        self.assertFalse(started)
+        self.assertIn("Could not start", message)
+        self.assertEqual(up.update_state(), "idle")
 
-    def test_script_is_valid_shell(self):
-        script = up.update_script(self.src, "main", 80, 443)
-        p = subprocess.run(["sh", "-n", "-c", script], stderr=subprocess.PIPE)
-        self.assertEqual(p.returncode, 0, p.stderr.decode())
+    def test_the_unit_and_the_script_it_runs(self):
+        self.assertEqual(up.UPDATE_UNIT % "git", "checkin-board-update@git.service")
+        self.assertTrue(os.access(up.UPDATER, os.X_OK))
+        self.assertEqual(subprocess.run(["sh", "-n", up.UPDATER]).returncode, 0)
 
     def test_finished_status_expires(self):
         with open(up.UPDATE_STATUS, "w") as f:
@@ -224,7 +214,7 @@ class LogTests(unittest.TestCase):
 
 
 class RealScriptTests(unittest.TestCase):
-    """Run the generated update script against a local 'origin' with a stub installer."""
+    """Run the root updater (update-run.sh git) against a local 'origin' with a stub installer."""
     def setUp(self):
         self.tmp = sandbox(up)
         self.env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
@@ -235,6 +225,9 @@ class RealScriptTests(unittest.TestCase):
             f.write('#!/bin/sh\necho "installer ran: $@" > "%s/installer.out"\n' % self.tmp)
         self.commit(self.origin, "one")
         self.git(["clone", "-q", self.origin, self.src], cwd=self.tmp)
+        for path, text in ((up.ADDON_SRC, self.src), (up.UPDATE_ORIGIN, self.origin + "\n"), (up.INSTALL_PORTS, "8080 0\n")):
+            with open(path, "w") as f:
+                f.write(text)
 
     def tearDown(self):
         cleanup(self.tmp)
@@ -249,8 +242,7 @@ class RealScriptTests(unittest.TestCase):
         self.git(["commit", "-q", "-m", msg], cwd=repo)
 
     def run_script(self):
-        script = up.update_script(self.src, "main", 8080, 0)
-        return subprocess.run(["sh", "-c", script], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        return run_updater(up, "git", origin_re="^/")           # the address here is a folder: only the test lets the updater take one
 
     def test_pulls_then_installs_with_the_ports(self):
         self.commit(self.origin, "two")
@@ -338,18 +330,6 @@ class UsbUpdateTests(unittest.TestCase):
         self.assertEqual([c["path"] for c in got], [new, old])                             # newest first, the link is not followed
         self.assertEqual(got[0]["drive"], "NEW")
 
-    def test_the_script_is_built_from_safe_values_only(self):
-        folder = self.stick("STICK")
-        script = up.usb_script(folder, 8080, 0, "USB update 2026-10-07 10:00")
-        for part in ("cp -r", "NS_KEEP_SRC=1", "NS_VERSION='USB update 2026-10-07 10:00'", "8080 --https-port=0", "usb_src"):
-            self.assertIn(part, script)
-        self.assertEqual(subprocess.run(["sh", "-n", "-c", script], stderr=subprocess.PIPE).returncode, 0)
-        for bad in ("/media/x/it's/update", "relative/update", "/media/x/../etc/update", "/media/$(x)/update"):
-            with self.assertRaises(ValueError):
-                up.usb_script(bad, 80, 443, "v")
-        with self.assertRaises(ValueError):
-            up.usb_script(folder, 80, 443, "v; rm -rf /")
-
     def test_start_needs_a_stick_and_runs_one_update_at_a_time(self):
         started, message = up.start_usb_update()
         self.assertFalse(started)
@@ -362,19 +342,31 @@ class UsbUpdateTests(unittest.TestCase):
         self.assertEqual(up.update_state(), "running")
         self.assertFalse(up.start_usb_update()[0])
 
-    def test_the_script_copies_the_folder_and_runs_its_installer(self):
+    def test_the_root_updater_copies_the_folder_and_runs_its_installer(self):
         folder = self.stick("STICK")
         with open(up.INSTALL_PORTS, "w") as f:
             f.write("8080 0")
-        started, _message = up.start_usb_update()
-        self.assertTrue(started)
-        done = subprocess.run(["sh", "-c", self.spawned[0][-1]], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        self.assertEqual(done.returncode, 0, done.stderr.decode())
+        done = run_updater(up, "usb", usb_root=self.media)
+        self.assertEqual(done.returncode, 0, done.stderr.decode() + (core.read_file(up.UPDATE_LOG) or ""))
         self.assertEqual(core.read_file(up.UPDATE_STATUS).strip(), "ok")
-        self.assertTrue(os.path.exists(os.path.join(core.BASE_DIR, "usb_src", "base", "base_web.py")))     # a copy in the data folder: the stick can be pulled out
+        self.assertTrue(os.path.exists(os.path.join(os.path.dirname(up.INSTALL_PORTS), "usb_src", "base", "base_web.py")))     # a copy in the install folder: the stick can be pulled out
         ran = open(os.path.join(self.tmp, "usb-installer.out")).read().strip()
         self.assertRegex(ran, r"^1\|USB update \d{4}-\d\d-\d\d \d\d:\d\d\|8080 --https-port=0$")
         self.assertTrue(os.path.exists(folder))                                                          # the stick's folder is left alone
+
+    def test_the_root_updater_takes_the_newest_stick_and_ignores_links_and_look_alikes(self):
+        self.stick("EMPTY", valid=False)
+        old, new = self.stick("OLD", age=86400), self.stick("NEW SPACE")
+        os.makedirs(os.path.join(self.media, "LINK"))
+        os.symlink(self.stick("ELSEWHERE", age=10), os.path.join(self.media, "LINK", "update"))
+        run_updater(up, "usb", usb_root=self.media)
+        self.assertEqual(core.read_file(up.UPDATE_STATUS).strip(), "ok")
+        self.assertIn("NEW SPACE", core.read_file(up.UPDATE_LOG))
+
+    def test_the_root_updater_without_a_stick_fails(self):
+        run_updater(up, "usb", usb_root=self.media)
+        self.assertEqual(core.read_file(up.UPDATE_STATUS).strip(), "failed")
+        self.assertIn("No USB stick", core.read_file(up.UPDATE_LOG))
 
     def test_the_page_shows_the_stick_only_while_nothing_runs(self):
         import rebootupdate_web as rw

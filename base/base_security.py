@@ -1,6 +1,6 @@
 # Base - who may talk to the web service, and the optional PIN.
-# The web service runs as root (a module can restart services, reboot the machine or run an updater), so
-# a request is checked before anything is done:
+# The web service runs as an ordinary user (it can only reboot the computer or start the root-owned updater through the narrow polkit rules the
+# installer adds), but it still decides who may do that, so a request is checked before anything is done:
 #   - Host header: refuse names that are not this computer's (DNS rebinding: a web page on the
 #     internet that points its own name at the computer's address and then talks to it from the browser);
 #   - Origin / Referer: a browser's POST from another site is refused (CSRF);
@@ -125,7 +125,7 @@ def set_pin(pin):
         raise ValueError("the PIN must be %d to %d characters" % (PIN_MIN, PIN_MAX))
     salt = os.urandom(16)
     line = "pbkdf2$%d$%s$%s\n" % (ITERATIONS, _hex(salt), _hex(_hash(pin, salt, ITERATIONS)))
-    fd = os.open(core.ADMIN_PIN + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    fd = os.open(core.ADMIN_PIN + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o640)   # install.sh gives the file to the service's group: the service reads it, nobody else
     with os.fdopen(fd, "w") as f:
         f.write(line)
     os.rename(core.ADMIN_PIN + ".tmp", core.ADMIN_PIN)

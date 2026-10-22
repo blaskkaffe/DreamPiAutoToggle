@@ -8,7 +8,7 @@ Read before adding, removing or restructuring a feature. Back to [CLAUDE.md](../
 
 The rules that keep it so:
 
-- **A module owns its code and its state files.** It defines its own path constants from `core.BASE_DIR` / `core.TMP_PREFIX` (never in `base_core.py`); `tests/support.py` imports every module file and `sandbox()` redirects all of those paths into a temp dir.
+- **A module owns its code and its state files.** It defines its own path constants from `core.BASE_DIR` (what the service writes: `/var/lib/checkin-board`), `core.INSTALL_DIR` (what only the installer writes and the service just reads: `/opt/checkin-board`) or `core.TMP_PREFIX` (never in `base_core.py`); a file the service must not be able to change (a PIN hash, the update source) is under `INSTALL_DIR`; `tests/support.py` imports every module file and `sandbox()` redirects all of those paths into a temp dir.
 - **Modules never import each other.** A module that needs another's state reads that module's **file** (its documented format) or asks `/api`: the check-in board reads `contacts.json` and the photos folder, the contacts module's files.
 - **What many modules fill together goes through the base**: `core.module_announcements(key)` (module.json lists), `modules.collect("about_rows")` (each module's `about_rows()` adds rows to the About table) and `core.service(name)` (a module's web entry lists `SERVICES = {"name": fn}`; the base calls it while the module is on).
 - **The base never imports module code** and never names a module.
@@ -35,7 +35,7 @@ There is no service besides the web service; a module that needs one writes its 
 | `rebootupdate` (Reboot and Update) | yes | Settings: the Updates rows (check, Update now, log) and the Reboot row, all in System; `GET /update`, `POST /update/check`, `/update/start`, `/reboot` | on |
 
 A module is **installed** when its folder (with a `module.json`) is there, and **enabled** when the picker has it on (`modules.json` in
-`/opt/checkin-board`: `{"snow": true, ...}`; a module without an entry uses `enabled` from its manifest; a module that is not
+`/var/lib/checkin-board`: `{"snow": true, ...}`; a module without an entry uses `enabled` from its manifest; a module that is not
 visible in the picker is always on). Not installed or not enabled = absent: no layout, no endpoints (404), no service work.
 `core.module_manifest()`, `module_names()`, `module_enabled()`, `module_visible()`, `save_module_enabled()` are the one place that knows.
 
@@ -49,7 +49,8 @@ modules/<name>/
   page.js          optional: custom widgets, hooks, a background (runs in the page's script after the base scripts)
   page.css         optional: only for what the page kit has nothing for (see the kit rules below)
   *.html           optional: markup of a custom widget (layout.json: "html_file")
-  install.sh       optional, sourced by install.sh (sees $DEST $SRC, ns_module_enable)
+  install.sh       optional, sourced by install.sh as root (sees $DEST $SRC $RUN_USER, ns_module_enable); the web service is NOT root, so a module that needs
+                   a root action writes a root-owned unit + a polkit rule for it here (see modules/rebootupdate/) instead of asking for root
   remove.sh        optional, sourced when the folder is gone from the repo, and by uninstall.sh
 ```
 

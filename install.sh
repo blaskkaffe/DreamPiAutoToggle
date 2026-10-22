@@ -11,6 +11,9 @@
 #   sudo ./install.sh --hostname=checkinchicken   give the computer that name, so the board is at http://checkinchicken.local
 #                                  (the address the kiosk screens use when they are not told another one; needs avahi-daemon for the .local name)
 #   sudo ./install.sh --allow-sleep  do not stop the computer from sleeping (by default the host never sleeps, see below)
+#   sudo ./install.sh --user=NAME  run the web service as this user (default: checkin, a system user that is made for it). The service is never root:
+#                                  it gets the right to open port 80 / 443 and to ask systemd for three things (update, update from USB,
+#                                  reboot), see docs/web.md. An existing user may be named; its state folder is /var/lib/checkin-board.
 #   sudo ./install.sh --pin        ask for a PIN that the page then wants before it updates, restarts
 #                                  the computer or imports contacts (--pin=1234 gives it on the command line,
 #                                  which shows in the shell history); --no-pin removes it. It is kept
@@ -19,7 +22,10 @@
 # One computer runs this (the host); every other screen opens its address in a browser, in kiosk mode if you like
 # (kiosk/kiosk-browser.sh). Everything the screens show is kept by the host, so they are all in step.
 set -e
-DEST=/opt/checkin-board
+DEST=/opt/checkin-board         # the code and what only the installer writes: owned by root, the service only reads it (project.json "install_dir")
+DATA=/var/lib/checkin-board     # everything the service writes: owned by the service's user (project.json "data_dir")
+RUN_USER=checkin
+umask 022                       # what is copied to $DEST must be readable by the service whatever the shell's umask is
 SRC="$(cd "$(dirname "$0")" && pwd)"
 PORT=80
 HTTPS_PORT=443
@@ -29,6 +35,7 @@ if [ -f "$DEST/install_ports" ]; then
     case "$OLD_PORT" in ''|*[!0-9]*) ;; *) PORT=$OLD_PORT ;; esac
     case "$OLD_HTTPS" in ''|*[!0-9]*) ;; *) HTTPS_PORT=$OLD_HTTPS ;; esac
 fi
+if [ -f "$DEST/run_user" ]; then read -r OLD_USER < "$DEST/run_user" || true; [ -z "$OLD_USER" ] || RUN_USER=$OLD_USER; fi      # an update keeps the user
 PIN=keep
 NEW_HOSTNAME=""
 ALLOW_SLEEP=0
@@ -39,6 +46,7 @@ for arg in "$@"; do
                   if [ "${#PIN}" -lt 4 ] || [ "${#PIN}" -gt 64 ]; then echo "The PIN must be 4 to 64 characters"; exit 1; fi ;;
         --no-pin) PIN=off ;;
         --allow-sleep) ALLOW_SLEEP=1 ;;
+        --user=*) RUN_USER="${arg#--user=}" ;;
         --https-port=*) HTTPS_PORT="${arg#--https-port=}" ;;
         --no-https) HTTPS_PORT=0 ;;
         --hostname=*) NEW_HOSTNAME="${arg#--hostname=}"
@@ -49,6 +57,7 @@ for arg in "$@"; do
 done
 
 if [ "$(id -u)" != "0" ]; then echo "Run with sudo: sudo ./install.sh [port] [--https-port=N|--no-https]"; exit 1; fi
+case "$RUN_USER" in ''|-*|root|*[!a-z0-9_-]*) echo "The service must run as an ordinary user (letters, digits, - and _; not root): --user=$RUN_USER"; exit 1 ;; esac
 
 if [ -n "$NEW_HOSTNAME" ] && [ "$(hostname)" != "$NEW_HOSTNAME" ]; then
     if command -v hostnamectl >/dev/null 2>&1; then hostnamectl set-hostname "$NEW_HOSTNAME"; else echo "$NEW_HOSTNAME" > /etc/hostname; hostname "$NEW_HOSTNAME"; fi
@@ -57,15 +66,34 @@ if [ -n "$NEW_HOSTNAME" ] && [ "$(hostname)" != "$NEW_HOSTNAME" ]; then
     echo "The computer is now called $NEW_HOSTNAME (http://$NEW_HOSTNAME.local with avahi-daemon running)"
 fi
 
-mkdir -p "$DEST"
-chmod 755 "$DEST"   # the code in here runs as root: nobody else may be able to change it
+# The user the web service runs as, and its folder. An existing user is used as it is; a new one has no login and no shell.
+MADE_USER=
+if ! id "$RUN_USER" >/dev/null 2>&1; then
+    useradd --system --user-group --no-create-home --home-dir "$DATA" --shell /usr/sbin/nologin "$RUN_USER" 2>/dev/null \
+        || useradd -r -M -d "$DATA" -s /bin/false "$RUN_USER" \
+        || { echo "Could not make the user $RUN_USER"; exit 1; }
+    MADE_USER=1
+    echo "Made the user $RUN_USER for the web service"
+fi
+RUN_GROUP=$(id -gn "$RUN_USER")
+mkdir -p "$DEST" "$DATA"
+chown root:root "$DEST"; chmod 755 "$DEST"   # the code: nobody but root may change it, the service only reads it
+echo "$RUN_USER" > "$DEST/run_user"
+[ -z "$MADE_USER" ] || echo "$RUN_USER" > "$DEST/user_created"      # so that uninstall.sh removes it again (a user that was there before is left alone)
+
+# An install from before the service was a user kept its state next to the code: move it to its own folder (nothing is overwritten).
+for ns_name in contacts.json checkin.json modules.json module_order.json colours.json tints.json palette.json palette_custom.json time_zone language \
+               photos screen.json tile_layout.json screens sounds snow.json settings_pin background_image imagebg.json allowed_hosts https.crt https.key debug; do
+    if [ -e "$DEST/$ns_name" ] && [ ! -e "$DATA/$ns_name" ]; then mv "$DEST/$ns_name" "$DATA/$ns_name"; fi
+done
+rm -rf "$DEST/usb_src"
 cp "$SRC"/base/base_*.py "$SRC"/base/lang_*.json "$SRC/base/layout.json" "$SRC/project.json" "$SRC/uninstall.sh" "$SRC/diagnose-network.sh" "$DEST/"
 rm -f "$DEST/wifi-powersave-off.sh"      # an older install had a Wi-Fi script here
 mkdir -p "$DEST/page" "$DEST/kiosk"
 cp "$SRC"/base/page/index.html "$SRC"/base/page/page.css "$SRC"/base/page/page.js "$SRC"/base/page/widgets.js "$SRC"/base/page/boot.js "$DEST/page/"
 cp "$SRC"/kiosk/* "$DEST/kiosk/"
 chmod +x "$DEST/kiosk/kiosk-browser.sh"
-mkdir -p "$DEST/sounds"; cp "$SRC"/base/sounds/* "$DEST/sounds/"      # the button sounds (copy more .wav / .mp3 / .ogg files in by hand: Settings > Appearance > Button sound lists them)
+mkdir -p "$DATA/sounds"; cp "$SRC"/base/sounds/* "$DATA/sounds/"      # the button sounds (copy more .wav / .mp3 / .ogg files in by hand: Settings > Appearance > Button sound lists them)
 
 # >>> sync_modules
 # The optional features: every folder in modules/ is copied to $DEST/modules/. A folder that was installed before but
@@ -118,6 +146,7 @@ echo "$PORT $HTTPS_PORT" > "$DEST/install_ports"
 # "Update now" only pulls from the address the checkout had when it was installed
 if [ -z "$NS_KEEP_SRC" ] && command -v git >/dev/null 2>&1; then
     git -c safe.directory="$SRC" -C "$SRC" config --get remote.origin.url > "$DEST/update_origin" 2>/dev/null || rm -f "$DEST/update_origin"
+    git -c safe.directory="$SRC" -C "$SRC" rev-parse --abbrev-ref HEAD > "$DEST/update_branch" 2>/dev/null || rm -f "$DEST/update_branch"
 fi
 
 # Optional PIN for update / restart on the page (stored as a salted hash)
@@ -132,18 +161,18 @@ fi
 case "$PIN" in
     keep) ;;
     off) (cd "$DEST" && python3 base_security.py clear) && echo "PIN removed" ;;
-    *) (cd "$DEST" && NS_PIN="$PIN" python3 base_security.py set) && echo "PIN set: the page asks for it before an update or restart" ;;
+    *) (cd "$DEST" && NS_PIN="$PIN" python3 base_security.py set && chgrp "$RUN_GROUP" "$DEST/admin_pin" && chmod 640 "$DEST/admin_pin") && echo "PIN set: the page asks for it before an update or restart" ;;
 esac
 PIN=
 
 # Self-signed certificate for the HTTPS page. Kept on updates, renewed when it
 # expires within 30 days. 820 days: Apple devices refuse certificates valid
 # for more than 825 days.
-if [ -f "$DEST/https.crt" ] && command -v openssl >/dev/null 2>&1 \
-        && ! openssl x509 -checkend 2592000 -noout -in "$DEST/https.crt" >/dev/null 2>&1; then
-    rm -f "$DEST/https.crt" "$DEST/https.key"
+if [ -f "$DATA/https.crt" ] && command -v openssl >/dev/null 2>&1 \
+        && ! openssl x509 -checkend 2592000 -noout -in "$DATA/https.crt" >/dev/null 2>&1; then
+    rm -f "$DATA/https.crt" "$DATA/https.key"
 fi
-if [ "$HTTPS_PORT" != 0 ] && [ ! -f "$DEST/https.crt" ]; then
+if [ "$HTTPS_PORT" != 0 ] && [ ! -f "$DATA/https.crt" ]; then
     if command -v openssl >/dev/null 2>&1; then
         HOST=$(hostname)
         SAN="DNS:$HOST.local,DNS:$HOST,DNS:localhost,IP:127.0.0.1"
@@ -153,11 +182,11 @@ if [ "$HTTPS_PORT" != 0 ] && [ ! -f "$DEST/https.crt" ]; then
         CNF=$(mktemp)
         printf '[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=%s.local\nO=Check-in\n[ext]\nsubjectAltName=%s\nbasicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n' "$HOST" "$SAN" > "$CNF"
         if openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 820 \
-                -keyout "$DEST/https.key" -out "$DEST/https.crt" -config "$CNF" >/dev/null 2>&1; then
-            chmod 600 "$DEST/https.key"
+                -keyout "$DATA/https.key" -out "$DATA/https.crt" -config "$CNF" >/dev/null 2>&1; then
+            chmod 600 "$DATA/https.key"
             echo "Created a self-signed HTTPS certificate"
         else
-            rm -f "$DEST/https.key" "$DEST/https.crt"
+            rm -f "$DATA/https.key" "$DATA/https.crt"
             echo "Could not create an HTTPS certificate, the page stays HTTP only"
         fi
         rm -f "$CNF"
@@ -175,16 +204,31 @@ After=network.target
 StartLimitIntervalSec=0
 
 [Service]
+User=$RUN_USER
+Group=$RUN_GROUP
 ExecStart=$WEBPY $DEST/base_web.py $PORT $HTTPS_PORT
 Restart=always
 RestartSec=3
-Nice=-5
-# The page runs as root, so it is fenced in: no setuid tricks, no writes to /usr, /boot or /etc,
-# no cgroup or kernel-module changes. (The update runs in its own transient unit, see modules/rebootupdate/rebootupdate_update.py.)
+Environment=PYTHONDONTWRITEBYTECODE=1
+# Not root. The one privilege it keeps is opening port 80 / 443; update and reboot are asked of systemd (polkit rule, modules/rebootupdate/install.sh).
+RuntimeDirectory=checkin-board
+RuntimeDirectoryMode=0755
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 NoNewPrivileges=yes
-ProtectSystem=full
-ProtectControlGroups=yes
+# It can write in its own folder and nowhere else; /home and /tmp are not there for it, the code in $DEST is read-only.
+ProtectSystem=strict
+ReadWritePaths=$DATA
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
 ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+LockPersonality=yes
+UMask=0027
 
 [Install]
 WantedBy=multi-user.target
@@ -223,6 +267,18 @@ for ns_dir in "$DEST"/modules/*/; do
     [ -f "$ns_dir/install.sh" ] && . "$ns_dir/install.sh"
 done
 
+# Ownership: the code is root's (the service can not change what it runs); the state folder is the service's. The key of the HTTPS certificate is
+# readable by the service only. (Everything above that wrote into $DATA ran as root.)
+chown -R root:root "$DEST"
+chmod -R go-w "$DEST"
+find "$DEST" -type d -exec chmod 755 {} +
+find "$DEST" -type f -exec chmod go+r {} +
+python3 -m compileall -q "$DEST" >/dev/null 2>&1 || true      # the service can not write the compiled files itself
+chown -R "$RUN_USER:$RUN_GROUP" "$DATA"
+chmod 750 "$DATA"
+[ ! -f "$DATA/https.key" ] || chmod 600 "$DATA/https.key"
+[ ! -f "$DEST/admin_pin" ] || { chgrp "$RUN_GROUP" "$DEST/admin_pin"; chmod 640 "$DEST/admin_pin"; }
+
 systemctl daemon-reload
 systemctl enable checkin-board.service >/dev/null 2>&1
 systemctl restart checkin-board.service
@@ -233,8 +289,9 @@ done
 
 echo
 echo "Installed. Open http://$(hostname).local$( [ "$PORT" = 80 ] || echo ":$PORT" )"
-if [ "$HTTPS_PORT" != 0 ] && [ -f "$DEST/https.crt" ]; then
+if [ "$HTTPS_PORT" != 0 ] && [ -f "$DATA/https.crt" ]; then
     echo "      or https://$(hostname).local$( [ "$HTTPS_PORT" = 443 ] || echo ":$HTTPS_PORT" )  (accept the certificate warning once)"
 fi
+echo "The web service runs as the user $RUN_USER (not root); its state is in $DATA."
 echo "Import the people in Settings > Contacts. Other screens: open the same address (see kiosk/kiosk-browser.sh)."
 echo "Uninstall any time with: sudo $DEST/uninstall.sh"

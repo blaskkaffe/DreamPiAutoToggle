@@ -1,6 +1,6 @@
 """Shared helpers for the tests: import the add-on modules from the repo root
 and point every file path they use at a throw-away directory, so tests never
-touch /opt/checkin-board or /tmp/checkin-board.*."""
+touch /opt/checkin-board, /var/lib/checkin-board or /run/checkin-board*."""
 import os
 import shutil
 import sys
@@ -36,11 +36,12 @@ for _name in sorted(os.listdir(_MODULES)):
             except Exception as _e:        # a file that needs hardware or a library only
                 sys.stderr.write("tests/support.py: %s not imported: %s\n" % (_f, _e))
 
-__all__ = ['ROOT', 'core', 'web', 'sandbox', 'cleanup']
+__all__ = ['ROOT', 'core', 'web', 'sandbox', 'cleanup', 'run_updater']
 
 
 _ORIGINAL = {}   # module -> {name: original string value}, taken the first time a module is sandboxed
 ORIGINAL_BASE = core.BASE_DIR
+ORIGINAL_INSTALL = core.INSTALL_DIR
 
 
 def sandbox(*modules):
@@ -58,8 +59,15 @@ def sandbox(*modules):
         for name, val in _ORIGINAL[mod].items():
             if val.startswith(base + "/") or val == base:
                 setattr(mod, name, tmp + val[len(base):])
-            elif val.startswith("/tmp/checkin-board"):
-                setattr(mod, name, os.path.join(tmp, os.path.basename(val)))
+            elif val.startswith(ORIGINAL_INSTALL + "/") or val == ORIGINAL_INSTALL:      # the installer's files (version, PIN hash, update source) have a folder of their own
+                setattr(mod, name, tmp + "/install" + val[len(ORIGINAL_INSTALL):])
+            elif val.startswith("/run/checkin-board"):      # the service's run folder and the updater's
+                setattr(mod, name, tmp + val[len("/run"):])
+    for mod in _ALL:
+        if hasattr(mod, "reset_for_tests"):      # in-memory state of a module that must not leak from one test into the next
+            mod.reset_for_tests()
+    for d in ("/install", "/checkin-board", "/checkin-board-update"):
+        os.makedirs(tmp + d)
     with open(core.LANGUAGE, "w") as f:           # the tests read English texts (a new install is Swedish: project.json); a test of Swedish chooses it itself
         f.write("en\n")
     return tmp
@@ -67,3 +75,15 @@ def sandbox(*modules):
 
 def cleanup(tmp):
     shutil.rmtree(tmp, ignore_errors=True)
+
+
+def run_updater(up, mode, usb_root=None, origin_re=None):
+    """Run modules/rebootupdate/update-run.sh (the root-owned updater) against the sandbox: its install folder, its run folder, a fake USB root."""
+    env = dict(os.environ, CHECKIN_INSTALL_DIR=os.path.dirname(up.ADDON_SRC), CHECKIN_UPDATE_DIR=up.UPDATE_DIR)
+    if usb_root:
+        env["CHECKIN_USB_ROOT"] = usb_root
+    if origin_re:
+        env["CHECKIN_ORIGIN_RE"] = origin_re
+        env["CHECKIN_GIT_PROTOCOLS"] = "file:https:ssh"
+    import subprocess
+    return subprocess.run(["sh", up.UPDATER, mode], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

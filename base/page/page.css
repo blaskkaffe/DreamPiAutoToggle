@@ -202,6 +202,7 @@
  .rp-io{flex:none;min-width:5.2em;min-height:calc(34px * var(--z,1));padding:0 14px;border-radius:var(--r-io);font-weight:700;font-size:var(--fs-md);letter-spacing:.04em}   /* INNE (green) / UTE (red) */
  /* the building buttons: the top row, at the left of the title, as tall as the cogwheel */
  header > .rp-chips.in-header{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:2;margin:0;flex-wrap:nowrap;max-width:calc(50% - 84px);overflow:hidden;gap:6px}
+ .rp-typed{position:fixed;z-index:60;top:12px;right:12px;padding:8px 16px;background:var(--pop);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl);font-size:1.6em;font-variant-numeric:tabular-nums;color:var(--text-1)} .rp-typed.bad{font-size:1em} .rp-num{opacity:.7;font-variant-numeric:tabular-nums}
  .rp-chipmenu{position:fixed;z-index:25;display:flex;flex-direction:column;gap:6px;padding:10px;background:var(--pop);border:var(--bw) solid var(--ctl-line);border-radius:var(--r-ctl);box-shadow:0 6px 24px rgba(0,0,0,.4)} .rp-chipmenu .pill-s{justify-content:center} header > .rp-chips.in-header .pill-s{flex:none;min-height:40px;padding:0 12px;font-size:var(--fs-sm)}
  /* the box frame and colour (the check-in settings): the frame is none / thin / thick; "the board colour" gives the frame and the title row the board colour of Appearance */
  .rp-box[data-frame=none]{border-width:0} .rp-box[data-frame=thick]{border-width:4px}

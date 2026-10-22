@@ -31,7 +31,7 @@
     {
      "type": "text",
      "muted": true,
-     "text": "Columns: name, department, role, phone, location, restrictToLocation. A line that starts with # is ignored. Location is the building or area."
+     "text": "Columns: name, department, role, phone, location, restrictToLocation, code. A line that starts with # is ignored. Location is the building or area. Code is the 3-digit number for the number pad on the board (optional, one per person)."
     }
    ]
   }

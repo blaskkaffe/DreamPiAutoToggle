@@ -7,7 +7,7 @@ import threading
 import time
 import unittest
 
-from support import sandbox, cleanup, core, web
+from support import sandbox, cleanup, core, web, run_updater
 import rebootupdate_web as ru
 import base_security as sec
 import rebootupdate_update as up
@@ -63,7 +63,7 @@ class PinTests(unittest.TestCase):
         self.assertTrue(sec.pin_required())
         text = open(core.ADMIN_PIN).read()
         self.assertNotIn("4821", text)                     # only a salted hash is stored
-        self.assertEqual(oct(os.stat(core.ADMIN_PIN).st_mode & 0o777), "0o600")
+        self.assertEqual(oct(os.stat(core.ADMIN_PIN).st_mode & 0o777), "0o640")      # the service reads it through its group (install.sh)
         self.assertTrue(sec.check_pin("4821")[0])
         self.assertFalse(sec.check_pin("4822")[0])
         self.assertFalse(sec.check_pin("")[0])
@@ -233,17 +233,21 @@ class HttpSecurityTests(unittest.TestCase):
 
 
 class UpdateOriginTests(unittest.TestCase):
+    """The page (an ordinary user) only asks for an update; the root updater checks the checkout and its origin against what install.sh recorded."""
+    URL = "https://github.com/blaskkaffe/CheckinChicken.git"
+
     def setUp(self):
         self.tmp = sandbox(up)
         self.src = os.path.join(self.tmp, "checkout")
         os.mkdir(self.src)
-        env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+        self.env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
         subprocess.check_call(["git", "init", "-q", "-b", "main"], cwd=self.src)
-        subprocess.check_call(["git", "remote", "add", "origin", "https://github.com/blaskkaffe/DreamPiAutoToggle.git"], cwd=self.src)
-        open(os.path.join(self.src, "install.sh"), "w").write("#!/bin/sh\n")
+        subprocess.check_call(["git", "remote", "add", "origin", self.URL], cwd=self.src)
+        open(os.path.join(self.src, "install.sh"), "w").write("#!/bin/sh\necho ran > \"%s/installer.out\"\n" % self.tmp)
         subprocess.check_call(["git", "add", "."], cwd=self.src)
-        subprocess.check_call(["git", "commit", "-q", "-m", "x"], cwd=self.src, env=env)
+        subprocess.check_call(["git", "commit", "-q", "-m", "x"], cwd=self.src, env=self.env)
         open(up.ADDON_SRC, "w").write(self.src)
+        open(up.UPDATE_ORIGIN, "w").write(self.URL + "\n")
         self._spawn, self.spawned = up._spawn, []
         up._spawn = self.spawned.append
 
@@ -251,54 +255,53 @@ class UpdateOriginTests(unittest.TestCase):
         up._spawn = self._spawn
         cleanup(self.tmp)
 
-    def set_origin(self, url):
-        subprocess.check_call(["git", "remote", "set-url", "origin", url], cwd=self.src)
-
-    def test_github_origin_is_fine_and_is_the_fetch_address(self):
+    def test_github_origin_is_fine_and_starts_the_git_updater(self):
         self.assertIsNone(up.origin_problem())
         self.assertTrue(up.start_update()[0])
-        script = self.spawned[0][-1]
-        self.assertIn("U='https://github.com/blaskkaffe/DreamPiAutoToggle.git'", script)
-        self.assertIn("GIT_ALLOW_PROTOCOL=https:ssh", script)
-        self.assertIn("fetch \"$U\"", script)
+        self.assertEqual(self.spawned, ["git"])          # the page names no folder, branch or address: the root updater reads those itself
 
-    def test_other_origins_are_refused(self):
+    def test_other_recorded_origins_are_refused(self):
         for url in ("https://evil.example.com/x/y.git", "/tmp/local", "ext::sh -c id", "https://github.com.evil.com/x/y",
                     "file:///etc", "https://github.com/x/y z"):
-            self.set_origin(url)
+            open(up.UPDATE_ORIGIN, "w").write(url + "\n")
             started, message = up.start_update()
             self.assertFalse(started, url)
             self.assertIn("Update refused", message)
         self.assertEqual(self.spawned, [])
 
-    def test_origin_must_match_what_was_installed(self):
-        open(up.UPDATE_ORIGIN, "w").write("https://github.com/blaskkaffe/DreamPiAutoToggle.git\n")
-        self.assertIsNone(up.origin_problem())
-        self.set_origin("https://github.com/someone-else/Fork.git")
-        self.assertIn("changed", up.origin_problem())
+    def test_no_recorded_origin_means_no_self_update(self):
+        os.remove(up.UPDATE_ORIGIN)
+        self.assertFalse(up.can_update())
         self.assertFalse(up.start_update()[0])
 
     def test_ssh_github_origin_is_fine(self):
-        self.set_origin("git@github.com:blaskkaffe/DreamPiAutoToggle.git")
+        open(up.UPDATE_ORIGIN, "w").write("git@github.com:blaskkaffe/CheckinChicken.git\n")
         self.assertIsNone(up.origin_problem())
 
-    def test_branch_cannot_look_like_an_option(self):
-        for branch in ("-x", "--upload-pack=sh", "a/../b", "a/"):
-            with self.assertRaises(ValueError):
-                up.update_script("/home/user/x", branch, 80, 443)
+    def test_the_root_updater_refuses_an_origin_that_changed_since_the_install(self):
+        subprocess.check_call(["git", "remote", "set-url", "origin", "https://github.com/someone-else/Fork.git"], cwd=self.src)
+        run_updater(up, "git")
+        self.assertEqual(core.read_file(up.UPDATE_STATUS).strip(), "failed")
+        self.assertIn("changed", core.read_file(up.UPDATE_LOG))
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "installer.out")))
 
-    def test_script_with_url_is_valid_shell(self):
-        script = up.update_script(self.src, "main", 80, 443, "https://github.com/a/b.git")
-        self.assertEqual(subprocess.run(["sh", "-n", "-c", script]).returncode, 0)
-        with self.assertRaises(ValueError):
-            up.update_script(self.src, "main", 80, 443, "https://evil.com/a/b")
+    def test_the_root_updater_refuses_a_recorded_address_that_is_not_github(self):
+        open(up.UPDATE_ORIGIN, "w").write("https://evil.example.com/a/b\n")
+        run_updater(up, "git")
+        self.assertEqual(core.read_file(up.UPDATE_STATUS).strip(), "failed")
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "installer.out")))
 
-    def test_status_file_is_not_written_through_a_link(self):
+    def test_the_root_updater_knows_only_git_and_usb(self):
+        for mode in ("", "git; id", "--help", "../x"):
+            run_updater(up, mode)
+            self.assertEqual(core.read_file(up.UPDATE_STATUS).strip(), "failed", mode)
+
+    def test_the_status_file_is_not_written_through_a_link(self):
         target = os.path.join(self.tmp, "victim")
         os.symlink(target, up.UPDATE_STATUS)
-        up._write_status("running")
+        run_updater(up, "git")
         self.assertFalse(os.path.exists(target))
-        self.assertEqual(open(up.UPDATE_STATUS).read(), "running")
+        self.assertEqual(core.read_file(up.UPDATE_STATUS).strip(), "failed")
 
 
 if __name__ == "__main__":

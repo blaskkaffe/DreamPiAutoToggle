@@ -15,10 +15,10 @@ custom("contacts-import",function(host){
 // "on the board", built from the data source /contacts). A tap on a person (not on the handle or the switch) opens a pop-up to edit the person: name, department, role, phone, building (POST /contacts/person).
 custom("contacts-people",function(host){var key="",box=host.querySelector(".cpeople"),modal=h("div",{"class":"rp-modal keep-visible",style:"display:none"}),list0=[];
  document.body.appendChild(modal);
- var FIELDS=[["name","Name","text"],["department","Department","text"],["role","Role","text"],["phone","Phone","tel"],["location","Building","text"]];
+ var FIELDS=[["name","Name","text"],["department","Department","text"],["role","Role","text"],["phone","Phone","tel"],["location","Building","text"],["code","Number (3 digits, for the number pad)","text"]];
  function close(){modal.style.display="none";modal.innerHTML=""}
  // a new person: the same pop-up with empty fields, no photo (it needs the person to exist first) and no Delete (POST /contacts/add)
- function add(){edit({id:"",title:"",name:"",department:"",role:"",phone:"",location:"",restrict:false,photo:"",isNew:true})}
+ function add(){edit({id:"",title:"",name:"",department:"",role:"",phone:"",location:"",code:"",restrict:false,photo:"",isNew:true})}
  function edit(p){modal.innerHTML='<div class="rp-sheet rp-need2" role="dialog" aria-modal="true" aria-label="'+(p.isNew?"New person":"Edit "+esc(p.title))+'"><button type="button" class="rp-x" data-close="1" title="Close" aria-label="Close">&#10005;</button>'+
   
   '<div class="rp-who"><span class="cphoto">'+rosterAvatar({name:p.name,photo:p.photo},"rp-avb")+'</span><div class="rp-wt"><div class="rp-wn">'+(p.isNew?"New person":esc(p.title))+'</div>'+
